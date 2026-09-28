@@ -1,0 +1,345 @@
+/* ===========================================================
+   ایران رانرز — مربی خودت باش (MVP)
+   توکن‌ها هماهنگ با iranrunners.com
+   =========================================================== */
+:root {
+  --red: #e8121a;
+  --red-dim: #b80e14;
+  --red-soft: #fdecec;
+  --black: #111111;
+  --bg: #ffffff;
+  --panel: #f6f6f6;
+  --panel-raised: #eeeeee;
+  --text: #111111;
+  --muted: #555555;
+  --faint: #8a8a8a;
+  --line: rgba(17, 17, 17, 0.1);
+  --radius: 18px;
+  --shadow: 0 20px 50px -30px rgba(0, 0, 0, 0.18);
+
+  --c-easy: #1d8a4e;
+  --c-easy-bg: #e7f5ec;
+  --c-tempo: #c66a00;
+  --c-tempo-bg: #fff1e0;
+  --c-interval: #e8121a;
+  --c-interval-bg: #fdecec;
+  --c-long: #111111;
+  --c-long-bg: #ececec;
+  --c-rest: #6b6b6b;
+  --c-rest-bg: #f3f3f3;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Vazirmatn", "Tahoma", sans-serif;
+  direction: rtl;
+  line-height: 1.8;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+body.modal-open { overflow: hidden; }
+a { color: var(--red); }
+h1, h2, h3 { line-height: 1.4; margin: 0 0 0.5em; font-weight: 800; }
+h1 { font-size: 1.55rem; }
+h2 { font-size: 1.2rem; }
+h3 { font-size: 1.05rem; }
+p { margin: 0 0 0.8em; }
+.muted { color: var(--muted); }
+.small { font-size: 0.87rem; }
+.eyebrow { color: var(--red); font-weight: 700; font-size: 0.85rem; margin-bottom: 0.25em; }
+[hidden] { display: none !important; }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+@media (min-width: 720px) { .wrap { padding: 0 28px; } }
+
+/* ---------- هدر ---------- */
+.site-header {
+  background: var(--black);
+  color: #fff;
+  position: sticky; top: 0; z-index: 20;
+  border-bottom: 3px solid var(--red);
+}
+.header-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 10px; padding-bottom: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; }
+.brand-mark {
+  width: 40px; height: 40px; border-radius: 10px; background: var(--red);
+  display: grid; place-items: center; font-weight: 900; font-size: 0.95rem; letter-spacing: 0.02em;
+}
+.brand-text { display: flex; flex-direction: column; line-height: 1.3; }
+.brand-text b { font-size: 1.05rem; }
+.brand-text small { color: #bdbdbd; font-size: 0.78rem; }
+.main-nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.main-nav a {
+  color: #e6e6e6; text-decoration: none; padding: 6px 12px; border-radius: 999px;
+  font-weight: 500; font-size: 0.92rem;
+}
+.main-nav a:hover { background: rgba(255, 255, 255, 0.1); }
+.main-nav a[aria-current="page"] { background: var(--red); color: #fff; }
+@media (max-width: 719px) {
+  .main-nav { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .main-nav a { white-space: nowrap; font-size: 0.86rem; padding: 5px 10px; }
+}
+
+/* ---------- بنر پزشکی (همیشگی و برجسته) ---------- */
+.medical-banner {
+  display: flex; gap: 14px; align-items: center;
+  margin: 18px 0;
+  padding: 16px 18px;
+  background: var(--red-soft);
+  border: 2px solid var(--red);
+  border-inline-start-width: 8px;
+  border-radius: 14px;
+  color: #5a0003;
+  font-size: 1rem;
+}
+.medical-banner p { margin: 0; }
+.medical-banner strong { color: var(--red-dim); }
+.medical-icon {
+  flex: 0 0 auto; width: 48px; height: 48px; border-radius: 50%;
+  background: var(--red); color: #fff; display: grid; place-items: center;
+}
+@media (max-width: 519px) {
+  .medical-banner { font-size: 0.93rem; padding: 12px 14px; }
+  .medical-icon { width: 38px; height: 38px; }
+  .medical-icon svg { width: 22px; height: 22px; }
+}
+
+main { outline: none; }
+.site-footer { color: var(--faint); font-size: 0.82rem; padding: 28px 0 40px; text-align: center; }
+
+/* ---------- کارت‌ها ---------- */
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-bottom: 18px;
+}
+@media (min-width: 720px) { .card { padding: 26px 28px; } }
+
+/* ---------- دکمه‌ها ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font: inherit; font-weight: 700; font-size: 0.95rem;
+  padding: 10px 20px; border-radius: 999px; border: 2px solid transparent;
+  cursor: pointer; text-decoration: none; line-height: 1.5; min-height: 44px;
+}
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--red); color: #fff; }
+.btn-primary:hover { background: var(--red-dim); }
+.btn-outline { background: #fff; color: var(--black); border-color: var(--black); }
+.btn-outline:hover { background: var(--black); color: #fff; }
+.btn-ghost { background: transparent; color: var(--muted); }
+.btn-ghost:hover { background: var(--panel); }
+.btn-danger { background: var(--red); color: #fff; width: 100%; }
+.btn-danger:not(:disabled):hover { background: var(--red-dim); }
+.btn-done { background: var(--c-easy); color: #fff; }
+.btn-icon { width: 44px; height: 44px; padding: 0; font-size: 1.6rem; background: var(--panel); color: var(--black); }
+.btn-icon:hover:not(:disabled) { background: var(--panel-raised); }
+.danger-text { color: var(--red-dim); }
+.linklike { font: inherit; background: none; border: 0; color: var(--red); cursor: pointer; padding: 0; text-decoration: underline; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+
+/* ---------- فرم‌ها ---------- */
+fieldset { border: 0; border-top: 1px solid var(--line); padding: 18px 0 6px; margin: 0; }
+legend { font-weight: 800; font-size: 1.05rem; padding: 0; margin-bottom: 10px; float: right; width: 100%; }
+legend + * { clear: both; }
+.sub-legend { font-weight: 700; margin: 14px 0 6px; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.field label { font-weight: 500; font-size: 0.92rem; }
+input[type=number], input[type=date], input:not([type]), select, textarea {
+  font: inherit; font-size: 1rem;
+  padding: 10px 12px; border: 1.5px solid #cfcfcf; border-radius: 10px; background: #fff; color: var(--text);
+  width: 100%; min-height: 44px;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--black); outline: none; box-shadow: 0 0 0 3px rgba(232, 18, 26, 0.18); }
+textarea { resize: vertical; }
+.row2, .row3 { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 560px) { .row2 { grid-template-columns: 1fr 1fr; } .row3 { grid-template-columns: repeat(3, 1fr); } }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.chip { position: relative; cursor: pointer; }
+.chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.chip span {
+  display: inline-block; padding: 8px 16px; border-radius: 999px; border: 1.5px solid #cfcfcf;
+  font-weight: 500; background: #fff; min-height: 44px; line-height: 1.7;
+}
+.chip input:checked + span { background: var(--black); color: #fff; border-color: var(--black); }
+.chip-danger input:checked + span { background: var(--red); border-color: var(--red); }
+.chip input:focus-visible + span { outline: 3px solid var(--red); outline-offset: 2px; }
+
+.level-grid { display: grid; gap: 10px; grid-template-columns: 1fr; margin-bottom: 14px; }
+@media (min-width: 640px) { .level-grid { grid-template-columns: 1fr 1fr; } }
+.level-opt { position: relative; cursor: pointer; }
+.level-opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.level-opt span {
+  display: flex; flex-direction: column; padding: 12px 16px; border: 1.5px solid #cfcfcf; border-radius: 14px; height: 100%;
+}
+.level-opt small { color: var(--muted); }
+.level-opt input:checked + span { border-color: var(--red); background: var(--red-soft); box-shadow: inset 0 0 0 1px var(--red); }
+.level-opt input:focus-visible + span { outline: 3px solid var(--red); outline-offset: 2px; }
+.race-fields { background: var(--panel); border-radius: 14px; padding: 14px 16px 4px; margin-top: 8px; }
+
+.form-errors { background: var(--red-soft); border: 1px solid var(--red); border-radius: 10px; padding: 10px 14px; color: #5a0003; margin-top: 12px; }
+.form-errors ul { margin: 0; padding-inline-start: 18px; }
+
+/* مقیاس ۱ تا ۵ */
+.scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 420px; }
+.scale-opt { position: relative; }
+.scale-opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.scale-opt span {
+  display: grid; place-items: center; height: 52px; border-radius: 12px; border: 1.5px solid #cfcfcf;
+  font-weight: 800; font-size: 1.2rem; cursor: pointer;
+}
+.scale-opt input:checked + span { background: var(--black); color: #fff; border-color: var(--black); }
+.scale-opt input:focus-visible + span { outline: 3px solid var(--red); outline-offset: 2px; }
+.scale-ends { display: flex; justify-content: space-between; max-width: 420px; color: var(--muted); font-size: 0.82rem; margin: 4px 0 8px; }
+
+/* ---------- نشان نوع جلسه ---------- */
+.badge {
+  display: inline-block; padding: 2px 12px; border-radius: 999px; font-weight: 700; font-size: 0.85rem;
+  background: var(--c-rest-bg); color: var(--c-rest); white-space: nowrap;
+}
+.badge-easy, .badge-runwalk { background: var(--c-easy-bg); color: var(--c-easy); }
+.badge-tempo { background: var(--c-tempo-bg); color: var(--c-tempo); }
+.badge-interval { background: var(--c-interval-bg); color: var(--c-interval); }
+.badge-long { background: var(--c-long-bg); color: var(--c-long); }
+.badge-race { background: var(--red); color: #fff; }
+.badge-cancelled { background: var(--red-dim); color: #fff; }
+.badge-none { background: transparent; color: var(--faint); border: 1px dashed #ccc; }
+
+/* ---------- جلسه‌ی امروز ---------- */
+.today-card { border: 2px solid var(--black); }
+.today-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.today-card h2 { font-size: 1.35rem; }
+.today-card h2 .badge { font-size: 1.05rem; padding: 4px 16px; }
+.pending { color: var(--faint); font-size: 0.95rem; font-weight: 500; }
+.checkin-cta { background: var(--panel); border-radius: 14px; padding: 14px 16px; margin: 8px 0 12px; }
+.checkin-cta p { margin-bottom: 10px; }
+.preview summary { cursor: pointer; color: var(--muted); font-weight: 500; }
+.sess-target { font-weight: 800; font-size: 1.1rem; margin: 4px 0; }
+.sess-orig { color: var(--muted); font-size: 0.88rem; }
+.sess-steps { margin: 6px 0 8px; padding-inline-start: 22px; }
+.sess-how { color: var(--muted); font-size: 0.93rem; }
+
+.alert { border-radius: 12px; padding: 12px 16px; margin: 10px 0; }
+.alert p { margin: 4px 0; }
+.alert-adapt { background: var(--c-tempo-bg); border: 1px solid #f0c38a; }
+.alert-note { background: var(--panel); border: 1px solid var(--line); }
+.alert-pain { background: var(--red); color: #fff; border: 0; }
+.alert-pain strong { font-size: 1.1rem; }
+.alert-pain .pain-msg { font-size: 1.1rem; font-weight: 800; }
+.alert-pain-soft { background: var(--red-soft); border: 1.5px solid var(--red); color: #5a0003; }
+
+.warnings { border-inline-start: 6px solid var(--c-tempo); }
+.warnings ul, .tips ul { margin: 0; padding-inline-start: 20px; }
+.warnings li, .tips li { margin-bottom: 6px; }
+
+/* ---------- هفته ---------- */
+.week-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.week-title { text-align: center; flex: 1; }
+.week-title h2 { margin: 0; }
+.week-title p { margin: 0; font-size: 0.88rem; }
+.week-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 16px 0; }
+@media (min-width: 720px) { .week-stats { grid-template-columns: repeat(4, 1fr); } }
+.stat { background: var(--panel); border-radius: 12px; padding: 10px 14px; display: flex; flex-direction: column; }
+.stat span { color: var(--muted); font-size: 0.8rem; }
+.stat b { font-size: 1rem; }
+.ratio-bar { height: 6px; background: var(--red); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.ratio-bar i { display: block; height: 100%; background: var(--c-easy); }
+
+.week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; padding-top: 8px; }
+.day {
+  font: inherit; color: inherit; cursor: pointer; position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
+  padding: 10px 4px 12px; background: #fff; border: 1.5px solid var(--line); border-radius: 12px;
+  border-top: 5px solid var(--c-rest-bg); min-height: 116px;
+}
+.day:hover { background: var(--panel); }
+.day-easy, .day-runwalk { border-top-color: var(--c-easy); --dot: var(--c-easy); }
+.day-tempo { border-top-color: var(--c-tempo); --dot: var(--c-tempo); }
+.day-interval { border-top-color: var(--c-interval); --dot: var(--c-interval); }
+.day-long { border-top-color: var(--c-long); --dot: var(--c-long); }
+.day-race { border-top-color: var(--red); background: var(--red-soft); --dot: var(--red); }
+.day-cancelled { border-top-color: var(--red-dim); background: var(--red-soft); --dot: var(--red-dim); }
+.day.is-past:not(.is-selected) { opacity: 0.7; }
+.day.is-today { border-color: var(--black); }
+.day.is-selected { box-shadow: 0 0 0 2px var(--red); border-color: var(--red); }
+.day-name { font-weight: 800; font-size: 0.92rem; }
+.day-name .short { display: none; }
+.day-date { color: var(--muted); font-size: 0.75rem; line-height: 1.3; }
+.day .badge { font-size: 0.74rem; padding: 1px 8px; white-space: normal; line-height: 1.6; }
+.type-dot { display: none; width: 12px; height: 12px; border-radius: 50%; background: var(--dot, #cfcfcf); }
+.day-target { font-weight: 800; font-size: 0.95rem; }
+.day-target small { font-weight: 500; font-size: 0.7rem; color: var(--muted); margin-inline-start: 2px; }
+.today-tag { position: absolute; top: -12px; background: var(--black); color: #fff; font-size: 0.68rem; font-weight: 700; padding: 0 8px; border-radius: 6px; }
+.done-mark { position: absolute; top: 4px; inset-inline-start: 6px; color: var(--c-easy); font-weight: 900; }
+@media (max-width: 759px) {
+  .week-grid { gap: 4px; }
+  .day { min-height: 96px; padding: 8px 2px 10px; }
+  .day-name .full, .day .badge { display: none; }
+  .day-name .short { display: inline; font-size: 1.05rem; }
+  .day-date { font-size: 0.66rem; }
+  .type-dot { display: block; }
+  .day-target { font-size: 0.85rem; display: flex; flex-direction: column; line-height: 1.2; }
+  .today-tag { font-size: 0.6rem; padding: 0 4px; top: -10px; }
+}
+.day-panel { margin-top: 14px; background: var(--panel); border-radius: 14px; padding: 16px 18px; }
+.day-panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.day-panel h3 .badge { font-size: 0.95rem; padding: 3px 14px; }
+.legend { margin-top: 14px; }
+
+/* ---------- مسابقه ---------- */
+.race-hero { background: var(--black); color: #fff; border: 0; position: relative; overflow: hidden; }
+.race-hero::after { content: ""; position: absolute; inset: auto -40px -60px auto; width: 220px; height: 220px; border-radius: 50%; background: var(--red); opacity: 0.9; }
+.race-hero h1 { font-size: 1.8rem; position: relative; z-index: 1; }
+.race-hero .race-date { color: #cfcfcf; position: relative; z-index: 1; }
+.countdown { position: relative; z-index: 1; display: inline-flex; align-items: baseline; gap: 8px; }
+.countdown b { font-size: 2.6rem; font-weight: 900; }
+.formula { font-family: "Vazirmatn", monospace; background: var(--panel); border-radius: 10px; padding: 8px 12px; display: inline-block; font-weight: 700; }
+.prediction { display: flex; flex-direction: column; background: var(--red-soft); border: 1.5px solid var(--red); border-radius: 14px; padding: 14px 18px; margin: 10px 0; }
+.prediction b { font-size: 2.2rem; font-weight: 900; color: var(--red-dim); align-self: flex-start; }
+.pred-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.93rem; }
+.pred-table th, .pred-table td { text-align: start; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.pred-table td[dir=ltr] { text-align: end; }
+.pred-table th { color: var(--muted); font-weight: 500; font-size: 0.82rem; }
+.pred-table tr.hl td { background: var(--red-soft); font-weight: 700; }
+.pb-form { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+
+/* ---------- پروفایل ---------- */
+.kv-list { margin: 0; }
+.kv { display: grid; grid-template-columns: 1fr; gap: 0 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+@media (min-width: 560px) { .kv { grid-template-columns: 180px 1fr; } }
+.kv dt { color: var(--muted); font-size: 0.9rem; }
+.kv dd { margin: 0; font-weight: 500; }
+
+/* ---------- پنجره‌ی درد ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(17, 17, 17, 0.82); z-index: 100;
+  display: grid; place-items: center; padding: 16px;
+}
+.modal {
+  background: #fff; border-radius: 18px; max-width: 520px; width: 100%;
+  padding: 26px 22px; border-top: 8px solid var(--red); max-height: calc(100vh - 32px); overflow-y: auto;
+}
+.modal-icon { width: 54px; height: 54px; border-radius: 50%; background: var(--red); color: #fff; display: grid; place-items: center; font-size: 2rem; font-weight: 900; margin-bottom: 10px; }
+.modal h2 { color: var(--red-dim); }
+.modal .pain-msg { font-size: 1.15rem; font-weight: 800; background: var(--red-soft); border-radius: 10px; padding: 12px 14px; }
+.modal ul { padding-inline-start: 20px; }
+.ack { display: flex; gap: 10px; align-items: flex-start; background: var(--panel); border-radius: 10px; padding: 12px; margin: 12px 0; cursor: pointer; font-weight: 500; }
+.ack input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 3px; accent-color: var(--red); }
+
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--black); color: #fff; padding: 10px 20px; border-radius: 999px; z-index: 200;
+  box-shadow: var(--shadow); transition: opacity 0.4s; max-width: calc(100vw - 32px); text-align: center;
+}
+.toast.out { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
