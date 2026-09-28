@@ -661,20 +661,42 @@
       '<a class="btn btn-primary" href="#onboarding">ویرایش پروفایل</a>' +
       '<button type="button" class="btn btn-outline" id="restart">شروع دوباره‌ی برنامه از این هفته</button>' +
       '<button type="button" class="btn btn-ghost danger-text" id="wipe">پاک کردن همه‌ی داده‌ها</button>' +
-      '</div></section>';
+      '</div><div id="confirm-box" class="alert alert-note confirm-box" role="alertdialog" aria-live="polite" hidden>' +
+      '<p id="confirm-text"></p><div class="actions">' +
+      '<button type="button" class="btn btn-primary" id="confirm-yes">بله، انجام بده</button>' +
+      '<button type="button" class="btn btn-ghost" id="confirm-no">انصراف</button></div></div></section>';
+
+    // تایید داخل صفحه (به‌جای confirm مرورگر)
+    var pending = null;
+    function ask(text, action) {
+      pending = action;
+      document.getElementById('confirm-text').textContent = text;
+      document.getElementById('confirm-box').hidden = false;
+      document.getElementById('confirm-yes').focus();
+    }
+    document.getElementById('confirm-no').addEventListener('click', function () {
+      pending = null;
+      document.getElementById('confirm-box').hidden = true;
+    });
+    document.getElementById('confirm-yes').addEventListener('click', function () {
+      var a = pending; pending = null;
+      if (a) a();
+    });
     document.getElementById('restart').addEventListener('click', function () {
-      if (!confirm('برنامه از هفته‌ی اول (با حجم پایه) دوباره شروع بشه؟ چک‌این‌ها حفظ می‌شن.')) return;
-      state.profile.startDate = C.dateKey(today());
-      save(); showToast('برنامه از امروز دوباره شروع شد.');
-      location.hash = '#plan';
+      ask('برنامه از هفته‌ی اول (با حجم پایه) دوباره شروع بشه؟ چک‌این‌ها حفظ می‌شن.', function () {
+        state.profile.startDate = C.dateKey(today());
+        save(); showToast('برنامه از امروز دوباره شروع شد.');
+        location.hash = '#plan';
+      });
     });
     document.getElementById('wipe').addEventListener('click', function () {
-      if (!confirm('همه‌ی داده‌ها (پروفایل، چک‌این‌ها، سابقه) از این مرورگر پاک بشه؟ این کار برگشت‌پذیر نیست.')) return;
-      state = emptyState();
-      try { localStorage.removeItem(STORE_KEY); } catch (e) { /* */ }
-      memoryFallback = null;
-      location.hash = '#onboarding';
-      route();
+      ask('همه‌ی داده‌ها (پروفایل، چک‌این‌ها، سابقه) از این مرورگر پاک بشه؟ این کار برگشت‌پذیر نیست.', function () {
+        state = emptyState();
+        try { localStorage.removeItem(STORE_KEY); } catch (e) { /* */ }
+        memoryFallback = null;
+        location.hash = '#onboarding';
+        route();
+      });
     });
   }
 
