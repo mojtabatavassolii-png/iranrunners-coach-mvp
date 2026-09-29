@@ -36,15 +36,37 @@
   function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
   function hms(h, m) { return (h * 60 + m) * 60; }
 
+  // زمان → ثانیه. قالب‌های قابل قبول (برای کیبورد عددی موبایل که «:» نداره):
+  //  «9:40»، «1:25:30»، «9.40»، «9 40»، فقط رقم: «940» / «1940» (دقیقه‌ثانیه)، «12530» / «012530» (ساعت‌دقیقه‌ثانیه)
+  //  رقم‌های فارسی (۰-۹) و عربی (٠-٩) هم پذیرفته می‌شن.
   function parseTime(str) {
-    // "hh:mm:ss" یا "mm:ss" → ثانیه
-    if (!str) return null;
-    var s = String(str).replace(/[۰-۹]/g, function (c) { return '۰۱۲۳۴۵۶۷۸۹'.indexOf(c); }).trim();
-    if (!/^\d{1,2}(:\d{1,2}){1,2}$/.test(s)) return null;
-    var p = s.split(':').map(Number);
+    if (str == null) return null;
+    var s = String(str)
+      .replace(/[۰-۹]/g, function (c) { return '۰۱۲۳۴۵۶۷۸۹'.indexOf(c); })
+      .replace(/[٠-٩]/g, function (c) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(c); })
+      .trim()
+      .replace(/[\s.,٫٬،'"’\/\-]+/g, ':')
+      .replace(/^:+|:+$/g, '');
+    var p;
+    if (/^\d+$/.test(s)) {
+      if (s.length < 3 || s.length > 6) return null;
+      p = s.length <= 4 ? [s.slice(0, -2), s.slice(-2)] : [s.slice(0, -4), s.slice(-4, -2), s.slice(-2)];
+    } else if (/^\d{1,3}(:\d{1,2}){1,2}$/.test(s)) {
+      p = s.split(':');
+    } else return null;
+    p = p.map(Number);
+    if (p[p.length - 1] >= 60 || (p.length === 3 && p[1] >= 60)) return null;
     var sec = p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p[0] * 60 + p[1];
-    if (p.slice(1).some(function (v) { return v >= 60; })) return null;
     return sec > 0 ? sec : null;
+  }
+  // نمایش خوانا برای تأیید ورودی: «۹ دقیقه و ۴۰ ثانیه»
+  function describeDuration(sec) {
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = Math.round(sec % 60);
+    var parts = [];
+    if (h) parts.push(h + ' ساعت');
+    if (m) parts.push(m + ' دقیقه');
+    if (x) parts.push(x + ' ثانیه');
+    return parts.join(' و ');
   }
   function formatDuration(sec) {
     sec = Math.round(sec);
@@ -977,7 +999,7 @@
     RACE_DISTANCES: RACE_DISTANCES, RACE_LABELS: RACE_LABELS,
     TYPE_INFO: TYPE_INFO, LOCATION_TIPS: LOCATION_TIPS, LOCATION_LABELS: LOCATION_LABELS, PAIN_MESSAGE: PAIN_MESSAGE,
     dateKey: dateKey, parseDate: parseDate, addDays: addDays, weekStart: weekStart, daysBetween: daysBetween,
-    persianDayIndex: persianDayIndex, parseTime: parseTime, formatDuration: formatDuration,
+    persianDayIndex: persianDayIndex, parseTime: parseTime, formatDuration: formatDuration, describeDuration: describeDuration,
     riegel: riegel, vdotFromRace: vdotFromRace, raceTimeFromVdot: raceTimeFromVdot,
     levelFromKm: levelFromKm, levelFromVdot: levelFromVdot, assessLevel: assessLevel,
     paceZones: paceZones, bmi: bmi, progression: progression, weeklyVolumeKm: weeklyVolumeKm,

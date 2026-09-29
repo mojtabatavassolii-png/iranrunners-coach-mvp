@@ -106,6 +106,17 @@
   }
   window.addEventListener('hashchange', function () { route(); window.scrollTo(0, 0); });
 
+  // تأیید زنده‌ی زمان واردشده: «= ۹ دقیقه و ۴۰ ثانیه»
+  document.addEventListener('input', function (e) {
+    var el = e.target;
+    if (!el.dataset || !el.dataset.timePreview) return;
+    var out = document.getElementById(el.dataset.timePreview);
+    if (!out) return;
+    var v = el.value.trim(), sec = C.parseTime(v);
+    out.textContent = !v ? '' : (sec ? '= ' + fa(C.describeDuration(sec)) : 'قالب زمان رو نشناختم؛ مثلاً «9:40» یا «940»');
+    out.classList.toggle('bad', !!v && !sec);
+  });
+
   // =====================================================================
   // ۱. فرم اولیه
   // =====================================================================
@@ -178,7 +189,8 @@
       '<div class="field" id="pbother-field"' + (pbKey === 'other' ? '' : ' hidden') + '><label for="pbother">فاصله (کیلومتر)</label>' +
       '<input id="pbother" name="pbOther" type="number" inputmode="decimal" min="1" max="100" step="0.1" value="' + esc(pbKey === 'other' ? pb.distanceKm : '') + '"></div>' +
       '<div class="field" id="pbtime-field"' + (pbKey ? '' : ' hidden') + '><label for="pbtime">زمان (ساعت:دقیقه:ثانیه)</label>' +
-      '<input id="pbtime" name="pbTime" dir="ltr" inputmode="numeric" placeholder="03:25:00" value="' + esc(pb.timeSec ? C.formatDuration(pb.timeSec) : '') + '"></div>' +
+      '<input id="pbtime" name="pbTime" dir="ltr" inputmode="numeric" autocomplete="off" placeholder="3:25:00" data-time-preview="pbtime-read" value="' + esc(pb.timeSec ? C.formatDuration(pb.timeSec) : '') + '">' +
+      '<small class="muted">مثلاً «3:25:00» یا فقط «32500»؛ برای ۵ کیلومتر «24:30» یا «2430».</small><small class="time-read" id="pbtime-read" aria-live="polite"></small></div>' +
       '</div>' +
       '<div id="level-preview" aria-live="polite"></div>' +
       '</fieldset>' +
@@ -283,7 +295,7 @@
       if (!fd.get('experience')) errs.push('بگو چه مدته منظم می‌دوی.');
       if (!fd.get('structured')) errs.push('بگو تا حالا تمرین ساختاریافته (اینتروال، تمپو) انجام دادی یا نه.');
       var pbObj = readPb();
-      if (pbObj === false) errs.push('رکورد: فاصله و زمان رو کامل و درست وارد کن (مثلاً ۰۳:۲۵:۰۰)، یا «رکورد ندارم» رو انتخاب کن.');
+      if (pbObj === false) errs.push('رکورد: فاصله و زمان رو کامل و درست وارد کن (مثلاً «3:25:00» یا فقط «32500»)، یا «رکورد ندارم» رو انتخاب کن.');
       var hrIn = readHr(form);
       if (hrIn.error) errs.push(hrIn.error);
       if (!(age >= 12 && age <= 90)) errs.push('سن باید بین ۱۲ تا ۹۰ باشه.');
@@ -869,7 +881,8 @@
       '<form id="fit-form" novalidate><div class="row3">' +
       '<div class="field"><label for="fk">نوع</label><select id="fk" name="kind">' + TEST_KINDS.map(function (k) { return '<option value="' + k[0] + '">' + k[2] + '</option>'; }).join('') + '</select></div>' +
       '<div class="field" id="fkm-field" hidden><label for="fkm">فاصله (کیلومتر)</label><input id="fkm" name="km" type="number" inputmode="decimal" min="1" max="100" step="0.1"></div>' +
-      '<div class="field"><label for="ft">زمان (ساعت:دقیقه:ثانیه)</label><input id="ft" name="time" dir="ltr" inputmode="numeric" placeholder="00:09:40"></div>' +
+      '<div class="field"><label for="ft">زمان</label><input id="ft" name="time" dir="ltr" inputmode="numeric" autocomplete="off" placeholder="9:40" data-time-preview="ft-read">' +
+      '<small class="muted">مثلاً «9:40» یا فقط «940». برای بیش از یک ساعت: «1:25:30» یا «12530».</small><small class="time-read" id="ft-read" aria-live="polite"></small></div>' +
       '<div class="field"><label for="fd">تاریخ</label><input id="fd" name="date" type="date" max="' + todayKey + '" value="' + todayKey + '"></div>' +
       '</div><p id="fit-err" class="form-errors" role="alert" hidden></p>' +
       '<button type="submit" class="btn btn-primary">ثبت و بازمحاسبه‌ی پیس‌ها</button></form></section>';
@@ -901,7 +914,9 @@
       var tt = C.parseTime(form.time.value), date = form.date.value;
       var err = document.getElementById('fit-err');
       var v = km && tt ? km / (tt / 3600) : 0;
-      if (!(km >= 1 && km <= 100) || !tt || v > 26 || v < 3) { err.hidden = false; err.textContent = 'فاصله و زمان رو درست وارد کن (مثلاً ۰۰:۰۹:۴۰ برای ۲ کیلومتر).'; return; }
+      if (!(km >= 1 && km <= 100)) { err.hidden = false; err.textContent = 'فاصله رو بین ۱ تا ۱۰۰ کیلومتر وارد کن.'; return; }
+      if (!tt) { err.hidden = false; err.textContent = 'زمان رو به شکل «9:40» یا فقط رقم «940» وارد کن.'; return; }
+      if (v > 26 || v < 3) { err.hidden = false; err.textContent = 'این زمان برای ' + fa(km) + ' کیلومتر ممکن نیست (' + fa(C.describeDuration(tt)) + ')؛ دوباره نگاهش کن.'; return; }
       if (!date || date > todayKey) { err.hidden = false; err.textContent = 'تاریخ باید امروز یا قبل از امروز باشه.'; return; }
       var before = C.paceZones(p);
       p.fitnessTests = (p.fitnessTests || []).concat([{ date: date, distanceKm: km, timeSec: tt, kind: kind === 'race' ? 'race' : 'test' }]);

@@ -400,3 +400,6 @@ textarea { resize: vertical; }
 .fitness-notes ul { margin: 0; padding-inline-start: 20px; }
 .fitness-notes li { margin-bottom: 8px; }
 @media (max-width: 519px) { .scale.scale10 { grid-template-columns: repeat(5, 1fr); } }
+
+.time-read { color: var(--c-easy); font-weight: 700; min-height: 1.4em; }
+.time-read.bad { color: var(--red-dim); }

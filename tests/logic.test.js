@@ -369,4 +369,12 @@ test('تاریخچه‌ی فیتنس: رکورد پایه‌ای که همون �
   assert.strictEqual(C.fitnessEntries(p).length, 1);
 });
 
+test('ورود زمان از کیبورد عددی موبایل (بدون «:») و رقم‌های فارسی/عربی', function () {
+  var cases = { '9:40': 580, '09:40': 580, '0940': 580, '940': 580, '9.40': 580, '9 40': 580, '۹:۴۰': 580, '٠٩:٤٠': 580,
+    '٩٤٠': 580, '19:40': 1180, '1940': 1180, '1:25:30': 5130, '12530': 5130, '012530': 5130, '1.25.30': 5130, '85:30': 5130, '3:25:00': 12300 };
+  Object.keys(cases).forEach(function (k) { assert.strictEqual(C.parseTime(k), cases[k], k); });
+  ['', '40', '9:75', '1:70:00', 'abc', '1234567'].forEach(function (k) { assert.strictEqual(C.parseTime(k), null, k); });
+  assert.strictEqual(C.describeDuration(580), '9 دقیقه و 40 ثانیه');
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));
