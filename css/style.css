@@ -23,6 +23,8 @@
   --c-tempo-bg: #fff1e0;
   --c-interval: #e8121a;
   --c-interval-bg: #fdecec;
+  --c-hills: #7a5a1e;
+  --c-hills-bg: #f5eddc;
   --c-reps: #0f6e8c;
   --c-reps-bg: #e3f3f8;
   --c-fartlek: #6d3fb3;
@@ -216,6 +218,7 @@ textarea { resize: vertical; }
 .badge-interval { background: var(--c-interval-bg); color: var(--c-interval); }
 .badge-fartlek { background: var(--c-fartlek-bg); color: var(--c-fartlek); }
 .badge-reps { background: var(--c-reps-bg); color: var(--c-reps); }
+.badge-hills { background: var(--c-hills-bg); color: var(--c-hills); }
 .badge-long { background: var(--c-long-bg); color: var(--c-long); }
 .badge-race { background: var(--red); color: #fff; }
 .badge-cancelled { background: var(--red-dim); color: #fff; }
@@ -274,6 +277,7 @@ textarea { resize: vertical; }
 .day-interval { border-top-color: var(--c-interval); --dot: var(--c-interval); }
 .day-fartlek { border-top-color: var(--c-fartlek); --dot: var(--c-fartlek); }
 .day-reps { border-top-color: var(--c-reps); --dot: var(--c-reps); }
+.day-hills { border-top-color: var(--c-hills); --dot: var(--c-hills); }
 .day-long { border-top-color: var(--c-long); --dot: var(--c-long); }
 .day-race { border-top-color: var(--red); background: var(--red-soft); --dot: var(--red); }
 .day-cancelled { border-top-color: var(--red-dim); background: var(--red-soft); --dot: var(--red-dim); }
@@ -403,3 +407,8 @@ textarea { resize: vertical; }
 
 .time-read { color: var(--c-easy); font-weight: 700; min-height: 1.4em; }
 .time-read.bad { color: var(--red-dim); }
+
+.ultra-ratio { background: var(--panel); border-radius: 10px; padding: 8px 12px; font-size: 0.9rem; }
+.ultra-ratio:empty { display: none; }
+.ultra-facts { margin: 0 0 10px; padding-inline-start: 20px; }
+.ultra-facts li { margin-bottom: 4px; }

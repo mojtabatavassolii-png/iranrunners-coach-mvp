@@ -29,6 +29,13 @@ function allDays(p, weeks) {
   return out;
 }
 var ALL = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+// دو روز سخت پشت‌سرهم، به‌جز جفت ران‌های پشت‌سرهم اولترا (روز اول + روز دوم)
+function hardPair(a, b) { return a.hard && b.hard && !(a.b2b === 'day1' && b.b2b === 'day2'); }
+function goalOf(type, date, ultra) {
+  var g = { type: type, date: date || null };
+  if (type === 'ultra') g.ultra = ultra || { km: 50, gain: 2000 };
+  return g;
+}
 var DAY_SETS = [[0, 2, 4], [0, 1, 2, 3, 4, 5, 6], [5, 6], [1, 3, 5, 6], [0, 1, 2, 3, 4], [6], [2, 3, 4, 5]];
 
 // ---------- تعیین سطح ----------
@@ -104,17 +111,17 @@ test('هیچ دو روز سختی پشت‌سرهم نیست (۱۰ سطح، تر
   ALL.forEach(function (n) {
     DAY_SETS.forEach(function (days) {
       var d = allDays(profileFor(n, { days: days }), 20);
-      for (var i = 1; i < d.length; i++) assert(!(d[i].hard && d[i - 1].hard), 'L' + n + ' ' + days + ' ' + d[i].date);
+      for (var i = 1; i < d.length; i++) assert(!hardPair(d[i - 1], d[i]), 'L' + n + ' ' + days + ' ' + d[i].date);
     });
   });
 });
 
-test('بدون دو روز سخت پشت‌سرهم، حتی با مسابقه و تیپر', function () {
-  ['5', '10', '21', '42'].forEach(function (rk) {
+test('بدون دو روز سخت پشت‌سرهم، حتی با مسابقه و تیپر (همه‌ی هدف‌ها)', function () {
+  ['5', '10', '21', '42', 'ultra'].forEach(function (rk) {
     ALL.forEach(function (n) {
       DAY_SETS.forEach(function (days) {
-        var d = allDays(profileFor(n, { days: days, race: { has: true, distance: rk, date: '2026-12-10' } }), 14);
-        for (var i = 1; i < d.length; i++) assert(!(d[i].hard && d[i - 1].hard), 'L' + n + ' ' + rk + ' ' + days + ' ' + d[i].date);
+        var d = allDays(profileFor(n, { days: days, goal: goalOf(rk, '2026-12-10') }), 14);
+        for (var i = 1; i < d.length; i++) assert(!hardPair(d[i - 1], d[i]), 'L' + n + ' ' + rk + ' ' + days + ' ' + d[i].date);
       });
     });
   });
@@ -186,14 +193,15 @@ test('سطح ۵-۶: اینتروال ساختاریافته ۴۰۰ تا ۱۰۰۰
   });
 });
 
-test('سطح ۷-۸: دوره‌بندی پایه/ساخت/اوج و انواع دنیلز (R، I، T)', function () {
+test('سطح ۷-۸: دوره‌بندی پایه/ساخت/اوج؛ پایه با تکرار R، ساخت/اوج با تمرین‌های هدف', function () {
   [7, 8].forEach(function (n) {
     var s = scan(profileFor(n), 12);
     ['base', 'build', 'peak'].forEach(function (k) { assert(s.periods[k], 'L' + n + ' ' + k); });
-    assert(s.types.reps, 'R'); assert(s.kinds.daniels, 'I'); assert(s.cruise > 0, 'T cruise');
+    assert(s.types.reps, 'R in base');
+    assert(s.types.interval && s.types.tempo && s.types.fartlek, 'L' + n + ' variety');
     assert(!s.doubles, 'no doubles below 9');
   });
-  var pm = profileFor(8, { race: { has: true, distance: '42', date: '2027-01-29' } });
+  var pm = profileFor(8, { goal: goalOf('42', '2027-01-29') });
   assert(scan(pm, 16).longKinds.mp, 'marathon peak has M-pace long run');
 });
 
@@ -375,6 +383,116 @@ test('ورود زمان از کیبورد عددی موبایل (بدون «:»)
   Object.keys(cases).forEach(function (k) { assert.strictEqual(C.parseTime(k), cases[k], k); });
   ['', '40', '9:75', '1:70:00', 'abc', '1234567'].forEach(function (k) { assert.strictEqual(C.parseTime(k), null, k); });
   assert.strictEqual(C.describeDuration(580), '9 دقیقه و 40 ثانیه');
+});
+
+// ---------- کتابخانه‌ی تمرین بر اساس هدف ----------
+function variants(p, weeks) {
+  var v = {};
+  for (var w = 0; w < weeks; w++) weekAt(p, w).days.forEach(function (d) { if (d.spec) v[d.spec.type] = (v[d.spec.type] || 0) + 1; if (d.type === 'long') v['long:' + d.kind] = (v['long:' + d.kind] || 0) + 1; });
+  return v;
+}
+test('هدف ۵/۱۰ کیلومتر: اینتروال کوتاه و متوسط، فارتلک سرعتی، تپه‌ی کوتاه', function () {
+  ['5', '10'].forEach(function (g) {
+    var v = variants(profileFor(6, { goal: goalOf(g) }), 12);
+    ['shortInt', 'midInt', 'speedFartlek', 'shortHills'].forEach(function (k) { assert(v[k], g + ' ' + k); });
+    ['mpInt', 'longHills', 'thresholdInt'].forEach(function (k) { assert(!v[k], g + ' no ' + k); });
+  });
+  var s = weekAt(profileFor(6, { goal: goalOf('5') }), 1).days.find(function (d) { return d.spec && d.spec.type === 'speedFartlek'; });
+  assert(/۱-۲-۳-۴-۳-۲-۱/.test(s.steps[1]), s.steps[1]);
+});
+test('هدف نیمه‌ماراتن: اینتروال آستانه، اینتروال بلند، تمپوی پیوسته', function () {
+  var v = variants(profileFor(6, { goal: goalOf('21') }), 9);
+  ['thresholdInt', 'longInt', 'tempoRun'].forEach(function (k) { assert(v[k], k); });
+  var th = weekAt(profileFor(6, { goal: goalOf('21') }), 0).days.find(function (d) { return d.spec && d.spec.type === 'thresholdInt'; });
+  assert(/^[34] × (8|9|10) دقیقه/.test(th.steps[1]), th.steps[1]);
+});
+test('هدف ماراتن: تمپوی بلند، اینتروال پیس ماراتن، فارتلک درازمدت، لانگ‌ران با پایان پیس ماراتن', function () {
+  var v = variants(profileFor(6, { goal: goalOf('42') }), 9);
+  ['longTempo', 'mpInt', 'longFartlek', 'long:mp'].forEach(function (k) { assert(v[k], k); });
+});
+test('هدف اولترا: تپه‌ی بلند، فرود، لانگ‌ران با ارتفاع‌گیری، شدت فقط با RPE', function () {
+  var p = profileFor(7, { goal: goalOf('ultra', null, { km: 50, gain: 2000 }), pb: { distanceKm: 10, timeSec: hms(0, 42) } });
+  var v = variants(p, 12);
+  ['longHills', 'downhill', 'long:ultra'].forEach(function (k) { assert(v[k], k); });
+  for (var w = 0; w < 12; w++) weekAt(p, w).days.forEach(function (d) {
+    if (d.spec || d.type === 'long') assert(d.how.indexOf('دقیقه در کیلومتر') < 0, 'no pace in trail: ' + d.label);
+    if (d.type === 'long') assert(d.vert > 0, 'vert target');
+  });
+});
+test('اولترا ۵۰ کیلومتر: ۳۰۰۰ متر صعود در مقابل مسیر تقریباً تخت', function () {
+  var steep = profileFor(7, { goal: goalOf('ultra', null, { km: 50, gain: 3000 }) });
+  var flat = profileFor(7, { goal: goalOf('ultra', null, { km: 50, gain: 400 }) });
+  assert.strictEqual(C.goalInfo(steep).cls, 'mountain'); // ۶۰ متر بر کیلومتر
+  assert.strictEqual(C.goalInfo(flat).cls, 'flat');
+  var vs = variants(steep, 12), vf = variants(flat, 12);
+  var hillsS = (vs.longHills || 0) + (vs.downhill || 0), hillsF = (vf.longHills || 0) + (vf.downhill || 0);
+  assert(hillsS > hillsF * 2, hillsS + ' vs ' + hillsF);
+  assert((vf.steady || 0) > (vs.steady || 0));
+  var vertS = 0, vertF = 0;
+  for (var w = 0; w < 12; w++) { vertS += weekAt(steep, w).vert; vertF += weekAt(flat, w).vert; }
+  assert(vertS > vertF * 3, vertS + ' vs ' + vertF);
+});
+test('ران‌های پشت‌سرهم: فقط اولترا، سطح ۵+، با پایه‌ی کافی؛ دو روز متوالی', function () {
+  var p = profileFor(7, { goal: goalOf('ultra') });
+  var found = 0;
+  for (var w = 0; w < 12; w++) {
+    var wk = weekAt(p, w);
+    if (w < 4 || wk.phase.key === 'deload' || wk.period === 'base') assert(!wk.b2b, 'w' + w);
+    if (wk.b2b) {
+      found++;
+      var d1 = wk.days.findIndex(function (d) { return d.b2b === 'day1'; });
+      assert(d1 >= 0 && wk.days[d1 + 1].b2b === 'day2' && wk.days[d1].km > wk.days[d1 + 1].km);
+    }
+  }
+  assert(found > 0, 'b2b for level 7');
+  [3, 4].forEach(function (n) { for (var w = 0; w < 16; w++) assert(!weekAt(profileFor(n, { goal: goalOf('ultra') }), w).b2b); });
+  for (var x = 0; x < 16; x++) assert(!weekAt(profileFor(7, { goal: goalOf('21') }), x).b2b);
+});
+test('جلسات کیفی اوایل هفته، با حداقل ۴۸ ساعت فاصله تا لانگ‌ران', function () {
+  ['none', '5', '21', '42', 'ultra'].forEach(function (g) {
+    [5, 6, 7, 8].forEach(function (n) {
+      for (var w = 0; w < 8; w++) {
+        var wk = weekAt(profileFor(n, { goal: goalOf(g) }), w);
+        var q = wk.days.map(function (d, i) { return d.spec ? i : -1; }).filter(function (i) { return i >= 0; });
+        if (!q.length) continue;
+        assert(q[0] <= 2, g + ' L' + n + ' w' + w + ' first quality on ' + q[0]);
+        q.forEach(function (i) { assert(i <= 3, g + ' L' + n + ' quality on ' + i); });
+      }
+    });
+  });
+});
+test('بدون هدف: چرخه‌ی متنوع در ۱۲ هفته (اینتروال کوتاه، تمپو، فارتلک، تپه، آستانه)', function () {
+  [5, 6].forEach(function (n) {
+    var v = variants(profileFor(n), 12);
+    ['shortInt', 'tempoRun', 'speedFartlek', 'thresholdInt', 'shortHills'].forEach(function (k) { assert(v[k], 'L' + n + ' ' + k); });
+  });
+});
+test('۸۰/۲۰ برای همه‌ی هدف‌ها', function () {
+  ['5', '10', '21', '42', 'ultra'].forEach(function (g) {
+    [3, 5, 6, 7, 8, 9].forEach(function (n) {
+      for (var w = 0; w < 12; w++) {
+        var wk = weekAt(profileFor(n, { goal: goalOf(g) }), w);
+        assert(wk.hardPct <= 20, g + ' L' + n + ' w' + w + ' ' + wk.hardPct);
+        assert(Math.abs(wk.totalKm - wk.volumeTarget) <= 0.5 || w >= 0 && wk.totalKm <= wk.volumeTarget + 0.5, g + ' L' + n + ' w' + w + ' km ' + wk.totalKm + '/' + wk.volumeTarget);
+      }
+    });
+  });
+});
+test('هدف بدون تاریخ: تمرین‌های هدف بدون تیپر؛ پروفایل قدیمی (race) هم خونده می‌شه', function () {
+  var p = profileFor(6, { goal: goalOf('21') });
+  assert.strictEqual(C.raceInfo(p), null);
+  assert.strictEqual(C.goalInfo(p).category, 'half');
+  var old = profileFor(6, { race: { has: true, distance: '42', date: '2026-12-18' } });
+  assert.strictEqual(C.goalInfo(old).category, 'marathon');
+  assert.strictEqual(C.raceInfo(old).key, '42');
+});
+test('تیپر و روز مسابقه برای اولترا', function () {
+  var p = profileFor(7, { goal: goalOf('ultra', '2026-12-18', { km: 50, gain: 2000, terrain: 'technical' }) });
+  var race = C.parseDate('2026-12-18');
+  var r = C.sessionFor(p, race);
+  assert.strictEqual(r.type, 'race'); assert.strictEqual(r.vert, 2000);
+  assert.strictEqual(C.sessionFor(p, C.addDays(race, -1)).type, 'rest');
+  assert.strictEqual(C.buildWeek(p, C.addDays(race, -7)).phase.key, 'taper');
 });
 
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

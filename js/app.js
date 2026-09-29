@@ -96,7 +96,7 @@
     if (!VIEWS[v]) v = 'plan';
     var nav = document.getElementById('main-nav');
     nav.hidden = !state.profile || v === 'onboarding' || needsMigration();
-    document.getElementById('nav-race').hidden = !(state.profile && state.profile.race && state.profile.race.has);
+    document.getElementById('nav-race').hidden = !(state.profile && C.goalInfo(state.profile).type !== 'none');
     nav.querySelectorAll('a').forEach(function (a) {
       if (a.dataset.view === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
@@ -150,7 +150,7 @@
     var p = state.profile || {};
     var editing = !!state.profile;
     var migrating = editing && p.schemaVersion !== SCHEMA_VERSION;
-    var race = p.race || { has: false };
+    var goal = C.goalInfo(p);
     var pb = p.pb || {};
     var days = p.days || [];
     var locs = p.locations || [];
@@ -215,17 +215,27 @@
       '<textarea id="injury" name="injury" rows="2" maxlength="300" placeholder="مثلاً: درد زانوی راست سال گذشته، آسم">' + esc(p.injury || '') + '</textarea></div>' +
       '</fieldset>' +
 
-      '<fieldset><legend>۶. هدف مسابقه</legend><div class="chips">' +
-      chip('raceHas', 'no', 'نه، فقط می‌خوام منظم بدوم', !race.has, 'radio') +
-      chip('raceHas', 'yes', 'بله، مسابقه‌ی خاصی دارم', race.has, 'radio') + '</div>' +
-      '<div id="race-fields" class="race-fields"' + (race.has ? '' : ' hidden') + '>' +
-      '<div class="row2">' +
-      '<div class="field"><label for="rdist">فاصله‌ی مسابقه</label><select id="rdist" name="raceDistance">' +
-      Object.keys(C.RACE_LABELS).map(function (k) { return '<option value="' + k + '"' + (race.distance === k ? ' selected' : '') + '>' + C.RACE_LABELS[k] + '</option>'; }).join('') +
-      '</select></div>' +
-      '<div class="field"><label for="rdate">تاریخ مسابقه</label><input id="rdate" name="raceDate" type="date" min="' + todayKey + '" value="' + esc(race.date || '') + '">' +
-      '<small class="muted" id="rdate-fa"></small></div></div>' +
-      '</div></fieldset>' +
+      '<fieldset><legend>۶. هدف مسابقه</legend>' +
+      '<div class="field"><label for="gtype">نوع مسابقه‌ی هدف</label><select id="gtype" name="goalType">' +
+      Object.keys(C.GOAL_TYPES).map(function (k) { return '<option value="' + k + '"' + (goal.type === k ? ' selected' : '') + '>' + C.GOAL_TYPES[k] + '</option>'; }).join('') +
+      '</select><small class="muted">نوع تمرین‌های شدید بر اساس همین هدف تخصصی می‌شه. بدون هدف، تمرین‌ها بین انواع مختلف می‌چرخن.</small></div>' +
+      '<div id="goal-fields" class="race-fields"' + (goal.type === 'none' ? ' hidden' : '') + '>' +
+      '<div class="field"><label for="rdate">تاریخ مسابقه (اگه مسابقه‌ی مشخصی داری)</label><input id="rdate" name="raceDate" type="date" min="' + todayKey + '" value="' + esc(goal.date || '') + '">' +
+      '<small class="muted" id="rdate-fa"></small><small class="muted">بدون تاریخ، تمرین‌ها با تمرکز این هدف چیده می‌شن ولی تیپر نداره.</small></div>' +
+      '<div id="ultra-fields"' + (goal.type === 'ultra' ? '' : ' hidden') + '>' +
+      '<p class="small muted">مسابقه‌های تریل و اولترا فاصله‌ی استاندارد ندارن؛ مشخصات مسیر خودت رو وارد کن.</p>' +
+      '<div class="row2"><div class="field"><label for="ukm">مسافت مسابقه (کیلومتر) <span class="req">(ضروری)</span></label>' +
+      '<input id="ukm" name="ultraKm" type="number" inputmode="decimal" min="10" max="400" step="0.1" value="' + esc(goal.km || '') + '"></div>' +
+      '<div class="field"><label for="ugain">ارتفاع‌گیری تجمعی (متر صعود) <span class="req">(ضروری)</span></label>' +
+      '<input id="ugain" name="ultraGain" type="number" inputmode="numeric" min="0" max="20000" step="10" value="' + esc(goal.type === 'ultra' ? goal.gain : '') + '"></div></div>' +
+      '<div class="row3"><div class="field"><label for="uloss">ارتفاع نزول (متر، اختیاری)</label>' +
+      '<input id="uloss" name="ultraLoss" type="number" inputmode="numeric" min="0" max="20000" step="10" value="' + esc(goal.loss || '') + '"><small class="muted">اگه مسیر نقطه‌به‌نقطه‌ست و با صعود فرق داره</small></div>' +
+      '<div class="field"><label for="uterrain">نوع زمین غالب (اختیاری)</label><select id="uterrain" name="ultraTerrain"><option value="">انتخاب نشده</option>' +
+      Object.keys(C.TERRAIN_LABELS).map(function (k) { return '<option value="' + k + '"' + (goal.terrain === k ? ' selected' : '') + '>' + C.TERRAIN_LABELS[k] + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label for="ualt">ارتفاع از سطح دریا (متر، اختیاری)</label>' +
+      '<input id="ualt" name="ultraAlt" type="number" inputmode="numeric" min="0" max="6000" step="10" value="' + esc(goal.altitude || '') + '"><small class="muted">اگه مسابقه در ارتفاع بالا برگزار می‌شه</small></div></div>' +
+      '<p id="ultra-ratio" class="ultra-ratio" aria-live="polite"></p>' +
+      '</div></div></fieldset>' +
 
       '<fieldset><legend>۷. ضربان قلب (اختیاری)</legend>' + hrFields(p) + '</fieldset>' +
 
@@ -271,9 +281,17 @@
         (inp.pbInvalid ? '<p class="small form-hint">رکورد کامل یا معتبر نیست و فعلاً در محاسبه‌ی سطح استفاده نشده.</p>' : '');
     }
     function syncRace() {
-      var yes = form.querySelector('input[name=raceHas]:checked');
-      document.getElementById('race-fields').hidden = !(yes && yes.value === 'yes');
+      var gt = form.goalType.value;
+      document.getElementById('goal-fields').hidden = gt === 'none';
+      document.getElementById('ultra-fields').hidden = gt !== 'ultra';
+      var out = document.getElementById('ultra-ratio');
+      var km = Number(form.ultraKm.value), gain = form.ultraGain.value === '' ? null : Number(form.ultraGain.value);
+      if (gt === 'ultra' && km > 0 && gain !== null && gain >= 0) {
+        var cls = C.ultraClass(gain / km), info = C.ULTRA_CLASS_INFO[cls];
+        out.innerHTML = 'شاخص فنی بودن مسیر: <b>' + fa(Math.round(gain / km)) + ' متر صعود در هر کیلومتر</b> → ' + esc(info.label) + '<br>تأکید برنامه: ' + esc(info.emphasis);
+      } else out.textContent = '';
     }
+    form.addEventListener('input', syncRace);
     function syncDate() {
       var v = document.getElementById('rdate').value;
       document.getElementById('rdate-fa').textContent = v ? 'معادل شمسی: ' + faDate(v) : '';
@@ -303,12 +321,20 @@
       if (!(h >= 120 && h <= 230)) errs.push('قد باید بین ۱۲۰ تا ۲۳۰ سانتی‌متر باشه.');
       if (!selDays.length) errs.push('حداقل یک روز آزاد انتخاب کن.');
       if (!selLocs.length) errs.push('حداقل یک محل تمرین انتخاب کن.');
-      var raceObj = { has: false };
-      if (fd.get('raceHas') === 'yes') {
+      var gType = fd.get('goalType') || 'none', goalObj = { type: gType, date: null };
+      if (gType !== 'none') {
         var rd = fd.get('raceDate');
-        if (!rd) errs.push('تاریخ مسابقه رو وارد کن.');
-        else if (C.daysBetween(today(), C.parseDate(rd)) < 1) errs.push('تاریخ مسابقه باید بعد از امروز باشه.');
-        raceObj = { has: true, distance: fd.get('raceDistance'), date: rd };
+        if (rd && C.daysBetween(today(), C.parseDate(rd)) < 1) errs.push('تاریخ مسابقه باید بعد از امروز باشه (یا خالیش بذار).');
+        goalObj.date = rd || null;
+        if (gType === 'ultra') {
+          var num = function (n) { var v = String(fd.get(n) || '').trim(); return v === '' ? null : Number(v); };
+          var uk = num('ultraKm'), ug = num('ultraGain'), ul = num('ultraLoss'), ua = num('ultraAlt');
+          if (!(uk >= 10 && uk <= 400)) errs.push('مسافت مسابقه‌ی تریل رو وارد کن (۱۰ تا ۴۰۰ کیلومتر).');
+          if (ug === null || !(ug >= 0 && ug <= 20000)) errs.push('ارتفاع‌گیری تجمعی مسابقه (متر صعود) رو وارد کن؛ اگه مسیر تخته، ۰ یا یه عدد کم بنویس.');
+          if (ul !== null && !(ul >= 0 && ul <= 20000)) errs.push('ارتفاع نزول باید بین ۰ تا ۲۰۰۰۰ متر باشه.');
+          if (ua !== null && !(ua >= 0 && ua <= 6000)) errs.push('ارتفاع از سطح دریا باید بین ۰ تا ۶۰۰۰ متر باشه.');
+          goalObj.ultra = { km: uk, gain: ug, loss: ul, terrain: fd.get('ultraTerrain') || null, altitude: ua };
+        }
       }
       var box = document.getElementById('onb-errors');
       if (errs.length) {
@@ -323,7 +349,7 @@
         injury: String(fd.get('injury') || '').trim(),
         currentWeeklyKm: curKm, experience: fd.get('experience'), structured: fd.get('structured') === 'yes',
         schemaVersion: SCHEMA_VERSION,
-        race: raceObj, pb: pbObj,
+        goal: goalObj, pb: pbObj,
         hrMax: hrIn.max, hrRest: hrIn.rest,
         // تاریخچه‌ی فیتنس و تنظیم دستی پیس ایزی با ویرایش پروفایل حفظ می‌شن
         fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0,
@@ -504,7 +530,8 @@
       (week.periodLabel ? '<small class="period-tag">' + esc(week.periodLabel) + '</small>' : '') + '</div>' +
       '<div class="stat"><span>جلسات</span><b>' + fa(runDays) + ' جلسه</b></div>' +
       (isRunWalk ? '<div class="stat"><span>کل زمان</span><b>' + fa(week.totalMin) + ' دقیقه</b></div>'
-        : '<div class="stat"><span>حجم کل</span><b>' + t(week.totalKm) + ' کیلومتر</b></div>') +
+        : '<div class="stat"><span>حجم کل</span><b>' + t(week.totalKm) + ' کیلومتر</b>' +
+          (week.goal && week.goal.category === 'ultra' && week.vert ? '<small class="period-tag">ارتفاع‌گیری: +' + fa(week.vert) + ' متر</small>' : '') + '</div>') +
       '<div class="stat stat-ratio"><span>نسبت آسان / سخت</span><b>' + fa(100 - week.hardPct) + ' / ' + fa(week.hardPct) + '</b>' +
       '<div class="ratio-bar" aria-hidden="true"><i style="width:' + (100 - week.hardPct) + '%"></i></div></div>' +
       '</div>';
@@ -543,7 +570,7 @@
       (ss.type !== 'cancelled' ? sessionBody(ss, selectedDay <= todayKey && selectedDay !== todayKey ? { key: selectedDay, prefix: 'panel' } : {}) : '') +
       (selectedDay > todayKey && ['rest', 'none'].indexOf(ss.type) < 0 ? '<p class="small muted">این جلسه ممکنه بعد از چک‌این همون روز با وضعیتت تطبیق داده بشه.</p>' : '') +
       '</div>';
-    html += '<p class="legend small muted">روزهای سخت (تمپو، اینتروال، تکرار سرعتی، فارتلک، لانگ‌ران) هیچ‌وقت پشت‌سرهم نیستن. ' +
+    html += '<p class="legend small muted">روزهای سخت (تمپو، اینتروال، تکرار سرعتی، فارتلک، تپه، لانگ‌ران) با حداقل ۴۸ ساعت فاصله‌ان؛ جلسات کیفی اوایل هفته و لانگ‌ران آخر هفته. ' +
       (lv.level <= 2 ? 'در سطح ' + fa(lv.level) + ' همه‌ی جلسات آسونه (بدون تمپو و اینتروال).' : 'حداکثر ۲۰٪ حجم هفته پرشدته (قانون ۸۰/۲۰).') +
       ' هفته‌ی اول هم‌اندازه‌ی حجم فعلی توئه؛ از هفته‌ی دوم حداکثر ۱۰٪ بیشتر از هفته‌ی کامل قبلی، و هر هفته‌ی چهارم سبک‌تره.</p>';
     html += '</section>';
@@ -776,55 +803,90 @@
   // =====================================================================
   // ۴. هدف مسابقه
   // =====================================================================
+  var CATEGORY_FOCUS = {
+    speed: 'VO2max و سرعت: اینتروال کوتاه (۴۰۰ تا ۸۰۰ متر با پیس ۵ کیلومتر)، اینتروال متوسط (۱۰۰۰ تا ۱۶۰۰ متر)، فارتلک سرعتی (۱-۱ یا هرمی) و تپه‌ی کوتاه.',
+    half: 'ترکیب VO2max و آستانه: اینتروال آستانه (۳ تا ۴ × ۸ تا ۱۰ دقیقه)، اینتروال بلند (۱۶۰۰ تا ۲۰۰۰ متر) و تمپوی پیوسته (۲۰ تا ۴۰ دقیقه).',
+    marathon: 'آستانه و استقامت ویژه: تمپوی بلند (۳۰ تا ۵۰ دقیقه)، اینتروال پیس ماراتن (۳ تا ۵ کیلومتر)، لانگ‌ران با پایان پیس ماراتن و فارتلک درازمدت.',
+    ultra: 'زمان روی پا، ارتفاع‌گیری و خستگی تجمعی: تپه‌ی بلند، تمرین فرود، لانگ‌ران با هدف ارتفاع‌گیری، و ران‌های پشت‌سرهم (از سطح ۵ با پایه‌ی کافی). شدت با RPE و زمان، نه پیس.',
+    general: 'بدون هدف مشخص، تمرین‌ها بین اینتروال کوتاه، تمپو، فارتلک، تپه و آستانه می‌چرخن تا سیستم‌های انرژی مختلف تحریک بشن و تمرین یکنواخت نشه.'
+  };
+
+  function ultraSummary(g) {
+    var info = C.ULTRA_CLASS_INFO[g.cls];
+    return '<ul class="ultra-facts">' +
+      '<li>شاخص فنی بودن مسیر: <b>' + fa(Math.round(g.ratio)) + ' متر صعود در هر کیلومتر</b> → ' + esc(info.label) + '</li>' +
+      '<li>تأکید برنامه: ' + esc(info.emphasis) + '</li>' +
+      (g.loss !== null ? '<li>نزول: ' + fa(g.loss) + ' متر' + (g.netDownhill ? ' (سرازیری غالب → تمرین فرود بیشتر)' : '') + '</li>' : '') +
+      (g.terrain ? '<li>زمین غالب: ' + esc(C.TERRAIN_LABELS[g.terrain]) + '</li>' : '') +
+      (g.altitude ? '<li>ارتفاع از سطح دریا: ' + fa(g.altitude) + ' متر</li>' : '') + '</ul>';
+  }
+
   function renderRace() {
-    var p = state.profile;
-    if (!p.race || !p.race.has) {
-      app.innerHTML = '<section class="card"><h1>هدف مسابقه</h1><p>هنوز مسابقه‌ای ثبت نکردی. از بخش پروفایل می‌تونی هدف مسابقه اضافه کنی.</p>' +
-        '<a class="btn btn-primary" href="#onboarding">افزودن هدف مسابقه</a></section>';
+    var p = state.profile, g = C.goalInfo(p), lv = C.assessLevel(p);
+    if (g.type === 'none') {
+      app.innerHTML = '<section class="card"><h1>هدف مسابقه</h1><p>هنوز هدف مسابقه‌ای انتخاب نکردی. ' + esc(CATEGORY_FOCUS.general) + '</p>' +
+        '<a class="btn btn-primary" href="#onboarding">انتخاب هدف مسابقه</a></section>';
       return;
     }
     var race = C.raceInfo(p);
     var now = today();
-    var daysLeft = C.daysBetween(now, race.date);
-    var taperStart = C.addDays(race.date, -C.taperWeeks(race.key) * 7);
     var fit = C.currentFitness(p);
     var pb = fit ? fit.entry : null;
-
-    var html = '<section class="card race-hero"><p class="eyebrow">هدف مسابقه</p>' +
-      '<h1>' + esc(C.RACE_LABELS[race.key]) + '</h1>' +
-      '<p class="race-date">' + esc(faDate(p.race.date)) + '</p>' +
-      '<div class="countdown">' + (daysLeft > 0 ? '<b>' + fa(daysLeft) + '</b><span>روز مونده</span>'
-        : daysLeft === 0 ? '<b>امروز!</b><span>موفق باشی</span>' : '<b>✓</b><span>مسابقه برگزار شده</span>') + '</div></section>';
-
-    // پیش‌بینی Riegel
-    html += '<section class="card"><h2>پیش‌بینی زمان (فرمول Riegel)</h2>' +
-      '<p class="formula" dir="ltr">T₂ = T₁ × (D₂ / D₁)<sup>1.06</sup></p>';
-    if (pb) {
-      var pred = C.riegel(pb.timeSec, pb.distanceKm, race.km);
-      html += '<div class="prediction"><span>زمان پیش‌بینی‌شده برای ' + esc(C.RACE_LABELS[race.key]) + '</span>' +
-        '<b dir="ltr">' + fa(C.formatDuration(pred)) + '</b>' +
-        '<small>پیس متوسط: ' + fa(C.formatDuration(pred / race.km)) + ' دقیقه در کیلومتر</small></div>' +
-        '<p class="muted small">بر اساس آخرین تایم‌تست/رکوردت: ' + t(Math.round(pb.distanceKm * 100) / 100) + ' کیلومتر در ' + fa(C.formatDuration(pb.timeSec)) + ' (' + esc(faDate(pb.date, true)) + ').</p>' +
-        '<table class="pred-table"><thead><tr><th>فاصله</th><th>زمان پیش‌بینی</th><th>پیس (دقیقه/کیلومتر)</th></tr></thead><tbody>' +
-        Object.keys(C.RACE_DISTANCES).map(function (k) {
-          var d = C.RACE_DISTANCES[k], tt = C.riegel(pb.timeSec, pb.distanceKm, d);
-          return '<tr' + (k === race.key ? ' class="hl"' : '') + '><td>' + esc(C.RACE_LABELS[k]) + '</td><td dir="ltr">' + fa(C.formatDuration(tt)) + '</td><td dir="ltr">' + fa(C.formatDuration(tt / d)) + '</td></tr>';
-        }).join('') + '</tbody></table>' +
-        '<p class="small muted">فرمول Riegel برای دونده‌های تمرین‌کرده دقیق‌تره. هرچی فاصله‌ی مسابقه از فاصله‌ی رکورد دورتر باشه (مثلاً از ۵ کیلومتر به ماراتن)، و اگه حجم تمرینت برای اون فاصله کافی نباشه، پیش‌بینی خوش‌بینانه‌تر می‌شه.</p>';
+    var html = '<section class="card race-hero"><p class="eyebrow">هدف مسابقه</p><h1>' + t(C.goalLabel(g)) + '</h1>';
+    if (race) {
+      var daysLeft = C.daysBetween(now, race.date);
+      html += '<p class="race-date">' + esc(faDate(g.date)) + '</p><div class="countdown">' + (daysLeft > 0 ? '<b>' + fa(daysLeft) + '</b><span>روز مونده</span>'
+        : daysLeft === 0 ? '<b>امروز!</b><span>موفق باشی</span>' : '<b>✓</b><span>مسابقه برگزار شده</span>') + '</div>';
     } else {
-      html += '<p>برای پیش‌بینی، یه تایم‌تست یا رکورد اخیر ثبت کن.</p>';
+      html += '<p class="race-date">بدون تاریخ مشخص: تمرین‌ها با تمرکز این هدف چیده می‌شن، بدون تیپر. <a href="#onboarding">افزودن تاریخ</a></p>';
     }
-    html += '<a class="btn btn-outline" href="#fitness">ثبت تایم‌تست یا رکورد تازه</a></section>';
+    html += '</section>';
 
-    // توضیح تیپر
-    html += '<section class="card"><h2>تیپر: کاهش حجم قبل از مسابقه</h2>' +
-      '<p>برنامه‌ی هفتگیت از <b>' + esc(faDate(C.dateKey(taperStart))) + '</b> (' + fa(C.taperWeeks(race.key)) + ' هفته قبل از مسابقه) خودکار وارد تیپر می‌شه:</p><ul>' +
-      (C.taperWeeks(race.key) === 2 ? '<li>دو هفته قبل: حجم حدود ' + (race.key === '42' ? '۷۰' : '۷۵') + '٪ و لانگ‌ران کوتاه‌تر.</li>' : '') +
-      '<li>هفته‌ی آخر: حجم حدود ' + (C.taperWeeks(race.key) === 2 ? '۵۰' : '۶۰') + '٪، بدون لانگ‌ران؛ تمرین‌های سخت کوتاه‌تر می‌شن.</li>' +
-      '<li>۲-۳ روز آخر: فقط دویدن آسون کوتاه با چند سرعت کوتاه.</li>' +
-      '<li>روز قبل مسابقه: استراحت کامل.</li>' +
-      '<li>۳ روز بعد مسابقه: استراحت، و بقیه‌ی اون هفته فقط دویدن آسون سبک.</li></ul></section>';
+    html += '<section class="card"><h2>تمرکز تمرین‌ها</h2><p>' + esc(CATEGORY_FOCUS[g.category]) + '</p>' +
+      (g.category === 'ultra' ? ultraSummary(g) : '') +
+      (lv.level <= 2 ? '<p class="small muted">در سطح ' + fa(lv.level) + ' هنوز جلسه‌ی شدید نداری؛ این تمرین‌ها از سطح ۳ به بعد و با پیشرفت تو فعال می‌شن.</p>' : '') +
+      '<p class="small muted">جلسات کیفی اوایل هفته (یکشنبه و سه‌شنبه) و لانگ‌ران آخر هفته‌ست؛ بین دو جلسه‌ی سخت همیشه حداقل ۴۸ ساعت فاصله هست' +
+      (g.category === 'ultra' ? '، به‌جز ران‌های پشت‌سرهم که عمداً دو روز متوالی‌ان.' : '.') + '</p></section>';
 
+    // پیش‌بینی زمان
+    if (g.category === 'ultra') {
+      html += '<section class="card"><h2>تخمین زمان</h2>';
+      if (pb) {
+        var eq = g.km + g.gain / 100, tf = { technical: 1.15, trail: 1.08, gravel: 1.02, mixed: 1.08 }[g.terrain] || 1.08;
+        var est = C.riegel(pb.timeSec, pb.distanceKm, eq) * tf;
+        html += '<div class="prediction"><span>تخمین خیلی تقریبی برای ' + t(C.goalLabel(g)) + '</span><b dir="ltr">' + fa(C.formatDuration(est)) + '</b>' +
+          '<small>معادل حدود ' + fa(Math.round(eq)) + ' کیلومتر مسیر تخت (هر ۱۰۰ متر صعود ≈ ۱ کیلومتر)، با ضریب زمین</small></div>';
+      }
+      html += '<p class="small muted">مسابقه‌های تریل استاندارد ندارن و زمان به مسیر، زمین، هوا و ارتفاع بستگی داره؛ فرمول‌های جاده‌ای (مثل Riegel) اینجا فقط یه نقطه‌ی شروع خیلی تقریبی‌ان. روز مسابقه با RPE پیش برو، نه ساعت.</p>' +
+        '<a class="btn btn-outline" href="#fitness">ثبت تایم‌تست تازه</a></section>';
+    } else {
+      html += '<section class="card"><h2>پیش‌بینی زمان (فرمول Riegel)</h2><p class="formula" dir="ltr">T₂ = T₁ × (D₂ / D₁)<sup>1.06</sup></p>';
+      if (pb) {
+        var pred = C.riegel(pb.timeSec, pb.distanceKm, g.km);
+        html += '<div class="prediction"><span>زمان پیش‌بینی‌شده برای ' + esc(C.RACE_LABELS[g.type]) + '</span>' +
+          '<b dir="ltr">' + fa(C.formatDuration(pred)) + '</b>' +
+          '<small>پیس متوسط: ' + fa(C.formatDuration(pred / g.km)) + ' دقیقه در کیلومتر</small></div>' +
+          '<p class="muted small">بر اساس آخرین تایم‌تست/رکوردت: ' + t(Math.round(pb.distanceKm * 100) / 100) + ' کیلومتر در ' + fa(C.formatDuration(pb.timeSec)) + ' (' + esc(faDate(pb.date, true)) + ').</p>' +
+          '<div class="table-wrap"><table class="pred-table"><thead><tr><th>فاصله</th><th>زمان پیش‌بینی</th><th>پیس (دقیقه/کیلومتر)</th></tr></thead><tbody>' +
+          Object.keys(C.RACE_DISTANCES).map(function (k) {
+            var d = C.RACE_DISTANCES[k], tt = C.riegel(pb.timeSec, pb.distanceKm, d);
+            return '<tr' + (k === g.type ? ' class="hl"' : '') + '><td>' + esc(C.RACE_LABELS[k]) + '</td><td dir="ltr">' + fa(C.formatDuration(tt)) + '</td><td dir="ltr">' + fa(C.formatDuration(tt / d)) + '</td></tr>';
+          }).join('') + '</tbody></table></div>' +
+          '<p class="small muted">فرمول Riegel برای دونده‌های تمرین‌کرده دقیق‌تره. هرچی فاصله‌ی مسابقه از فاصله‌ی رکورد دورتر باشه، پیش‌بینی خوش‌بینانه‌تر می‌شه.</p>';
+      } else html += '<p>برای پیش‌بینی، یه تایم‌تست یا رکورد اخیر ثبت کن.</p>';
+      html += '<a class="btn btn-outline" href="#fitness">ثبت تایم‌تست یا رکورد تازه</a></section>';
+    }
+
+    if (race) {
+      var tw = C.taperWeeks(race.key);
+      var taperStart = C.addDays(race.date, -tw * 7);
+      html += '<section class="card"><h2>تیپر: کاهش حجم قبل از مسابقه</h2>' +
+        '<p>برنامه‌ی هفتگیت از <b>' + esc(faDate(C.dateKey(taperStart))) + '</b> (' + fa(tw) + ' هفته قبل از مسابقه) خودکار وارد تیپر می‌شه:</p><ul>' +
+        (tw === 2 ? '<li>دو هفته قبل: حجم حدود ' + (race.key === '21' ? '۷۵' : '۷۰') + '٪ و لانگ‌ران کوتاه‌تر.</li>' : '') +
+        '<li>هفته‌ی آخر: حجم حدود ' + (tw === 2 ? '۵۰' : '۶۰') + '٪، بدون لانگ‌ران؛ تمرین‌های سخت کوتاه‌تر می‌شن.</li>' +
+        '<li>۲-۳ روز آخر: فقط دویدن آسون کوتاه با چند سرعت کوتاه.</li><li>روز قبل مسابقه: استراحت کامل.</li>' +
+        '<li>۳ روز بعد مسابقه: استراحت، و بقیه‌ی اون هفته فقط دویدن آسون سبک.</li></ul></section>';
+    }
     app.innerHTML = html;
   }
 
@@ -980,7 +1042,7 @@
       row('روزهای آزاد', esc(p.days.map(function (d) { return C.DAY_NAMES[d]; }).join('، '))) +
       row('محل تمرین', esc(p.locations.map(function (l) { return C.LOCATION_LABELS[l]; }).join('، '))) +
       row('آسیب / محدودیت', p.injury ? t(p.injury) : '<span class="muted">ثبت نشده</span>') +
-      row('هدف مسابقه', p.race && p.race.has ? esc(C.RACE_LABELS[p.race.distance]) + ' — ' + esc(faDate(p.race.date)) : '<span class="muted">ندارد</span>') +
+      row('هدف مسابقه', C.goalInfo(p).type !== 'none' ? t(C.goalLabel(C.goalInfo(p))) + (C.goalInfo(p).date ? ' — ' + esc(faDate(C.goalInfo(p).date)) : ' <span class="muted small">(بدون تاریخ)</span>') : '<span class="muted">بدون هدف مشخص</span>') +
       row('بهترین رکورد', p.pb ? t(p.pb.distanceKm + ' کیلومتر در ') + '<span dir="ltr">' + fa(C.formatDuration(p.pb.timeSec)) + '</span>' : '<span class="muted">ثبت نشده</span>') +
       row('شروع برنامه', esc(faDate(p.startDate))) +
       row('آمار', t(nCheck + ' چک‌این · ' + nDone + ' جلسه‌ی انجام‌شده')) +
