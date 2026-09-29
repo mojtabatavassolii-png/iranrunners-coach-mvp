@@ -240,26 +240,128 @@
   };
   function isHard(type) { return !!(TYPE_INFO[type] && TYPE_INFO[type].hard); }
 
-  // ---------- پیس‌ها ----------
-  // با رکورد: پیس‌های دنیلز از VDOT (E، M، T، I، R). بدون رکورد: فقط RPE.
-  function paceZones(profile) {
+  // ---------- فیتنس فعلی (تطبیقی) ----------
+  // VDOT همیشه از «آخرین» رکورد یا تایم‌تست میاد، نه بهترینِ قدیمی؛ فیتنس در طول زمان تغییر می‌کنه.
+  // profile.pb = رکورد پایه‌ی تعیین سطح (موقع ساخت برنامه)، profile.fitnessTests = تایم‌تست‌ها و مسابقه‌های بعدی
+  var FITNESS_STALE_WEEKS = 6;
+  var EASY_ADJUST_MAX = 30;       // حداکثر کندتر کردن دستی پیس ایزی (ثانیه بر کیلومتر)
+  var EASY_BAND = [-15, 25];      // بازه‌ی پیس ایزی نسبت به ۷۰٪ VDOT → ۴۰ ثانیه عرض
+
+  function fitnessEntries(profile) {
+    var list = (profile.fitnessTests || []).filter(function (t) { return t && t.distanceKm >= 1 && t.timeSec > 0 && t.date; });
     var pb = profile.pb;
-    if (!pb || !pb.distanceKm || !pb.timeSec) return null;
-    var vd = vdotFromRace(pb.distanceKm, pb.timeSec);
+    // رکورد پایه، مگه اینکه همون تایم‌تستی باشه که قبلاً ثبت شده (بعد از تغییر سطح بر اساس تایم‌تست)
+    if (pb && pb.distanceKm && pb.timeSec && !list.some(function (t) { return t.distanceKm === pb.distanceKm && t.timeSec === pb.timeSec && t.date === pb.date; })) {
+      list = list.concat([{ date: pb.date || profile.startDate, distanceKm: pb.distanceKm, timeSec: pb.timeSec, kind: 'baseline' }]);
+    }
+    // مرتب بر اساس تاریخ؛ در تاریخ یکسان، تایم‌تست بعدی بر رکورد پایه مقدمه
+    return list.slice().sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      return (a.kind === 'baseline' ? 0 : 1) - (b.kind === 'baseline' ? 0 : 1);
+    });
+  }
+  function currentFitness(profile) {
+    var list = fitnessEntries(profile);
+    if (!list.length) return null;
+    var last = list[list.length - 1];
+    return { vdot: vdotFromRace(last.distanceKm, last.timeSec), entry: last, count: list.length };
+  }
+
+  // ---------- پیس‌ها ----------
+  // با رکورد/تایم‌تست: پیس‌های دنیلز از VDOT فعلی. ایزی = بازه‌ی ۴۰ ثانیه‌ای حول ۷۰٪ VDOT.
+  // بدون هیچ رکوردی: پیس نداریم؛ تست حرف زدن، RPE و (اگه باشه) ضربان قلب راهنمان.
+  function paceZones(profile) {
+    var fit = currentFitness(profile);
+    var hr = hrZones(profile);
+    if (!fit) return hr ? { vdot: null, hrEasy: hr.easy, hr: hr } : null;
+    var vd = fit.vdot;
+    var adj = clamp(Number(profile.easyAdjustSec) || 0, 0, EASY_ADJUST_MAX);
+    var E = paceAtPct(vd, 0.70) + adj;
     var I = paceAtPct(vd, 0.98);
     var M = raceTimeFromVdot(vd, 42.195) / 42.195;
     return {
-      vdot: vd,
-      easy: [paceAtPct(vd, 0.74), paceAtPct(vd, 0.65)],
+      vdot: vd, fitness: fit, easyAdjustSec: adj,
+      easyCenter: E,
+      easy: [E + EASY_BAND[0], E + EASY_BAND[1]],
       marathon: [M - 3, M + 3],
       tempo: [paceAtPct(vd, 0.90), paceAtPct(vd, 0.86)],
       interval: [paceAtPct(vd, 1.0), paceAtPct(vd, 0.96)],
-      reps: [I - 18, I - 12]
+      reps: [I - 18, I - 12],
+      hrEasy: hr ? hr.easy : null, hr: hr
     };
   }
   function paceText(range) {
     if (!range) return '';
     return formatDuration(range[0]) + ' تا ' + formatDuration(range[1]) + ' دقیقه در هر کیلومتر';
+  }
+
+  // ---------- ضربان قلب (اختیاری) ----------
+  // Karvonen: ضربان هدف = استراحت + درصد × (حداکثر − استراحت)؛ ایزی = ۶۰ تا ۷۵٪ ذخیره‌ی ضربان.
+  // اگه حداکثر وارد نشده ولی استراحت هست: حداکثر تخمینی از سن (Tanaka: ۲۰۸ − ۰٫۷ × سن).
+  // اگه فقط حداکثر هست: ۶۵ تا ۷۸٪ حداکثر ضربان (تقریب).
+  function hrZones(profile) {
+    var max = Number(profile.hrMax) || 0, rest = Number(profile.hrRest) || 0;
+    if (!max && !rest) return null;
+    var estimated = false;
+    if (!max && rest && profile.age) { max = Math.round(208 - 0.7 * profile.age); estimated = true; }
+    if (!max || (rest && rest >= max - 20)) return null;
+    if (rest) {
+      var r = max - rest;
+      return { easy: [Math.round(rest + 0.60 * r), Math.round(rest + 0.75 * r)], method: 'karvonen', max: max, rest: rest, maxEstimated: estimated };
+    }
+    return { easy: [Math.round(max * 0.65), Math.round(max * 0.78)], method: 'max', max: max, rest: null, maxEstimated: false };
+  }
+
+  // ---------- «ایزی» واقعاً ایزیه؟ ----------
+  var TALK_TEST = 'تست حرف زدن: باید بتونی در حین دویدن به‌راحتی و بدون نفس‌نفس زدن صحبت کنی. اگر نمی‌تونی، سرعتت رو کم کن، حتی اگر از پیس هدف کندتر بشه.';
+  var EASY_RPE_WARNING = 'به نظر می‌رسه این پیس الان برات ایزی نیست. پیشنهاد می‌کنیم پیس ایزی رو کمی کندتر تنظیم کنیم یا یک تایم‌تست تازه ثبت کنی.';
+
+  // بازخورد بعد از جلسه‌ی ایزی. pace: 'ok' (داخل بازه یا کندتر) | 'fast' (تندتر از بازه) | 'unknown'
+  function easyRunFeedback(post, sessionType) {
+    if (!post || !(post.rpe >= 1)) return null;
+    if (post.rpe <= 6) return { kind: 'ok', message: 'عالی؛ این همون شدتیه که دویدن ایزی باید داشته باشه.' };
+    if (sessionType === 'runwalk') return { kind: 'runwalk', message: 'این جلسه برات سخت بود. دفعه‌ی بعد تکه‌های پیاده‌روی رو طولانی‌تر و دویدن رو آهسته‌تر کن؛ اگه تکرار شد، یه هفته همون مرحله رو تکرار کن.' };
+    if (post.pace === 'fast') return { kind: 'fast', message: 'سرعتت از بازه‌ی ایزی بیشتر بوده و برای همین سخت شده. دفعه‌ی بعد داخل بازه یا حتی کندتر بدو؛ ایزی ران باید آسون باشه.' };
+    if (post.pace === 'ok') return { kind: 'warn', message: EASY_RPE_WARNING };
+    return { kind: 'check', message: 'این جلسه برای «ایزی» زیادی سخت بود. دفعه‌ی بعد با تست حرف زدن سرعتت رو تنظیم کن و پیست رو هم نگاه کن.' };
+  }
+
+  // الگو در ۱۴ روز اخیر: چند جلسه‌ی ایزی با پیس درست، ولی RPE بالای ۶
+  function easyRpeTrend(postRuns, today) {
+    var from = dateKey(addDays(today, -14)), n = 0;
+    Object.keys(postRuns || {}).forEach(function (k) {
+      var p = postRuns[k];
+      if (k >= from && p && p.easy && p.rpe > 6 && p.pace === 'ok') n++;
+    });
+    return n;
+  }
+
+  // شرایط امروز (از چک‌این) → کدوم سمت بازه‌ی ایزی رو هدف بگیره
+  function easyDayHint(checkin, prevCheckin) {
+    if (!checkin) return null;
+    var tired = checkin.fatigue >= 3 || checkin.sleep <= 2 || (prevCheckin && prevCheckin.sleep <= 2);
+    return tired
+      ? { side: 'slow', message: 'با توجه به خستگی/خواب امروز، نیمه‌ی کند بازه (یا حتی کندتر) رو هدف بگیر.' }
+      : { side: 'any', message: 'امروز هر جای بازه که با تست حرف زدن جور باشه خوبه؛ در هوای گرم (بالای ۲۵ درجه) نیمه‌ی کند بازه رو بدو.' };
+  }
+
+  // یادآوری تایم‌تست
+  function fitnessReminder(profile, today) {
+    var fit = currentFitness(profile);
+    if (!fit) return { kind: 'none', message: 'هنوز رکورد یا تایم‌تستی ثبت نکردی. با یه تایم‌تست ۲ یا ۵ کیلومتری، پیس‌های تمرینی (از جمله بازه‌ی ایزی) دقیق محاسبه می‌شن.' };
+    var weeks = Math.floor(daysBetween(parseDate(fit.entry.date), today) / 7);
+    if (weeks >= FITNESS_STALE_WEEKS) return { kind: 'stale', weeks: weeks, message: 'آخرین تایم‌تست یا رکوردت ' + weeks + ' هفته پیش بوده. فیتنس در این مدت عوض می‌شه؛ یه تایم‌تست تازه ثبت کن تا پیس‌ها به‌روز بشن (پیشنهاد: هر ۴ تا ۶ هفته).' };
+    return null;
+  }
+
+  // آیا فیتنس فعلی به سطح دیگه‌ای رسیده؟ (برنامه خودکار سطح عوض نمی‌کنه تا حجم پرش نکنه؛ به کاربر پیشنهاد می‌ده)
+  function fitnessLevelSuggestion(profile) {
+    var fit = currentFitness(profile);
+    if (!fit || fit.entry.kind === 'baseline') return null;
+    var planLevel = assessLevel(profile).level;
+    var fitLevel = levelFromVdot(fit.vdot);
+    if (fitLevel === planLevel) return null;
+    return { from: planLevel, to: fitLevel, up: fitLevel > planLevel };
   }
 
   // ---------- ضرایب احتیاط ----------
@@ -410,6 +512,14 @@
     }[t];
   }
   function paceNote(label, range) { return range ? ' ' + label + ': ' + paceText(range) + '.' : ''; }
+  // راهنمای شدت ایزی: بازه‌ی پیس (نه یک عدد) + ضربان هدف (اگه داریم)
+  function easyGuide(zones) {
+    if (!zones) return '';
+    var out = '';
+    if (zones.easy) out += ' بازه‌ی پیس ایزی: ' + paceText(zones.easy) + ' (حد تندتر برای روزهای خوب، حد کندتر برای گرما، خستگی یا خواب بد).';
+    if (zones.hrEasy) out += ' ضربان هدف: ' + zones.hrEasy[0] + ' تا ' + zones.hrEasy[1] + ' ضربه در دقیقه.';
+    return out;
+  }
 
   function makeRunWalk(rw, factor, extraNote) {
     var runTotal = rw.runTotal * factor;
@@ -421,7 +531,8 @@
       steps: ['۵ دقیقه پیاده‌روی تند برای گرم کردن',
         reps + ' بار: ' + rw.run + ' دقیقه دویدن خیلی آرام + ' + rw.walk + ' دقیقه پیاده‌روی',
         '۵ دقیقه پیاده‌روی آرام برای سرد کردن'],
-      how: 'دویدن اون‌قدر آرام که نفس‌نفس نزنی. اگه یه تکرار سخت بود، پیاده‌روی رو طولانی‌تر کن — این شکست نیست، بخشی از برنامه‌ست.' + (extraNote ? ' ' + extraNote : '')
+      how: 'دویدن اون‌قدر آرام که نفس‌نفس نزنی. اگه یه تکرار سخت بود، پیاده‌روی رو طولانی‌تر کن — این شکست نیست، بخشی از برنامه‌ست.' + (extraNote ? ' ' + extraNote : ''),
+      talk: TALK_TEST, easyEffort: true
     };
   }
 
@@ -430,7 +541,8 @@
     return {
       type: 'easy', km: km, hardKm: 0, target: km + ' کیلومتر',
       steps: [km + ' کیلومتر دویدن پیوسته و آرام'],
-      how: rpeLine('easy') + paceNote('پیس تقریبی', zones && zones.easy) + (note ? ' ' + note : '')
+      how: rpeLine('easy') + easyGuide(zones) + (note ? ' ' + note : ''),
+      talk: TALK_TEST, easyEffort: true
     };
   }
 
@@ -481,8 +593,9 @@
     var s = {
       type: 'long', km: km, hardKm: segKm, target: km + ' کیلومتر', segKm: segKm, kind: segKm ? kind : 'plain',
       steps: steps,
-      how: rpeLine('long') + paceNote('پیس بخش آسون', zones && zones.easy) + extra +
-        ' لانگ‌ران به‌خاطر فشار حجمی جزو «روزهای سخت» حساب می‌شه.'
+      how: rpeLine('long') + easyGuide(zones) + extra +
+        ' لانگ‌ران به‌خاطر فشار حجمی جزو «روزهای سخت» حساب می‌شه.',
+      talk: TALK_TEST
     };
     if (segKm) s.variant = kind === 'mp' ? 'با پیس ماراتن' : 'با بخش‌های تمپو';
     return s;
@@ -585,9 +698,8 @@
     var steps = ['۱۰ تا ۱۵ دقیقه گرم کردن آسون', 'کیلومترهای اول کمی آهسته‌تر از پیس هدف شروع کن',
       'از ایستگاه‌های آب استفاده کن', 'بعد از خط پایان: پیاده‌روی و آب'];
     var how = 'روز مسابقه! هیچ چیز جدیدی (کفش، غذا، لباس) امتحان نکن.';
-    if (profile.pb && profile.pb.timeSec) {
-      how += ' زمان پیش‌بینی (Riegel): حدود ' + formatDuration(riegel(profile.pb.timeSec, profile.pb.distanceKm, d)) + '.';
-    }
+    var fit = currentFitness(profile);
+    if (fit) how += ' زمان پیش‌بینی (Riegel، از آخرین تایم‌تست/رکوردت): حدود ' + formatDuration(riegel(fit.entry.timeSec, fit.entry.distanceKm, d)) + '.';
     if (level === 1) how += ' با همون پروتکل دو-پیاده برو؛ هدف فقط رسیدن سالم به خط پایانه.';
     return { type: 'race', km: round05(d), hardKm: d, target: RACE_LABELS[r.distance], steps: steps, how: how };
   }
@@ -791,7 +903,7 @@
   // ---------- تطبیق با چک‌این روزانه ----------
   var PAIN_MESSAGE = 'این می‌تونه نشونه آسیب باشه. مربی نمی‌تونه این رو تشخیص بده. لطفاً به پزشک مراجعه کن.';
 
-  function adaptSession(session, checkin, prevCheckin) {
+  function adaptSession(session, checkin, prevCheckin, zones) {
     if (!checkin) return { session: session, adaptation: null };
     if (checkin.pain) {
       var c = {
@@ -812,7 +924,7 @@
     }
     if (session.hard) {
       var km = session.km ? Math.max(Math.min(3, session.km), round05(session.km * 0.6)) : null;
-      var e = km ? makeEasy(km, null) : makeRunWalk({ runTotal: 8, run: 1, walk: 2 }, 1);
+      var e = km ? makeEasy(km, zones || null) : makeRunWalk({ runTotal: 8, run: 1, walk: 2 }, 1);
       e.date = session.date; e.dayName = session.dayName;
       e.label = TYPE_INFO[e.type].label; e.hard = false; e.original = session;
       var msg = why + '، پس جلسه‌ی ' + session.label + ' امروز به ایزی ران کوتاه‌تر تبدیل شد. ' +
@@ -872,6 +984,10 @@
     weeklyVolume: weeklyVolume, volumeCeiling: volumeCeiling, weekWorkouts: weekWorkouts, periodFor: periodFor,
     chooseSessionDays: chooseSessionDays, placeQuality: placeQuality, circDist: circDist,
     buildWeek: buildWeek, sessionFor: sessionFor, adaptSession: adaptSession, isHard: isHard,
+    currentFitness: currentFitness, fitnessEntries: fitnessEntries, hrZones: hrZones, easyRunFeedback: easyRunFeedback,
+    easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, fitnessReminder: fitnessReminder,
+    fitnessLevelSuggestion: fitnessLevelSuggestion, TALK_TEST: TALK_TEST, EASY_RPE_WARNING: EASY_RPE_WARNING,
+    EASY_ADJUST_MAX: EASY_ADJUST_MAX,
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

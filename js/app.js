@@ -12,7 +12,7 @@
 
   // ---------- وضعیت و ذخیره‌سازی ----------
   var memoryFallback = null;
-  function emptyState() { return { profile: null, checkins: {}, done: {}, ackPain: {} }; }
+  function emptyState() { return { profile: null, checkins: {}, done: {}, ackPain: {}, postRuns: {} }; }
   function load() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
@@ -78,7 +78,7 @@
   }
   function effectiveSession(base) {
     var ci = state.checkins[base.date];
-    return C.adaptSession(base, ci, prevCheckin(base.date));
+    return C.adaptSession(base, ci, prevCheckin(base.date), C.paceZones(state.profile));
   }
   function unackedPainToday() {
     var k = C.dateKey(today());
@@ -89,7 +89,7 @@
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { plan: renderPlan, checkin: renderCheckin, race: renderRace, profile: renderProfile, onboarding: renderOnboarding };
+  var VIEWS = { plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, profile: renderProfile, onboarding: renderOnboarding };
   function route() {
     var v = (location.hash || '#plan').slice(1);
     if (!state.profile || needsMigration()) v = 'onboarding';
@@ -215,6 +215,8 @@
       '<small class="muted" id="rdate-fa"></small></div></div>' +
       '</div></fieldset>' +
 
+      '<fieldset><legend>۷. ضربان قلب (اختیاری)</legend>' + hrFields(p) + '</fieldset>' +
+
       '<div id="onb-errors" class="form-errors" role="alert" hidden></div>' +
       '<div class="actions">' +
       '<button type="submit" class="btn btn-primary">' + (editing ? 'ذخیره و به‌روزرسانی برنامه' : 'ساخت برنامه‌ی من') + '</button>' +
@@ -282,6 +284,8 @@
       if (!fd.get('structured')) errs.push('بگو تا حالا تمرین ساختاریافته (اینتروال، تمپو) انجام دادی یا نه.');
       var pbObj = readPb();
       if (pbObj === false) errs.push('رکورد: فاصله و زمان رو کامل و درست وارد کن (مثلاً ۰۳:۲۵:۰۰)، یا «رکورد ندارم» رو انتخاب کن.');
+      var hrIn = readHr(form);
+      if (hrIn.error) errs.push(hrIn.error);
       if (!(age >= 12 && age <= 90)) errs.push('سن باید بین ۱۲ تا ۹۰ باشه.');
       if (!(w >= 30 && w <= 250)) errs.push('وزن باید بین ۳۰ تا ۲۵۰ کیلوگرم باشه.');
       if (!(h >= 120 && h <= 230)) errs.push('قد باید بین ۱۲۰ تا ۲۳۰ سانتی‌متر باشه.');
@@ -308,8 +312,16 @@
         currentWeeklyKm: curKm, experience: fd.get('experience'), structured: fd.get('structured') === 'yes',
         schemaVersion: SCHEMA_VERSION,
         race: raceObj, pb: pbObj,
+        hrMax: hrIn.max, hrRest: hrIn.rest,
+        // تاریخچه‌ی فیتنس و تنظیم دستی پیس ایزی با ویرایش پروفایل حفظ می‌شن
+        fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0,
         createdAt: p.createdAt || new Date().toISOString()
       };
+      // تاریخ رکورد پایه: اگه تغییر نکرده، تاریخ قبلی؛ اگه جدیده، امروز
+      if (pbObj) {
+        var same = p.pb && p.pb.distanceKm === pbObj.distanceKm && p.pb.timeSec === pbObj.timeSec;
+        pbObj.date = same && p.pb.date ? p.pb.date : C.dateKey(today());
+      }
       // تغییر سطح یا حجم فعلی = نقطه‌ی شروع جدید؛ بقیه‌ی تغییرات پیشرفت برنامه رو حفظ می‌کنن
       var keep = editing && !migrating && p.startDate && p.currentWeeklyKm === curKm &&
         C.assessLevel(p).level === C.assessLevel(next).level;
@@ -335,7 +347,45 @@
       html += '<ol class="sess-steps">' + s.steps.map(function (x) { return '<li>' + t(x) + '</li>'; }).join('') + '</ol>';
     }
     if (s.how && s.type !== 'cancelled') html += '<p class="sess-how">' + t(s.how) + '</p>';
+    if (s.talk && s.type !== 'cancelled') html += '<p class="talk-test">' + t(s.talk) + '</p>';
+    if (opts.hint && s.easyEffort) html += '<p class="day-hint">' + t(opts.hint.message) + '</p>';
+    if (opts.key) html += postRunBlock(opts.key, s, opts.prefix || 'p');
     return html;
+  }
+
+  // ---------- بعد از جلسه‌ی ایزی: RPE و پیس ----------
+  var postRunOpen = null;
+  function postRunBlock(key, s, prefix) {
+    if (!s.easyEffort) return '';
+    var post = state.postRuns[key];
+    if (state.done[key] && post) {
+      var fb = C.easyRunFeedback(post, s.type);
+      if (!fb) return '';
+      var cls = fb.kind === 'ok' ? 'alert-good' : (fb.kind === 'warn' ? 'alert-adapt' : 'alert-note');
+      return '<div class="alert ' + cls + ' postrun-fb" role="status"><p class="small muted">بعد از جلسه: سختی ' + fa(post.rpe) + ' از ۱۰' +
+        (post.pace === 'ok' ? ' · پیس طبق برنامه' : post.pace === 'fast' ? ' · تندتر از بازه' : '') + '</p><p>' + t(fb.message) + '</p>' +
+        (fb.kind === 'warn' ? easyActions() : '') + '</div>';
+    }
+    if (postRunOpen !== key) return '';
+    var n = 'rpe-' + prefix;
+    var h = '<form class="postrun" data-postrun-form="' + key + '" data-type="' + s.type + '" novalidate>' +
+      '<p class="sub-legend">این دو چقدر برات آسون بود؟ از ۱ (خیلی سبک) تا ۱۰ (خیلی سخت).</p><div class="scale scale10" role="radiogroup" aria-label="سختی جلسه">';
+    for (var i = 1; i <= 10; i++) h += '<label class="scale-opt"><input type="radio" name="rpe" id="' + n + '-' + i + '" value="' + i + '"><span>' + fa(i) + '</span></label>';
+    h += '</div><div class="scale-ends"><span>۱ = خیلی سبک</span><span>۱۰ = خیلی سخت</span></div>';
+    if (s.type !== 'runwalk') {
+      h += '<p class="sub-legend">پیست چطور بود؟</p><div class="chips">' +
+        '<label class="chip"><input type="radio" name="pace" value="ok"><span>داخل بازه‌ی ایزی یا کندتر</span></label>' +
+        '<label class="chip"><input type="radio" name="pace" value="fast"><span>تندتر از بازه</span></label>' +
+        '<label class="chip"><input type="radio" name="pace" value="unknown"><span>پیس رو نگاه نکردم</span></label></div>';
+    }
+    return h + '<p class="form-errors" hidden></p><div class="actions"><button type="submit" class="btn btn-primary">ثبت</button>' +
+      '<button type="button" class="btn btn-ghost" data-postrun-cancel="1">انصراف</button></div></form>';
+  }
+  function easyActions() {
+    var p = state.profile, adj = Number(p.easyAdjustSec) || 0;
+    return '<div class="actions">' +
+      (adj < C.EASY_ADJUST_MAX ? '<button type="button" class="btn btn-outline" data-slow-easy="1">پیس ایزی رو ۱۰ ثانیه کندتر کن</button>' : '') +
+      '<a class="btn btn-ghost" href="#fitness">ثبت تایم‌تست تازه</a></div>';
   }
 
   function badge(type, label) {
@@ -384,8 +434,9 @@
     var r = effectiveSession(base);
     var s = r.session;
     html += '<h2>' + badge(s.type, s.label) + '</h2></div>' +
-      (s.type !== 'cancelled' ? doneButton(key) : '') + '</div>' +
-      adaptationBox(r.adaptation, key) + (s.type !== 'cancelled' ? sessionBody(s) : '') +
+      (s.type !== 'cancelled' ? doneButton(key, s) : '') + '</div>' +
+      adaptationBox(r.adaptation, key) +
+      (s.type !== 'cancelled' ? sessionBody(s, { key: key, prefix: 'today', hint: C.easyDayHint(ci, prevCheckin(key)) }) : '') +
       '<p class="small muted">چک‌این امروز: خستگی ' + fa(ci.fatigue) + ' از ۵ · خواب ' + fa(ci.sleep) + ' از ۵ · درد: ' + (ci.pain ? 'بله' : 'نه') +
       (ci.pain ? '' : ' · <a href="#checkin">ویرایش چک‌این</a>') + '</p>';
     return html + '</section>';
@@ -396,8 +447,12 @@
       'اگه هنوز درد داری، امروز هم تمرین نکن و به پزشک مراجعه کن. توی چک‌این امروز دقیق جواب بده.</div>';
   }
 
-  function doneButton(key) {
+  function doneButton(key, s) {
     var done = !!state.done[key];
+    // جلسه‌ی ایزی: قبل از ثبت انجام، سؤال RPE و پیس پرسیده می‌شه
+    if (!done && s && s.easyEffort) {
+      return '<button type="button" class="btn btn-outline" data-postrun="' + key + '" aria-expanded="' + (postRunOpen === key) + '">انجامش دادم</button>';
+    }
     return '<button type="button" class="btn ' + (done ? 'btn-done' : 'btn-outline') + '" data-done="' + key + '" aria-pressed="' + done + '">' +
       (done ? '✓ انجام شد' : 'انجامش دادم') + '</button>';
   }
@@ -415,6 +470,7 @@
     var html = '';
     html += todayCard();
     html += '<section class="card level-strip">' + levelCard(lv, true) + '</section>';
+    html += fitnessNotesCard(p, now);
 
     if (warnings.length) {
       html += '<section class="card warnings"><h3>نکته‌های مهم برای تو</h3><ul>' +
@@ -469,10 +525,10 @@
     html += '<div class="day-panel" id="day-panel" role="tabpanel" aria-labelledby="tab-' + selectedDay + '">' +
       '<div class="day-panel-head"><div><p class="eyebrow">' + esc(ss.dayName) + ' ' + esc(faDate(selectedDay)) +
       (selectedDay === todayKey ? ' · امروز' : '') + '</p><h3>' + badge(ss.type, ss.label) + '</h3></div>' +
-      (selectedDay <= todayKey && ['rest', 'none', 'cancelled'].indexOf(ss.type) < 0 && (selectedDay < todayKey || state.checkins[todayKey]) ? doneButton(selectedDay) : '') +
+      (selectedDay <= todayKey && ['rest', 'none', 'cancelled'].indexOf(ss.type) < 0 && (selectedDay < todayKey || state.checkins[todayKey]) ? doneButton(selectedDay, ss) : '') +
       '</div>' +
       (rs.adaptation ? adaptationBox(rs.adaptation, selectedDay) : '') +
-      (ss.type !== 'cancelled' ? sessionBody(ss) : '') +
+      (ss.type !== 'cancelled' ? sessionBody(ss, selectedDay <= todayKey && selectedDay !== todayKey ? { key: selectedDay, prefix: 'panel' } : {}) : '') +
       (selectedDay > todayKey && ['rest', 'none'].indexOf(ss.type) < 0 ? '<p class="small muted">این جلسه ممکنه بعد از چک‌این همون روز با وضعیتت تطبیق داده بشه.</p>' : '') +
       '</div>';
     html += '<p class="legend small muted">روزهای سخت (تمپو، اینتروال، تکرار سرعتی، فارتلک، لانگ‌ران) هیچ‌وقت پشت‌سرهم نیستن. ' +
@@ -509,11 +565,75 @@
     var dn = e.target.closest('[data-done]');
     if (dn) {
       var k = dn.dataset.done;
-      if (state.done[k]) delete state.done[k]; else state.done[k] = true;
+      if (state.done[k]) { delete state.done[k]; delete state.postRuns[k]; } else state.done[k] = true;
       save();
       route();
+      return;
     }
+    var pr = e.target.closest('[data-postrun]');
+    if (pr) { postRunOpen = postRunOpen === pr.dataset.postrun ? null : pr.dataset.postrun; route(); return; }
+    if (e.target.closest('[data-postrun-cancel]')) { postRunOpen = null; route(); return; }
+    if (e.target.closest('[data-slow-easy]')) {
+      state.profile.easyAdjustSec = Math.min(C.EASY_ADJUST_MAX, (Number(state.profile.easyAdjustSec) || 0) + 10);
+      save();
+      showToast('پیس ایزی ' + fa(state.profile.easyAdjustSec) + ' ثانیه کندتر از محاسبه‌ی VDOT تنظیم شد.');
+      route();
+      return;
+    }
+    if (e.target.closest('[data-apply-level]')) { applyFitnessLevel(); return; }
   });
+
+  app.addEventListener('submit', function (e) {
+    var f = e.target.closest('[data-postrun-form]');
+    if (!f) return;
+    e.preventDefault();
+    var rpe = f.querySelector('input[name=rpe]:checked');
+    var pace = f.querySelector('input[name=pace]:checked');
+    var err = f.querySelector('.form-errors');
+    if (!rpe || (f.dataset.type !== 'runwalk' && !pace)) {
+      err.hidden = false;
+      err.textContent = f.dataset.type !== 'runwalk' ? 'سختی جلسه و وضعیت پیس رو انتخاب کن.' : 'سختی جلسه رو انتخاب کن.';
+      return;
+    }
+    var key = f.dataset.postrunForm;
+    state.done[key] = true;
+    state.postRuns[key] = { rpe: Number(rpe.value), pace: pace ? pace.value : null, easy: true, type: f.dataset.type, at: new Date().toISOString() };
+    postRunOpen = null;
+    save();
+    route();
+  });
+
+  // کارت «به‌روزرسانی فیتنس» روی داشبورد: یادآوری تایم‌تست، الگوی RPE بالا، پیشنهاد تغییر سطح
+  function fitnessNotesCard(p, now) {
+    var items = [];
+    var rem = C.fitnessReminder(p, now);
+    if (rem) items.push('<li>' + t(rem.message) + ' <a href="#fitness">ثبت تایم‌تست</a></li>');
+    var trend = C.easyRpeTrend(state.postRuns, now);
+    if (trend >= 2) items.push('<li><strong>الگوی تکراری:</strong> در دو هفته‌ی اخیر ' + fa(trend) + ' جلسه‌ی ایزی با پیس برنامه برات سخت (RPE بالای ۶) بوده. ' +
+      t(C.EASY_RPE_WARNING) + easyActions() + '</li>');
+    var sg = C.fitnessLevelSuggestion(p);
+    if (sg) items.push('<li>بر اساس آخرین تایم‌تستت، فیتنست با <strong>سطح ' + fa(sg.to) + '</strong> جور درمیاد (برنامه‌ی فعلی: سطح ' + fa(sg.from) + '). ' +
+      (sg.up ? 'اگه بخوای، برنامه از همین هفته با سطح جدید و از همین حجم فعلیت ادامه پیدا می‌کنه.' : 'اگه وقفه یا آسیب داشتی، بهتره برنامه با سطح پایین‌تر و از همین حجم ادامه پیدا کنه.') +
+      '<div class="actions"><button type="button" class="btn btn-outline" data-apply-level="1">برنامه رو با سطح ' + fa(sg.to) + ' ادامه بده</button></div></li>');
+    if (!items.length) return '';
+    return '<section class="card fitness-notes"><h3>به‌روزرسانی فیتنس</h3><ul>' + items.join('') + '</ul></section>';
+  }
+
+  // تغییر سطح بر اساس آخرین تایم‌تست؛ حجم از حجم فعلی برنامه ادامه پیدا می‌کنه (نه از عدد قدیمی)
+  function applyFitnessLevel() {
+    var p = state.profile, now = today();
+    var fit = C.currentFitness(p);
+    if (!fit) return;
+    var wk = C.buildWeek(p, now);
+    var km = C.weeklyVolume(p, Math.max(0, wk.weekIndex), true).km;
+    var before = C.assessLevel(p).level;
+    p.pb = { distanceKm: fit.entry.distanceKm, timeSec: fit.entry.timeSec, date: fit.entry.date };
+    p.currentWeeklyKm = km;
+    p.startDate = C.dateKey(now);
+    save();
+    showToast('برنامه با سطح ' + fa(C.assessLevel(p).level) + ' (قبلاً ' + fa(before) + ') و حجم ' + t(km) + ' کیلومتر ادامه پیدا می‌کنه.');
+    route();
+  }
 
   // جابه‌جایی بین روزها با کلیدهای جهت (در راست‌چین، چپ = روز بعد)
   app.addEventListener('keydown', function (e) {
@@ -655,7 +775,8 @@
     var now = today();
     var daysLeft = C.daysBetween(now, race.date);
     var taperStart = C.addDays(race.date, -C.taperWeeks(race.key) * 7);
-    var pb = p.pb;
+    var fit = C.currentFitness(p);
+    var pb = fit ? fit.entry : null;
 
     var html = '<section class="card race-hero"><p class="eyebrow">هدف مسابقه</p>' +
       '<h1>' + esc(C.RACE_LABELS[race.key]) + '</h1>' +
@@ -671,7 +792,7 @@
       html += '<div class="prediction"><span>زمان پیش‌بینی‌شده برای ' + esc(C.RACE_LABELS[race.key]) + '</span>' +
         '<b dir="ltr">' + fa(C.formatDuration(pred)) + '</b>' +
         '<small>پیس متوسط: ' + fa(C.formatDuration(pred / race.km)) + ' دقیقه در کیلومتر</small></div>' +
-        '<p class="muted small">بر اساس رکورد ' + t(pb.distanceKm) + ' کیلومتر در ' + fa(C.formatDuration(pb.timeSec)) + '.</p>' +
+        '<p class="muted small">بر اساس آخرین تایم‌تست/رکوردت: ' + t(Math.round(pb.distanceKm * 100) / 100) + ' کیلومتر در ' + fa(C.formatDuration(pb.timeSec)) + ' (' + esc(faDate(pb.date, true)) + ').</p>' +
         '<table class="pred-table"><thead><tr><th>فاصله</th><th>زمان پیش‌بینی</th><th>پیس (دقیقه/کیلومتر)</th></tr></thead><tbody>' +
         Object.keys(C.RACE_DISTANCES).map(function (k) {
           var d = C.RACE_DISTANCES[k], tt = C.riegel(pb.timeSec, pb.distanceKm, d);
@@ -679,13 +800,9 @@
         }).join('') + '</tbody></table>' +
         '<p class="small muted">فرمول Riegel برای دونده‌های تمرین‌کرده دقیق‌تره. هرچی فاصله‌ی مسابقه از فاصله‌ی رکورد دورتر باشه (مثلاً از ۵ کیلومتر به ماراتن)، و اگه حجم تمرینت برای اون فاصله کافی نباشه، پیش‌بینی خوش‌بینانه‌تر می‌شه.</p>';
     } else {
-      html += '<p>برای پیش‌بینی، بهترین رکورد اخیرت رو وارد کن.</p>';
+      html += '<p>برای پیش‌بینی، یه تایم‌تست یا رکورد اخیر ثبت کن.</p>';
     }
-    html += '<form id="pb-form" class="pb-form" novalidate><div class="row2">' +
-      '<div class="field"><label for="pbd2">فاصله‌ی رکورد (کیلومتر)</label><input id="pbd2" name="d" type="number" inputmode="decimal" min="1" max="100" step="0.1" value="' + esc(pb ? pb.distanceKm : '') + '"></div>' +
-      '<div class="field"><label for="pbt2">زمان (ساعت:دقیقه:ثانیه)</label><input id="pbt2" name="t" dir="ltr" placeholder="00:27:30" value="' + esc(pb ? C.formatDuration(pb.timeSec) : '') + '"></div>' +
-      '</div><div id="pb-err" class="form-errors" role="alert" hidden></div>' +
-      '<button type="submit" class="btn btn-outline">' + (pb ? 'به‌روزرسانی رکورد' : 'محاسبه') + '</button></form></section>';
+    html += '<a class="btn btn-outline" href="#fitness">ثبت تایم‌تست یا رکورد تازه</a></section>';
 
     // توضیح تیپر
     html += '<section class="card"><h2>تیپر: کاهش حجم قبل از مسابقه</h2>' +
@@ -697,26 +814,135 @@
       '<li>۳ روز بعد مسابقه: استراحت، و بقیه‌ی اون هفته فقط دویدن آسون سبک.</li></ul></section>';
 
     app.innerHTML = html;
-    document.getElementById('pb-form').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var d = Number(this.d.value), tt = C.parseTime(this.t.value);
-      var box = document.getElementById('pb-err');
-      var v = d / (tt / 3600);
-      if (!(d >= 1 && d <= 100) || !tt || v > 26 || v < 3) {
-        box.hidden = false;
-        box.textContent = 'فاصله (۱ تا ۱۰۰ کیلومتر) و زمان رو درست و به شکل ۰۰:۲۷:۳۰ وارد کن.';
-        return;
-      }
-      var before = C.assessLevel(state.profile).level;
-      state.profile.pb = { distanceKm: d, timeSec: tt };
-      var after = C.assessLevel(state.profile).level;
-      // تغییر سطح = نوع تمرین‌ها عوض می‌شه؛ برنامه از همین هفته با حجم فعلی دوباره شروع می‌شه
-      if (after !== before) state.profile.startDate = C.dateKey(today());
+  }
+
+  // =====================================================================
+  // به‌روزرسانی فیتنس: تایم‌تست/رکورد تازه → VDOT و همه‌ی پیس‌ها بازمحاسبه
+  // =====================================================================
+  var TEST_KINDS = [['t2', 2, 'تایم‌تست ۲ کیلومتر'], ['t3', 3, 'تایم‌تست ۳ کیلومتر'], ['t5', 5, 'تایم‌تست ۵ کیلومتر'], ['race', null, 'مسابقه یا فاصله‌ی دیگه']];
+  var ENTRY_LABELS = { test: 'تایم‌تست', race: 'مسابقه', baseline: 'رکورد پایه (موقع ساخت برنامه)' };
+
+  function renderFitness() {
+    var p = state.profile, now = today();
+    var z = C.paceZones(p);
+    var fit = C.currentFitness(p);
+    var rem = C.fitnessReminder(p, now);
+    var hr = C.hrZones(p);
+    var html = '<section class="card"><p class="eyebrow">به‌روزرسانی فیتنس</p><h1>فیتنس و پیس‌های فعلی</h1>';
+    if (fit) {
+      var e = fit.entry, weeks = Math.floor(C.daysBetween(C.parseDate(e.date), now) / 7);
+      html += '<div class="fit-head"><div class="vdot-badge"><b>' + t(fit.vdot.toFixed(1)) + '</b><small>VDOT</small></div><div>' +
+        '<p>از <b>' + esc(ENTRY_LABELS[e.kind] || 'رکورد') + '</b>: ' + t(Math.round(e.distanceKm * 100) / 100) + ' کیلومتر در <span dir="ltr">' + fa(C.formatDuration(e.timeSec)) + '</span></p>' +
+        '<p class="small muted">' + esc(faDate(e.date)) + (weeks > 0 ? ' · ' + fa(weeks) + ' هفته پیش' : ' · همین هفته') + '</p></div></div>';
+    } else {
+      html += '<p>هنوز رکورد یا تایم‌تستی ثبت نشده، پس پیس دقیقی نداریم و راهنمای شدت فعلاً تست حرف زدن' + (hr ? ' و ضربان قلبه.' : 'ه.') + '</p>';
+    }
+    if (rem && rem.kind === 'stale') html += '<div class="alert alert-adapt" role="status"><p>' + t(rem.message) + '</p></div>';
+
+    if (z && z.easy) {
+      var adj = z.easyAdjustSec;
+      html += '<h2>پیس‌های تمرینی (از VDOT فعلی)</h2><div class="table-wrap"><table class="pred-table pace-table"><thead><tr><th>نوع</th><th>پیس (دقیقه/کیلومتر)</th><th>کاربرد</th></tr></thead><tbody>' +
+        '<tr class="hl"><td>ایزی (E)</td><td dir="ltr">' + fa(C.formatDuration(z.easy[0]) + ' – ' + C.formatDuration(z.easy[1])) + '</td><td>ایزی ران و لانگ‌ران؛ یک بازه، نه یک عدد</td></tr>' +
+        '<tr><td>ماراتن (M)</td><td dir="ltr">' + fa(C.formatDuration((z.marathon[0] + z.marathon[1]) / 2)) + '</td><td>بخش‌های پیس ماراتن</td></tr>' +
+        '<tr><td>آستانه (T)</td><td dir="ltr">' + fa(C.formatDuration(z.tempo[0]) + ' – ' + C.formatDuration(z.tempo[1])) + '</td><td>تمپو و کروز اینتروال</td></tr>' +
+        '<tr><td>اینتروال (I)</td><td dir="ltr">' + fa(C.formatDuration(z.interval[0]) + ' – ' + C.formatDuration(z.interval[1])) + '</td><td>تکرارهای ۸۰۰ تا ۱۲۰۰ متر</td></tr>' +
+        '<tr><td>تکرار (R)</td><td dir="ltr">' + fa(C.formatDuration(z.reps[0]) + ' – ' + C.formatDuration(z.reps[1])) + '</td><td>تکرارهای ۲۰۰ و ۴۰۰ متر</td></tr>' +
+        '</tbody></table></div>' +
+        '<p class="small muted">مرکز بازه‌ی ایزی حدود ۷۰٪ VDOT هست. حد تندتر برای روزهای خوب، حد کندتر برای گرما، خستگی یا خواب بد. اگه تست حرف زدن رو رد کردی، حتی از حد کند هم آهسته‌تر بدو.</p>' +
+        '<div class="adjust-row"><p class="small">' + (adj ? 'پیس ایزی الان <b>' + fa(adj) + ' ثانیه</b> کندتر از محاسبه‌ی VDOT تنظیم شده.' : 'پیس ایزی دقیقاً از VDOT محاسبه شده.') + '</p><div class="actions">' +
+        (adj < C.EASY_ADJUST_MAX ? '<button type="button" class="btn btn-outline" id="fit-slow">۱۰ ثانیه کندتر</button>' : '') +
+        (adj ? '<button type="button" class="btn btn-ghost" id="fit-reset">برگردون به محاسبه‌ی VDOT</button>' : '') + '</div></div>';
+    }
+    if (hr) {
+      html += '<p class="hr-line">ضربان قلب ایزی: <b>' + fa(hr.easy[0]) + ' تا ' + fa(hr.easy[1]) + '</b> ضربه در دقیقه <span class="small muted">(' +
+        (hr.method === 'karvonen' ? '۶۰ تا ۷۵٪ ذخیره‌ی ضربان، فرمول Karvonen' + (hr.maxEstimated ? '؛ حداکثر ضربان از سن تخمین زده شده: ' + fa(hr.max) : '') : '۶۵ تا ۷۸٪ حداکثر ضربان؛ با وارد کردن ضربان استراحت دقیق‌تر می‌شه') + ')</span></p>';
+    }
+    html += '</section>';
+
+    // فرم ثبت تایم‌تست/رکورد تازه
+    var todayKey = C.dateKey(now);
+    html += '<section class="card"><h2>ثبت تایم‌تست یا رکورد تازه</h2>' +
+      '<p class="small muted">پیشنهاد: هر ۴ تا ۶ هفته، یا بعد از وقفه/آسیب/تغییر فصل. با ثبت نتیجه، VDOT و همه‌ی پیس‌های تمرینی (از جمله ایزی) خودکار بازمحاسبه می‌شن.</p>' +
+      '<details class="howto"><summary>تایم‌تست رو چطور اجرا کنم؟</summary><ol class="small">' +
+      '<li>۱۵ دقیقه دویدن آسون + ۴ سرعت کوتاه برای گرم کردن.</li><li>روی مسیر صاف یا پیست، با حداکثر تلاشی که بتونی تا آخر یکنواخت نگهش داری.</li>' +
+      '<li>روزی که سرحالی (نه بعد از تمرین سخت یا خواب بد) و هوا خیلی گرم نیست.</li><li>۱۰ دقیقه سرد کردن. اگه درد داشتی، تست رو متوقف کن.</li></ol></details>' +
+      '<form id="fit-form" novalidate><div class="row3">' +
+      '<div class="field"><label for="fk">نوع</label><select id="fk" name="kind">' + TEST_KINDS.map(function (k) { return '<option value="' + k[0] + '">' + k[2] + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field" id="fkm-field" hidden><label for="fkm">فاصله (کیلومتر)</label><input id="fkm" name="km" type="number" inputmode="decimal" min="1" max="100" step="0.1"></div>' +
+      '<div class="field"><label for="ft">زمان (ساعت:دقیقه:ثانیه)</label><input id="ft" name="time" dir="ltr" inputmode="numeric" placeholder="00:09:40"></div>' +
+      '<div class="field"><label for="fd">تاریخ</label><input id="fd" name="date" type="date" max="' + todayKey + '" value="' + todayKey + '"></div>' +
+      '</div><p id="fit-err" class="form-errors" role="alert" hidden></p>' +
+      '<button type="submit" class="btn btn-primary">ثبت و بازمحاسبه‌ی پیس‌ها</button></form></section>';
+
+    // تاریخچه
+    var list = C.fitnessEntries(p).slice().reverse();
+    if (list.length) {
+      html += '<section class="card"><h2>تاریخچه‌ی فیتنس</h2><div class="table-wrap"><table class="pred-table"><thead><tr><th>تاریخ</th><th>نوع</th><th>فاصله</th><th>زمان</th><th>VDOT</th><th></th></tr></thead><tbody>' +
+        list.map(function (e, i) {
+          var idx = (p.fitnessTests || []).indexOf((p.fitnessTests || []).filter(function (x) { return x.date === e.date && x.timeSec === e.timeSec && x.distanceKm === e.distanceKm; })[0]);
+          return '<tr' + (i === 0 ? ' class="hl"' : '') + '><td>' + esc(faDate(e.date, true)) + '</td><td>' + esc(ENTRY_LABELS[e.kind] || '—') + '</td><td>' + t(Math.round(e.distanceKm * 100) / 100) + ' km</td>' +
+            '<td dir="ltr">' + fa(C.formatDuration(e.timeSec)) + '</td><td>' + t(C.vdotFromRace(e.distanceKm, e.timeSec).toFixed(1)) + '</td>' +
+            '<td>' + (e.kind !== 'baseline' && idx >= 0 ? '<button type="button" class="linklike" data-del-test="' + idx + '">حذف</button>' : '') + '</td></tr>';
+        }).join('') + '</tbody></table></div><p class="small muted">همیشه «آخرین» نتیجه ملاکه، نه بهترین؛ چون هدف پیس متناسب با فیتنس امروزته.</p></section>';
+    }
+
+    // ضربان قلب
+    html += '<section class="card"><h2>ضربان قلب (اختیاری)</h2>' + hrFields(p) +
+      '<p id="hr-err" class="form-errors" role="alert" hidden></p><button type="button" class="btn btn-outline" id="hr-save">ذخیره‌ی ضربان</button></section>';
+
+    app.innerHTML = html;
+
+    var form = document.getElementById('fit-form');
+    form.kind.addEventListener('change', function () { document.getElementById('fkm-field').hidden = form.kind.value !== 'race'; });
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var kind = form.kind.value;
+      var km = kind === 'race' ? Number(form.km.value) : TEST_KINDS.filter(function (k) { return k[0] === kind; })[0][1];
+      var tt = C.parseTime(form.time.value), date = form.date.value;
+      var err = document.getElementById('fit-err');
+      var v = km && tt ? km / (tt / 3600) : 0;
+      if (!(km >= 1 && km <= 100) || !tt || v > 26 || v < 3) { err.hidden = false; err.textContent = 'فاصله و زمان رو درست وارد کن (مثلاً ۰۰:۰۹:۴۰ برای ۲ کیلومتر).'; return; }
+      if (!date || date > todayKey) { err.hidden = false; err.textContent = 'تاریخ باید امروز یا قبل از امروز باشه.'; return; }
+      var before = C.paceZones(p);
+      p.fitnessTests = (p.fitnessTests || []).concat([{ date: date, distanceKm: km, timeSec: tt, kind: kind === 'race' ? 'race' : 'test' }]);
+      // تایم‌تست تازه = پیس‌ها از نو؛ تنظیم دستی قبلی دیگه لازم نیست
+      p.easyAdjustSec = 0;
       save();
-      showToast(after !== before ? 'رکورد ذخیره شد؛ سطحت از ' + fa(before) + ' به ' + fa(after) + ' تغییر کرد و برنامه به‌روز شد.'
-        : 'رکورد ذخیره شد؛ پیس‌های برنامه هم به‌روز شد.');
-      renderRace();
+      var after = C.paceZones(p);
+      showToast('VDOT: ' + fa((before && before.vdot ? before.vdot.toFixed(1) + ' ← ' : '')) + fa(after.vdot.toFixed(1)) + ' · بازه‌ی ایزی جدید: ' + fa(C.formatDuration(after.easy[0]) + ' تا ' + C.formatDuration(after.easy[1])));
+      renderFitness();
     });
+    var slow = document.getElementById('fit-slow'), reset = document.getElementById('fit-reset');
+    if (slow) slow.addEventListener('click', function () { p.easyAdjustSec = Math.min(C.EASY_ADJUST_MAX, (Number(p.easyAdjustSec) || 0) + 10); save(); renderFitness(); });
+    if (reset) reset.addEventListener('click', function () { p.easyAdjustSec = 0; save(); renderFitness(); });
+    app.querySelectorAll('[data-del-test]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        p.fitnessTests.splice(Number(b.dataset.delTest), 1);
+        save(); renderFitness();
+      });
+    });
+    document.getElementById('hr-save').addEventListener('click', function () {
+      var r = readHr(app), err = document.getElementById('hr-err');
+      if (r.error) { err.hidden = false; err.textContent = r.error; return; }
+      p.hrMax = r.max; p.hrRest = r.rest; save();
+      showToast(C.hrZones(p) ? 'ضربان ذخیره شد؛ بازه‌ی ضربان ایزی به‌روز شد.' : 'ضربان پاک شد.');
+      renderFitness();
+    });
+  }
+
+  // فیلدهای ضربان (در فرم اولیه و صفحه‌ی فیتنس)
+  function hrFields(p) {
+    return '<p class="small muted">اگه ساعت یا کمربند ضربان داری، این‌ها رو وارد کن تا بازه‌ی ضربان ایزی (۶۰ تا ۷۵٪ ذخیره‌ی ضربان، فرمول Karvonen) هم کنار پیس نشون داده بشه. هر دو اختیاری‌ان.</p>' +
+      '<div class="row2"><div class="field"><label for="hrmax">حداکثر ضربان قلب تقریبی</label><input id="hrmax" name="hrMax" type="number" inputmode="numeric" min="120" max="230" value="' + esc(p.hrMax || '') + '"></div>' +
+      '<div class="field"><label for="hrrest">ضربان استراحت (صبح، قبل از بلند شدن)</label><input id="hrrest" name="hrRest" type="number" inputmode="numeric" min="30" max="100" value="' + esc(p.hrRest || '') + '"></div></div>';
+  }
+  function readHr(root) {
+    var mx = root.querySelector('#hrmax').value.trim(), rs = root.querySelector('#hrrest').value.trim();
+    var max = mx ? Number(mx) : null, rest = rs ? Number(rs) : null;
+    if (max !== null && !(max >= 120 && max <= 230)) return { error: 'حداکثر ضربان باید بین ۱۲۰ تا ۲۳۰ باشه.' };
+    if (rest !== null && !(rest >= 30 && rest <= 100)) return { error: 'ضربان استراحت باید بین ۳۰ تا ۱۰۰ باشه.' };
+    if (max !== null && rest !== null && rest >= max - 20) return { error: 'ضربان استراحت باید خیلی کمتر از حداکثر ضربان باشه.' };
+    return { max: max, rest: rest };
   }
 
   // =====================================================================
@@ -732,6 +958,8 @@
         (C.assessLevel(p).vdot ? ' <span class="muted small">(VDOT ' + t(C.assessLevel(p).vdot.toFixed(1)) + ')</span>' : '')) +
       row('سابقه‌ی دویدن', esc(C.EXPERIENCE[p.experience] ? C.EXPERIENCE[p.experience].label : '—')) +
       row('تمرین ساختاریافته', p.structured ? 'انجام داده' : 'انجام نداده') +
+      row('ضربان قلب', C.hrZones(p) ? 'ایزی: ' + fa(C.hrZones(p).easy[0]) + ' تا ' + fa(C.hrZones(p).easy[1]) + ' ضربه در دقیقه' : '<span class="muted">وارد نشده</span>') +
+      row('فیتنس فعلی', C.currentFitness(p) ? 'VDOT ' + t(C.currentFitness(p).vdot.toFixed(1)) + ' · <a href="#fitness">جزئیات و به‌روزرسانی</a>' : '<a href="#fitness">ثبت تایم‌تست</a>') +
       row('حجم فعلی (نقطه‌ی شروع)', t(p.currentWeeklyKm + ' کیلومتر در هفته')) +
       row('سن / وزن / قد', t(p.age + ' سال · ' + p.weightKg + ' کیلوگرم · ' + p.heightCm + ' سانتی‌متر') + ' <span class="muted small">(BMI ' + t(bmi.toFixed(1)) + ')</span>') +
       row('روزهای آزاد', esc(p.days.map(function (d) { return C.DAY_NAMES[d]; }).join('، '))) +

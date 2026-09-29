@@ -375,3 +375,28 @@ textarea { resize: vertical; }
   .level-num { width: 52px; height: 52px; }
   .level-num b { font-size: 1.35rem; }
 }
+
+/* ---------- ایزی تطبیقی، فیتنس ---------- */
+.talk-test { background: var(--c-easy-bg); color: #10502d; border-radius: 10px; padding: 8px 12px; font-size: 0.9rem; font-weight: 500; }
+.day-hint { background: var(--panel); border-inline-start: 4px solid var(--c-easy); border-radius: 8px; padding: 6px 12px; font-size: 0.88rem; }
+.alert-good { background: var(--c-easy-bg); border: 1px solid #b6dfc6; }
+.postrun { background: #fff; border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 10px 0; }
+.scale.scale10 { grid-template-columns: repeat(10, 1fr); gap: 4px; max-width: 520px; }
+.scale10 .scale-opt span { height: 44px; font-size: 1rem; }
+.scale10 + .scale-ends { max-width: 520px; }
+.fit-head { display: flex; align-items: center; gap: 14px; margin: 8px 0 12px; }
+.fit-head p { margin: 0; }
+.vdot-badge { flex: 0 0 auto; width: 72px; height: 72px; border-radius: 16px; background: var(--black); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; border-bottom: 4px solid var(--red); line-height: 1.1; }
+.vdot-badge b { font-size: 1.35rem; font-weight: 900; }
+.vdot-badge small { font-size: 0.7rem; color: #cfcfcf; }
+.table-wrap { overflow-x: auto; }
+.pace-table td:first-child { font-weight: 700; white-space: nowrap; }
+.pred-table td[dir=ltr] { white-space: nowrap; }
+.adjust-row { background: var(--panel); border-radius: 12px; padding: 10px 14px; }
+.adjust-row .actions { margin-top: 6px; }
+.hr-line { margin-top: 12px; }
+.howto summary { cursor: pointer; color: var(--red-dim); font-weight: 700; margin-bottom: 8px; }
+.fitness-notes { border-inline-start: 6px solid var(--c-easy); }
+.fitness-notes ul { margin: 0; padding-inline-start: 20px; }
+.fitness-notes li { margin-bottom: 8px; }
+@media (max-width: 519px) { .scale.scale10 { grid-template-columns: repeat(5, 1fr); } }

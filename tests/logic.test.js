@@ -271,4 +271,102 @@ test('شروع وسط هفته: هفته‌ی شروع ناقص، اولین ه�
   assert.strictEqual(C.buildWeek(p, C.parseDate('2026-10-10')).totalKm, 55);
 });
 
+// ---------- پیس تطبیقی ----------
+test('پیس ایزی: بازه‌ی ۳۰ تا ۴۵ ثانیه‌ای حول ۷۰٪ VDOT', function () {
+  var p = profileFor(6, { pb: { distanceKm: 42.195, timeSec: hms(3, 25) } });
+  var z = C.paceZones(p);
+  var width = z.easy[1] - z.easy[0];
+  assert(width >= 30 && width <= 45, 'width ' + width);
+  assert(z.easy[0] < z.easyCenter && z.easyCenter < z.easy[1]);
+  // مرکز = پیسی که در اون VO2 = ۷۰٪ VDOT
+  var v = 1000 / (z.easyCenter / 60);
+  var vo2 = -4.60 + 0.182258 * v + 0.000104 * v * v;
+  assert(Math.abs(vo2 / z.vdot - 0.70) < 0.005, 'pct ' + vo2 / z.vdot);
+});
+
+test('به‌روزرسانی فیتنس: آخرین تایم‌تست (نه بهترین رکورد قدیمی) پیس‌ها رو تعیین می‌کنه', function () {
+  var p = profileFor(6, { pb: { distanceKm: 42.195, timeSec: hms(3, 25), date: '2026-09-26' } });
+  var before = C.paceZones(p);
+  // بعد از وقفه/آسیب: تایم‌تست ۵ کیلومتر کندتر
+  p.fitnessTests = [{ date: '2026-11-07', distanceKm: 5, timeSec: hms(0, 25), kind: 'test' }];
+  var after = C.paceZones(p);
+  assert(after.vdot < before.vdot);
+  assert(after.easy[0] > before.easy[0] && after.tempo[0] > before.tempo[0] && after.interval[0] > before.interval[0]);
+  // تایم‌تست ۲ کیلومتری سریع‌تر، تاریخ جدیدتر
+  p.fitnessTests.push({ date: '2026-12-05', distanceKm: 2, timeSec: hms(0, 7, 30), kind: 'test' });
+  assert(C.paceZones(p).vdot > after.vdot);
+  // پیس داخل جلسه‌ی ایزی برنامه هم عوض می‌شه
+  var easyDay = C.buildWeek(p, C.parseDate('2026-12-05')).days.find(function (d) { return d.type === 'easy'; });
+  assert(easyDay.how.indexOf(C.formatDuration(C.paceZones(p).easy[0])) >= 0);
+});
+
+test('کندتر کردن دستی پیس ایزی (حداکثر ۳۰ ثانیه)', function () {
+  var p = profileFor(5, { pb: { distanceKm: 10, timeSec: hms(0, 48) } });
+  var base = C.paceZones(p).easy;
+  p.easyAdjustSec = 10;
+  assert.strictEqual(Math.round(C.paceZones(p).easy[0] - base[0]), 10);
+  p.easyAdjustSec = 90;
+  assert.strictEqual(Math.round(C.paceZones(p).easy[0] - base[0]), 30);
+});
+
+test('ضربان قلب: Karvonen ۶۰–۷۵٪ ذخیره، یا تخمین از سن', function () {
+  var z = C.hrZones({ hrMax: 190, hrRest: 50, age: 30 });
+  assert.deepStrictEqual(z.easy, [134, 155]);
+  assert.strictEqual(z.method, 'karvonen');
+  var e = C.hrZones({ hrRest: 60, age: 40 });
+  assert(e.maxEstimated && e.max === 180);
+  assert.deepStrictEqual(C.hrZones({ hrMax: 200, age: 30 }).easy, [130, 156]);
+  assert.strictEqual(C.hrZones({ age: 30 }), null);
+  assert.strictEqual(C.hrZones({ hrMax: 120, hrRest: 110, age: 30 }), null);
+  // بدون رکورد ولی با ضربان: راهنمای ضربان روی جلسه‌ی ایزی
+  var p = profileFor(3, { hrMax: 190, hrRest: 50 });
+  var easy = weekAt(p, 0).days.find(function (d) { return d.type === 'easy'; });
+  assert(easy.how.indexOf('134 تا 155') >= 0);
+});
+
+test('تست حرف زدن روی هر جلسه‌ی ایزی', function () {
+  [1, 3, 6, 9].forEach(function (n) {
+    weekAt(profileFor(n), 0).days.forEach(function (d) {
+      if (d.type === 'easy' || d.type === 'runwalk') assert.strictEqual(d.talk, C.TALK_TEST);
+    });
+  });
+});
+
+test('RPE بعد از جلسه‌ی ایزی: بالای ۶ با پیس درست → پیام دقیق', function () {
+  assert.strictEqual(C.easyRunFeedback({ rpe: 7, pace: 'ok' }, 'easy').message,
+    'به نظر می‌رسه این پیس الان برات ایزی نیست. پیشنهاد می‌کنیم پیس ایزی رو کمی کندتر تنظیم کنیم یا یک تایم‌تست تازه ثبت کنی.');
+  assert.strictEqual(C.easyRunFeedback({ rpe: 6, pace: 'ok' }, 'easy').kind, 'ok');
+  assert.strictEqual(C.easyRunFeedback({ rpe: 8, pace: 'fast' }, 'easy').kind, 'fast');
+  assert.strictEqual(C.easyRunFeedback({ rpe: 8 }, 'runwalk').kind, 'runwalk');
+  var today = C.parseDate('2026-10-20');
+  assert.strictEqual(C.easyRpeTrend({ '2026-10-10': { easy: true, rpe: 7, pace: 'ok' }, '2026-10-15': { easy: true, rpe: 8, pace: 'ok' },
+    '2026-10-16': { easy: true, rpe: 8, pace: 'fast' }, '2026-09-01': { easy: true, rpe: 9, pace: 'ok' } }, today), 2);
+});
+
+test('راهنمای روز: خستگی یا خواب بد → نیمه‌ی کند بازه', function () {
+  assert.strictEqual(C.easyDayHint({ fatigue: 3, sleep: 4 }).side, 'slow');
+  assert.strictEqual(C.easyDayHint({ fatigue: 1, sleep: 2 }).side, 'slow');
+  assert.strictEqual(C.easyDayHint({ fatigue: 2, sleep: 4 }, { sleep: 2 }).side, 'slow');
+  assert.strictEqual(C.easyDayHint({ fatigue: 2, sleep: 4 }, { sleep: 4 }).side, 'any');
+});
+
+test('یادآوری تایم‌تست بعد از ۶ هفته و پیشنهاد تغییر سطح', function () {
+  var p = profileFor(5, { pb: { distanceKm: 10, timeSec: hms(0, 48), date: '2026-09-26' } });
+  assert.strictEqual(C.fitnessReminder(p, C.parseDate('2026-10-20')), null);
+  assert.strictEqual(C.fitnessReminder(p, C.parseDate('2026-11-10')).kind, 'stale');
+  assert.strictEqual(C.fitnessReminder(profileFor(5), C.parseDate('2026-11-10')).kind, 'none');
+  assert.strictEqual(C.fitnessLevelSuggestion(p), null);
+  p.fitnessTests = [{ date: '2026-11-07', distanceKm: 5, timeSec: hms(0, 19, 30), kind: 'test' }];
+  var sgg = C.fitnessLevelSuggestion(p);
+  assert(sgg && sgg.up && sgg.to > sgg.from, JSON.stringify(sgg));
+  // تغییر سطح خودکار اعمال نمی‌شه (حجم پرش نمی‌کنه)
+  assert.strictEqual(C.assessLevel(p).level, 5);
+});
+
+test('تاریخچه‌ی فیتنس: رکورد پایه‌ای که همون تایم‌تسته تکراری نشون داده نمی‌شه', function () {
+  var e = { date: '2026-10-03', distanceKm: 5, timeSec: hms(0, 19, 40), kind: 'test' };
+  var p = profileFor(6, { fitnessTests: [e], pb: { distanceKm: 5, timeSec: hms(0, 19, 40), date: '2026-10-03' } });
+  assert.strictEqual(C.fitnessEntries(p).length, 1);
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));
