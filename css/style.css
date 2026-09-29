@@ -23,6 +23,10 @@
   --c-tempo-bg: #fff1e0;
   --c-interval: #e8121a;
   --c-interval-bg: #fdecec;
+  --c-reps: #0f6e8c;
+  --c-reps-bg: #e3f3f8;
+  --c-fartlek: #6d3fb3;
+  --c-fartlek-bg: #f1ebfa;
   --c-long: #111111;
   --c-long-bg: #ececec;
   --c-rest: #6b6b6b;
@@ -187,6 +191,7 @@ textarea { resize: vertical; }
 .race-fields { background: var(--panel); border-radius: 14px; padding: 14px 16px 4px; margin-top: 8px; }
 
 .form-errors { background: var(--red-soft); border: 1px solid var(--red); border-radius: 10px; padding: 10px 14px; color: #5a0003; margin-top: 12px; }
+.req { color: var(--red); font-weight: 700; font-size: 0.85rem; }
 .form-errors ul { margin: 0; padding-inline-start: 18px; }
 
 /* مقیاس ۱ تا ۵ */
@@ -209,6 +214,8 @@ textarea { resize: vertical; }
 .badge-easy, .badge-runwalk { background: var(--c-easy-bg); color: var(--c-easy); }
 .badge-tempo { background: var(--c-tempo-bg); color: var(--c-tempo); }
 .badge-interval { background: var(--c-interval-bg); color: var(--c-interval); }
+.badge-fartlek { background: var(--c-fartlek-bg); color: var(--c-fartlek); }
+.badge-reps { background: var(--c-reps-bg); color: var(--c-reps); }
 .badge-long { background: var(--c-long-bg); color: var(--c-long); }
 .badge-race { background: var(--red); color: #fff; }
 .badge-cancelled { background: var(--red-dim); color: #fff; }
@@ -265,6 +272,8 @@ textarea { resize: vertical; }
 .day-easy, .day-runwalk { border-top-color: var(--c-easy); --dot: var(--c-easy); }
 .day-tempo { border-top-color: var(--c-tempo); --dot: var(--c-tempo); }
 .day-interval { border-top-color: var(--c-interval); --dot: var(--c-interval); }
+.day-fartlek { border-top-color: var(--c-fartlek); --dot: var(--c-fartlek); }
+.day-reps { border-top-color: var(--c-reps); --dot: var(--c-reps); }
 .day-long { border-top-color: var(--c-long); --dot: var(--c-long); }
 .day-race { border-top-color: var(--red); background: var(--red-soft); --dot: var(--red); }
 .day-cancelled { border-top-color: var(--red-dim); background: var(--red-soft); --dot: var(--red-dim); }
@@ -343,3 +352,26 @@ textarea { resize: vertical; }
 .toast.out { opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- کارت سطح (۱ تا ۱۰) ---------- */
+.level-card { display: flex; gap: 16px; align-items: flex-start; background: var(--panel); border-radius: 14px; padding: 14px 16px; margin-top: 12px; }
+.level-card.compact { margin-top: 0; background: transparent; padding: 0; }
+.level-num {
+  flex: 0 0 auto; width: 64px; height: 64px; border-radius: 16px; background: var(--black); color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1;
+  border-bottom: 4px solid var(--red);
+}
+.level-num b { font-size: 1.7rem; font-weight: 900; }
+.level-num small { font-size: 0.68rem; color: #cfcfcf; }
+.level-body { min-width: 0; }
+.level-body h3 { margin-bottom: 4px; }
+.level-body p { margin-bottom: 6px; }
+.level-note { background: var(--c-tempo-bg); border-radius: 8px; padding: 6px 10px; font-weight: 500; }
+.level-wait { margin: 12px 0 0; }
+.form-hint { color: var(--c-tempo); margin-top: 6px; }
+.period-tag { display: inline-block; margin-top: 4px; font-size: 0.75rem; font-weight: 700; color: var(--red-dim); }
+.level-strip { padding-block: 16px; }
+@media (max-width: 519px) {
+  .level-num { width: 52px; height: 52px; }
+  .level-num b { font-size: 1.35rem; }
+}

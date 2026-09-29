@@ -5,6 +5,8 @@
   'use strict';
   var C = window.CoachLogic;
   var STORE_KEY = 'iranrunners-coach-mvp-v1';
+  // نسخه ۳: سطح ۱ تا ۱۰ از حجم، سابقه، رکورد و تجربه‌ی تمرین ساختاریافته محاسبه می‌شه
+  var SCHEMA_VERSION = 3;
   var app = document.getElementById('app');
   var modalRoot = document.getElementById('modal-root');
 
@@ -84,14 +86,16 @@
     return ci && ci.pain && !state.ackPain[k] ? k : null;
   }
 
+  function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
+
   // ---------- مسیریابی ----------
   var VIEWS = { plan: renderPlan, checkin: renderCheckin, race: renderRace, profile: renderProfile, onboarding: renderOnboarding };
   function route() {
     var v = (location.hash || '#plan').slice(1);
-    if (!state.profile) v = 'onboarding';
+    if (!state.profile || needsMigration()) v = 'onboarding';
     if (!VIEWS[v]) v = 'plan';
     var nav = document.getElementById('main-nav');
-    nav.hidden = !state.profile || v === 'onboarding';
+    nav.hidden = !state.profile || v === 'onboarding' || needsMigration();
     document.getElementById('nav-race').hidden = !(state.profile && state.profile.race && state.profile.race.has);
     nav.querySelectorAll('a').forEach(function (a) {
       if (a.dataset.view === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
@@ -105,41 +109,78 @@
   // =====================================================================
   // ۱. فرم اولیه
   // =====================================================================
+  // فاصله‌های رایج برای رکورد؛ «other» = فاصله‌ی دلخواه
+  var PB_DISTANCES = [['5', 5, '۵ کیلومتر'], ['10', 10, '۱۰ کیلومتر'], ['21', 21.0975, 'نیمه‌ماراتن'], ['42', 42.195, 'ماراتن'], ['other', null, 'فاصله‌ی دیگه']];
+  function pbDistanceKey(km) {
+    if (!km) return '';
+    for (var i = 0; i < PB_DISTANCES.length - 1; i++) if (Math.abs(PB_DISTANCES[i][1] - km) < 0.01) return PB_DISTANCES[i][0];
+    return 'other';
+  }
+
+  function levelCard(a, compact) {
+    var L = a.info;
+    var mar = L.marathon;
+    var marText = mar[1] === Infinity ? 'کندتر از ' + C.formatDuration(mar[0]) :
+      (mar[0] === 0 ? 'زیر ' + C.formatDuration(mar[1]) : C.formatDuration(mar[0]) + ' تا ' + C.formatDuration(mar[1]));
+    var kmText = L.km[1] === Infinity ? L.km[0] + ' کیلومتر و بیشتر' : (L.km[0] === 0 ? 'زیر ' + L.km[1] : L.km[0] + ' تا ' + L.km[1]) + ' کیلومتر';
+    return '<div class="level-card' + (compact ? ' compact' : '') + '">' +
+      '<div class="level-num" aria-hidden="true"><b>' + fa(a.level) + '</b><small>از ۱۰</small></div>' +
+      '<div class="level-body"><p class="eyebrow">سطح تو</p><h3>سطح ' + fa(a.level) + ': ' + esc(L.name) + '</h3>' +
+      '<p class="small muted">' + esc(L.desc) + ' · حجم مرجع: ' + t(kmText) + ' · ماراتن مرجع: <span dir="ltr">' + fa(marText) + '</span></p>' +
+      '<p class="small">' + (a.source === 'pb'
+        ? 'تعیین‌شده از روی رکوردت (VDOT ' + t(a.vdot.toFixed(1)) + ')؛ سطح تقریبی از روی حجم: ' + fa(a.volLevel)
+        : 'تعیین‌شده از روی حجم فعلی و سابقه‌ات؛ با وارد کردن رکورد، دقیق‌تر می‌شه.') + '</p>' +
+      '<p class="small"><b>نوع تمرین‌ها:</b> ' + esc(C.TIER_INFO[L.tier]) + '</p>' +
+      a.notes.map(function (n) { return '<p class="small level-note">' + t(n) + '</p>'; }).join('') +
+      '</div></div>';
+  }
+
   function renderOnboarding() {
     var p = state.profile || {};
     var editing = !!state.profile;
+    var migrating = editing && p.schemaVersion !== SCHEMA_VERSION;
     var race = p.race || { has: false };
     var pb = p.pb || {};
     var days = p.days || [];
     var locs = p.locations || [];
     var todayKey = C.dateKey(today());
+    var pbKey = pbDistanceKey(pb.distanceKm);
 
     function chip(name, value, label, checked, type) {
       return '<label class="chip"><input type="' + (type || 'checkbox') + '" name="' + name + '" value="' + value + '"' +
         (checked ? ' checked' : '') + '><span>' + label + '</span></label>';
     }
-    var levelDesc = {
-      absolute: 'تا حالا ندویدم یا نمی‌تونم ۱۰ دقیقه پیوسته بدوم',
-      beginner: 'می‌تونم ۲۰-۳۰ دقیقه آروم بدوم',
-      intermediate: 'مرتب می‌دوم، ۲۰ تا ۴۰ کیلومتر در هفته',
-      advanced: 'بیش از ۴۰ کیلومتر در هفته، تجربه‌ی مسابقه'
-    };
 
     app.innerHTML =
       '<section class="card onboarding">' +
       '<h1>' + (editing ? 'ویرایش پروفایل' : 'بیا برنامه‌ی دویدنت رو بسازیم') + '</h1>' +
-      '<p class="muted">' + (editing ? 'تغییرات، برنامه‌ی هفته‌های پیش رو رو دوباره می‌سازه.' :
+      (migrating ? '<div class="alert alert-adapt" role="status"><strong>سطح‌بندی جدید</strong>' +
+        '<p>از این نسخه، سطحت (از ۱ تا ۱۰) به‌جای انتخاب مستقیم، از روی حجم فعلی، سابقه، رکورد و تجربه‌ی تمرینیت محاسبه می‌شه. لطفاً بخش اول رو کامل کن و ذخیره کن.</p></div>' : '') +
+      '<p class="muted">' + (editing ? 'تغییرات، برنامه‌ی هفته‌های پیش رو رو دوباره می‌سازه. اگه سطح یا حجم فعلیت عوض بشه، برنامه از همین هفته با حجم جدید شروع می‌شه.' :
         'این فرم فقط یک‌بار پر می‌شه (بعداً از بخش پروفایل قابل ویرایشه). همه‌ی اطلاعات فقط روی همین مرورگر می‌مونه.') + '</p>' +
       '<form id="onb" novalidate>' +
 
-      '<fieldset><legend>۱. سطح دویدن</legend><div class="level-grid">' +
-      Object.keys(C.LEVELS).map(function (k) {
-        return '<label class="level-opt"><input type="radio" name="level" value="' + k + '"' + (p.level === k ? ' checked' : '') + ' required>' +
-          '<span><b>' + C.LEVELS[k].label + '</b><small>' + fa(levelDesc[k]) + '</small></span></label>';
-      }).join('') + '</div>' +
-      '<div class="field" id="cur-km-field"><label for="curkm">حجم فعلی هفتگی (کیلومتر، اختیاری)</label>' +
-      '<input id="curkm" name="currentWeeklyKm" type="number" inputmode="decimal" min="0" max="150" step="1" value="' + esc(p.currentWeeklyKm || '') + '">' +
-      '<small class="muted">اگه وارد کنی، برنامه از همین حجم شروع می‌کنه تا قانون ۱۰٪ رعایت بشه.</small></div>' +
+      '<fieldset><legend>۱. وضعیت فعلی دویدنت</legend>' +
+      '<p class="muted small">سطحت رو خودمون از روی این جواب‌ها محاسبه می‌کنیم (از ۱ تا ۱۰، بر اساس جدول VDOT جک دنیلز).</p>' +
+      '<div class="field"><label for="curkm">همین الان، به طور میانگین چند کیلومتر در هفته می‌دوی؟ <span class="req">(ضروری)</span></label>' +
+      '<input id="curkm" name="currentWeeklyKm" type="number" inputmode="decimal" min="0" max="400" step="0.5" required value="' +
+      esc(p.currentWeeklyKm != null && (p.currentWeeklyKm > 0 || !migrating) ? p.currentWeeklyKm : '') + '">' +
+      '<small class="muted">میانگین چند هفته‌ی اخیر. اگه اصلاً نمی‌دوی، ۰ بنویس. هفته‌ی اول برنامه دقیقاً از همین عدد شروع می‌شه.</small></div>' +
+      '<p class="sub-legend">چه مدته منظم می‌دوی؟ <span class="req">(ضروری)</span></p><div class="chips">' +
+      Object.keys(C.EXPERIENCE).map(function (k) { return chip('experience', k, C.EXPERIENCE[k].label, p.experience === k, 'radio'); }).join('') + '</div>' +
+      '<p class="sub-legend">تا حالا تمرین ساختاریافته (اینتروال، تمپو) انجام دادی؟ <span class="req">(ضروری)</span></p><div class="chips">' +
+      chip('structured', 'yes', 'بله', p.structured === true, 'radio') + chip('structured', 'no', 'نه', p.structured === false, 'radio') + '</div>' +
+      '<p class="sub-legend">بهترین رکورد اخیرت (اختیاری، ولی سطح رو خیلی دقیق‌تر می‌کنه)</p>' +
+      '<div class="row3">' +
+      '<div class="field"><label for="pbsel">فاصله</label><select id="pbsel" name="pbSel"><option value="">رکورد ندارم</option>' +
+      PB_DISTANCES.map(function (d) { return '<option value="' + d[0] + '"' + (pbKey === d[0] ? ' selected' : '') + '>' + d[2] + '</option>'; }).join('') +
+      '</select></div>' +
+      '<div class="field" id="pbother-field"' + (pbKey === 'other' ? '' : ' hidden') + '><label for="pbother">فاصله (کیلومتر)</label>' +
+      '<input id="pbother" name="pbOther" type="number" inputmode="decimal" min="1" max="100" step="0.1" value="' + esc(pbKey === 'other' ? pb.distanceKm : '') + '"></div>' +
+      '<div class="field" id="pbtime-field"' + (pbKey ? '' : ' hidden') + '><label for="pbtime">زمان (ساعت:دقیقه:ثانیه)</label>' +
+      '<input id="pbtime" name="pbTime" dir="ltr" inputmode="numeric" placeholder="03:25:00" value="' + esc(pb.timeSec ? C.formatDuration(pb.timeSec) : '') + '"></div>' +
+      '</div>' +
+      '<div id="level-preview" aria-live="polite"></div>' +
       '</fieldset>' +
 
       '<fieldset><legend>۲. مشخصات بدنی</legend><div class="row3">' +
@@ -150,7 +191,7 @@
 
       '<fieldset><legend>۳. کدوم روزها وقت آزاد داری؟</legend><div class="chips">' +
       C.DAY_NAMES.map(function (n, i) { return chip('days', i, n, days.indexOf(i) >= 0); }).join('') + '</div>' +
-      '<small class="muted" id="days-hint">سیستم بهترین روزها رو برای جلسات انتخاب می‌کنه؛ لازم نیست همه‌ی روزهای آزاد تمرین باشن.</small>' +
+      '<small class="muted">سیستم بهترین روزها رو برای جلسات انتخاب می‌کنه؛ لازم نیست همه‌ی روزهای آزاد تمرین باشن.</small>' +
       '</fieldset>' +
 
       '<fieldset><legend>۴. محل تمرین در دسترس</legend><div class="chips">' +
@@ -172,31 +213,58 @@
       '</select></div>' +
       '<div class="field"><label for="rdate">تاریخ مسابقه</label><input id="rdate" name="raceDate" type="date" min="' + todayKey + '" value="' + esc(race.date || '') + '">' +
       '<small class="muted" id="rdate-fa"></small></div></div>' +
-      '<p class="sub-legend">بهترین رکورد قبلی (اختیاری — برای پیش‌بینی زمان با فرمول Riegel)</p>' +
-      '<div class="row2">' +
-      '<div class="field"><label for="pbdist">فاصله‌ی رکورد (کیلومتر)</label><input id="pbdist" name="pbDistance" type="number" inputmode="decimal" min="1" max="100" step="0.1" value="' + esc(pb.distanceKm || '') + '"></div>' +
-      '<div class="field"><label for="pbtime">زمان (ساعت:دقیقه:ثانیه)</label><input id="pbtime" name="pbTime" dir="ltr" inputmode="numeric" placeholder="00:27:30" value="' + esc(pb.timeSec ? C.formatDuration(pb.timeSec) : '') + '"></div>' +
-      '</div></div></fieldset>' +
+      '</div></fieldset>' +
 
       '<div id="onb-errors" class="form-errors" role="alert" hidden></div>' +
       '<div class="actions">' +
       '<button type="submit" class="btn btn-primary">' + (editing ? 'ذخیره و به‌روزرسانی برنامه' : 'ساخت برنامه‌ی من') + '</button>' +
-      (editing ? '<a class="btn btn-ghost" href="#profile">انصراف</a>' : '') +
+      (editing && !needsMigration() ? '<a class="btn btn-ghost" href="#profile">انصراف</a>' : '') +
       '</div></form></section>';
 
     var form = document.getElementById('onb');
+
+    // خوندن رکورد از فرم؛ null = رکوردی وارد نشده، false = ناقص/نامعتبر
+    function readPb() {
+      var sel = form.pbSel.value;
+      if (!sel) return null;
+      var km = sel === 'other' ? Number(form.pbOther.value) : PB_DISTANCES.filter(function (d) { return d[0] === sel; })[0][1];
+      var tt = C.parseTime(form.pbTime.value);
+      if (!(km >= 1 && km <= 100) || !tt) return false;
+      // سرعت غیرممکن (سریع‌تر از رکورد جهانی) یا خیلی کند
+      var v = km / (tt / 3600);
+      if (v > 26 || v < 3) return false;
+      return { distanceKm: km, timeSec: tt };
+    }
+    function readLevelInputs() {
+      var kmRaw = form.currentWeeklyKm.value.trim();
+      var exp = form.querySelector('input[name=experience]:checked');
+      var st = form.querySelector('input[name=structured]:checked');
+      if (kmRaw === '' || !exp || !st) return null;
+      var pbv = readPb();
+      return { currentWeeklyKm: Number(kmRaw), experience: exp.value, structured: st.value === 'yes', pb: pbv || null, pbInvalid: pbv === false };
+    }
+    function syncLevel() {
+      var sel = form.pbSel.value;
+      document.getElementById('pbother-field').hidden = sel !== 'other';
+      document.getElementById('pbtime-field').hidden = !sel;
+      var box = document.getElementById('level-preview');
+      var inp = readLevelInputs();
+      if (!inp) {
+        box.innerHTML = '<p class="small muted level-wait">بعد از جواب دادن به سؤال‌های ضروری بالا، سطحت همین‌جا نشون داده می‌شه.</p>';
+        return;
+      }
+      box.innerHTML = levelCard(C.assessLevel(inp)) +
+        (inp.pbInvalid ? '<p class="small form-hint">رکورد کامل یا معتبر نیست و فعلاً در محاسبه‌ی سطح استفاده نشده.</p>' : '');
+    }
     function syncRace() {
       var yes = form.querySelector('input[name=raceHas]:checked');
       document.getElementById('race-fields').hidden = !(yes && yes.value === 'yes');
-    }
-    function syncLevel() {
-      var l = form.querySelector('input[name=level]:checked');
-      document.getElementById('cur-km-field').hidden = !l || l.value === 'absolute';
     }
     function syncDate() {
       var v = document.getElementById('rdate').value;
       document.getElementById('rdate-fa').textContent = v ? 'معادل شمسی: ' + faDate(v) : '';
     }
+    form.addEventListener('input', syncLevel);
     form.addEventListener('change', function () { syncRace(); syncLevel(); syncDate(); });
     syncRace(); syncLevel(); syncDate();
 
@@ -204,29 +272,27 @@
       e.preventDefault();
       var fd = new FormData(form);
       var errs = [];
-      var level = fd.get('level');
       var age = Number(fd.get('age')), w = Number(fd.get('weightKg')), h = Number(fd.get('heightCm'));
       var selDays = fd.getAll('days').map(Number);
       var selLocs = fd.getAll('locations');
-      if (!level) errs.push('سطح دویدن رو انتخاب کن.');
+      var kmRaw = String(fd.get('currentWeeklyKm') || '').trim();
+      var curKm = Number(kmRaw);
+      if (kmRaw === '' || !(curKm >= 0 && curKm <= 400)) errs.push('بنویس الان به طور میانگین چند کیلومتر در هفته می‌دوی (عددی بین ۰ تا ۴۰۰).');
+      if (!fd.get('experience')) errs.push('بگو چه مدته منظم می‌دوی.');
+      if (!fd.get('structured')) errs.push('بگو تا حالا تمرین ساختاریافته (اینتروال، تمپو) انجام دادی یا نه.');
+      var pbObj = readPb();
+      if (pbObj === false) errs.push('رکورد: فاصله و زمان رو کامل و درست وارد کن (مثلاً ۰۳:۲۵:۰۰)، یا «رکورد ندارم» رو انتخاب کن.');
       if (!(age >= 12 && age <= 90)) errs.push('سن باید بین ۱۲ تا ۹۰ باشه.');
       if (!(w >= 30 && w <= 250)) errs.push('وزن باید بین ۳۰ تا ۲۵۰ کیلوگرم باشه.');
       if (!(h >= 120 && h <= 230)) errs.push('قد باید بین ۱۲۰ تا ۲۳۰ سانتی‌متر باشه.');
       if (!selDays.length) errs.push('حداقل یک روز آزاد انتخاب کن.');
       if (!selLocs.length) errs.push('حداقل یک محل تمرین انتخاب کن.');
-      var raceHas = fd.get('raceHas') === 'yes';
       var raceObj = { has: false };
-      var pbObj = null;
-      if (raceHas) {
+      if (fd.get('raceHas') === 'yes') {
         var rd = fd.get('raceDate');
         if (!rd) errs.push('تاریخ مسابقه رو وارد کن.');
         else if (C.daysBetween(today(), C.parseDate(rd)) < 1) errs.push('تاریخ مسابقه باید بعد از امروز باشه.');
         raceObj = { has: true, distance: fd.get('raceDistance'), date: rd };
-      }
-      var pbd = Number(fd.get('pbDistance')), pbt = C.parseTime(fd.get('pbTime'));
-      if (fd.get('pbDistance') || fd.get('pbTime')) {
-        if (!(pbd >= 1 && pbd <= 100) || !pbt) errs.push('رکورد قبلی: فاصله (کیلومتر) و زمان رو به شکل ۰۰:۲۷:۳۰ وارد کن، یا هر دو رو خالی بذار.');
-        else pbObj = { distanceKm: pbd, timeSec: pbt };
       }
       var box = document.getElementById('onb-errors');
       if (errs.length) {
@@ -235,15 +301,20 @@
         box.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
-      state.profile = {
-        level: level, age: age, weightKg: w, heightCm: h,
+      var next = {
+        age: age, weightKg: w, heightCm: h,
         days: selDays.sort(), locations: selLocs,
         injury: String(fd.get('injury') || '').trim(),
-        currentWeeklyKm: level === 'absolute' ? 0 : Number(fd.get('currentWeeklyKm')) || 0,
+        currentWeeklyKm: curKm, experience: fd.get('experience'), structured: fd.get('structured') === 'yes',
+        schemaVersion: SCHEMA_VERSION,
         race: raceObj, pb: pbObj,
-        startDate: (editing && p.startDate) || C.dateKey(today()),
         createdAt: p.createdAt || new Date().toISOString()
       };
+      // تغییر سطح یا حجم فعلی = نقطه‌ی شروع جدید؛ بقیه‌ی تغییرات پیشرفت برنامه رو حفظ می‌کنن
+      var keep = editing && !migrating && p.startDate && p.currentWeeklyKm === curKm &&
+        C.assessLevel(p).level === C.assessLevel(next).level;
+      next.startDate = keep ? p.startDate : C.dateKey(today());
+      state.profile = next;
       save();
       showToast(editing ? 'برنامه به‌روز شد.' : 'برنامه‌ات ساخته شد!');
       viewWeekOffset = 0;
@@ -338,10 +409,12 @@
     var week = C.buildWeek(p, viewDate);
     var todayKey = C.dateKey(now);
     var warnings = C.profileWarnings(p, now);
-    var isRunWalk = p.level === 'absolute';
+    var lv = C.assessLevel(p);
+    var isRunWalk = lv.level === 1;
 
     var html = '';
     html += todayCard();
+    html += '<section class="card level-strip">' + levelCard(lv, true) + '</section>';
 
     if (warnings.length) {
       html += '<section class="card warnings"><h3>نکته‌های مهم برای تو</h3><ul>' +
@@ -351,15 +424,16 @@
     // سربرگ هفته
     var wkNum = week.weekIndex + 1;
     html += '<section class="card week-card"><div class="week-head">' +
-      '<button type="button" class="btn btn-icon" data-week="-1" aria-label="هفته‌ی قبل"' + (week.weekIndex <= 0 ? ' disabled' : '') + '>›</button>' +
-      '<div class="week-title"><h2>' + (week.weekIndex >= 0 ? 'هفته‌ی ' + fa(wkNum) + ' برنامه' : 'قبل از شروع') + '</h2>' +
+      '<button type="button" class="btn btn-icon" data-week="-1" aria-label="هفته‌ی قبل"' + (week.start <= p.startDate ? ' disabled' : '') + '>›</button>' +
+      '<div class="week-title"><h2>' + (week.weekIndex >= 0 ? 'هفته‌ی ' + fa(wkNum) + ' برنامه' : week.phase.key === 'intro' ? 'هفته‌ی شروع' : 'قبل از شروع') + '</h2>' +
       '<p class="muted">' + esc(faDate(week.start, true)) + ' تا ' + esc(faDate(week.days[6].date, true)) +
       (viewWeekOffset !== 0 ? ' · <button type="button" class="linklike" data-week="0">برگشت به این هفته</button>' : '') + '</p></div>' +
       '<button type="button" class="btn btn-icon" data-week="1" aria-label="هفته‌ی بعد">‹</button></div>';
 
     var runDays = week.days.filter(function (d) { return ['rest', 'none'].indexOf(d.type) < 0; }).length;
     html += '<div class="week-stats">' +
-      '<div class="stat"><span>فاز</span><b>' + t(week.phase.label) + '</b></div>' +
+      '<div class="stat"><span>فاز</span><b>' + t(week.phase.label) + '</b>' +
+      (week.periodLabel ? '<small class="period-tag">' + esc(week.periodLabel) + '</small>' : '') + '</div>' +
       '<div class="stat"><span>جلسات</span><b>' + fa(runDays) + ' جلسه</b></div>' +
       (isRunWalk ? '<div class="stat"><span>کل زمان</span><b>' + fa(week.totalMin) + ' دقیقه</b></div>'
         : '<div class="stat"><span>حجم کل</span><b>' + t(week.totalKm) + ' کیلومتر</b></div>') +
@@ -401,9 +475,9 @@
       (ss.type !== 'cancelled' ? sessionBody(ss) : '') +
       (selectedDay > todayKey && ['rest', 'none'].indexOf(ss.type) < 0 ? '<p class="small muted">این جلسه ممکنه بعد از چک‌این همون روز با وضعیتت تطبیق داده بشه.</p>' : '') +
       '</div>';
-    html += '<p class="legend small muted">روزهای سخت (تمپو، اینتروال، لانگ‌ران) هیچ‌وقت پشت‌سرهم نیستن. ' +
-      (isRunWalk ? 'برای شروع، همه‌ی جلسات دو-پیاده‌ی آسونه.' : 'حداکثر ۲۰٪ حجم هفته پرشدته (قانون ۸۰/۲۰).') +
-      ' حجم هر هفته حداکثر ۱۰٪ از هفته‌ی کامل قبلی بیشتره و هر هفته‌ی چهارم سبک‌تره.</p>';
+    html += '<p class="legend small muted">روزهای سخت (تمپو، اینتروال، تکرار سرعتی، فارتلک، لانگ‌ران) هیچ‌وقت پشت‌سرهم نیستن. ' +
+      (lv.level <= 2 ? 'در سطح ' + fa(lv.level) + ' همه‌ی جلسات آسونه (بدون تمپو و اینتروال).' : 'حداکثر ۲۰٪ حجم هفته پرشدته (قانون ۸۰/۲۰).') +
+      ' هفته‌ی اول هم‌اندازه‌ی حجم فعلی توئه؛ از هفته‌ی دوم حداکثر ۱۰٪ بیشتر از هفته‌ی کامل قبلی، و هر هفته‌ی چهارم سبک‌تره.</p>';
     html += '</section>';
 
     // نکات محل تمرین
@@ -627,14 +701,20 @@
       e.preventDefault();
       var d = Number(this.d.value), tt = C.parseTime(this.t.value);
       var box = document.getElementById('pb-err');
-      if (!(d >= 1 && d <= 100) || !tt) {
+      var v = d / (tt / 3600);
+      if (!(d >= 1 && d <= 100) || !tt || v > 26 || v < 3) {
         box.hidden = false;
-        box.textContent = 'فاصله (۱ تا ۱۰۰ کیلومتر) و زمان رو به شکل ۰۰:۲۷:۳۰ وارد کن.';
+        box.textContent = 'فاصله (۱ تا ۱۰۰ کیلومتر) و زمان رو درست و به شکل ۰۰:۲۷:۳۰ وارد کن.';
         return;
       }
+      var before = C.assessLevel(state.profile).level;
       state.profile.pb = { distanceKm: d, timeSec: tt };
+      var after = C.assessLevel(state.profile).level;
+      // تغییر سطح = نوع تمرین‌ها عوض می‌شه؛ برنامه از همین هفته با حجم فعلی دوباره شروع می‌شه
+      if (after !== before) state.profile.startDate = C.dateKey(today());
       save();
-      showToast('رکورد ذخیره شد؛ پیس‌های برنامه هم به‌روز شد.');
+      showToast(after !== before ? 'رکورد ذخیره شد؛ سطحت از ' + fa(before) + ' به ' + fa(after) + ' تغییر کرد و برنامه به‌روز شد.'
+        : 'رکورد ذخیره شد؛ پیس‌های برنامه هم به‌روز شد.');
       renderRace();
     });
   }
@@ -648,7 +728,11 @@
     var nCheck = Object.keys(state.checkins).length, nDone = Object.keys(state.done).length;
     function row(k, v) { return '<div class="kv"><dt>' + esc(k) + '</dt><dd>' + v + '</dd></div>'; }
     app.innerHTML = '<section class="card"><h1>پروفایل من</h1><dl class="kv-list">' +
-      row('سطح', esc(C.LEVELS[p.level].label)) +
+      row('سطح', 'سطح ' + fa(C.assessLevel(p).level) + ' از ۱۰: ' + esc(C.assessLevel(p).info.name) +
+        (C.assessLevel(p).vdot ? ' <span class="muted small">(VDOT ' + t(C.assessLevel(p).vdot.toFixed(1)) + ')</span>' : '')) +
+      row('سابقه‌ی دویدن', esc(C.EXPERIENCE[p.experience] ? C.EXPERIENCE[p.experience].label : '—')) +
+      row('تمرین ساختاریافته', p.structured ? 'انجام داده' : 'انجام نداده') +
+      row('حجم فعلی (نقطه‌ی شروع)', t(p.currentWeeklyKm + ' کیلومتر در هفته')) +
       row('سن / وزن / قد', t(p.age + ' سال · ' + p.weightKg + ' کیلوگرم · ' + p.heightCm + ' سانتی‌متر') + ' <span class="muted small">(BMI ' + t(bmi.toFixed(1)) + ')</span>') +
       row('روزهای آزاد', esc(p.days.map(function (d) { return C.DAY_NAMES[d]; }).join('، '))) +
       row('محل تمرین', esc(p.locations.map(function (l) { return C.LOCATION_LABELS[l]; }).join('، '))) +
