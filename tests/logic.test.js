@@ -495,4 +495,48 @@ test('تیپر و روز مسابقه برای اولترا', function () {
   assert.strictEqual(C.buildWeek(p, C.addDays(race, -7)).phase.key, 'taper');
 });
 
+// ---------- دوزبانه ----------
+test('دیکشنری فارسی و انگلیسی دقیقاً کلیدهای یکسان دارن', function () {
+  var fa = require('../js/i18n/fa.js'), en = require('../js/i18n/en.js');
+  function keys(o, pre, out) {
+    Object.keys(o).forEach(function (k) {
+      var v = o[k], path = pre ? pre + '.' + k : k;
+      // جمع انگلیسی ({one, other}) معادل یک رشته‌ست
+      if (v && typeof v === 'object' && !Array.isArray(v) && !('other' in v)) keys(v, path, out); else out.push(path);
+    });
+    return out;
+  }
+  var a = keys(fa, '', []), b = keys(en, '', []);
+  var missingEn = a.filter(function (k) { return b.indexOf(k) < 0; }), missingFa = b.filter(function (k) { return a.indexOf(k) < 0; });
+  assert.deepStrictEqual([missingEn, missingFa], [[], []]);
+});
+test('برنامه به انگلیسی: هیچ متن فارسی در جلسه‌ها، هشدارها و پیام‌ها نیست', function () {
+  var I = C.i18n;
+  I.setLang('en', false);
+  try {
+    var fa = /[؀-ۿ]/, found = [];
+    var scan = function (o) {
+      if (typeof o === 'string') { if (fa.test(o)) found.push(o); } else if (o && typeof o === 'object') Object.keys(o).forEach(function (k) { scan(o[k]); });
+    };
+    [1, 3, 5, 7, 9].forEach(function (n) {
+      ['none', '10', '21', '42', 'ultra'].forEach(function (g) {
+        var p = profileFor(n, { age: 55, injury: 'knee', hrMax: 185, hrRest: 50,
+          goal: g === 'ultra' ? goalOf('ultra', '2026-12-18', { km: 60, gain: 3000, loss: 4000, terrain: 'technical', altitude: 2500 }) : goalOf(g, g === 'none' ? null : '2026-12-18') });
+        for (var w = 0; w < 16; w++) {
+          var week = C.buildWeek(p, C.addDays(C.parseDate(p.startDate), w * 7));
+          scan(week);
+          week.days.forEach(function (s) { scan(C.adaptSession(s, { fatigue: 5, sleep: 1, pain: false }, { sleep: 1 }, null)); });
+        }
+        scan(C.profileWarnings(p, C.parseDate(p.startDate)));
+        scan(C.assessLevel(p).notes);
+      });
+    });
+    scan([C.PAIN_MESSAGE, C.TALK_TEST, C.EASY_RPE_WARNING, C.DAY_NAMES, C.describeDuration(5130)]);
+    assert.deepStrictEqual(found.slice(0, 5), []);
+    assert.strictEqual(C.describeDuration(580), '9 min 40 s');
+    assert.strictEqual(C.TYPE_INFO.tempo.label, 'Tempo');
+  } finally { I.setLang('fa', false); }
+  assert.strictEqual(C.TYPE_INFO.tempo.label, 'تمپو');
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

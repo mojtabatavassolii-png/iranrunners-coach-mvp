@@ -50,7 +50,6 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "Vazirmatn", "Tahoma", sans-serif;
-  direction: rtl;
   line-height: 1.8;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
@@ -86,7 +85,15 @@ p { margin: 0 0 0.8em; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.3; }
 .brand-text b { font-size: 1.05rem; }
 .brand-text small { color: var(--brand-light); font-size: 0.78rem; }
-.main-nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.main-nav { display: flex; gap: 4px; flex-wrap: wrap; order: 2; margin-inline-start: auto; }
+.brand { order: 1; }
+/* دکمه‌ی تغییر زبان (همیشه در هدر) */
+.lang-toggle {
+  order: 3; font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  background: rgba(255, 255, 255, 0.12); color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px; padding: 4px 14px; min-height: 36px;
+}
+.lang-toggle:hover { background: #fff; color: var(--brand-deep); }
 .main-nav a {
   color: #e8f8f3; text-decoration: none; padding: 6px 12px; border-radius: 999px;
   font-weight: 500; font-size: 0.92rem;
@@ -94,7 +101,8 @@ p { margin: 0 0 0.8em; }
 .main-nav a:hover { background: rgba(255, 255, 255, 0.14); }
 .main-nav a[aria-current="page"] { background: #fff; color: var(--brand-deep); font-weight: 700; }
 @media (max-width: 719px) {
-  .main-nav { width: 100%; flex-wrap: wrap; row-gap: 2px; }
+  .main-nav { width: 100%; flex-wrap: wrap; row-gap: 2px; order: 3; margin-inline-start: 0; }
+  .lang-toggle { order: 2; margin-inline-start: auto; }
   .main-nav a { white-space: nowrap; font-size: 0.86rem; padding: 5px 10px; }
 }
 
@@ -164,6 +172,7 @@ main { outline: none; }
 /* ---------- فرم‌ها ---------- */
 fieldset { border: 0; border-top: 1px solid var(--line); padding: 18px 0 6px; margin: 0; }
 legend { font-weight: 800; font-size: 1.05rem; padding: 0; margin-bottom: 10px; float: right; width: 100%; }
+[dir=ltr] legend { float: left; }
 legend + * { clear: both; }
 .sub-legend { font-weight: 700; margin: 14px 0 6px; }
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
@@ -431,6 +440,8 @@ textarea { resize: vertical; }
 }
 .help-link:hover { background: var(--brand); color: #fff; }
 .guide-toc ol { margin: 0; padding-inline-start: 26px; columns: 2 220px; list-style: persian; }
+[dir=ltr] .guide-toc ol { list-style: decimal; }
+[dir=rtl] .sess-steps, [dir=rtl] .guide-body ol { list-style: persian; }
 .guide-toc li { margin-bottom: 6px; break-inside: avoid; }
 .guide-sec { padding-top: 14px; padding-bottom: 14px; scroll-margin-top: 150px; }
 .guide-sec summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -444,3 +455,40 @@ textarea { resize: vertical; }
 .guide-body li { margin-bottom: 6px; }
 .glossary dt { font-weight: 700; margin-top: 10px; }
 .glossary dd { margin: 2px 0 0; padding-inline-start: 12px; }
+
+/* ---------- صفحه‌ی ورود (هویت ایران رانرز: قرمز و مشکی) ---------- */
+body.login-mode { background: #fff; }
+body.login-mode .site-header, body.login-mode .site-footer { display: none; }
+body.login-mode #app { padding-top: 0; }
+body.login-mode > .wrap { max-width: none; padding: 0; }
+.login {
+  min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; justify-content: space-between;
+  background: #fff; color: #111111; font-family: "Vazirmatn", "Tahoma", sans-serif;
+}
+.login-top {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  padding: 48px 16px 32px; gap: 6px;
+}
+.login-logo { width: 168px; height: 168px; border-radius: 50%; display: block; margin: 0 auto 18px; box-shadow: 0 0 0 6px #fff, 0 0 0 8px #111111; }
+.login h1 { font-size: 1.5rem; font-weight: 900; color: #111111; margin: 0; text-wrap: balance; }
+.login-sub { color: #444; margin: 0 0 22px; max-width: 34ch; }
+.login-btn {
+  background: #E8121A; color: #fff; font-size: 1.15rem; font-weight: 800;
+  width: min(100%, 340px); min-height: 56px; border-radius: 14px; border: 0;
+  box-shadow: 0 10px 24px -12px rgba(232, 18, 26, 0.7);
+}
+.login-btn:hover { background: #c20f16; }
+.login-btn:focus-visible { outline: 3px solid #111111; outline-offset: 3px; }
+.login-note { color: #666; font-size: 0.85rem; margin-top: 14px; }
+.login-lang {
+  background: #111111; color: #fff; display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); flex-wrap: wrap;
+}
+.login-lang-label { font-size: 0.9rem; color: #bdbdbd; }
+.lang-opt {
+  font: inherit; font-size: 0.95rem; cursor: pointer; color: #fff; background: transparent;
+  border: 1.5px solid #555; border-radius: 999px; padding: 6px 16px; min-height: 44px; display: inline-flex; align-items: center; gap: 8px;
+}
+.lang-opt b { font-weight: 900; letter-spacing: 0.04em; }
+.lang-opt[aria-pressed="true"] { background: #E8121A; border-color: #E8121A; }
+.lang-opt:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
