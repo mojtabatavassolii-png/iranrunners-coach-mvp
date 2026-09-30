@@ -385,7 +385,7 @@
   }
 
   // ---------- «ایزی» واقعاً ایزیه؟ ----------
-  var TALK_TEST = 'تست حرف زدن: باید بتونی در حین دویدن به‌راحتی و بدون نفس‌نفس زدن صحبت کنی. اگر نمی‌تونی، سرعتت رو کم کن، حتی اگر از پیس هدف کندتر بشه.';
+  var TALK_TEST = 'تست حرف زدن: باید راحت حرف بزنی؛ اگه نمی‌تونی، آهسته‌تر بدو، حتی کندتر از پیس هدف.';
   var EASY_RPE_WARNING = 'به نظر می‌رسه این پیس الان برات ایزی نیست. پیشنهاد می‌کنیم پیس ایزی رو کمی کندتر تنظیم کنیم یا یک تایم‌تست تازه ثبت کنی.';
 
   // بازخورد بعد از جلسه‌ی ایزی. pace: 'ok' (داخل بازه یا کندتر) | 'fast' (تندتر از بازه) | 'unknown'
@@ -667,11 +667,11 @@
   // ---------- سازنده‌ی جلسات ----------
   function rpeLine(t) {
     return {
-      easy: 'شدت: آسون (RPE ۳-۴ از ۱۰). باید بتونی جمله‌ی کامل بگی.',
-      long: 'شدت: آسون و یکنواخت (RPE ۴ از ۱۰). هدف مسافته، نه سرعت.',
-      tempo: 'شدت: آستانه، «سخت ولی قابل کنترل» (RPE ۷ از ۱۰). فقط چند کلمه می‌تونی بگی.',
-      interval: 'شدت: سخت (RPE ۸ از ۱۰)، ولی همه‌ی تکرارها با سرعت یکسان.',
-      reps: 'شدت: سریع و روان (RPE ۸ از ۱۰)؛ تمرکز روی فرم و سرعت، با ریکاوری کامل بین تکرارها.'
+      easy: 'شدت: آسون (RPE ۳-۴ از ۱۰).',
+      long: 'شدت: آسون و یکنواخت (RPE ۴ از ۱۰).',
+      tempo: 'شدت: سخت ولی قابل کنترل (RPE ۷ از ۱۰).',
+      interval: 'شدت: سخت (RPE ۸ از ۱۰)، همه‌ی تکرارها یکسان.',
+      reps: 'شدت: سریع و روان (RPE ۸ از ۱۰)، ریکاوری کامل.'
     }[t];
   }
   function paceNote(label, range) { return range ? ' ' + label + ': ' + paceText(range) + '.' : ''; }
@@ -679,8 +679,8 @@
   function easyGuide(zones) {
     if (!zones) return '';
     var out = '';
-    if (zones.easy) out += ' بازه‌ی پیس ایزی: ' + paceText(zones.easy) + ' (حد تندتر برای روزهای خوب، حد کندتر برای گرما، خستگی یا خواب بد).';
-    if (zones.hrEasy) out += ' ضربان هدف: ' + zones.hrEasy[0] + ' تا ' + zones.hrEasy[1] + ' ضربه در دقیقه.';
+    if (zones.easy) out += ' پیس: ' + paceText(zones.easy) + '.';
+    if (zones.hrEasy) out += ' ضربان: ' + zones.hrEasy[0] + ' تا ' + zones.hrEasy[1] + '.';
     return out;
   }
 
@@ -694,7 +694,7 @@
       steps: ['۵ دقیقه پیاده‌روی تند برای گرم کردن',
         reps + ' بار: ' + rw.run + ' دقیقه دویدن خیلی آرام + ' + rw.walk + ' دقیقه پیاده‌روی',
         '۵ دقیقه پیاده‌روی آرام برای سرد کردن'],
-      how: 'دویدن اون‌قدر آرام که نفس‌نفس نزنی. اگه یه تکرار سخت بود، پیاده‌روی رو طولانی‌تر کن — این شکست نیست، بخشی از برنامه‌ست.' + (extraNote ? ' ' + extraNote : ''),
+      how: 'دویدن اون‌قدر آرام که نفس‌نفس نزنی؛ اگه سخت شد، پیاده‌روی رو طولانی‌تر کن.' + (extraNote ? ' ' + extraNote : ''),
       talk: TALK_TEST, easyEffort: true
     };
   }
@@ -716,7 +716,7 @@
     s.variant = 'دوجلسه‌ای';
     s.target = am + ' + ' + pm + ' کیلومتر';
     s.steps = ['صبح: ' + am + ' کیلومتر دویدن آسون', 'عصر: ' + pm + ' کیلومتر دویدن آسون'].concat(s.steps.slice(1));
-    s.how += ' بین دو جلسه حداقل ۶ ساعت فاصله بذار و بینشون خوب غذا بخور.';
+    s.how += ' بین دو جلسه حداقل ۶ ساعت فاصله.';
     return s;
   }
 
@@ -745,7 +745,7 @@
     var s = {
       type: 'tempo', km: round05(mainKm + wuKm), hardKm: mainKm, target: round05(mainKm + wuKm) + ' کیلومتر', mild: !!mild,
       steps: (half ? [half + ' کیلومتر گرم کردن آسون'] : []).concat(main, half ? [half + ' کیلومتر سرد کردن آسون'] : []),
-      how: (mild ? 'تمپوی ملایم: کمی آهسته‌تر از تمپوی کامل (RPE ۶-۷ از ۱۰).' : rpeLine('tempo')) + paceNote('پیس', zones && zones.tempo)
+      how: (mild ? 'شدت: کمی آهسته‌تر از تمپوی کامل (RPE ۶-۷ از ۱۰).' : rpeLine('tempo')) + paceNote('پیس', zones && zones.tempo)
     };
     s.variant = mild ? 'ملایم' : 'آستانه، T';
     return s;
@@ -778,7 +778,7 @@
       steps: [(half ? half + ' کیلومتر گرم کردن + ' : '۱۰ دقیقه دویدن آرام + ') + '۴ سرعت کوتاه ۲۰ ثانیه‌ای',
         reps + ' × ' + rep + ' متر، بین هر تکرار ' + rest,
         half ? half + ' کیلومتر سرد کردن آسون' : '۱۰ دقیقه دویدن آرام'],
-      how: (kind === 'short' ? 'تکرارها تند ولی کنترل‌شده (RPE ۷-۸ از ۱۰)، نه تمام‌توان. استراحت طولانی عمدیه.' : rpeLine('interval')) +
+      how: (kind === 'short' ? 'شدت: تند ولی کنترل‌شده (RPE ۷-۸ از ۱۰)، نه تمام‌توان.' : rpeLine('interval')) +
         paceNote(kind === 'daniels' ? 'پیس I' : 'پیس تکرارها', zones && zones.interval)
     };
     s.variant = kind === 'short' ? 'کوتاه' : (kind === 'daniels' ? 'VO2max، I' : null);
@@ -804,7 +804,7 @@
     return {
       type: 'fartlek', km: total, hardKm: hardKm, target: total + ' کیلومتر',
       steps: [half + ' کیلومتر گرم کردن آسون', reps + ' بار: ۲ دقیقه تند (حس ریتم ۱۰ کیلومتر) + ۲ دقیقه دویدن آرام', half + ' کیلومتر سرد کردن آسون'],
-      how: 'فارتلک یعنی «بازی با سرعت»: تکه‌های تند با حس، نه با ساعت. شدت تکه‌های تند RPE ۷-۸ از ۱۰.' + paceNote('پیس تقریبی تکه‌های تند', zones && zones.tempo)
+      how: 'شدت تکه‌های تند: RPE ۷-۸ از ۱۰.' + paceNote('پیس تکه‌های تند', zones && zones.tempo)
     };
   }
 
@@ -822,7 +822,9 @@
     var race = function (d) { return raceTimeFromVdot(v, d) / d; };
     var adj = clamp(Number(profile.easyAdjustSec) || 0, 0, EASY_ADJUST_MAX);
     return { vdot: v, known: !!currentFitness(profile), p5: race(5), p10: race(10), pHM: race(21.0975), pM: race(42.195),
-      pT: paceAtPct(v, 0.88), pE: paceAtPct(v, 0.70) + adj };
+      pT: paceAtPct(v, 0.88), pE: paceAtPct(v, 0.70) + adj,
+      // همون بازه‌ای که صفحه‌ی فیتنس برای آستانه نشون می‌ده
+      tRange: [paceAtPct(v, 0.90), paceAtPct(v, 0.86)] };
   }
   function r1(x) { return Math.round(x * 10) / 10; }
   function round10(x) { return Math.round(x / 10) * 10; }
@@ -852,7 +854,7 @@
     var hard = reps * rep / 1000, jog = hard * ctx.P.p5 / ctx.P.pE * 1.1;
     return sess('interval', 'کوتاه، پیس ۵ کیلومتر', hard, hard + ctx.wu + jog,
       [wuStep(ctx), reps + ' × ' + rep + ' متر با پیس ۵ کیلومتر؛ استراحت: جاگ آرام هم‌زمان با تکرار یا کمی بیشتر', cdStep(ctx)],
-      'شدت: VO2max (RPE ۸ از ۱۰)؛ همه‌ی تکرارها با سرعت یکسان، آخری هم نباید تمام‌توان باشه.' + paceHint(ctx, 'پیس ۵ کیلومتر', ctx.P.p5),
+      rpeLine('interval') + paceHint(ctx, 'پیس ۵ کیلومتر', ctx.P.p5),
       { rep: rep, kind: 'short5k' });
   }
   // اینتروال متوسط: ۱۰۰۰ تا ۱۶۰۰ متر با پیس بین ۵ تا ۱۰ کیلومتر، استراحت ۲ تا ۳ دقیقه
@@ -862,7 +864,7 @@
     var hard = reps * rep / 1000;
     return sess('interval', 'متوسط، پیس ۵ تا ۱۰ کیلومتر', hard, hard + ctx.wu + reps * 0.4,
       [wuStep(ctx), reps + ' × ' + rep + ' متر با پیسی بین ۵ و ۱۰ کیلومتر؛ بین هر تکرار ۲ تا ۳ دقیقه جاگ آرام', cdStep(ctx)],
-      'شدت: سخت (RPE ۸ از ۱۰)، یکنواخت از اول تا آخر.' + paceHint(ctx, 'پیس', ctx.P.p5, ctx.P.p10),
+      rpeLine('interval') + paceHint(ctx, 'پیس', ctx.P.p5, ctx.P.p10),
       { rep: rep, kind: 'mid' });
   }
   // فارتلک سرعتی: ۱ دقیقه تند / ۱ دقیقه ایزی، یا هرمی ۱-۲-۳-۴-۳-۲-۱
@@ -880,7 +882,7 @@
     }
     var hard = hardMin * 60 / pF;
     return sess('fartlek', variant, hard, hard + recMin * 60 / ctx.P.pE + ctx.wu, [wuStep(ctx), step, cdStep(ctx)],
-      'تکه‌های تند بین پیس ۵ و ۱۰ کیلومتر (RPE ۷-۸)، دقیقه‌های ایزی واقعاً آسون.' + paceHint(ctx, 'پیس تکه‌های تند', ctx.P.p5, ctx.P.p10),
+      'شدت تکه‌های تند: RPE ۷-۸ از ۱۰.' + paceHint(ctx, 'پیس تکه‌های تند', ctx.P.p5, ctx.P.p10),
       { form: form });
   }
   // تپه‌ی کوتاه: ۸ تا ۱۲ تکرار سرعتی حدود ۱۰۰ متر، برگشت با پیاده‌روی
@@ -888,7 +890,7 @@
     var reps = clamp(Math.round(main / 0.1), 8, 12), hard = reps * 0.1;
     return sess('hills', 'تپه‌ی کوتاه', hard, ctx.wu + reps * 0.2,
       [wuStep(ctx), reps + ' × حدود ۱۰۰ متر دویدن تند روی سربالایی کوتاه (شیب ۶ تا ۱۰٪)؛ برگشت با پیاده‌روی', cdStep(ctx)],
-      'شدت: تند و قدرتی (RPE ۸-۹) با فرم خوب: قدم کوتاه، زانو بالا، دست‌ها فعال. ریکاوری کامل با پیاده‌روی.',
+      'شدت: تند و قدرتی (RPE ۸-۹ از ۱۰).',
       { vert: reps * 8 });
   }
   // نیمه‌ماراتن — اینتروال آستانه: ۳ تا ۴ × ۸ تا ۱۰ دقیقه، استراحت ۹۰ ثانیه تا ۲ دقیقه
@@ -897,7 +899,7 @@
     var hard = reps * repMin * 60 / ctx.P.pT;
     return sess('tempo', 'اینتروال آستانه', hard, hard + ctx.wu + reps * 0.3,
       [wuStep(ctx), reps + ' × ' + repMin + ' دقیقه با پیس آستانه؛ بین هر تکرار ۹۰ ثانیه تا ۲ دقیقه جاگ آرام', cdStep(ctx)],
-      rpeLine('tempo') + paceHint(ctx, 'پیس آستانه', ctx.P.pT - 4, ctx.P.pT + 6), { thresholdInt: true });
+      rpeLine('tempo') + paceHint(ctx, 'پیس', ctx.P.tRange[0], ctx.P.tRange[1]), { thresholdInt: true });
   }
   // اینتروال بلند: ۱۶۰۰ تا ۲۰۰۰ متر با پیس بین ۱۰ کیلومتر و نیمه‌ماراتن
   function makeLongInt(main, ctx, rep) {
@@ -905,28 +907,28 @@
     var reps = clamp(Math.floor(main * 1000 / rep + 1e-9), 3, rep >= 2000 ? 5 : 6), hard = reps * rep / 1000;
     return sess('interval', 'بلند', hard, hard + ctx.wu + reps * 0.4,
       [wuStep(ctx), reps + ' × ' + rep + ' متر با پیسی بین ۱۰ کیلومتر و نیمه‌ماراتن؛ بین هر تکرار ۲ تا ۳ دقیقه جاگ', cdStep(ctx)],
-      'شدت: سخت ولی پایدار (RPE ۷-۸).' + paceHint(ctx, 'پیس', ctx.P.p10, ctx.P.pHM), { rep: rep, kind: 'long' });
+      'شدت: سخت ولی پایدار (RPE ۷-۸ از ۱۰).' + paceHint(ctx, 'پیس', ctx.P.p10, ctx.P.pHM), { rep: rep, kind: 'long' });
   }
   // تمپوی پیوسته: ۲۰ تا ۴۰ دقیقه با پیس آستانه
   function makeTempoRun(main, ctx, maxMin) {
     var min = clamp(Math.round(main * ctx.P.pT / 60), 20, maxMin || 40), hard = min * 60 / ctx.P.pT;
     return sess('tempo', 'پیوسته', hard, hard + ctx.wu,
       [wuStep(ctx), min + ' دقیقه دویدن پیوسته با پیس آستانه (پیسی که حدوداً یک ساعت قابل حفظه)', cdStep(ctx)],
-      (ctx.rpeOnly ? 'شدت: «سخت ولی قابل کنترل» (RPE ۷ از ۱۰)؛ ملاک تلاشه، نه پیس.' : rpeLine('tempo')) + paceHint(ctx, 'پیس آستانه', ctx.P.pT - 4, ctx.P.pT + 6));
+      rpeLine('tempo') + paceHint(ctx, 'پیس', ctx.P.tRange[0], ctx.P.tRange[1]));
   }
   // ماراتن — تمپوی پیوسته‌ی بلند: ۳۰ تا ۵۰ دقیقه با پیس آستانه یا کمی کندتر
   function makeLongTempo(main, ctx) {
     var p = ctx.P.pT + 8, min = clamp(Math.round(main * p / 60), 30, 50), hard = min * 60 / p;
     return sess('tempo', 'پیوسته‌ی بلند', hard, hard + ctx.wu,
       [wuStep(ctx), min + ' دقیقه پیوسته با پیس آستانه یا کمی کندتر', cdStep(ctx)],
-      'شدت: RPE ۶-۷؛ ریتمی که می‌تونی بدون افت تا آخر نگهش داری.' + paceHint(ctx, 'پیس', ctx.P.pT, ctx.P.pT + 15));
+      'شدت: RPE ۶-۷ از ۱۰، بدون افت تا آخر.' + paceHint(ctx, 'پیس', ctx.P.tRange[0], ctx.P.tRange[1] + 10));
   }
   // اینتروال پیس ماراتن: ۳ تا ۵ کیلومتر با پیس دقیق ماراتن، استراحت کوتاه
   function makeMpInt(main, ctx) {
     var repKm = main >= 13 ? 5 : (main >= 10 ? 4 : 3), reps = clamp(Math.floor(main / repKm + 1e-9), 2, 4), hard = reps * repKm;
     return sess('tempo', 'اینتروال پیس ماراتن', hard, hard + ctx.wu + (reps - 1),
       [wuStep(ctx), reps + ' × ' + repKm + ' کیلومتر با پیس دقیق ماراتن؛ بین هر تکرار ۱ کیلومتر دویدن آسون', cdStep(ctx)],
-      'هدف: یاد گرفتن ریتم دقیق مسابقه؛ نه تندتر، نه کندتر (RPE ۶-۷).' + paceHint(ctx, 'پیس ماراتن', ctx.P.pM - 3, ctx.P.pM + 3));
+      'شدت: RPE ۶-۷ از ۱۰؛ دقیقاً ریتم مسابقه.' + paceHint(ctx, 'پیس', ctx.P.pM - 3, ctx.P.pM + 3));
   }
   // فارتلک درازمدت: یک ران ۶۰ تا ۹۰ دقیقه‌ای با چند بخش ۱۰ دقیقه‌ای پیس ماراتن یا کمی سریع‌تر
   function makeLongFartlek(main, ctx, weeklyKm) {
@@ -935,7 +937,7 @@
     var hard = n * 600 / ctx.P.pM, easyKm = (dur - n * 10) * 60 / ctx.P.pE;
     return sess('fartlek', 'درازمدت', hard, hard + easyKm,
       [dur + ' دقیقه دویدن که داخلش ' + n + ' بخش ۱۰ دقیقه‌ای با پیس ماراتن یا کمی سریع‌تر داره', 'بین بخش‌ها حداقل ۵ دقیقه آسون؛ ۱۵ دقیقه‌ی اول و ۱۰ دقیقه‌ی آخر آسون'],
-      'بخش‌های تند با ریتم مسابقه (RPE ۶-۷)؛ تمرین حفظ ریتم با خستگی.' + paceHint(ctx, 'پیس ماراتن', ctx.P.pM - 5, ctx.P.pM + 3), { minutes: null });
+      'شدت بخش‌های تند: RPE ۶-۷ از ۱۰.' + paceHint(ctx, 'پیس بخش‌های تند', ctx.P.pM - 5, ctx.P.pM + 3), { minutes: null });
   }
   // تریل — تپه‌ی بلند: ۴ تا ۸ × ۵ تا ۱۰ دقیقه سربالایی مداوم با تلاش کنترل‌شده، پایین اومدن آروم
   function makeLongHills(main, ctx) {
@@ -944,7 +946,7 @@
     var hard = reps * repMin * 60 / pUp, vert = round10(reps * repMin * 10);
     return sess('hills', 'تپه‌ی بلند', hard, ctx.wu + hard * 2,
       [wuStep(ctx), reps + ' × ' + repMin + ' دقیقه دویدن سربالایی مداوم با تلاش کنترل‌شده (RPE ۶-۷، نه اسپرینت)', 'برگشت: پایین اومدن آروم (جاگ یا پیاده) به‌عنوان ریکاوری', cdStep(ctx)],
-      'شدت با تلاش ادراک‌شده و زمان تعریف می‌شه، نه پیس. نفس کنترل‌شده بمونه؛ اگه شیب خیلی تنده، تند راه رفتن (power hike) مجازه. صعود تقریبی: ' + vert + ' متر.',
+      'شدت: RPE ۶-۷ از ۱۰ (با تلاش، نه پیس). صعود تقریبی: ' + vert + ' متر.',
       { vert: vert, rpeOnly: true });
   }
   // تمرین فرود: تکرارهای کوتاه سرازیری کنترل‌شده برای عضلات چهارسر
@@ -952,7 +954,7 @@
     var reps = clamp(Math.round(main / 0.3), 6, 10), hard = reps * 0.3;
     return sess('hills', 'فرود (سرازیری)', hard, ctx.wu + reps * 0.6,
       [wuStep(ctx), reps + ' × ۶۰ تا ۹۰ ثانیه سرازیری کنترل‌شده روی شیب ملایم (۴ تا ۸٪)', 'برگشت به بالا با پیاده‌روی یا جاگ خیلی آرام', cdStep(ctx)],
-      'هدف: آماده کردن عضلات چهارسر برای فشار سرازیری. قدم کوتاه و سریع، بدن کمی رو به جلو، فرود نرم؛ سرعت کنترل‌شده، نه رها (RPE ۶). کوفتگی ران در روزهای بعد طبیعیه؛ اولین بار با ۶ تکرار شروع کن.',
+      'شدت: کنترل‌شده، نه رها (RPE ۶ از ۱۰). قدم کوتاه و سریع، فرود نرم.',
       { rpeOnly: true, descent: reps * 12 });
   }
   // تریل با مسیر نسبتاً تخت — دویدن استیدی بر اساس RPE
@@ -960,7 +962,7 @@
     var pS = ctx.P.pM + 12, min = clamp(Math.round(main * pS / 60), 20, 40), hard = min * 60 / pS;
     return sess('tempo', 'استیدی', hard, hard + 30 * 60 / ctx.P.pE,
       ['۱۵ دقیقه آسون', min + ' دقیقه با تلاش «استیدی» (RPE ۵-۶): کمی سخت‌تر از ایزی، هنوز می‌تونی جمله‌های کوتاه بگی', '۱۵ دقیقه آسون'],
-      'ملاک تلاش و زمانه، نه پیس؛ روی زمین ناهموار پیس قابل اعتماد نیست. هدف، نگه داشتن یک ریتم پایدار برای مدت طولانیه.',
+      'شدت: RPE ۵-۶ از ۱۰ (با تلاش، نه پیس).',
       { rpeOnly: true });
   }
   // سطح ۳-۴ تریل/عمومی: تپه‌ی کوتاه کنترل‌شده
@@ -968,7 +970,7 @@
     var reps = clamp(Math.round(main / 0.12), 6, 8), hard = reps * 0.12;
     return sess('hills', 'تپه‌ی کوتاه کنترل‌شده', hard, Math.max(2, ctx.wu) + reps * 0.25,
       ['۱۰ دقیقه دویدن آرام', reps + ' × ۳۰ تا ۴۵ ثانیه سربالایی با تلاش کنترل‌شده (RPE ۶-۷)', 'برگشت با پیاده‌روی کامل', '۱۰ دقیقه دویدن آرام'],
-      'تپه‌ی کوتاه قدرت پا رو بدون فشار سرعت بالا می‌سازه. تلاش کنترل‌شده، نه تمام‌توان.', { vert: reps * 6 });
+      'شدت: کنترل‌شده (RPE ۶-۷ از ۱۰)، نه تمام‌توان.', { vert: reps * 6 });
   }
 
   function makeQuality(spec, weeklyKm, ctx) {
@@ -1009,12 +1011,12 @@
       if (vert) steps.push('ارتفاع‌گیری تجمعی هدف: حدود ' + vert + ' متر (اگه تپه‌ی بزرگ نداری، یه سربالایی رو چند بار تکرار کن)');
       if ((g.ratio || 0) >= 35) steps.push('سربالایی‌های تند رو تند راه برو (power hike)؛ این مهارت مسابقه‌ست، نه ضعف');
       steps.push('هر ۳۰ تا ۴۵ دقیقه بخور و بنوش، همون چیزی که روز مسابقه استفاده می‌کنی');
-      var how = 'شدت: آسون و بر اساس تلاش (RPE ۴-۵)، نه پیس؛ روی زمین ناهموار پیس قابل اعتماد نیست. هدف، زمان روی پا و ارتفاع‌گیریه.';
-      if (g.terrain === 'technical') how += ' مسیر مسابقه فنیه؛ اگه می‌تونی روی تریل سنگلاخی و سرازیری فنی تمرین کن.';
-      if (opts.b2b) how += ' روزهای پشت‌سرهم خستگی تجمعی پایان مسابقه رو شبیه‌سازی می‌کنن؛ روز دوم هم آسون بدو.';
-      if (ctx.zones && ctx.zones.hrEasy) how += ' ضربان هدف: ' + ctx.zones.hrEasy[0] + ' تا ' + ctx.zones.hrEasy[1] + '.';
+      var how = 'شدت: آسون (RPE ۴-۵ از ۱۰، با تلاش، نه پیس).';
+      if (g.terrain === 'technical') how += ' اگه می‌تونی روی تریل فنی بدو.';
+      if (opts.b2b === 'day2') how += ' امروز هم آسون بدو.';
+      if (ctx.zones && ctx.zones.hrEasy) how += ' ضربان: ' + ctx.zones.hrEasy[0] + ' تا ' + ctx.zones.hrEasy[1] + '.';
       var su = { type: 'long', km: km, hardKm: 0, target: km + ' کیلومتر' + (vert ? '، +' + vert + ' متر' : ''), segKm: 0, kind: 'ultra', vert: vert,
-        steps: steps, how: how + ' لانگ‌ران به‌خاطر فشار حجمی جزو «روزهای سخت» حساب می‌شه.', talk: TALK_TEST, rpeOnly: true };
+        steps: steps, how: how, talk: TALK_TEST, rpeOnly: true };
       su.variant = opts.b2b ? (opts.b2b === 'day2' ? 'پشت‌سرهم، روز دوم' : 'پشت‌سرهم، روز اول') : 'تریل';
       if (opts.b2b) su.b2b = opts.b2b;
       return su;
@@ -1036,7 +1038,7 @@
     var s = {
       type: 'long', km: km, hardKm: segKm, target: km + ' کیلومتر', segKm: segKm, kind: segKm ? kind : 'plain',
       steps: st,
-      how: rpeLine('long') + easyGuide(zones) + extra + ' لانگ‌ران به‌خاطر فشار حجمی جزو «روزهای سخت» حساب می‌شه.',
+      how: rpeLine('long') + easyGuide(zones) + extra,
       talk: TALK_TEST
     };
     if (segKm) s.variant = kind === 'mp' ? 'پایان با پیس ماراتن' : 'با بخش‌های تمپو';
@@ -1047,7 +1049,7 @@
     return {
       type: 'rest', km: null, hardKm: 0, target: '—',
       steps: ['استراحت کامل یا پیاده‌روی سبک / حرکات کششی'],
-      how: note || 'ریکاوری بخشی از تمرینه؛ بدن توی روزهای استراحت قوی‌تر می‌شه.'
+      how: note || ''
     };
   }
 
@@ -1239,22 +1241,22 @@
 
   function weekPhase(profile, ws, pr, w, vol) {
     var race = raceInfo(profile);
-    if (w === -1 && addDays(ws, 6) >= parseDate(profile.startDate)) return { key: 'intro', label: 'هفته‌ی شروع (چند روز تا اولین هفته‌ی کامل)' };
+    if (w === -1 && addDays(ws, 6) >= parseDate(profile.startDate)) return { key: 'intro', label: 'هفته‌ی شروع' };
     if (w < 0) return { key: 'before', label: 'قبل از شروع برنامه' };
     if (race) {
       var we = addDays(ws, 6);
       var minDaysToRace = daysBetween(we, race.date);
       if (race.date >= ws && race.date <= we) return { key: 'race', label: 'هفته‌ی مسابقه' };
       if (race.date < ws && daysBetween(race.date, ws) < 7) return { key: 'recovery', label: 'ریکاوری بعد از مسابقه' };
-      if (inPostRaceRamp(profile, ws)) return { key: 'return', label: 'برگشت تدریجی بعد از مسابقه (+۱۰٪ در هفته)' };
+      if (inPostRaceRamp(profile, ws)) return { key: 'return', label: 'برگشت بعد از مسابقه' };
       var taperDays = taperWeeks(race.key) * 7;
       var inTaper = Math.max(0, Math.min(7, taperDays - minDaysToRace + 1));
-      if (minDaysToRace > 0 && inTaper >= 3) return { key: 'taper', label: 'تیپر (کاهش حجم قبل از مسابقه)' };
+      if (minDaysToRace > 0 && inTaper >= 3) return { key: 'taper', label: 'تیپر' };
     }
-    if (pr.deload) return { key: 'deload', label: 'هفته‌ی ریکاوری (۸۰٪ حجم)' };
-    if (w === 0) return { key: 'first', label: 'هفته‌ی اول: هم‌اندازه‌ی حجم فعلی تو' };
-    if (vol && vol.atCeiling) return { key: 'maintain', label: 'حفظ حجم (به سقف رشد این دوره رسیدی)' };
-    return { key: 'build', label: 'افزایش حجم (حداکثر +۱۰٪ نسبت به هفته‌ی کامل قبل)' };
+    if (pr.deload) return { key: 'deload', label: 'هفته‌ی سبک' };
+    if (w === 0) return { key: 'first', label: 'هفته‌ی اول' };
+    if (vol && vol.atCeiling) return { key: 'maintain', label: 'حفظ حجم' };
+    return { key: 'build', label: 'افزایش حجم' };
   }
 
   function applyRace(profile, s, date, race, ctx, rw, level) {

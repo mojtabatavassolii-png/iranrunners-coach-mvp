@@ -86,7 +86,7 @@ p { margin: 0 0 0.8em; }
 .main-nav a:hover { background: rgba(255, 255, 255, 0.1); }
 .main-nav a[aria-current="page"] { background: var(--red); color: #fff; }
 @media (max-width: 719px) {
-  .main-nav { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .main-nav { width: 100%; flex-wrap: wrap; row-gap: 2px; }
   .main-nav a { white-space: nowrap; font-size: 0.86rem; padding: 5px 10px; }
 }
 
@@ -412,3 +412,25 @@ textarea { resize: vertical; }
 .ultra-ratio:empty { display: none; }
 .ultra-facts { margin: 0 0 10px; padding-inline-start: 20px; }
 .ultra-facts li { margin-bottom: 4px; }
+
+/* ---------- آموزش ---------- */
+.help-link {
+  display: inline-grid; place-items: center; width: 1.35em; height: 1.35em; border-radius: 50%;
+  background: var(--red-soft); color: var(--red-dim); border: 1px solid var(--red);
+  font-size: 0.8rem; font-weight: 700; text-decoration: none; vertical-align: middle; line-height: 1;
+}
+.help-link:hover { background: var(--red); color: #fff; }
+.guide-toc ol { margin: 0; padding-inline-start: 26px; columns: 2 220px; list-style: persian; }
+.guide-toc li { margin-bottom: 6px; break-inside: avoid; }
+.guide-sec { padding-top: 14px; padding-bottom: 14px; scroll-margin-top: 150px; }
+.guide-sec summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.guide-sec summary::-webkit-details-marker { display: none; }
+.guide-sec summary::after { content: '+'; color: var(--red); font-weight: 700; font-size: 1.4rem; }
+.guide-sec[open] summary::after { content: '−'; }
+.guide-sec summary h2 { margin: 0; font-size: 1.08rem; }
+.guide-body { margin-top: 12px; }
+.guide-body h3 { font-size: 1rem; margin: 16px 0 6px; }
+.guide-body ul, .guide-body ol { padding-inline-start: 22px; }
+.guide-body li { margin-bottom: 6px; }
+.glossary dt { font-weight: 700; margin-top: 10px; }
+.glossary dd { margin: 2px 0 0; padding-inline-start: 12px; }
