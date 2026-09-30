@@ -181,7 +181,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=11" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=12" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
