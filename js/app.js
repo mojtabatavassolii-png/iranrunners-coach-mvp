@@ -96,6 +96,8 @@
     if (!VIEWS[v]) v = 'plan';
     var nav = document.getElementById('main-nav');
     nav.hidden = !state.profile || v === 'onboarding' || needsMigration();
+    // هشدار پزشکی فقط در صفحه‌ی چک‌این
+    document.getElementById('medical-banner').hidden = v !== 'checkin';
     document.getElementById('nav-race').hidden = !(state.profile && C.goalInfo(state.profile).type !== 'none');
     nav.querySelectorAll('a').forEach(function (a) {
       if (a.dataset.view === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
@@ -504,7 +506,6 @@
     var viewDate = C.addDays(now, viewWeekOffset * 7);
     var week = C.buildWeek(p, viewDate);
     var todayKey = C.dateKey(now);
-    var warnings = C.profileWarnings(p, now);
     var lv = C.assessLevel(p);
     var isRunWalk = lv.level === 1;
 
@@ -513,10 +514,6 @@
     html += '<section class="card level-strip">' + levelCard(lv, true) + '</section>';
     html += fitnessNotesCard(p, now);
 
-    if (warnings.length) {
-      html += '<section class="card warnings"><h3>مهم</h3><ul>' +
-        warnings.map(function (w) { return '<li>' + t(w) + '</li>'; }).join('') + '</ul></section>';
-    }
 
     // سربرگ هفته
     var wkNum = week.weekIndex + 1;
@@ -1123,6 +1120,13 @@
   // =====================================================================
   // پروفایل
   // =====================================================================
+  // نکته‌های ایمنی مخصوص این پروفایل (آسیب، سن، BMI، …)
+  function warningsCard(list) {
+    if (!list.length) return '';
+    return '<section class="card warnings"><h2>نکته‌های مهم برای تو</h2><ul>' +
+      list.map(function (w) { return '<li>' + t(w) + '</li>'; }).join('') + '</ul></section>';
+  }
+
   function renderProfile() {
     var p = state.profile;
     var bmi = C.bmi(p);
@@ -1151,7 +1155,8 @@
       '</div><div id="confirm-box" class="alert alert-note confirm-box" role="alertdialog" aria-live="polite" hidden>' +
       '<p id="confirm-text"></p><div class="actions">' +
       '<button type="button" class="btn btn-primary" id="confirm-yes">بله، انجام بده</button>' +
-      '<button type="button" class="btn btn-ghost" id="confirm-no">انصراف</button></div></div></section>';
+      '<button type="button" class="btn btn-ghost" id="confirm-no">انصراف</button></div></div></section>' +
+      warningsCard(C.profileWarnings(p, today()));
 
     // تایید داخل صفحه (به‌جای confirm مرورگر)
     var pending = null;

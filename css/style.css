@@ -98,10 +98,11 @@ p { margin: 0 0 0.8em; }
   .main-nav a { white-space: nowrap; font-size: 0.86rem; padding: 5px 10px; }
 }
 
-/* ---------- بنر پزشکی (همیشگی و برجسته) ---------- */
+/* ---------- بنر پزشکی (فقط در صفحه‌ی چک‌این) ---------- */
+#app { padding-top: 18px; }
 .medical-banner {
   display: flex; gap: 14px; align-items: center;
-  margin: 18px 0;
+  margin: 18px 0 0;
   padding: 16px 18px;
   background: var(--accent-soft);
   border: 2px solid var(--accent);
