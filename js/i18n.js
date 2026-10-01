@@ -56,22 +56,37 @@
     return s.replace(/(\d)\.(\d)/g, '$1٫$2').replace(/\d/g, function (d) { return FA_DIGITS[d]; });
   }
 
-  // تاریخ: شمسی در فارسی، میلادی در انگلیسی
+  // تقویم نمایش: 'jalali' (شمسی) یا 'gregorian' (میلادی)، مستقل از زبان (پیش‌فرض رو app.js بر اساس زبان تعیین می‌کنه)
+  var calendar = 'jalali';
+  function setCalendar(c) { if (c === 'jalali' || c === 'gregorian') calendar = c; }
+  function getCalendar() { return calendar; }
   var fmtCache = {};
-  function date(d, short) {
-    var k = lang + (short ? 's' : 'l');
+  function fmt(kind) {
+    var k = lang + calendar + kind;
     if (!(k in fmtCache)) {
-      try {
-        fmtCache[k] = new Intl.DateTimeFormat(lang === 'fa' ? 'fa-IR-u-ca-persian' : 'en-GB',
-          short ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'long', year: 'numeric' });
-        if (lang === 'fa' && short) fmtCache[k] = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { day: 'numeric', month: 'long' });
-      } catch (e) { fmtCache[k] = null; }
+      var loc = (lang === 'fa' ? 'fa-IR' : 'en-GB') + (calendar === 'jalali' ? '-u-ca-persian' : '-u-ca-gregory');
+      var opt = kind === 'long' ? { day: 'numeric', month: 'long', year: 'numeric' }
+        : kind === 'month' ? { month: 'long', year: 'numeric' }
+        : kind === 'mname' ? { month: 'long' } : kind === 'year' ? { year: 'numeric' }
+        : { day: 'numeric', month: lang === 'fa' ? 'long' : 'short' };
+      try { fmtCache[k] = new Intl.DateTimeFormat(loc, opt); } catch (e) { fmtCache[k] = null; }
     }
-    var f = fmtCache[k];
+    return fmtCache[k];
+  }
+  // قالب‌بندی تاریخ با Intl (ICU)؛ ساختن ماه شمسی با jalaali-js در app.js
+  function date(d, short) {
+    var f = fmt(short ? 'short' : 'long');
     return f ? f.format(d) : num(d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate());
   }
+  // عنوان ماه؛ در فارسی «مهر ۱۴۰۵» (ترتیب پیش‌فرض ICU برای شمسی «۱۴۰۵ مهر» است)
+  function monthTitle(d) {
+    if (lang === 'fa' && fmt('mname') && fmt('year')) return fmt('mname').format(d) + ' ' + fmt('year').format(d);
+    var f = fmt('month');
+    return f ? f.format(d) : num(d.getFullYear() + '-' + (d.getMonth() + 1));
+  }
 
-  var api = { register: register, t: t, has: has, getLang: getLang, setLang: setLang, savedLang: savedLang, dir: dir, num: num, date: date, LANGS: LANGS };
+  var api = { register: register, t: t, has: has, getLang: getLang, setLang: setLang, savedLang: savedLang, dir: dir, num: num, date: date,
+    monthTitle: monthTitle, setCalendar: setCalendar, getCalendar: getCalendar, LANGS: LANGS };
 
   if (typeof module !== 'undefined' && module.exports) {
     register('fa', require('./i18n/fa.js'));

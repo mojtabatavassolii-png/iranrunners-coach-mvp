@@ -511,3 +511,36 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .reason-block { background: var(--info-soft); border: 1px solid var(--info-line); border-radius: 12px; padding: 4px 14px 10px; margin: 6px 0 10px; }
 .pb-intro { margin-bottom: 4px; }
 .start-preview { color: var(--brand-deep); font-weight: 700; margin-top: 6px; }
+
+/* ---------- سوییچ نمای هفتگی/ماهانه ---------- */
+.view-tabs { display: inline-flex; gap: 4px; background: var(--panel); border-radius: 999px; padding: 4px; margin: 0 0 12px; }
+.view-tabs button {
+  font: inherit; font-weight: 700; font-size: 0.92rem; border: 0; background: transparent; color: var(--muted);
+  padding: 8px 18px; border-radius: 999px; cursor: pointer; min-height: 40px;
+}
+.view-tabs button[aria-selected="true"] { background: var(--brand); color: #fff; }
+
+/* ---------- نمای ماهانه ---------- */
+.month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin-top: 12px; }
+.mhead { text-align: center; font-size: 0.78rem; font-weight: 700; color: var(--muted); padding-bottom: 2px; }
+.mday {
+  font: inherit; color: inherit; cursor: pointer; position: relative; min-height: 64px; padding: 4px 2px 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--card); border: 1.5px solid var(--line); border-top: 4px solid transparent; border-radius: 10px;
+}
+.mday:hover { background: var(--panel); }
+.mday-empty { background: transparent; border-color: transparent; cursor: default; }
+.mday-rest { background: var(--bg); }
+.mday.day-none { opacity: 0.45; }
+.mday.is-past:not(.is-selected) { opacity: 0.75; }
+.mday.is-today { border-color: var(--brand); border-top-color: var(--brand); }
+.mday.is-selected { box-shadow: 0 0 0 2px var(--accent-strong); border-color: var(--accent-strong); }
+.mday-num { font-weight: 800; font-size: 0.95rem; line-height: 1.3; }
+.mday-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--dot, var(--c-rest)); }
+.mday-amt { font-size: 0.72rem; color: var(--muted); line-height: 1.2; }
+.mday-done { position: absolute; top: 2px; inset-inline-end: 5px; color: var(--c-easy-ink); font-weight: 900; font-size: 0.8rem; }
+.month-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 12px 0 4px; font-size: 0.82rem; color: var(--muted); }
+.month-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--dot); margin-inline-end: 5px; vertical-align: middle; }
+.month-card .day-panel { margin-top: 12px; }
+@media (max-width: 519px) { .mday { min-height: 56px; } .mday-amt { font-size: 0.66rem; } }
+.month-legend span { background: none !important; }

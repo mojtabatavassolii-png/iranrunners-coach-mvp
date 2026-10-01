@@ -37,6 +37,22 @@
   }
   var state = load();
 
+  // ---------- تنظیمات نمایش (جدا از پروفایل): تقویم، شروع هفته، نمای برنامه ----------
+  // 'auto' = بر اساس زبان: فارسی → شمسی و شنبه؛ انگلیسی → میلادی و دوشنبه
+  var SETTINGS_KEY = 'iranrunners-coach-settings';
+  var WS_MAP = { sat: 6, sun: 0, mon: 1 };
+  function loadSettings() {
+    var d = { calendar: 'auto', weekStart: 'auto', planView: 'week' };
+    try { return Object.assign(d, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { return d; }
+  }
+  var settings = loadSettings();
+  function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* */ } }
+  function applyCalendarSettings() {
+    var isFa = I.getLang() === 'fa';
+    I.setCalendar(settings.calendar === 'auto' ? (isFa ? 'jalali' : 'gregorian') : settings.calendar);
+    C.setWeekStart(settings.weekStart === 'auto' ? (isFa ? WS_MAP.sat : WS_MAP.mon) : WS_MAP[settings.weekStart]);
+  }
+
   // ورود: یک‌بار در هر نشست مرورگر
   var enteredMemory = false;
   function isEntered() {
@@ -55,6 +71,7 @@
     return new Date(n.getFullYear(), n.getMonth(), n.getDate());
   }
   var viewWeekOffset = 0;
+  var monthOffset = 0;
   var selectedDay = null;
 
   // ---------- ابزار نمایش ----------
@@ -83,6 +100,7 @@
 
   // ---------- متن‌های ثابت صفحه (هدر، منو، بنر، فوتر) و جهت ----------
   function applyStatic() {
+    applyCalendarSettings();
     var root = document.documentElement;
     root.lang = I.getLang();
     root.dir = I.dir();
@@ -181,7 +199,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=14" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=15" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -295,7 +313,7 @@
       '</div></fieldset>' +
 
       '<fieldset><legend>' + esc(T('onb.s3')) + '</legend><div class="chips">' +
-      C.DAY_NAMES.map(function (n, i) { return chip('days', i, n, days.indexOf(i) >= 0); }).join('') + '</div>' +
+      C.WEEK_ORDER.map(function (i) { return chip('days', i, C.DAY_NAMES[i], days.indexOf(i) >= 0); }).join('') + '</div>' +
       '</fieldset>' +
 
       '<fieldset><legend>' + esc(T('onb.s4')) + '</legend><div class="chips">' +
@@ -411,7 +429,8 @@
     form.addEventListener('input', syncRace);
     function syncDate() {
       var v = document.getElementById('rdate').value;
-      document.getElementById('rdate-fa').textContent = v ? T('onb.raceDateEq', { d: faDate(v) }) : '';
+      // تاریخ ورودی مرورگر میلادیه؛ در تقویم شمسی معادلش نشون داده می‌شه
+      document.getElementById('rdate-fa').textContent = v && I.getCalendar() === 'jalali' ? T('onb.raceDateEq', { d: faDate(v) }) : '';
     }
     form.addEventListener('input', syncLevel);
     form.addEventListener('change', function () { syncRace(); syncLevel(); syncDate(); });
@@ -639,6 +658,16 @@
     if (lv.level === 0) html += zeroCard(p, now);
     html += fitnessNotesCard(p, now);
 
+    html += '<div class="view-tabs" role="tablist" aria-label="' + esc(T('plan.viewAria')) + '">' +
+      ['week', 'month'].map(function (m) {
+        return '<button type="button" role="tab" data-view-mode="' + m + '" aria-selected="' + (settings.planView === m) + '">' + esc(T('plan.' + m)) + '</button>';
+      }).join('') + '</div>';
+    if (settings.planView === 'month') {
+      html += monthCard(p, now, todayKey, isRunWalk, prevGlyph, nextGlyph);
+      app.innerHTML = html;
+      return;
+    }
+
     // سربرگ هفته
     var wkNum = week.weekIndex + 1;
     html += '<section class="card week-card"><div class="week-head">' +
@@ -686,20 +715,114 @@
         '</button>';
     });
     html += '</div>';
-    var rs = resolved[keys.indexOf(selectedDay)], ss = rs.session;
-    html += '<div class="day-panel" id="day-panel" role="tabpanel" aria-labelledby="tab-' + selectedDay + '">' +
-      '<div class="day-panel-head"><div><p class="eyebrow">' + esc(ss.dayName) + ' ' + esc(faDate(selectedDay)) +
-      (selectedDay === todayKey ? esc(T('week.todaySuffix')) : '') + '</p><h3>' + badge(ss.type, ss.label) + '</h3></div>' +
-      (selectedDay <= todayKey && ['rest', 'none', 'cancelled'].indexOf(ss.type) < 0 && (selectedDay < todayKey || state.checkins[todayKey]) ? doneButton(selectedDay, ss) : '') +
-      '</div>' +
-      (rs.adaptation ? adaptationBox(rs.adaptation, selectedDay) : '') +
-      (ss.type !== 'cancelled' ? sessionBody(ss, selectedDay <= todayKey && selectedDay !== todayKey ? { key: selectedDay, prefix: 'panel' } : {}) : '') +
-      '</div>';
+    html += dayPanel(resolved[keys.indexOf(selectedDay)], todayKey, 'tab-' + selectedDay);
     html += '</section>';
     app.innerHTML = html;
   }
 
+  // جزئیات کامل یک روز (مشترک بین نمای هفتگی و ماهانه)
+  function dayPanel(rs, todayKey, labelledBy) {
+    var ss = rs.session, d = ss.date;
+    return '<div class="day-panel" id="day-panel" role="tabpanel"' + (labelledBy ? ' aria-labelledby="' + labelledBy + '"' : '') + '>' +
+      '<div class="day-panel-head"><div><p class="eyebrow">' + esc(ss.dayName) + ' ' + esc(faDate(d)) +
+      (d === todayKey ? esc(T('week.todaySuffix')) : '') + '</p><h3>' + badge(ss.type, ss.label) + '</h3></div>' +
+      (d <= todayKey && ['rest', 'none', 'cancelled'].indexOf(ss.type) < 0 && (d < todayKey || state.checkins[todayKey]) ? doneButton(d, ss) : '') +
+      '</div>' +
+      (rs.adaptation ? adaptationBox(rs.adaptation, d) : '') +
+      (ss.type !== 'cancelled' ? sessionBody(ss, d <= todayKey && d !== todayKey ? { key: d, prefix: 'panel' } : {}) : '') +
+      '</div>';
+  }
+
+  // ---------- نمای ماهانه: ماه تقویمی (شمسی با jalaali-js یا میلادی)، با همون جلسه‌های تطبیق‌یافته ----------
+  function monthBounds(now) {
+    if (I.getCalendar() === 'jalali') {
+      var j = window.jalaali.toJalaali(now), m = j.jm - 1 + monthOffset;
+      var jy = j.jy + Math.floor(m / 12), jm = ((m % 12) + 12) % 12 + 1;
+      var g = window.jalaali.toGregorian(jy, jm, 1);
+      return { first: new Date(g.gy, g.gm - 1, g.gd), len: window.jalaali.jalaaliMonthLength(jy, jm) };
+    }
+    var f = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+    return { first: f, len: new Date(f.getFullYear(), f.getMonth() + 1, 0).getDate() };
+  }
+  function dayOfMonth(d) { return I.getCalendar() === 'jalali' ? window.jalaali.toJalaali(d).jd : d.getDate(); }
+
+  function monthCard(p, now, todayKey, timeBased, prevGlyph, nextGlyph) {
+    var mb = monthBounds(now), weeks = {};
+    // هر هفته یک‌بار ساخته می‌شه؛ چک‌این هر روز (خستگی، خواب، درد) روی جلسه اعمال می‌شه
+    function resolve(date) {
+      var k = C.dateKey(C.weekStart(date));
+      if (!weeks[k]) weeks[k] = C.buildWeek(p, date);
+      var s = weeks[k].days[C.dayIndex(date)];
+      return state.checkins[s.date] ? effectiveSession(s) : { session: s, adaptation: null };
+    }
+    var days = [];
+    for (var i = 0; i < mb.len; i++) days.push(resolve(C.addDays(mb.first, i)));
+    var keys = days.map(function (r) { return r.session.date; });
+    if (keys.indexOf(selectedDay) < 0) {
+      var firstRun = days.filter(function (r) { return ['rest', 'none'].indexOf(r.session.type) < 0; })[0];
+      selectedDay = keys.indexOf(todayKey) >= 0 ? todayKey : (firstRun || days[0]).session.date;
+    }
+    var active = days.filter(function (r) { return ['rest', 'none', 'cancelled'].indexOf(r.session.type) < 0; });
+    var km = active.reduce(function (x, r) { return x + (r.session.km || 0); }, 0);
+    var min = active.reduce(function (x, r) { return x + (r.session.minutes || 0); }, 0);
+    var done = days.filter(function (r) { return state.done[r.session.date]; }).length;
+
+    var html = '<section class="card week-card month-card"><div class="week-head">' +
+      '<button type="button" class="btn btn-icon" data-month="-1" aria-label="' + esc(T('month.prev')) + '">' + prevGlyph + '</button>' +
+      '<div class="week-title"><h2>' + t(I.monthTitle(C.addDays(mb.first, 14))) + '</h2>' +
+      '<p class="muted">' + tt(timeBased ? 'month.statsMin' : 'month.stats', { n: active.length, km: Math.round(km * 2) / 2, min: min, d: done }) +
+      (monthOffset !== 0 ? ' · <button type="button" class="linklike" data-month="0">' + esc(T('month.back')) + '</button>' : '') + '</p></div>' +
+      '<button type="button" class="btn btn-icon" data-month="1" aria-label="' + esc(T('month.next')) + '">' + nextGlyph + '</button></div>';
+
+    html += '<div class="month-grid" role="grid" aria-label="' + esc(T('month.gridAria')) + '">' +
+      C.WEEK_ORDER.map(function (i) { return '<span class="mhead" role="columnheader">' + esc(C.DAY_SHORT[i]) + '</span>'; }).join('');
+    var lead = C.dayIndex(mb.first);
+    for (var b = 0; b < lead; b++) html += '<span class="mday mday-empty" aria-hidden="true"></span>';
+    days.forEach(function (r) {
+      var s = r.session, d = s.date, date = C.parseDate(d);
+      var rest = ['rest', 'none'].indexOf(s.type) >= 0;
+      var amount = s.km ? fa(s.km) : (s.minutes ? fa(s.minutes) + "'" : '');
+      html += '<button type="button" class="mday day-' + s.type + (rest ? ' mday-rest' : '') + (d === todayKey ? ' is-today' : '') + (d < todayKey ? ' is-past' : '') +
+        (d === selectedDay ? ' is-selected' : '') + '" data-mday="' + d + '" aria-pressed="' + (d === selectedDay) + '" aria-label="' + esc(faDate(d) + ' · ' + s.label) + '">' +
+        '<span class="mday-num">' + fa(dayOfMonth(date)) + '</span>' +
+        (rest ? '' : '<span class="mday-dot" aria-hidden="true"></span><span class="mday-amt">' + amount + '</span>') +
+        (state.done[d] ? '<span class="mday-done" aria-hidden="true">✓</span>' : '') + '</button>';
+    });
+    var tail = (7 - (lead + days.length) % 7) % 7;
+    for (var c = 0; c < tail; c++) html += '<span class="mday mday-empty" aria-hidden="true"></span>';
+    html += '</div>';
+
+    // راهنمای رنگ‌ها فقط برای نوع‌هایی که این ماه هست
+    var seen = [];
+    days.forEach(function (r) { var ty = r.session.type; if (ty !== 'none' && ty !== 'rest' && seen.indexOf(ty) < 0) seen.push(ty); });
+    if (seen.length) {
+      html += '<div class="month-legend">' + seen.map(function (ty) {
+        return '<span class="day-' + ty + '"><i aria-hidden="true"></i>' + esc(C.TYPE_INFO[ty].label) + '</span>';
+      }).join('') + '</div>';
+    }
+    html += dayPanel(days[keys.indexOf(selectedDay)], todayKey, null);
+    return html + '</section>';
+  }
+
   app.addEventListener('click', function (e) {
+    var vm = e.target.closest('[data-view-mode]');
+    if (vm) { settings.planView = vm.dataset.viewMode; saveSettings(); selectedDay = null; renderPlan(); return; }
+    var mo = e.target.closest('[data-month]');
+    if (mo) {
+      var mv = Number(mo.dataset.month);
+      monthOffset = mv === 0 ? 0 : monthOffset + mv;
+      selectedDay = null;
+      renderPlan();
+      return;
+    }
+    var md = e.target.closest('[data-mday]');
+    if (md) {
+      selectedDay = md.dataset.mday;
+      renderPlan();
+      var panel = document.getElementById('day-panel');
+      if (panel && panel.scrollIntoView) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      return;
+    }
     var wk = e.target.closest('[data-week]');
     if (wk) {
       var v = Number(wk.dataset.week);
@@ -1218,6 +1341,32 @@
       list.map(function (w) { return '<li>' + t(w) + '</li>'; }).join('') + '</ul></section>';
   }
 
+  // نوع تقویم و روز شروع هفته؛ مستقل از زبان، ذخیره در localStorage
+  function settingsCard() {
+    function sel(id, name, cur, opts) {
+      return '<select id="' + id + '" name="' + name + '">' + opts.map(function (o) {
+        return '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
+      }).join('') + '</select>';
+    }
+    var D = C.DAY_NAMES;
+    return '<section class="card settings-card"><h2>' + esc(T('settings.title')) + '</h2>' +
+      '<div class="row2"><div class="field"><label for="set-cal">' + esc(T('settings.calendar')) + '</label>' +
+      sel('set-cal', 'calendar', settings.calendar, [['auto', T('settings.auto')], ['jalali', T('settings.jalali')], ['gregorian', T('settings.gregorian')]]) + '</div>' +
+      '<div class="field"><label for="set-ws">' + esc(T('settings.weekStart')) + '</label>' +
+      sel('set-ws', 'weekStart', settings.weekStart, [['auto', T('settings.auto')], ['sat', D[0]], ['sun', D[1]], ['mon', D[2]]]) + '</div></div>' +
+      '<p class="small muted">' + tt('settings.current', { cal: T('settings.' + I.getCalendar()), day: C.DAY_NAMES[C.WEEK_ORDER[0]] }) + '</p>' +
+      '<p class="small muted">' + esc(T('settings.note')) + '</p></section>';
+  }
+  app.addEventListener('change', function (e) {
+    var el = e.target;
+    if (el.id !== 'set-cal' && el.id !== 'set-ws') return;
+    settings[el.name] = el.value;
+    saveSettings();
+    applyStatic();
+    showToast(T('settings.saved'));
+    route();
+  });
+
   function renderProfile() {
     var p = state.profile;
     var bmi = C.bmi(p);
@@ -1235,7 +1384,7 @@
       row('km', p.monthAvgKm != null && p.experience !== 'never' ? tt('profile.kmVal2', { last: p.lastWeekKm, avg: p.monthAvgKm, start: lv.volume ? lv.volume.start : p.currentWeeklyKm })
         : tt('profile.kmVal', { n: p.currentWeeklyKm })) +
       row('body', tt('profile.bodyVal', { age: p.age, w: p.weightKg, h: p.heightCm }) + ' <span class="muted small">(BMI ' + t(bmi.toFixed(1)) + ')</span>') +
-      row('days', esc(p.days.map(function (d) { return C.DAY_NAMES[d]; }).join(T('app.listSep')))) +
+      row('days', esc(C.WEEK_ORDER.filter(function (d) { return p.days.indexOf(d) >= 0; }).map(function (d) { return C.DAY_NAMES[d]; }).join(T('app.listSep')))) +
       row('locs', esc(p.locations.map(function (l) { return C.LOCATION_LABELS[l]; }).join(T('app.listSep')))) +
       row('injury', p.injury ? t(p.injury) : muted('profile.notRecorded')) +
       row('goal', g.type !== 'none' ? t(C.goalLabel(g)) + (g.date ? ' — ' + esc(faDate(g.date)) : ' <span class="muted small">' + esc(T('profile.noDate')) + '</span>') : muted('profile.noGoal')) +
@@ -1251,6 +1400,7 @@
       '<p id="confirm-text"></p><div class="actions">' +
       '<button type="button" class="btn btn-primary" id="confirm-yes">' + esc(T('profile.confirmYes')) + '</button>' +
       '<button type="button" class="btn btn-ghost" id="confirm-no">' + esc(T('app.cancel')) + '</button></div></div></section>' +
+      settingsCard() +
       warningsCard(C.profileWarnings(p, today()));
 
     // تایید داخل صفحه (به‌جای confirm مرورگر)

@@ -307,7 +307,7 @@
       tagline: 'Your running plan · beta',
       metaDescription: 'Be Your Own Coach: a weekly running plan built on fixed training rules, no server.',
       navAria: 'Sections',
-      nav: { plan: 'Weekly plan', checkin: 'Today\'s check-in', fitness: 'Fitness', race: 'Race goal', guide: 'Guide', profile: 'Profile' },
+      nav: { plan: 'Plan', checkin: 'Today\'s check-in', fitness: 'Fitness', race: 'Race goal', guide: 'Guide', profile: 'Profile' },
       langSwitch: 'فارسی',
       langSwitchAria: 'Switch language to Persian',
       bannerAria: 'Medical notice',
@@ -386,7 +386,7 @@
       s6: '6. Race goal',
       goalType: 'Target race type',
       raceDate: 'Race date (if you have a specific race)',
-      raceDateEq: '',
+      raceDateEq: 'Solar Hijri date: {d}',
       ultraKm: 'Race distance (km)',
       ultraGain: 'Total climb (metres of ascent)',
       ultraLoss: 'Total descent (m, optional)',
@@ -419,6 +419,23 @@
         ultraLoss: 'Descent must be between 0 and 20,000 m.',
         ultraAlt: 'Altitude must be between 0 and 6,000 m.'
       }
+    },
+    plan: { week: 'Weekly view', month: 'Monthly view', viewAria: 'Plan view' },
+    month: {
+      prev: 'Previous month', next: 'Next month', back: 'Back to this month', gridAria: 'Month calendar',
+      stats: { one: '{n} session · {km} km · {d} done', other: '{n} sessions · {km} km · {d} done' },
+      statsMin: { one: '{n} session · {min} min · {d} done', other: '{n} sessions · {min} min · {d} done' }
+    },
+    settings: {
+      title: 'Calendar settings',
+      calendar: 'Calendar',
+      weekStart: 'First day of the week',
+      auto: 'Automatic (from language)',
+      jalali: 'Solar Hijri (Jalali)',
+      gregorian: 'Gregorian',
+      current: 'Now: {cal} calendar, weeks start on {day}.',
+      note: 'Defaults: Persian → Solar Hijri and Saturday; English → Gregorian and Monday. Changing the first day of the week moves the plan\'s week boundaries (the long run falls on the last day of the week); your free days stay the same.',
+      saved: 'Settings saved.'
     },
     sess: { original: 'Original plan:' },
     post: {
@@ -776,6 +793,7 @@
           body: '<ul><li>All your information is stored only in this browser and is never sent to any server.</li>' +
             '<li>If you clear your browser data or switch devices, the information is lost.</li>' +
             '<li>Change the language any time with the button at the top of the page; your choice is remembered in this browser.</li>' +
+            '<li>Change the calendar (Solar Hijri or Gregorian) and the first day of the week in Profile → Calendar settings, independently of the language.</li>' +
             '<li>This plan is built from fixed training rules, not AI, and doesn\'t replace a doctor or a coach.</li></ul>'
         }
       }

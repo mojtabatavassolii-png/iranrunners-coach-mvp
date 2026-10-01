@@ -28,7 +28,15 @@
   }
 
   // ---------- تاریخ (همه‌چیز با تاریخ محلی، بدون UTC) ----------
-  // ایندکس روزهای هفته به ترتیب ایرانی: ۰=شنبه ... ۶=جمعه
+  // روز شروع هفته قابل تنظیمه (روز هفته‌ی JS: ۶=شنبه پیش‌فرض، ۱=دوشنبه، ۰=یکشنبه).
+  // ایندکس روز داخل هفته نسبت به همین شروع حساب می‌شه؛ آخرین روز هفته = روز لانگ‌ران.
+  // روزهای آزاد کاربر (profile.days) همیشه با مبنای شنبه ذخیره می‌شن (۰=شنبه ... ۶=جمعه).
+  var WEEK_START = 6;
+  function setWeekStart(js) { if (js >= 0 && js <= 6) WEEK_START = js; }
+  function getWeekStart() { return WEEK_START; }
+  function satToRel(satIdx) { return ((satIdx + 6) % 7 - WEEK_START + 7) % 7; }
+  function relToSat(rel) { return ((rel + WEEK_START) % 7 + 1) % 7; }
+  function weekOrder() { var o = []; for (var r = 0; r < 7; r++) o.push(relToSat(r)); return o; }
   function dayNames() { return T('days'); }
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -38,7 +46,7 @@
     return new Date(p[0], p[1] - 1, p[2]);
   }
   function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
-  function persianDayIndex(d) { return (d.getDay() + 1) % 7; }
+  function persianDayIndex(d) { return (d.getDay() - WEEK_START + 7) % 7; }
   function weekStart(d) { return addDays(d, -persianDayIndex(d)); }
   function daysBetween(a, b) { return Math.round((b - a) / 86400000); }
 
@@ -1164,7 +1172,7 @@
     var ctx = { wu: L.wuKm, zones: zones, P: paceSet(profile, level), rpeOnly: ultra, goal: goal };
     var pr = progression(W);
     var race = raceInfo(profile);
-    var avail = (profile.days || []).slice();
+    var avail = (profile.days || []).map(satToRel);
     var nSessions = Math.min(avail.length, L.sessions);
     var sessionDays = chooseSessionDays(avail, nSessions);
     var longDay = sessionDays.indexOf(6) >= 0 ? 6 : sessionDays[sessionDays.length - 1];
@@ -1291,8 +1299,8 @@
       else s = makeRest();
       if (race && s.type !== 'none') s = applyRace(profile, s, date, race, ctx, template._rw, level);
       s.date = dateKey(date);
-      s.dayName = T('days')[i];
-      s.dayShort = T('daysShort')[i];
+      s.dayName = T('days')[(date.getDay() + 1) % 7];
+      s.dayShort = T('daysShort')[(date.getDay() + 1) % 7];
       s.label = TYPE_INFO[s.type].label + (s.variant ? ' (' + s.variant + ')' : '');
       s.hard = isHard(s.type);
       days.push(s);
@@ -1446,7 +1454,7 @@
     RACE_DISTANCES: RACE_DISTANCES, RACE_LABELS: RACE_LABELS,
     TYPE_INFO: TYPE_INFO, LOCATION_TIPS: LOCATION_TIPS, LOCATION_LABELS: LOCATION_LABELS,
     dateKey: dateKey, parseDate: parseDate, addDays: addDays, weekStart: weekStart, daysBetween: daysBetween,
-    persianDayIndex: persianDayIndex, parseTime: parseTime, formatDuration: formatDuration, describeDuration: describeDuration,
+    persianDayIndex: persianDayIndex, dayIndex: persianDayIndex, setWeekStart: setWeekStart, getWeekStart: getWeekStart, satToRel: satToRel, parseTime: parseTime, formatDuration: formatDuration, describeDuration: describeDuration,
     riegel: riegel, vdotFromRace: vdotFromRace, raceTimeFromVdot: raceTimeFromVdot,
     levelFromKm: levelFromKm, levelFromVdot: levelFromVdot, assessLevel: assessLevel,
     paceZones: paceZones, bmi: bmi, progression: progression, weeklyVolumeKm: weeklyVolumeKm,
@@ -1464,6 +1472,7 @@
   };
   // متن‌هایی که به زبان فعلی بستگی دارن، موقع خوندن ترجمه می‌شن
   Object.defineProperty(api, 'DAY_NAMES', { enumerable: true, get: dayNames });
+  Object.defineProperty(api, 'WEEK_ORDER', { enumerable: true, get: weekOrder });
   Object.defineProperty(api, 'DAY_SHORT', { enumerable: true, get: function () { return T('daysShort'); } });
   Object.defineProperty(api, 'PAIN_MESSAGE', { enumerable: true, get: function () { return T('painMessage'); } });
   Object.defineProperty(api, 'TALK_TEST', { enumerable: true, get: talkTest });

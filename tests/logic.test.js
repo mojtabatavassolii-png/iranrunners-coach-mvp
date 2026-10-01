@@ -542,6 +542,44 @@ test('حجم: افت بدون دلیل خاص = کاهش واقعی؛ جهش ی�
   assert(fast.notes.length >= 2);
 });
 
+// ---------- تقویم و شروع هفته ----------
+test('شروع هفته از دوشنبه: هفته دوشنبه تا یکشنبه، لانگ‌ران یکشنبه، بدون دو روز سخت پشت‌سرهم', function () {
+  C.setWeekStart(1);
+  try {
+    [3, 5, 7].forEach(function (n) {
+      var p = profileFor(n, { startDate: '2026-09-28' }); // دوشنبه
+      for (var w = 0; w < 8; w++) {
+        var wk = C.buildWeek(p, C.addDays(C.parseDate(p.startDate), w * 7));
+        assert.strictEqual(C.parseDate(wk.days[0].date).getDay(), 1);
+        assert.strictEqual(wk.days[6].type === 'long' || wk.days[6].type === 'rest' || wk.days[6].type === 'race', true, wk.days[6].type);
+        for (var i = 0; i < 6; i++) assert(!(wk.days[i].hard && wk.days[i + 1].hard) || wk.days[i + 1].b2b === 'day2', n + ' ' + w + ' ' + i);
+      }
+    });
+    // روزهای آزاد با مبنای شنبه ذخیره می‌شن: فقط سه‌شنبه (۳) و یکشنبه (۱) → همون روزها
+    var q = profileFor(4, { startDate: '2026-09-28', days: [1, 3] });
+    var wk2 = C.buildWeek(q, C.parseDate('2026-10-05'));
+    var runDays = wk2.days.filter(function (d) { return d.type !== 'rest'; }).map(function (d) { return C.parseDate(d.date).getDay(); }).sort();
+    assert.deepStrictEqual(runDays, [0, 2]);
+    assert.deepStrictEqual(C.WEEK_ORDER, [2, 3, 4, 5, 6, 0, 1]);
+  } finally { C.setWeekStart(6); }
+  assert.strictEqual(C.parseDate(C.buildWeek(profileFor(5), C.parseDate('2026-10-05')).days[0].date).getDay(), 6);
+});
+test('تبدیل تقویم: jalaali-js با تقویم ICU برای ۲۰ سال یکیه؛ نمونه‌های شناخته‌شده', function () {
+  var J = require('../js/vendor/jalaali.js');
+  assert.deepStrictEqual(J.toJalaali(2026, 10, 1), { jy: 1405, jm: 7, jd: 9 });
+  assert.deepStrictEqual(J.toGregorian(1403, 1, 1), { gy: 2024, gm: 3, gd: 20 });
+  assert.strictEqual(J.jalaaliMonthLength(1403, 12), 30);
+  assert.strictEqual(J.jalaaliMonthLength(1404, 12), 29);
+  var f = new Intl.DateTimeFormat('en-u-ca-persian-nu-latn', { year: 'numeric', month: 'numeric', day: 'numeric' });
+  var bad = 0;
+  for (var d = new Date(2020, 0, 1); d < new Date(2040, 0, 1); d = C.addDays(d, 1)) {
+    var parts = {}; f.formatToParts(d).forEach(function (x) { parts[x.type] = x.value; });
+    var r = J.toJalaali(d);
+    if (+parts.year !== r.jy || +parts.month !== r.jm || +parts.day !== r.jd) bad++;
+  }
+  assert.strictEqual(bad, 0);
+});
+
 // ---------- سطح ۰ ----------
 function zeroProfile(over) {
   return Object.assign({ age: 40, weightKg: 80, heightCm: 172, days: [0, 1, 2, 3, 4, 5, 6], locations: ['park'], injury: '',
