@@ -580,6 +580,44 @@ test('تبدیل تقویم: jalaali-js با تقویم ICU برای ۲۰ سال
   assert.strictEqual(bad, 0);
 });
 
+// ---------- چرخه‌ی قاعدگی ----------
+function cycleProfile(start, over) {
+  return Object.assign(profileFor(5), { sex: 'female', cycle: { enabled: true, lastStart: start, cycleLen: 28, periodLen: 5 } }, over || {});
+}
+test('چرخه: فازها از تاریخ شروع، طول چرخه و طول پریود؛ تکرار در چرخه‌های بعدی', function () {
+  var p = cycleProfile('2026-10-04');
+  function ph(d) { var i = C.cycleInfo(p, C.parseDate(d)); return i.phase + ':' + i.day + (i.heavy ? 'h' : ''); }
+  assert.strictEqual(ph('2026-10-04'), 'period:1h');
+  assert.strictEqual(ph('2026-10-05'), 'period:2h');
+  assert.strictEqual(ph('2026-10-08'), 'period:5');
+  assert.strictEqual(ph('2026-10-09'), 'follicular:6');
+  assert.strictEqual(ph('2026-10-16'), 'ovulation:13');   // روز ۱۴ = ۲۸−۱۴؛ پنجره ۱۲ تا ۱۵
+  assert.strictEqual(ph('2026-10-20'), 'luteal:17');
+  assert.strictEqual(ph('2026-10-27'), 'lateLuteal:24');
+  assert.strictEqual(ph('2026-11-01'), 'period:1h');      // چرخه‌ی بعد
+  assert.strictEqual(ph('2026-09-30'), 'lateLuteal:25');  // قبل از تاریخ ثبت‌شده هم تخمین زده می‌شه
+  var np = C.nextPeriod(p, C.parseDate('2026-10-25'));
+  assert.strictEqual(C.dateKey(np.next), '2026-11-01'); assert.strictEqual(np.daysTo, 7);
+});
+test('چرخه: فقط با رضایت (زن + فعال)؛ پیشنهاد فقط برای جلسه‌ی سخت، بدون تغییر خودکار', function () {
+  assert.strictEqual(C.cycleInfo(cycleProfile('2026-10-04', { sex: 'na' }), C.parseDate('2026-10-05')), null);
+  assert.strictEqual(C.cycleInfo(cycleProfile('2026-10-04', { cycle: { enabled: false, lastStart: '2026-10-04' } }), C.parseDate('2026-10-05')), null);
+  var p = cycleProfile('2026-10-04');
+  var week = C.buildWeek(p, C.parseDate('2026-10-05'));
+  var noCycle = C.buildWeek(profileFor(5), C.parseDate('2026-10-05'));
+  // برنامه‌ی موتور دست نخورده: همون جلسه‌های بدون چرخه
+  assert.deepStrictEqual(week.days.map(function (d) { return d.type; }), noCycle.days.map(function (d) { return d.type; }));
+  var hard = week.days.filter(function (d) { return d.hard && d.type !== 'race'; })[0];
+  var info = C.cycleInfo(p, C.parseDate('2026-10-05'));
+  var sug = C.cycleSuggestion(hard, info, null);
+  assert(sug && sug.alt.type === 'easy' && sug.alt.km <= hard.km && sug.rest.type === 'rest');
+  var easy = week.days.filter(function (d) { return d.type === 'easy'; })[0];
+  assert.strictEqual(C.cycleSuggestion(easy, info, null), null);
+  assert.strictEqual(C.cycleSuggestion(hard, C.cycleInfo(p, C.parseDate('2026-10-12')), null), null); // فولیکولار
+  var late = C.cycleSuggestion(hard, C.cycleInfo(p, C.parseDate('2026-10-28')), null);
+  assert(late && late.phase === 'lateLuteal' && late.rest === null);
+});
+
 // ---------- سطح ۰ ----------
 function zeroProfile(over) {
   return Object.assign({ age: 40, weightKg: 80, heightCm: 172, days: [0, 1, 2, 3, 4, 5, 6], locations: ['park'], injury: '',

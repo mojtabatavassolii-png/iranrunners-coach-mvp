@@ -1415,6 +1415,42 @@
     return { session: session, adaptation: null };
   }
 
+  // ---------- چرخه‌ی قاعدگی (اختیاری؛ فقط با رضایت و داده‌ی خود کاربر) ----------
+  // فاز تخمینی هر روز از تاریخ شروع آخرین پریود، طول چرخه و طول پریود:
+  //  period (روز ۱ تا P؛ روز ۱ و ۲ = heavy) → follicular → ovulation (حدود ۱۴ روز قبل از پریود بعدی، ±۲ روز)
+  //  → luteal → lateLuteal (۵ روز آخر). برنامه هیچ‌وقت خودکار عوض نمی‌شه؛ فقط پیشنهاد می‌ده.
+  function cycleSettings(profile) {
+    var c = profile && profile.cycle;
+    if (!c || !c.enabled || !c.lastStart || profile.sex !== 'female') return null;
+    var L = clamp(Number(c.cycleLen) || 28, 21, 45), P = clamp(Number(c.periodLen) || 5, 2, 10);
+    return { start: parseDate(c.lastStart), L: L, P: Math.min(P, L - 10) };
+  }
+  function cycleInfo(profile, date) {
+    var c = cycleSettings(profile);
+    if (!c) return null;
+    var k = ((daysBetween(c.start, date) % c.L) + c.L) % c.L;  // روز چرخه از ۰
+    var ov = c.L - 14;
+    var phase = k < c.P ? 'period' : (k >= ov - 2 && k <= ov + 1) ? 'ovulation' : k < ov - 2 ? 'follicular' : k >= c.L - 5 ? 'lateLuteal' : 'luteal';
+    return { phase: phase, day: k + 1, heavy: phase === 'period' && k < 2, length: c.L, nextStart: addDays(date, c.L - k) };
+  }
+  // شروع پریود بعدی (اگه امروز روز پریوده، شروع پریود فعلی هم برگردونده می‌شه)
+  function nextPeriod(profile, today) {
+    var info = cycleInfo(profile, today);
+    if (!info) return null;
+    return { date: info.phase === 'period' ? addDays(today, -(info.day - 1)) : info.nextStart, inPeriod: info.phase === 'period', day: info.day,
+      next: info.nextStart, daysTo: info.phase === 'period' ? 0 : daysBetween(today, info.nextStart) };
+  }
+  // پیشنهاد تطبیق برای یک جلسه‌ی سخت؛ خودِ کاربر تصمیم می‌گیره (adapt / rest / keep)
+  function cycleSuggestion(session, info, zones) {
+    if (!info || !session || !session.hard || session.type === 'race') return null;
+    if (info.phase !== 'period' && info.phase !== 'lateLuteal') return null;
+    var km = session.km ? Math.max(Math.min(4, session.km), round05(session.km * (info.heavy ? 0.5 : 0.65))) : 4;
+    var alt = makeEasy(km, zones || null, T(info.phase === 'period' ? 'cycle.altNote' : 'cycle.altNoteLuteal'));
+    var rest = info.phase === 'period' ? { type: 'rest', km: null, hardKm: 0, target: T('cycle.activeRestTarget'), steps: [T('cycle.activeRestStep')], how: T('cycle.activeRestHow') } : null;
+    return { phase: info.phase, heavy: info.heavy, day: info.day, alt: alt, rest: rest };
+  }
+  var CYCLE_PHASES = ['period', 'follicular', 'ovulation', 'luteal', 'lateLuteal'];
+
   // ---------- هشدارهای پروفایل ----------
   function profileWarnings(profile, today) {
     var out = [];
@@ -1467,6 +1503,7 @@
     EASY_ADJUST_MAX: EASY_ADJUST_MAX,
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks,
     goalInfo: goalInfo, goalLabel: goalLabel, GOAL_TYPES: GOAL_TYPES, TERRAIN_LABELS: TERRAIN_LABELS,
+    cycleInfo: cycleInfo, nextPeriod: nextPeriod, cycleSuggestion: cycleSuggestion, CYCLE_PHASES: CYCLE_PHASES,
     ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet
   };

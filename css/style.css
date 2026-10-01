@@ -544,3 +544,27 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .month-card .day-panel { margin-top: 12px; }
 @media (max-width: 519px) { .mday { min-height: 56px; } .mday-amt { font-size: 0.66rem; } }
 .month-legend span { background: none !important; }
+.btn-icon .chev { display: block; }
+
+/* ---------- چرخه‌ی قاعدگی ---------- */
+:root { --cy-period: #d6336c; --cy-ovulation: #9b5de5; --cy-follicular: #00a884; --cy-late: #e8879f; }
+.check-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-weight: 500; cursor: pointer; }
+.check-row input { width: 20px; height: 20px; accent-color: var(--brand); }
+.cycle-box { background: #fdeef3; border: 1px solid #f3c1d2; }
+.cycle-box .actions { margin-top: 8px; }
+.cycle-note { background: var(--c-easy-bg); border-radius: 10px; padding: 6px 12px; }
+.cycle-card { border-inline-start: 6px solid var(--cy-late); }
+.cycle-card.cycle-soon { background: #fdeef3; border-inline-start-color: var(--cy-period); }
+.settings-sub { margin-top: 18px; font-size: 1rem; }
+/* نشانگر ملایم فاز: نوار کوچک پایین خونه */
+.day.cy::after, .mday.cy::after {
+  content: ""; position: absolute; left: 18%; right: 18%; bottom: 3px; height: 3px; border-radius: 2px; background: transparent;
+}
+.cy-period::after { background: var(--cy-period) !important; }
+.cy-heavy::after { height: 5px !important; }
+.cy-ovulation::after { background: var(--cy-ovulation) !important; }
+.cy-follicular::after { background: var(--cy-follicular) !important; opacity: 0.45; }
+.cy-lateLuteal::after { background: repeating-linear-gradient(90deg, var(--cy-late) 0 4px, transparent 4px 7px) !important; }
+.cycle-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0 4px; font-size: 0.82rem; color: var(--muted); }
+.cycle-legend span { position: relative; padding-bottom: 6px; }
+.cycle-legend span::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; border-radius: 2px; }

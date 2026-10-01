@@ -420,6 +420,61 @@
         ultraAlt: 'Altitude must be between 0 and 6,000 m.'
       }
     },
+    cycle: {
+      sexQ: 'Sex (optional)',
+      sexHint: 'Only used for training suggestions and stays on this device.',
+      sex: { female: 'Woman', male: 'Man', na: 'Prefer not to say' },
+      title: 'Adapting to your menstrual cycle (optional)',
+      intro: 'If you like, you can enter details of your menstrual cycle so your training plan can take it into account. This is completely optional, and you can turn it off or change it at any time.',
+      enable: 'I\'d like my plan to adapt to my cycle',
+      lastStart: 'First day of your last period',
+      cycleLen: 'Average cycle length (days)',
+      cycleLenHint: 'From the first day of one period to the first day of the next; usually 21 to 35 days.',
+      periodLen: 'Average period length (days)',
+      privacy: 'This information is stored only on this device (localStorage) and is never sent anywhere.',
+      err: {
+        lastStart: 'Enter the first day of your last period (today or earlier, at most 120 days ago).',
+        cycleLen: 'Cycle length must be between 21 and 45 days.',
+        periodLen: 'Period length must be between 2 and 10 days.'
+      },
+      phase: { period: 'Period days', follicular: 'Follicular phase', ovulation: 'Around ovulation', luteal: 'Luteal phase', lateLuteal: 'Days before your period' },
+      when: { today: 'today', date: 'on {d}' },
+      promptPeriod: 'Based on your calendar, {when} is probably day {day} of your period. Shall we change the "{label}" session to a lighter easy run, or keep the original plan?',
+      promptHeavy: 'The first days are often the hardest; active rest is also an option.',
+      promptLuteal: 'Based on your calendar, {when} is probably a few days before your next period, when some people feel more tired. If that\'s you, shall we make the "{label}" session lighter?',
+      decide: 'It\'s your call; symptoms differ from person to person and month to month.',
+      btnAdapt: 'Make it lighter',
+      btnRest: 'Active rest',
+      btnKeep: 'Keep the original plan',
+      chosen: {
+        adapt: 'As you chose, this session was changed to a lighter easy run.',
+        rest: 'As you chose, this day is now active rest.',
+        keep: 'As you chose, the original plan is kept. If you don\'t feel good while running, cut it short.'
+      },
+      undo: 'Change my choice',
+      follicularNote: 'These days (after your period until around ovulation) often bring more energy; a good time for hard sessions.',
+      altNote: 'Lighter because of your period; if you feel good, you can run a little more.',
+      altNoteLuteal: 'Lighter, as you chose; listen to your body.',
+      activeRestTarget: '20–30 min',
+      activeRestStep: 'Easy walking, stretching or gentle yoga',
+      activeRestHow: 'Light movement can help you feel better; stop whenever you like.',
+      cardTitle: 'Your cycle',
+      today: 'Today: cycle day {day} · {phase}',
+      next: { one: 'Your next period is expected around {date} (in {n} day).', other: 'Your next period is expected around {date} (in {n} days).' },
+      nextSoon: { one: 'Reminder: your next period is expected around {date}, in {n} day. If you like, keep those days in mind when planning.', other: 'Reminder: your next period is expected around {date}, in {n} days. If you like, keep those days in mind when planning.' },
+      inPeriod: 'You\'re probably on day {day} of your period. If you have a hard session, you can make it lighter.',
+      started: 'My period started today',
+      startedToast: 'Period start updated; the estimates are now more accurate.',
+      estimate: 'All dates are estimates and don\'t replace medical advice.',
+      settingsTitle: 'Menstrual cycle',
+      settingsEnabled: 'Adapt to my cycle',
+      settingsMarkers: 'Show cycle phases on the calendar',
+      settingsEdit: 'Change dates and cycle length under "Edit profile".',
+      settingsNeedData: 'To turn this on, first enter the first day of your last period under "Edit profile".',
+      profileRow: 'Cycle adaptation',
+      profileOn: 'On · {len}-day cycle, {p}-day period',
+      profileOff: 'Off'
+    },
     plan: { week: 'Weekly view', month: 'Monthly view', viewAria: 'Plan view' },
     month: {
       prev: 'Previous month', next: 'Next month', back: 'Back to this month', gridAria: 'Month calendar',
@@ -654,7 +709,7 @@
       rows: {
         level: 'Level', exp: 'Running history', structured: 'Structured training', hr: 'Heart rate', fitness: 'Current fitness',
         km: 'Training volume', body: 'Age / weight / height', days: 'Free days', locs: 'Training locations',
-        injury: 'Injury / limitation', goal: 'Race goal', pb: 'Best time', start: 'Plan start', stats: 'Stats'
+        sex: 'Sex', cycle: 'Cycle adaptation', injury: 'Injury / limitation', goal: 'Race goal', pb: 'Best time', start: 'Plan start', stats: 'Stats'
       },
       levelVal: 'Level {n} of 10: {name}',
       structYes: 'Done before',
@@ -786,6 +841,14 @@
             '<h3>Taper</h3><p>Before the race the volume drops so you reach the start line fresh: 1 week for 5 and 10 km, 2 weeks for the half marathon, marathon and ultras. Some intensity is kept but the volume comes down. Without a race date, sessions are goal-specific but there is no taper.</p>' +
             '<h3>After the race</h3><p>Volume restarts at 70% and grows 10% each week until you\'re back to normal.</p>' +
             '<h3>Time prediction</h3><p>Calculated with the Riegel formula from your latest test or best time. When the target distance is much longer than the test distance, or you haven\'t done enough endurance training, the real time is usually slower. For ultras, every 100 m of climb counts as 1 km and a terrain factor is added, so it\'s only a very rough estimate.</p>'
+        },
+        cycle: {
+          title: 'Adapting to your menstrual cycle',
+          body: '<ul><li>Completely optional: only if you choose "Woman" in the form and turn it on yourself. Switch it off any time in Profile → Settings.</li>' +
+            '<li>From the first day of your last period, your cycle length and period length, each day\'s phase is estimated: <b>period days</b>, the <b>follicular phase</b> (after your period until around ovulation; often more energy), <b>around ovulation</b> (about 14 days before the next period), the <b>luteal phase</b> and the <b>days before your period</b> (you may feel more tired).</li>' +
+            '<li>The plan <b>never changes on its own</b>. If you have a hard session on period days or just before your period, we ask whether to make it lighter, switch to active rest (period days) or keep the original plan.</li>' +
+            '<li>The dashboard shows when your next period is expected and reminds you a few days ahead. If it starts earlier or later, the "My period started today" button makes the estimates more accurate.</li>' +
+            '<li>Small markers on the calendar show the phases and can be switched off in Settings. All of this stays on this device.</li></ul>'
         },
         places: { title: 'Training location tips', body: '<ul>{tips}</ul>' },
         data: {

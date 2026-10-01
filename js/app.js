@@ -19,7 +19,7 @@
 
   // ---------- وضعیت و ذخیره‌سازی ----------
   var memoryFallback = null;
-  function emptyState() { return { profile: null, checkins: {}, done: {}, ackPain: {}, postRuns: {} }; }
+  function emptyState() { return { profile: null, checkins: {}, done: {}, ackPain: {}, postRuns: {}, cycleChoices: {} }; }
   function load() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
@@ -42,7 +42,7 @@
   var SETTINGS_KEY = 'iranrunners-coach-settings';
   var WS_MAP = { sat: 6, sun: 0, mon: 1 };
   function loadSettings() {
-    var d = { calendar: 'auto', weekStart: 'auto', planView: 'week' };
+    var d = { calendar: 'auto', weekStart: 'auto', planView: 'week', cycleMarkers: true };
     try { return Object.assign(d, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { return d; }
   }
   var settings = loadSettings();
@@ -87,6 +87,10 @@
   function tt(key, params) { return t(T(key, params)); }
   function faDate(key, short) { return I.date(C.parseDate(key), short); }
   function isRtl() { return I.dir() === 'rtl'; }
+  function chevron(dir) {
+    return '<svg class="chev" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="' +
+      (dir === 'left' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7') + '" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
 
   function showToast(msg) {
     var el = document.createElement('div');
@@ -129,7 +133,73 @@
   }
   function effectiveSession(base) {
     var ci = state.checkins[base.date];
-    return C.adaptSession(base, ci, prevCheckin(base.date), C.paceZones(state.profile));
+    return withCycle(C.adaptSession(base, ci, prevCheckin(base.date), C.paceZones(state.profile)));
+  }
+  // چرخه‌ی قاعدگی: فقط پیشنهاد؛ جلسه فقط با انتخاب خود کاربر (adapt / rest) عوض می‌شه
+  function withCycle(r) {
+    var s = r.session;
+    if (!s || s.type === 'cancelled' || !s.date) return r;
+    var info = C.cycleInfo(state.profile, C.parseDate(s.date));
+    if (!info) return r;
+    r.cycle = { info: info };
+    var sug = C.cycleSuggestion(s, info, C.paceZones(state.profile));
+    if (!sug) { if (info.phase === 'follicular' && s.hard && s.type !== 'race') r.cycle.note = 'follicular'; return r; }
+    var ch = (state.cycleChoices || {})[s.date];
+    r.cycle.sug = sug; r.cycle.choice = ch; r.cycle.label = s.label;
+    var alt = ch === 'adapt' ? sug.alt : (ch === 'rest' ? sug.rest : null);
+    if (alt) {
+      alt = JSON.parse(JSON.stringify(alt));
+      alt.date = s.date; alt.dayName = s.dayName; alt.dayShort = s.dayShort;
+      alt.label = C.TYPE_INFO[alt.type].label; alt.hard = false; alt.original = s;
+      r.session = alt;
+    }
+    return r;
+  }
+  function cycleBox(r, key, todayKey) {
+    var c = r && r.cycle;
+    if (!c || key < todayKey) return '';
+    if (c.note === 'follicular') return '<p class="cycle-note small">' + esc(T('cycle.follicularNote')) + '</p>';
+    if (!c.sug) return '';
+    var when = key === todayKey ? T('cycle.when.today') : T('cycle.when.date', { d: faDate(key) });
+    if (c.choice) {
+      return '<div class="alert cycle-box" role="status"><p>' + esc(T('cycle.chosen.' + c.choice)) + '</p>' +
+        '<button type="button" class="linklike" data-cycle-undo="' + key + '">' + esc(T('cycle.undo')) + '</button></div>';
+    }
+    var msg = c.sug.phase === 'period' ? T('cycle.promptPeriod', { when: when, day: c.sug.day, label: c.label }) + (c.sug.heavy ? ' ' + T('cycle.promptHeavy') : '')
+      : T('cycle.promptLuteal', { when: when, label: c.label });
+    return '<div class="alert cycle-box" role="group"><p>' + t(msg) + '</p><p class="small muted">' + esc(T('cycle.decide')) + '</p><div class="actions">' +
+      '<button type="button" class="btn btn-primary" data-cycle-choice="adapt" data-date="' + key + '">' + esc(T('cycle.btnAdapt')) + '</button>' +
+      (c.sug.rest ? '<button type="button" class="btn btn-outline" data-cycle-choice="rest" data-date="' + key + '">' + esc(T('cycle.btnRest')) + '</button>' : '') +
+      '<button type="button" class="btn btn-ghost" data-cycle-choice="keep" data-date="' + key + '">' + esc(T('cycle.btnKeep')) + '</button></div></div>';
+  }
+  // نشانگر ملایم فاز روی خونه‌های تقویم (قابل خاموش شدن)
+  function cycleMarkClass(dateKey) {
+    if (settings.cycleMarkers === false) return '';
+    var info = C.cycleInfo(state.profile, C.parseDate(dateKey));
+    return info ? ' cy cy-' + info.phase + (info.heavy ? ' cy-heavy' : '') : '';
+  }
+  function cycleLegend(keys) {
+    if (settings.cycleMarkers === false || !C.cycleInfo(state.profile, today())) return '';
+    var seen = [];
+    keys.forEach(function (k) { var i = C.cycleInfo(state.profile, C.parseDate(k)); if (i && i.phase !== 'luteal' && seen.indexOf(i.phase) < 0) seen.push(i.phase); });
+    if (!seen.length) return '';
+    return '<div class="cycle-legend">' + C.CYCLE_PHASES.filter(function (ph) { return seen.indexOf(ph) >= 0; }).map(function (ph) {
+      return '<span class="cy cy-' + ph + '"><i aria-hidden="true"></i>' + esc(T('cycle.phase.' + ph)) + '</span>';
+    }).join('') + '</div>';
+  }
+  // کارت داشبورد: فاز امروز و تخمین پریود بعدی (یادآوری چند روز قبل)
+  function cycleCard(now) {
+    var np = C.nextPeriod(state.profile, now);
+    if (!np) return '';
+    var info = C.cycleInfo(state.profile, now);
+    var soon = !np.inPeriod && np.daysTo <= 5;
+    var line = np.inPeriod ? T('cycle.inPeriod', { day: np.day })
+      : T(soon ? 'cycle.nextSoon' : 'cycle.next', { date: faDate(C.dateKey(np.next)), n: np.daysTo });
+    return '<section class="card cycle-card' + (soon || np.inPeriod ? ' cycle-soon' : '') + '"><h3>' + esc(T('cycle.cardTitle')) + '</h3>' +
+      '<p class="small muted">' + tt('cycle.today', { day: info.day, phase: T('cycle.phase.' + info.phase) }) + '</p>' +
+      '<p>' + t(line) + '</p>' +
+      '<div class="actions"><button type="button" class="btn btn-ghost" data-period-started="1">' + esc(T('cycle.started')) + '</button></div>' +
+      '<p class="small muted">' + esc(T('cycle.estimate')) + '</p></section>';
   }
   function unackedPainToday() {
     var k = C.dateKey(today());
@@ -199,7 +269,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=15" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=16" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -255,6 +325,7 @@
     var todayKey = C.dateKey(today());
     var pbKey = pbDistanceKey(pb.distanceKm);
     var req = ' <span class="req">' + esc(T('onb.required')) + '</span>';
+    var cyc = p.cycle || {};
     // پروفایل‌های قدیمی فقط یک عدد حجم دارن: هر دو فیلد با همون پر می‌شن
     var oldKm = p.currentWeeklyKm != null && (p.currentWeeklyKm > 0 || !migrating) && p.experience !== 'never' ? p.currentWeeklyKm : '';
     var volLast = p.lastWeekKm != null && p.experience !== 'never' ? p.lastWeekKm : oldKm;
@@ -310,7 +381,23 @@
       '<div class="field"><label for="age">' + esc(T('onb.age')) + '</label><input id="age" name="age" type="number" inputmode="numeric" min="12" max="90" required value="' + esc(p.age || '') + '"></div>' +
       '<div class="field"><label for="weight">' + esc(T('onb.weight')) + '</label><input id="weight" name="weightKg" type="number" inputmode="decimal" min="30" max="250" required value="' + esc(p.weightKg || '') + '"></div>' +
       '<div class="field"><label for="height">' + esc(T('onb.height')) + '</label><input id="height" name="heightCm" type="number" inputmode="numeric" min="120" max="230" required value="' + esc(p.heightCm || '') + '"></div>' +
-      '</div></fieldset>' +
+      '</div>' +
+      '<p class="sub-legend">' + esc(T('cycle.sexQ')) + '</p><div class="chips">' +
+      ['female', 'male', 'na'].map(function (k) { return chip('sex', k, T('cycle.sex.' + k), p.sex === k, 'radio'); }).join('') + '</div>' +
+      '<small class="muted">' + esc(T('cycle.sexHint')) + '</small>' +
+      '</fieldset>' +
+
+      '<fieldset id="cycle-fieldset" hidden><legend>' + esc(T('cycle.title')) + '</legend>' +
+      '<p class="small">' + esc(T('cycle.intro')) + '</p>' +
+      '<label class="check-row"><input type="checkbox" id="cyon" name="cycleOn"' + (cyc.enabled ? ' checked' : '') + '> <span>' + esc(T('cycle.enable')) + '</span></label>' +
+      '<div id="cycle-fields" hidden><div class="row3">' +
+      '<div class="field"><label for="cystart">' + esc(T('cycle.lastStart')) + '</label><input id="cystart" name="cycleStart" type="date" max="' + todayKey + '" value="' + esc(cyc.lastStart || '') + '">' +
+      '<small class="muted" id="cystart-fa"></small></div>' +
+      '<div class="field"><label for="cylen">' + esc(T('cycle.cycleLen')) + '</label><input id="cylen" name="cycleLen" type="number" inputmode="numeric" min="21" max="45" value="' + esc(cyc.cycleLen || 28) + '">' +
+      '<small class="muted">' + esc(T('cycle.cycleLenHint')) + '</small></div>' +
+      '<div class="field"><label for="cyplen">' + esc(T('cycle.periodLen')) + '</label><input id="cyplen" name="periodLen" type="number" inputmode="numeric" min="2" max="10" value="' + esc(cyc.periodLen || 5) + '"></div>' +
+      '</div><p class="small muted">' + esc(T('cycle.privacy')) + '</p></div>' +
+      '</fieldset>' +
 
       '<fieldset><legend>' + esc(T('onb.s3')) + '</legend><div class="chips">' +
       C.WEEK_ORDER.map(function (i) { return chip('days', i, C.DAY_NAMES[i], days.indexOf(i) >= 0); }).join('') + '</div>' +
@@ -432,9 +519,17 @@
       // تاریخ ورودی مرورگر میلادیه؛ در تقویم شمسی معادلش نشون داده می‌شه
       document.getElementById('rdate-fa').textContent = v && I.getCalendar() === 'jalali' ? T('onb.raceDateEq', { d: faDate(v) }) : '';
     }
+    function syncCycle() {
+      var sx = form.querySelector('input[name=sex]:checked');
+      var fem = !!sx && sx.value === 'female';
+      document.getElementById('cycle-fieldset').hidden = !fem;
+      document.getElementById('cycle-fields').hidden = !(fem && form.cycleOn.checked);
+      var v = form.cycleStart.value;
+      document.getElementById('cystart-fa').textContent = v && I.getCalendar() === 'jalali' ? T('onb.raceDateEq', { d: faDate(v) }) : '';
+    }
     form.addEventListener('input', syncLevel);
-    form.addEventListener('change', function () { syncRace(); syncLevel(); syncDate(); });
-    syncRace(); syncLevel(); syncDate();
+    form.addEventListener('change', function () { syncRace(); syncLevel(); syncDate(); syncCycle(); });
+    syncRace(); syncLevel(); syncDate(); syncCycle();
 
     form.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -465,6 +560,16 @@
       if (!(h >= 120 && h <= 230)) errs.push(T('onb.err.height'));
       if (!selDays.length) errs.push(T('onb.err.days'));
       if (!selLocs.length) errs.push(T('onb.err.locs'));
+      // چرخه‌ی قاعدگی: فقط اگه «زن» انتخاب شده و کاربر خودش فعالش کرده
+      var sex = fd.get('sex') || null, cycleObj = Object.assign({}, p.cycle || {}, { enabled: false });
+      if (sex === 'female' && fd.get('cycleOn')) {
+        var cs = String(fd.get('cycleStart') || ''), cl = Number(fd.get('cycleLen')), cp = Number(fd.get('periodLen'));
+        var ago = cs ? C.daysBetween(C.parseDate(cs), today()) : -1;
+        if (!cs || ago < 0 || ago > 120) errs.push(T('cycle.err.lastStart'));
+        if (!(cl >= 21 && cl <= 45)) errs.push(T('cycle.err.cycleLen'));
+        if (!(cp >= 2 && cp <= 10)) errs.push(T('cycle.err.periodLen'));
+        cycleObj = { enabled: true, lastStart: cs, cycleLen: cl, periodLen: cp };
+      }
       var gType = fd.get('goalType') || 'none', goalObj = { type: gType, date: null };
       if (gType !== 'none') {
         var rd = fd.get('raceDate');
@@ -496,6 +601,7 @@
         schemaVersion: SCHEMA_VERSION,
         goal: goalObj, pb: pbObj,
         hrMax: hrIn.max, hrRest: hrIn.rest,
+        sex: sex, cycle: cycleObj,
         // تاریخچه‌ی فیتنس و تنظیم دستی پیس ایزی با ویرایش پروفایل حفظ می‌شن
         fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0,
         createdAt: p.createdAt || new Date().toISOString()
@@ -608,8 +714,10 @@
       return html + '</section>';
     }
     if (!ci) {
+      var rc = withCycle({ session: base, adaptation: null });
+      base = rc.session;
       html += '<h2>' + badge(base.type, base.label) + ' <span class="pending">' + esc(T('today.waiting')) + '</span></h2></div></div>' +
-        (yesterdayPain ? painYesterdayBox() : '') +
+        (yesterdayPain ? painYesterdayBox() : '') + cycleBox(rc, key, key) +
         '<div class="checkin-cta"><p>' + esc(T('today.cta')) + ' ' + helpLink('checkin', T('today.ctaHelp')) + '</p>' +
         '<a class="btn btn-primary" href="#checkin">' + esc(T('today.ctaBtn')) + '</a></div>' +
         '<details class="preview"><summary>' + esc(T('today.preview')) + '</summary>' + sessionBody(base) + '</details>';
@@ -619,7 +727,7 @@
     var s = r.session;
     html += '<h2>' + badge(s.type, s.label) + '</h2></div>' +
       (s.type !== 'cancelled' ? doneButton(key, s) : '') + '</div>' +
-      adaptationBox(r.adaptation, key) +
+      adaptationBox(r.adaptation, key) + cycleBox(r, key, key) +
       (s.type !== 'cancelled' ? sessionBody(s, { key: key, prefix: 'today', hint: C.easyDayHint(ci, prevCheckin(key)) }) : '') +
       '<p class="small muted">' + tt('today.summary', { f: ci.fatigue, s: ci.sleep, p: T(ci.pain ? 'app.yes' : 'app.no') }) +
       (ci.pain ? '' : ' · <a href="#checkin">' + esc(T('today.edit')) + '</a>') + '</p>';
@@ -649,13 +757,15 @@
     var todayKey = C.dateKey(now);
     var lv = C.assessLevel(p);
     var isRunWalk = lv.level <= 1;
-    // فلش‌ها بسته به جهت صفحه
-    var prevGlyph = isRtl() ? '›' : '‹', nextGlyph = isRtl() ? '‹' : '›';
+    // فلش‌ها: آیکون SVG (کاراکترهای ‹ › در متن راست‌به‌چپ توسط بعضی مرورگرها مثل Safari آینه می‌شن).
+    // «قبلی» همیشه به سمت شروع خط اشاره می‌کنه: راست در فارسی، چپ در انگلیسی.
+    var prevGlyph = chevron(isRtl() ? 'right' : 'left'), nextGlyph = chevron(isRtl() ? 'left' : 'right');
 
     var html = '';
     html += todayCard();
     html += '<section class="card level-strip">' + levelCard(lv, true) + '</section>';
     if (lv.level === 0) html += zeroCard(p, now);
+    html += cycleCard(now);
     html += fitnessNotesCard(p, now);
 
     html += '<div class="view-tabs" role="tablist" aria-label="' + esc(T('plan.viewAria')) + '">' +
@@ -696,14 +806,12 @@
       selectedDay = keys.indexOf(todayKey) >= 0 ? todayKey :
         (week.days.filter(function (d) { return ['rest', 'none'].indexOf(d.type) < 0; })[0] || week.days[0]).date;
     }
-    var resolved = week.days.map(function (d) {
-      return state.checkins[d.date] ? effectiveSession(d) : { session: d, adaptation: null };
-    });
+    var resolved = week.days.map(function (d) { return effectiveSession(d); });
     html += '<div class="week-grid" role="tablist" aria-label="' + esc(T('week.daysAria')) + '">';
     resolved.forEach(function (r) {
       var s = r.session, d = s.date;
       var sel = d === selectedDay;
-      var cls = 'day day-' + s.type + (d === todayKey ? ' is-today' : '') + (d < todayKey ? ' is-past' : '') + (sel ? ' is-selected' : '');
+      var cls = 'day day-' + s.type + (d === todayKey ? ' is-today' : '') + (d < todayKey ? ' is-past' : '') + (sel ? ' is-selected' : '') + cycleMarkClass(d);
       var shortT = s.km ? fa(String(s.km)) + '<small>' + esc(T('app.kmUnit')) + '</small>' : (s.minutes ? fa(s.minutes) + '<small>' + esc(T('week.minUnit')) + '</small>' : '—');
       html += '<button type="button" role="tab" id="tab-' + d + '" aria-controls="day-panel" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '" class="' + cls + '" data-day="' + d + '">' +
         '<span class="day-name"><span class="full">' + esc(s.dayName) + '</span><span class="short">' + esc(s.dayShort || s.dayName.charAt(0)) + '</span></span>' +
@@ -715,6 +823,7 @@
         '</button>';
     });
     html += '</div>';
+    html += cycleLegend(keys);
     html += dayPanel(resolved[keys.indexOf(selectedDay)], todayKey, 'tab-' + selectedDay);
     html += '</section>';
     app.innerHTML = html;
@@ -728,7 +837,7 @@
       (d === todayKey ? esc(T('week.todaySuffix')) : '') + '</p><h3>' + badge(ss.type, ss.label) + '</h3></div>' +
       (d <= todayKey && ['rest', 'none', 'cancelled'].indexOf(ss.type) < 0 && (d < todayKey || state.checkins[todayKey]) ? doneButton(d, ss) : '') +
       '</div>' +
-      (rs.adaptation ? adaptationBox(rs.adaptation, d) : '') +
+      (rs.adaptation ? adaptationBox(rs.adaptation, d) : '') + cycleBox(rs, d, todayKey) +
       (ss.type !== 'cancelled' ? sessionBody(ss, d <= todayKey && d !== todayKey ? { key: d, prefix: 'panel' } : {}) : '') +
       '</div>';
   }
@@ -753,7 +862,7 @@
       var k = C.dateKey(C.weekStart(date));
       if (!weeks[k]) weeks[k] = C.buildWeek(p, date);
       var s = weeks[k].days[C.dayIndex(date)];
-      return state.checkins[s.date] ? effectiveSession(s) : { session: s, adaptation: null };
+      return effectiveSession(s);
     }
     var days = [];
     for (var i = 0; i < mb.len; i++) days.push(resolve(C.addDays(mb.first, i)));
@@ -783,7 +892,7 @@
       var rest = ['rest', 'none'].indexOf(s.type) >= 0;
       var amount = s.km ? fa(s.km) : (s.minutes ? fa(s.minutes) + "'" : '');
       html += '<button type="button" class="mday day-' + s.type + (rest ? ' mday-rest' : '') + (d === todayKey ? ' is-today' : '') + (d < todayKey ? ' is-past' : '') +
-        (d === selectedDay ? ' is-selected' : '') + '" data-mday="' + d + '" aria-pressed="' + (d === selectedDay) + '" aria-label="' + esc(faDate(d) + ' · ' + s.label) + '">' +
+        (d === selectedDay ? ' is-selected' : '') + cycleMarkClass(d) + '" data-mday="' + d + '" aria-pressed="' + (d === selectedDay) + '" aria-label="' + esc(faDate(d) + ' · ' + s.label) + '">' +
         '<span class="mday-num">' + fa(dayOfMonth(date)) + '</span>' +
         (rest ? '' : '<span class="mday-dot" aria-hidden="true"></span><span class="mday-amt">' + amount + '</span>') +
         (state.done[d] ? '<span class="mday-done" aria-hidden="true">✓</span>' : '') + '</button>';
@@ -800,6 +909,7 @@
         return '<span class="day-' + ty + '"><i aria-hidden="true"></i>' + esc(C.TYPE_INFO[ty].label) + '</span>';
       }).join('') + '</div>';
     }
+    html += cycleLegend(keys);
     html += dayPanel(days[keys.indexOf(selectedDay)], todayKey, null);
     return html + '</section>';
   }
@@ -864,6 +974,20 @@
       state.profile.zeroWeeks = state.profile.zeroWeeks || {};
       state.profile.zeroWeeks[zwk.start] = { feel: zf.dataset.zeroFeel, src: 'user' };
       save(); showToast(T('zero.toastSaved')); route();
+      return;
+    }
+    var cc = e.target.closest('[data-cycle-choice]');
+    if (cc) {
+      state.cycleChoices = state.cycleChoices || {};
+      state.cycleChoices[cc.dataset.date] = cc.dataset.cycleChoice;
+      save(); route();
+      return;
+    }
+    var cu = e.target.closest('[data-cycle-undo]');
+    if (cu) { delete (state.cycleChoices || {})[cu.dataset.cycleUndo]; save(); route(); return; }
+    if (e.target.closest('[data-period-started]')) {
+      state.profile.cycle.lastStart = C.dateKey(today());
+      save(); showToast(T('cycle.startedToast')); route();
       return;
     }
     if (e.target.closest('[data-zero-graduate]')) {
@@ -1154,7 +1278,7 @@
   // =====================================================================
   // آموزش: همه‌ی توضیح‌ها یک‌جا، بخش به بخش (محتوا از دیکشنری)
   // =====================================================================
-  var GUIDE_ORDER = ['start', 'levels', 'week', 'sessions', 'intensity', 'fitness', 'checkin', 'goals', 'places', 'data'];
+  var GUIDE_ORDER = ['start', 'levels', 'week', 'sessions', 'intensity', 'fitness', 'checkin', 'goals', 'cycle', 'places', 'data'];
   function guideSections() {
     var levelRows = C.LEVELS.map(function (L) {
       return '<tr><td>' + fa(L.n) + '</td><td>' + esc(L.name) + '</td><td dir="ltr">' + fa(L.km[1] === Infinity ? L.km[0] + '+' : L.km[1] === 0 ? '0' : L.km[0] + '–' + L.km[1]) + '</td><td>' + esc(L.tier) + '</td></tr>';
@@ -1355,10 +1479,29 @@
       '<div class="field"><label for="set-ws">' + esc(T('settings.weekStart')) + '</label>' +
       sel('set-ws', 'weekStart', settings.weekStart, [['auto', T('settings.auto')], ['sat', D[0]], ['sun', D[1]], ['mon', D[2]]]) + '</div></div>' +
       '<p class="small muted">' + tt('settings.current', { cal: T('settings.' + I.getCalendar()), day: C.DAY_NAMES[C.WEEK_ORDER[0]] }) + '</p>' +
-      '<p class="small muted">' + esc(T('settings.note')) + '</p></section>';
+      '<p class="small muted">' + esc(T('settings.note')) + '</p>' + cycleSettings() + '</section>';
+  }
+  function cycleSettings() {
+    var p = state.profile;
+    if (!p || p.sex !== 'female') return '';
+    var c = p.cycle || {};
+    return '<h3 class="settings-sub">' + esc(T('cycle.settingsTitle')) + '</h3>' +
+      '<label class="check-row"><input type="checkbox" id="set-cycle"' + (c.enabled ? ' checked' : '') + (c.lastStart ? '' : ' disabled') + '> <span>' + esc(T('cycle.settingsEnabled')) + '</span></label>' +
+      '<label class="check-row"><input type="checkbox" id="set-cymark"' + (settings.cycleMarkers !== false ? ' checked' : '') + (c.enabled ? '' : ' disabled') + '> <span>' + esc(T('cycle.settingsMarkers')) + '</span></label>' +
+      '<p class="small muted">' + esc(T(c.lastStart ? 'cycle.settingsEdit' : 'cycle.settingsNeedData')) + '</p>';
   }
   app.addEventListener('change', function (e) {
     var el = e.target;
+    if (el.id === 'set-cycle') {
+      state.profile.cycle = Object.assign({}, state.profile.cycle, { enabled: el.checked });
+      save(); showToast(T('settings.saved')); route();
+      return;
+    }
+    if (el.id === 'set-cymark') {
+      settings.cycleMarkers = el.checked;
+      saveSettings(); showToast(T('settings.saved')); route();
+      return;
+    }
     if (el.id !== 'set-cal' && el.id !== 'set-ws') return;
     settings[el.name] = el.value;
     saveSettings();
@@ -1386,6 +1529,8 @@
       row('body', tt('profile.bodyVal', { age: p.age, w: p.weightKg, h: p.heightCm }) + ' <span class="muted small">(BMI ' + t(bmi.toFixed(1)) + ')</span>') +
       row('days', esc(C.WEEK_ORDER.filter(function (d) { return p.days.indexOf(d) >= 0; }).map(function (d) { return C.DAY_NAMES[d]; }).join(T('app.listSep')))) +
       row('locs', esc(p.locations.map(function (l) { return C.LOCATION_LABELS[l]; }).join(T('app.listSep')))) +
+      (p.sex ? row('sex', esc(T('cycle.sex.' + p.sex))) : '') +
+      (p.sex === 'female' ? row('cycle', p.cycle && p.cycle.enabled ? tt('cycle.profileOn', { len: p.cycle.cycleLen, p: p.cycle.periodLen }) : muted('cycle.profileOff')) : '') +
       row('injury', p.injury ? t(p.injury) : muted('profile.notRecorded')) +
       row('goal', g.type !== 'none' ? t(C.goalLabel(g)) + (g.date ? ' — ' + esc(faDate(g.date)) : ' <span class="muted small">' + esc(T('profile.noDate')) + '</span>') : muted('profile.noGoal')) +
       row('pb', p.pb ? tt('profile.pbVal', { km: p.pb.distanceKm }) + ' <span dir="ltr">' + fa(C.formatDuration(p.pb.timeSec)) + '</span>' : muted('profile.notRecorded')) +
