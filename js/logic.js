@@ -117,8 +117,9 @@
   //  km: بازه‌ی حجم هفتگی (کیلومتر)، marathon: بازه‌ی رکورد ماراتن مرجع [سریع‌ترین، کندترین] (ثانیه)
   //  tier: گروه پیچیدگی تمرین، sessions: حداکثر جلسه در هفته، longCap: سقف لانگ‌ران، wuKm: گرم/سرد کردن
   //  maxKm: سقف رشد حجم در این سطح
+  // سطح ۰: تازه‌وارد کامل (هیچ‌وقت منظم ندویده) — برنامه‌ی جدا: پیاده‌روی قدرتی و دو-پیاده‌ی خیلی تدریجی
   var LEVELS = [
-    null,
+    { n: 0, km: [0, 0], marathon: [hms(6, 0), Infinity], tier: '0', sessions: 3, longCap: 0, wuKm: 0, maxKm: 0 },
     { n: 1, km: [0, 15], marathon: [hms(5, 30), Infinity], tier: 'A', sessions: 3, longCap: 10, wuKm: 0, maxKm: 25 },
     { n: 2, km: [15, 25], marathon: [hms(5, 0), hms(5, 30)], tier: 'A', sessions: 4, longCap: 12, wuKm: 0, maxKm: 35 },
     { n: 3, km: [25, 35], marathon: [hms(4, 30), hms(5, 0)], tier: 'B', sessions: 4, longCap: 16, wuKm: 2, maxKm: 45 },
@@ -132,18 +133,17 @@
   ];
   // اسم و توضیح هر سطح از دیکشنری
   LEVELS.forEach(function (L) {
-    if (!L) return;
     Object.defineProperty(L, 'name', { enumerable: true, get: function () { return T('levels.' + L.n + '.name'); } });
     Object.defineProperty(L, 'desc', { enumerable: true, get: function () { return T('levels.' + L.n + '.desc'); } });
   });
 
   var EXPERIENCE = {};
-  ['lt3m', '3to12m', '1to3y', 'gt3y'].forEach(function (k) {
+  ['never', 'lt3m', '3to12m', '1to3y', 'gt3y'].forEach(function (k) {
     EXPERIENCE[k] = {};
     Object.defineProperty(EXPERIENCE[k], 'label', { enumerable: true, get: function () { return T('exp.' + k); } });
   });
 
-  var TIER_INFO = i18nMap(['A', 'B', 'C', 'D', 'E'], 'tier');
+  var TIER_INFO = i18nMap(['0', 'A', 'B', 'C', 'D', 'E'], 'tier');
 
   function levelFromKm(km) {
     for (var n = 10; n >= 1; n--) if (km >= LEVELS[n].km[0]) return n;
@@ -174,6 +174,8 @@
   function assessLevel(profile) {
     var km = Number(profile.currentWeeklyKm) || 0;
     var exp = profile.experience || 'gt3y';
+    // «هیچ‌وقت ندویده‌ام»: همیشه سطح ۰، بدون توجه به حجم یا رکورد
+    if (exp === 'never') return { level: 0, volLevel: 0, vdot: null, pbLevel: null, cautious: false, notes: [], source: 'never', info: LEVELS[0] };
     var structured = profile.structured !== false;
     var volLevel = levelFromKm(km);
     var capped = Math.min(volLevel, experienceCap(exp, km));
@@ -254,8 +256,10 @@
     '42': [40, 30, 24, 18, 16, 16, 14, 12, 12, 12]
   };
   function minPrepWeeks(g, level) {
-    if (g.type !== 'ultra') return MIN_PREP_WEEKS[g.type][level - 1];
-    var w = [44, 36, 30, 24, 20, 18, 16, 14, 12, 12][level - 1];
+    var extra0 = level === 0 ? 8 : 0;
+    level = Math.max(1, level);
+    if (g.type !== 'ultra') return MIN_PREP_WEEKS[g.type][level - 1] + extra0;
+    var w = [44, 36, 30, 24, 20, 18, 16, 14, 12, 12][level - 1] + extra0;
     if (g.km > 50) w += 4;
     if (g.km > 100) w += 8;
     if (g.ratio >= 35) w += 2;
@@ -296,7 +300,7 @@
   ];
 
   var TYPE_INFO = {
-    rest: { hard: false }, easy: { hard: false }, runwalk: { hard: false }, tempo: { hard: true }, interval: { hard: true },
+    rest: { hard: false }, easy: { hard: false }, runwalk: { hard: false }, walkrun: { hard: false }, tempo: { hard: true }, interval: { hard: true },
     reps: { hard: true }, fartlek: { hard: true }, hills: { hard: true }, long: { hard: true }, race: { hard: true },
     cancelled: { hard: false }, none: { hard: false }
   };
@@ -383,7 +387,8 @@
   // بازخورد بعد از جلسه‌ی ایزی. pace: 'ok' (داخل بازه یا کندتر) | 'fast' (تندتر از بازه) | 'unknown'
   function easyRunFeedback(post, sessionType) {
     if (!post || !(post.rpe >= 1)) return null;
-    if (post.rpe <= 6) return { kind: 'ok', message: T('feedback.ok') };
+    if (sessionType !== 'walkrun' && post.rpe <= 6) return { kind: 'ok', message: T('feedback.ok') };
+    if (sessionType === 'walkrun') return post.rpe <= 6 ? { kind: 'ok', message: T('zero.feedbackOk') } : { kind: 'runwalk', message: T('zero.feedbackHard') };
     if (sessionType === 'runwalk') return { kind: 'runwalk', message: T('feedback.runwalk') };
     if (post.pace === 'fast') return { kind: 'fast', message: T('feedback.fast') };
     if (post.pace === 'ok') return { kind: 'warn', message: T('easyRpeWarning') };
@@ -411,6 +416,7 @@
 
   // یادآوری تایم‌تست
   function fitnessReminder(profile, today) {
+    if (profile.experience === 'never') return null;
     var fit = currentFitness(profile);
     if (!fit) return { kind: 'none', message: T('reminder.none') };
     var weeks = Math.floor(daysBetween(parseDate(fit.entry.date), today) / 7);
@@ -421,7 +427,7 @@
   // آیا فیتنس فعلی به سطح دیگه‌ای رسیده؟ (برنامه خودکار سطح عوض نمی‌کنه تا حجم پرش نکنه؛ به کاربر پیشنهاد می‌ده)
   function fitnessLevelSuggestion(profile) {
     var fit = currentFitness(profile);
-    if (!fit || fit.entry.kind === 'baseline') return null;
+    if (!fit || fit.entry.kind === 'baseline' || profile.experience === 'never') return null;
     var planLevel = assessLevel(profile).level;
     var fitLevel = levelFromVdot(fit.vdot);
     if (fitLevel === planLevel) return null;
@@ -680,6 +686,33 @@
         T('s.runwalk.cool')],
       how: T('s.runwalk.how') + (extraNote ? ' ' + extraNote : ''),
       talk: talkTest(), easyEffort: true
+    };
+  }
+
+  // ---------- سطح ۰: از پیاده‌روی قدرتی تا ۱۵ دقیقه دویدن پیوسته ----------
+  // هر مرحله: [ثانیه دویدن، ثانیه پیاده‌روی، تعداد تکرار]. مرحله‌ی آخر = ۱۵ دقیقه دویدن پیوسته (آمادگی سطح ۱)
+  var ZERO_STAGES = [[20, 150, 6], [30, 120, 8], [60, 120, 8], [90, 120, 6], [120, 90, 6], [180, 90, 5], [420, 90, 2], [900, 0, 1]];
+  var ZERO_FINAL = ZERO_STAGES.length - 1;
+  // بازخورد هفتگی: «راحت» = دو مرحله جلو، «مناسب» یا بی‌جواب = یک مرحله، «سخت» = تکرار همون مرحله
+  var ZERO_STEP = { easy: 2, ok: 1, hard: 0 };
+  function zeroStage(profile, w) {
+    var st = 0, ps = planStart(profile), log = profile.zeroWeeks || {};
+    for (var i = 0; i < w; i++) {
+      var f = log[dateKey(addDays(ps, i * 7))];
+      st = Math.min(ZERO_FINAL, st + ZERO_STEP[(f && f.feel) || 'ok']);
+    }
+    return st;
+  }
+  function secText(sec) { return sec < 60 ? T('dur.s', { n: sec }) : T('dur.m', { n: Math.round(sec / 6) / 10 }); }
+  function makeWalkRun(stage) {
+    var S = ZERO_STAGES[stage], run = S[0], walk = S[1], reps = S[2];
+    var main = stage === ZERO_FINAL ? T('zero.continuous')
+      : T(stage === 0 ? 'zero.mainPower' : 'zero.main', { reps: reps, run: secText(run), walk: secText(walk) });
+    return {
+      type: 'walkrun', minutes: Math.round(10 + reps * (run + walk) / 60), km: null, hardKm: 0, stage: stage,
+      target: T('s.min', { n: Math.round(10 + reps * (run + walk) / 60) }),
+      steps: [T('zero.warm'), main, T('zero.cool')],
+      how: T('zero.how'), cheer: T('zero.cheer.' + stage), easyEffort: true
     };
   }
 
@@ -1054,7 +1087,7 @@
     var steps = T('s.race.steps').slice();
     var h = T('s.race.how');
     if (fit) h += T('s.race.pred', { time: formatDuration(riegel(fit.entry.timeSec, fit.entry.distanceKm, d)) });
-    if (level === 1) h += T('s.race.runwalk');
+    if (level <= 1) h += T('s.race.runwalk');
     return { type: 'race', km: round05(d), hardKm: d, target: RACE_LABELS[g.type], steps: steps, how: h };
   }
 
@@ -1091,7 +1124,10 @@
     // بدون تجربه‌ی تمرین ساختاریافته: ۴ هفته‌ی اول تمرین‌های کیفی در حد گروه B
     if (profile.structured === false && W < 4 && 'CDE'.indexOf(tier) >= 0) tier = 'B';
 
-    if (level === 1) {
+    if (level === 0) {
+      template._zero = zeroStage(profile, W);
+      sessionDays.forEach(function (d) { template[d] = { kind: 'walkrun' }; });
+    } else if (level === 1) {
       var rw = runWalkMinutes(profile, W, nSessions);
       if (rfWeek < 1) rw.runTotal *= rfWeek;
       sessionDays.forEach(function (d) { template[d] = { kind: 'runwalk' }; });
@@ -1197,6 +1233,7 @@
       var date = addDays(ws, i);
       var s;
       if (date < start) s = { type: 'none', km: null, hardKm: 0, target: '—', steps: [], how: T('s.notStarted') };
+      else if (template._zero !== undefined && template[i]) s = makeWalkRun(template._zero);
       else if (template._rw && template[i]) s = makeRunWalk(template._rw, 1);
       else if (template[i]) s = JSON.parse(JSON.stringify(template[i].session));
       else s = makeRest();
@@ -1218,6 +1255,7 @@
       period: period, periodLabel: period ? PERIOD_LABELS[period] : null,
       phase: weekPhase(profile, ws, pr, w, vol),
       volumeTarget: weeklyKm, b2b: b2bDay !== null,
+      zeroStage: level === 0 ? template._zero : null, zeroFinal: ZERO_FINAL,
       totalKm: round05(totalKm), totalMin: totalMin, vert: vert,
       hardPct: totalKm ? Math.round(hardKm / totalKm * 100) : 0
     };
@@ -1247,6 +1285,7 @@
     var diff = daysBetween(date, race.date); // روز تا مسابقه
     var zones = ctx.zones;
     if (diff === 0) return makeRace(profile, ctx, level);
+    if (s.type === 'walkrun' && (diff > 1 || diff < -3)) return s;
     if (diff === 1) return makeRest(T('s.taper.dayBefore'));
     if (diff < 0 && diff >= -3) return makeRest(T('s.taper.recovery'));
     if (diff < -3 && diff >= -7) {
@@ -1320,7 +1359,7 @@
   function profileWarnings(profile, today) {
     var out = [];
     var a = assessLevel(profile); // یادداشت‌های سطح (مثل پیام احتیاط) توی کارت سطح نشون داده می‌شن
-    if (profile.structured === false && a.info.tier !== 'A' && a.info.tier !== 'B')
+    if (profile.structured === false && 'CDE'.indexOf(a.info.tier) >= 0)
       out.push(T('warn.structured'));
     var race = raceInfo(profile), goal = goalInfo(profile);
     if (race) {
@@ -1366,6 +1405,7 @@
     EASY_ADJUST_MAX: EASY_ADJUST_MAX,
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks,
     goalInfo: goalInfo, goalLabel: goalLabel, GOAL_TYPES: GOAL_TYPES, TERRAIN_LABELS: TERRAIN_LABELS,
+    ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet
   };
   // متن‌هایی که به زبان فعلی بستگی دارن، موقع خوندن ترجمه می‌شن

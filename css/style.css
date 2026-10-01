@@ -231,7 +231,7 @@ textarea { resize: vertical; }
   display: inline-block; padding: 2px 12px; border-radius: 999px; font-weight: 700; font-size: 0.85rem;
   background: var(--c-rest-bg); color: var(--c-rest-ink); white-space: nowrap;
 }
-.badge-easy, .badge-runwalk { background: var(--c-easy-bg); color: var(--c-easy-ink); }
+.badge-easy, .badge-runwalk, .badge-walkrun { background: var(--c-easy-bg); color: var(--c-easy-ink); }
 .badge-tempo { background: var(--c-tempo-bg); color: var(--c-tempo-ink); }
 .badge-interval { background: var(--c-interval-bg); color: var(--c-interval-ink); }
 .badge-fartlek { background: var(--c-fartlek-bg); color: var(--c-fartlek-ink); }
@@ -290,7 +290,7 @@ textarea { resize: vertical; }
   border-top: 5px solid var(--c-rest-bg); min-height: 116px;
 }
 .day:hover { background: var(--panel); }
-.day-easy, .day-runwalk { border-top-color: var(--c-easy); --dot: var(--c-easy); }
+.day-easy, .day-runwalk, .day-walkrun { border-top-color: var(--c-easy); --dot: var(--c-easy); }
 .day-tempo { border-top-color: var(--c-tempo); --dot: var(--c-tempo); }
 .day-interval { border-top-color: var(--c-interval); --dot: var(--c-interval); }
 .day-fartlek { border-top-color: var(--c-fartlek); --dot: var(--c-fartlek); }
@@ -493,3 +493,18 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .lang-opt b { font-weight: 900; letter-spacing: 0.04em; }
 .lang-opt[aria-pressed="true"] { background: #fff; border-color: #fff; color: var(--brand-deep); }
 .lang-opt:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* ---------- سطح ۰: شروع از صفر ---------- */
+.cheer { background: var(--accent-soft); color: var(--ink); border-radius: 10px; padding: 8px 12px; font-weight: 500; }
+.zero-note { margin: 10px 0; }
+.zero-card { border-inline-start: 6px solid var(--c-easy); }
+.zero-stage { margin-bottom: 6px; }
+.zero-bar { height: 10px; background: var(--panel-raised); border-radius: 5px; overflow: hidden; margin-bottom: 8px; }
+.zero-bar i { display: block; height: 100%; background: var(--c-easy); border-radius: 5px; }
+.zero-ready { border-inline-start-color: var(--accent); background: var(--accent-soft); }
+.chip-btn {
+  font: inherit; cursor: pointer; display: inline-block; padding: 8px 16px; border-radius: 999px; min-height: 44px;
+  border: 1.5px solid var(--field-line); background: #fff; color: var(--text); font-weight: 500;
+}
+.chip-btn[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+@media (min-width: 720px) { .week-stats-zero { grid-template-columns: repeat(3, 1fr); } }

@@ -495,6 +495,61 @@ test('تیپر و روز مسابقه برای اولترا', function () {
   assert.strictEqual(C.buildWeek(p, C.addDays(race, -7)).phase.key, 'taper');
 });
 
+// ---------- سطح ۰ ----------
+function zeroProfile(over) {
+  return Object.assign({ age: 40, weightKg: 80, heightCm: 172, days: [0, 1, 2, 3, 4, 5, 6], locations: ['park'], injury: '',
+    currentWeeklyKm: 0, experience: 'never', structured: false, schemaVersion: 3, pb: null, startDate: '2026-09-26' }, over || {});
+}
+test('سطح ۰: «هیچ‌وقت ندویده‌ام» همیشه سطح ۰، حتی با حجم یا رکورد', function () {
+  assert.strictEqual(C.assessLevel(zeroProfile()).level, 0);
+  assert.strictEqual(C.assessLevel(zeroProfile({ currentWeeklyKm: 30, pb: { distanceKm: 5, timeSec: 1500 } })).level, 0);
+  assert.strictEqual(C.assessLevel(profileFor(1)).level, 1);
+  assert.strictEqual(C.LEVELS[0].name, 'تازه‌وارد کامل');
+  assert.strictEqual(C.LEVELS[1].name, 'تازه‌کار');
+  for (var n = 2; n <= 10; n++) assert.strictEqual(C.LEVELS[n].n, n);
+});
+test('سطح ۰: فقط پیاده‌روی و دویدن سبک، ۳ جلسه، هفته‌ی اول پیاده‌روی قدرتی، بدون روز سخت', function () {
+  var p = zeroProfile();
+  var w1 = C.buildWeek(p, C.parseDate('2026-09-26'));
+  var s = w1.days.filter(function (d) { return d.type !== 'rest'; });
+  assert.strictEqual(s.length, 3);
+  s.forEach(function (d) {
+    assert.strictEqual(d.type, 'walkrun'); assert.strictEqual(d.hard, false); assert.strictEqual(d.km, null);
+    assert(d.minutes <= 30, d.minutes); assert(d.cheer && d.how.indexOf('RPE') < 0);
+  });
+  assert.strictEqual(w1.zeroStage, 0);
+  assert(/پیاده‌روی تند/.test(s[0].steps[1]), s[0].steps[1]);
+});
+test('سطح ۰: «مناسب» → ۸ هفته تا ۱۵ دقیقه، «راحت» → ۴ هفته، «سخت» → تکرار مرحله', function () {
+  function weeksTo(feel) {
+    var p = zeroProfile({ zeroWeeks: {} });
+    for (var w = 0; w < 20; w++) {
+      var wk = C.buildWeek(p, C.addDays(C.parseDate(p.startDate), w * 7));
+      if (wk.zeroStage === wk.zeroFinal) return w + 1;
+      if (feel) p.zeroWeeks[wk.start] = { feel: feel, src: 'user' };
+    }
+    return 99;
+  }
+  assert.strictEqual(weeksTo(null), 8);
+  assert.strictEqual(weeksTo('ok'), 8);
+  assert.strictEqual(weeksTo('easy'), 5);
+  assert.strictEqual(weeksTo('hard'), 99);
+  var last = C.buildWeek(zeroProfile(), C.addDays(C.parseDate('2026-09-26'), 7 * 7)).days.filter(function (d) { return d.type === 'walkrun'; })[0];
+  assert.strictEqual(last.minutes, 25);
+  assert(/۱۵ دقیقه دویدن آروم و پیوسته/.test(last.steps[1]));
+});
+test('سطح ۰: بدون هشدار تمرین ساختاریافته و یادآوری تایم‌تست؛ مسابقه بدون تیپر روی جلسه‌ها', function () {
+  var p = zeroProfile({ goal: goalOf('5', '2026-12-18') });
+  assert.strictEqual(C.fitnessReminder(p, C.parseDate('2026-10-01')), null);
+  var w = C.profileWarnings(p, C.parseDate('2026-10-01'));
+  assert(w.every(function (x) { return x.indexOf('ساختاریافته') < 0; }));
+  assert(w.some(function (x) { return x.indexOf('هفته آماده‌سازی') >= 0; }));
+  var race = C.parseDate('2026-12-18');
+  assert.strictEqual(C.sessionFor(p, race).type, 'race');
+  assert.strictEqual(C.sessionFor(p, C.addDays(race, -1)).type, 'rest');
+  C.buildWeek(p, C.addDays(race, -5)).days.forEach(function (d) { assert(['walkrun', 'rest', 'race'].indexOf(d.type) >= 0, d.type); });
+});
+
 // ---------- دوزبانه ----------
 test('دیکشنری فارسی و انگلیسی دقیقاً کلیدهای یکسان دارن', function () {
   var fa = require('../js/i18n/fa.js'), en = require('../js/i18n/en.js');

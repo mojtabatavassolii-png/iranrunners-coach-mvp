@@ -7,7 +7,8 @@
     dur: { h: '{n} h', m: '{n} min', s: '{n} s', join: ' ' },
 
     levels: {
-      1: { name: 'Complete beginner', desc: 'No regular running yet, or less than three months' },
+      0: { name: 'Complete beginner', desc: 'Has never run regularly and wants to start from zero' },
+      1: { name: 'Novice', desc: 'A little running experience (under three months), can run a few minutes without stopping' },
       2: { name: 'Beginner', desc: 'Three to twelve months of regular running' },
       3: { name: 'Advanced novice', desc: 'Over a year of running, first races done' },
       4: { name: 'Lower intermediate', desc: 'Several races, some training structure' },
@@ -18,8 +19,9 @@
       9: { name: 'Sub-elite', desc: 'Competes at national level' },
       10: { name: 'World-class elite', desc: 'International professional, sponsored or national team' }
     },
-    exp: { lt3m: 'Less than three months', '3to12m': 'Three to twelve months', '1to3y': 'One to three years', gt3y: 'More than three years' },
+    exp: { never: 'I\'ve never run / I want to start from zero', lt3m: 'Less than three months', '3to12m': 'Three to twelve months', '1to3y': 'One to three years', gt3y: 'More than three years' },
     tier: {
+      0: 'Brisk walking with very short, gentle running bits that grow a little each week, up to 15 minutes of continuous running.',
       A: 'Run-walk and easy runs only; no intervals or tempo.',
       B: 'Mostly easy running, one gentle tempo a week and very short intervals (200–400 m) with long rests.',
       C: 'A full mix of easy runs, tempo, structured intervals (400–1000 m) and long runs with tempo sections.',
@@ -44,7 +46,7 @@
       mountain: { label: 'Steep mountain (over 60 m per km)', short: 'Steep mountain', emphasis: 'Most focus on hills, power hiking, downhills and strength' }
     },
     types: {
-      rest: 'Rest', easy: 'Easy run', runwalk: 'Easy run (run-walk)', tempo: 'Tempo', interval: 'Intervals',
+      rest: 'Rest', walkrun: 'Walk & light jog', easy: 'Easy run', runwalk: 'Easy run (run-walk)', tempo: 'Tempo', interval: 'Intervals',
       reps: 'Speed reps', fartlek: 'Fartlek', hills: 'Hills', long: 'Long run', race: 'Race day', cancelled: 'Cancelled', none: 'Before start'
     },
     periods: { base: 'Base phase', build: 'Build phase', peak: 'Peak phase' },
@@ -70,6 +72,45 @@
       none: 'You haven\'t logged a best time or time trial yet. A 2 or 5 km time trial lets us calculate your training paces (including your easy range) accurately.',
       stale: { one: 'Your last time trial or best time was {weeks} week ago. Fitness changes over time; log a new time trial to update your paces (every 4–6 weeks is ideal).',
         other: 'Your last time trial or best time was {weeks} weeks ago. Fitness changes over time; log a new time trial to update your paces (every 4–6 weeks is ideal).' }
+    },
+
+
+    // ---------- Level 0: starting from zero (simple, encouraging, no jargon) ----------
+    zero: {
+      warm: '5 min easy walk to warm up',
+      cool: '5 min easy walk to cool down, then a little stretching',
+      mainPower: 'Brisk walking (long steps, arms moving); during it, {reps} times run very gently for just {run}, then walk for {walk}',
+      main: '{reps} times: {run} very gentle running + {walk} brisk walking',
+      continuous: '15 min of slow, continuous running; if you need to, walk a few steps and start again',
+      how: 'Run slowly enough that you can talk easily. Whenever you feel tired, walk; walking is part of the training, not a failure.',
+      cheer: {
+        0: 'Just starting means you\'ve taken the most important step. This week is mostly walking.',
+        1: 'Your body is getting used to it. The running bits are still very short; there\'s no rush.',
+        2: 'Now each running bit is one minute. Go slowly; speed doesn\'t matter at all.',
+        3: 'You\'re running more and more. If you get out of breath, just slow down.',
+        4: 'You\'re halfway there! Two minutes of running seemed hard a few weeks ago.',
+        5: 'Three minutes in a row: your legs and heart are getting stronger.',
+        6: 'Seven-minute stretches! You\'re almost there.',
+        7: 'The big goal: 15 minutes of continuous running. Start slowly; you can do this.'
+      },
+      feedbackOk: 'Well done! Keep going like this, slow and steady.',
+      feedbackHard: 'It\'s fine that it felt hard. Next time run slower and walk more. If the whole week felt hard, tap "It was hard" at the end of the week and we\'ll repeat this stage.',
+      cardTitle: 'Your path to 15 minutes of continuous running',
+      stage: 'Stage {n} of {total}',
+      stageLabel: 'Stage',
+      weeksLeft: { one: 'At this rate, you\'ll get there in about {n} week.', other: 'At this rate, you\'ll get there in about {n} weeks.' },
+      q: 'How was this week?',
+      qHint: 'Your answer sets next week\'s stage.',
+      easy: 'It was easy',
+      ok: 'It was about right',
+      hard: 'It was hard',
+      answer: { easy: 'Next week you\'ll move up two stages.', ok: 'Next week you\'ll move up one stage.', hard: 'Next week we\'ll repeat this stage; there\'s no rush.' },
+      autoHard: 'One of your sessions felt hard, so this week counts as "hard". If that\'s not right, change it.',
+      readyTitle: 'Congratulations! You\'re ready for level 1',
+      readyText: 'You can now run for 15 minutes without stopping. From here, the plan will slowly add more running.',
+      readyBtn: 'Move to level 1',
+      toastSaved: 'Saved. Thank you!',
+      toastGraduated: 'Well done! Your plan continues at level 1 from today.'
     },
 
     // ---------- Session builders ----------
@@ -291,7 +332,8 @@
       title: 'Level {n}: {name}',
       help: 'How do levels work?',
       fromPb: 'From your best time (VDOT {v})',
-      fromVolume: 'From your current mileage and history'
+      fromVolume: 'From your current mileage and history',
+      fromZero: 'Starting from zero, step by step'
     },
     onb: {
       titleEdit: 'Edit profile',
@@ -304,6 +346,7 @@
       s1: '1. Your current running',
       kmLabel: 'Right now, how many kilometres do you run per week on average?',
       kmHint: 'Average of the last few weeks; enter 0 if you don\'t run.',
+      zeroNote: 'Great that you want to start! You don\'t need to know anything about kilometres or race times. Your plan starts with walking and adds very gentle running little by little; most people reach 15 minutes of continuous running within 4 to 8 weeks.',
       expQ: 'How long have you been running regularly?',
       structQ: 'Have you ever done structured training (intervals, tempo)?',
       pbQ: 'Your best recent time (optional)',
@@ -627,7 +670,8 @@
             '<ul><li><b>If you entered a best time:</b> we compute your VDOT (Jack Daniels\' fitness index) from it and read your level from a table of reference marathon times. A best time takes priority because it shows your real fitness.</li>' +
             '<li><b>Without a best time:</b> from your current weekly mileage, then capped by your running history. If you haven\'t done structured training (intervals/tempo) yet, the level is at most 4.</li>' +
             '<li>If your best time is much faster than your current mileage suggests, volume increases more cautiously.</li>' +
-            '<li>Your level sets the <b>type and complexity of sessions</b>; weekly volume starts from your real current mileage.</li></ul>' +
+            '<li>Your level sets the <b>type and complexity of sessions</b>; weekly volume starts from your real current mileage.</li>' +
+            '<li><b>Level 0 (complete beginner):</b> if you\'ve never run regularly, choose "I\'ve never run". The plan starts with brisk walking and very short running bits that slowly get longer. At the end of each week you say how it went: "easy" moves you up two stages, "about right" one stage, and "hard" repeats the stage. Most people reach 15 minutes of continuous running, and level 1, within 4 to 8 weeks.</li></ul>' +
             '<div class="table-wrap"><table class="pred-table"><thead><tr><th>Level</th><th>Name</th><th>Typical volume (km/week)</th><th>Group</th></tr></thead><tbody>{levelRows}</tbody></table></div>' +
             '<h3>Sessions in each group</h3><ul>{tiers}</ul>' +
             '<p>After you log a new time trial, if your fitness now matches a different level, you\'ll see a suggestion to change level; it only changes when you confirm.</p>'
@@ -647,6 +691,7 @@
         sessions: {
           title: 'Session types',
           body: '<dl class="glossary">' +
+            '<dt>Walk & light jog</dt><dd>For level 0: mostly brisk walking with short bits of very gentle running.</dd>' +
             '<dt>Easy run</dt><dd>Easy running at a pace where you can talk comfortably. The foundation of every plan.</dd>' +
             '<dt>Run-walk</dt><dd>Alternating running and walking, for starting from zero.</dd>' +
             '<dt>Long run</dt><dd>The longest run of the week, at an easy effort. Because of its volume load it counts as a hard day. Sometimes with a tempo or marathon-pace finish.</dd>' +

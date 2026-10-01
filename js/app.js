@@ -181,7 +181,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=12" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=13" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -220,7 +220,7 @@
     return '<div class="level-card' + (compact ? ' compact' : '') + '">' +
       '<div class="level-num" aria-hidden="true"><b>' + fa(a.level) + '</b><small>' + esc(T('level.of10')) + '</small></div>' +
       '<div class="level-body"><h3>' + tt('level.title', { n: a.level, name: L.name }) + ' ' + helpLink('levels', T('level.help')) + '</h3>' +
-      '<p class="small muted">' + (a.source === 'pb' ? tt('level.fromPb', { v: a.vdot.toFixed(1) }) : esc(T('level.fromVolume'))) + '</p>' +
+      '<p class="small muted">' + (a.source === 'pb' ? tt('level.fromPb', { v: a.vdot.toFixed(1) }) : esc(T(a.source === 'never' ? 'level.fromZero' : 'level.fromVolume'))) + '</p>' +
       a.notes.map(function (n) { return '<p class="small level-note">' + t(n) + '</p>'; }).join('') +
       '</div></div>';
   }
@@ -251,12 +251,14 @@
       '<form id="onb" novalidate>' +
 
       '<fieldset><legend>' + esc(T('onb.s1')) + '</legend>' +
-      '<div class="field"><label for="curkm">' + esc(T('onb.kmLabel')) + req + '</label>' +
-      '<input id="curkm" name="currentWeeklyKm" type="number" inputmode="decimal" min="0" max="400" step="0.5" required value="' +
-      esc(p.currentWeeklyKm != null && (p.currentWeeklyKm > 0 || !migrating) ? p.currentWeeklyKm : '') + '">' +
-      '<small class="muted">' + esc(T('onb.kmHint')) + '</small></div>' +
       '<p class="sub-legend">' + esc(T('onb.expQ')) + req + '</p><div class="chips">' +
       Object.keys(C.EXPERIENCE).map(function (k) { return chip('experience', k, C.EXPERIENCE[k].label, p.experience === k, 'radio'); }).join('') + '</div>' +
+      '<p class="alert alert-good zero-note" id="zero-note" hidden>' + esc(T('onb.zeroNote')) + '</p>' +
+      '<div id="runner-fields">' +
+      '<div class="field"><label for="curkm">' + esc(T('onb.kmLabel')) + req + '</label>' +
+      '<input id="curkm" name="currentWeeklyKm" type="number" inputmode="decimal" min="0" max="400" step="0.5" required value="' +
+      esc(p.currentWeeklyKm != null && (p.currentWeeklyKm > 0 || !migrating) && p.experience !== 'never' ? p.currentWeeklyKm : '') + '">' +
+      '<small class="muted">' + esc(T('onb.kmHint')) + '</small></div>' +
       '<p class="sub-legend">' + esc(T('onb.structQ')) + req + '</p><div class="chips">' +
       chip('structured', 'yes', T('app.yes'), p.structured === true, 'radio') + chip('structured', 'no', T('app.no'), p.structured === false, 'radio') + '</div>' +
       '<p class="sub-legend">' + esc(T('onb.pbQ')) + '</p>' +
@@ -269,7 +271,7 @@
       '<div class="field" id="pbtime-field"' + (pbKey ? '' : ' hidden') + '><label for="pbtime">' + esc(T('onb.pbTime')) + '</label>' +
       '<input id="pbtime" name="pbTime" dir="ltr" inputmode="numeric" autocomplete="off" placeholder="3:25:00" data-time-preview="pbtime-read" value="' + esc(pb.timeSec ? C.formatDuration(pb.timeSec) : '') + '">' +
       '<small class="muted">' + esc(T('onb.pbTimeHint')) + '</small><small class="time-read" id="pbtime-read" aria-live="polite"></small></div>' +
-      '</div>' +
+      '</div></div>' +
       '<div id="level-preview" aria-live="polite"></div>' +
       '</fieldset>' +
 
@@ -336,7 +338,9 @@
       if (v > 26 || v < 3) return false;
       return { distanceKm: km, timeSec: tt2 };
     }
+    function isNever() { var e = form.querySelector('input[name=experience]:checked'); return !!e && e.value === 'never'; }
     function readLevelInputs() {
+      if (isNever()) return { currentWeeklyKm: 0, experience: 'never', structured: false, pb: null };
       var kmRaw = form.currentWeeklyKm.value.trim();
       var exp = form.querySelector('input[name=experience]:checked');
       var st = form.querySelector('input[name=structured]:checked');
@@ -345,6 +349,9 @@
       return { currentWeeklyKm: Number(kmRaw), experience: exp.value, structured: st.value === 'yes', pb: pbv || null, pbInvalid: pbv === false };
     }
     function syncLevel() {
+      var never = isNever();
+      document.getElementById('runner-fields').hidden = never;
+      document.getElementById('zero-note').hidden = !never;
       var sel = form.pbSel.value;
       document.getElementById('pbother-field').hidden = sel !== 'other';
       document.getElementById('pbtime-field').hidden = !sel;
@@ -384,12 +391,13 @@
       var age = Number(fd.get('age')), w = Number(fd.get('weightKg')), h = Number(fd.get('heightCm'));
       var selDays = fd.getAll('days').map(Number);
       var selLocs = fd.getAll('locations');
-      var kmRaw = String(fd.get('currentWeeklyKm') || '').trim();
+      var never = fd.get('experience') === 'never';
+      var kmRaw = never ? '0' : String(fd.get('currentWeeklyKm') || '').trim();
       var curKm = Number(kmRaw);
-      if (kmRaw === '' || !(curKm >= 0 && curKm <= 400)) errs.push(T('onb.err.km'));
       if (!fd.get('experience')) errs.push(T('onb.err.exp'));
-      if (!fd.get('structured')) errs.push(T('onb.err.struct'));
-      var pbObj = readPb();
+      if (kmRaw === '' || !(curKm >= 0 && curKm <= 400)) errs.push(T('onb.err.km'));
+      if (!never && !fd.get('structured')) errs.push(T('onb.err.struct'));
+      var pbObj = never ? null : readPb();
       if (pbObj === false) errs.push(T('onb.err.pb'));
       var hrIn = readHr(form);
       if (hrIn.error) errs.push(hrIn.error);
@@ -424,7 +432,7 @@
         age: age, weightKg: w, heightCm: h,
         days: selDays.sort(), locations: selLocs,
         injury: String(fd.get('injury') || '').trim(),
-        currentWeeklyKm: curKm, experience: fd.get('experience'), structured: fd.get('structured') === 'yes',
+        currentWeeklyKm: curKm, experience: fd.get('experience'), structured: !never && fd.get('structured') === 'yes',
         schemaVersion: SCHEMA_VERSION,
         goal: goalObj, pb: pbObj,
         hrMax: hrIn.max, hrRest: hrIn.rest,
@@ -463,7 +471,8 @@
     }
     if (s.how && s.type !== 'cancelled') html += '<p class="sess-how">' + t(s.how) + '</p>';
     if (s.talk && s.type !== 'cancelled') html += '<p class="talk-test">' + t(s.talk) + '</p>';
-    if (opts.hint && s.easyEffort) html += '<p class="day-hint">' + t(opts.hint.message) + '</p>';
+    if (s.cheer) html += '<p class="cheer">' + t(s.cheer) + '</p>';
+    if (opts.hint && s.easyEffort && s.type !== 'walkrun') html += '<p class="day-hint">' + t(opts.hint.message) + '</p>';
     if (opts.key) html += postRunBlock(opts.key, s, opts.prefix || 'p');
     return html;
   }
@@ -487,7 +496,7 @@
       '<p class="sub-legend">' + esc(T('post.q1')) + '</p><div class="scale scale10" role="radiogroup" aria-label="' + esc(T('post.rpeAria')) + '">';
     for (var i = 1; i <= 10; i++) h += '<label class="scale-opt"><input type="radio" name="rpe" id="' + n + '-' + i + '" value="' + i + '"><span>' + fa(i) + '</span></label>';
     h += '</div><div class="scale-ends"><span>' + esc(T('post.low')) + '</span><span>' + esc(T('post.high')) + '</span></div>';
-    if (s.type !== 'runwalk') {
+    if (s.type !== 'runwalk' && s.type !== 'walkrun') {
       h += '<p class="sub-legend">' + esc(T('post.q2')) + '</p><div class="chips">' +
         '<label class="chip"><input type="radio" name="pace" value="ok"><span>' + esc(T('post.ok')) + '</span></label>' +
         '<label class="chip"><input type="radio" name="pace" value="fast"><span>' + esc(T('post.fast')) + '</span></label>' +
@@ -579,13 +588,14 @@
     var week = C.buildWeek(p, viewDate);
     var todayKey = C.dateKey(now);
     var lv = C.assessLevel(p);
-    var isRunWalk = lv.level === 1;
+    var isRunWalk = lv.level <= 1;
     // فلش‌ها بسته به جهت صفحه
     var prevGlyph = isRtl() ? '›' : '‹', nextGlyph = isRtl() ? '‹' : '›';
 
     var html = '';
     html += todayCard();
     html += '<section class="card level-strip">' + levelCard(lv, true) + '</section>';
+    if (lv.level === 0) html += zeroCard(p, now);
     html += fitnessNotesCard(p, now);
 
     // سربرگ هفته
@@ -598,15 +608,17 @@
       '<button type="button" class="btn btn-icon" data-week="1" aria-label="' + esc(T('week.next')) + '">' + nextGlyph + '</button></div>';
 
     var runDays = week.days.filter(function (d) { return ['rest', 'none'].indexOf(d.type) < 0; }).length;
-    html += '<div class="week-stats">' +
-      '<div class="stat"><span>' + esc(T('week.phase')) + ' ' + helpLink('week', T('week.phaseHelp')) + '</span><b>' + t(week.phase.label) + '</b>' +
-      (week.periodLabel ? '<small class="period-tag">' + esc(week.periodLabel) + '</small>' : '') + '</div>' +
+    var zero = lv.level === 0;
+    html += '<div class="week-stats' + (zero ? ' week-stats-zero' : '') + '">' +
+      (zero ? '<div class="stat"><span>' + esc(T('zero.stageLabel')) + '</span><b>' + tt('zero.stage', { n: (week.zeroStage || 0) + 1, total: week.zeroFinal + 1 }) + '</b></div>'
+        : '<div class="stat"><span>' + esc(T('week.phase')) + ' ' + helpLink('week', T('week.phaseHelp')) + '</span><b>' + t(week.phase.label) + '</b>' +
+      (week.periodLabel ? '<small class="period-tag">' + esc(week.periodLabel) + '</small>' : '') + '</div>') +
       '<div class="stat"><span>' + esc(T('week.sessions')) + '</span><b>' + tt('week.nSessions', { n: runDays }) + '</b></div>' +
       (isRunWalk ? '<div class="stat"><span>' + esc(T('week.totalTime')) + '</span><b>' + tt('week.nMin', { n: week.totalMin }) + '</b></div>'
         : '<div class="stat"><span>' + esc(T('week.volume')) + '</span><b>' + tt('week.nKm', { n: week.totalKm }) + '</b>' +
           (week.goal && week.goal.category === 'ultra' && week.vert ? '<small class="period-tag">' + tt('week.vert', { n: week.vert }) + '</small>' : '') + '</div>') +
-      '<div class="stat stat-ratio"><span>' + esc(T('week.ratio')) + ' ' + helpLink('week', T('week.ratioHelp')) + '</span><b dir="ltr">' + fa(100 - week.hardPct) + ' / ' + fa(week.hardPct) + '</b>' +
-      '<div class="ratio-bar" aria-hidden="true"><i style="width:' + (100 - week.hardPct) + '%"></i></div></div>' +
+      (zero ? '' : '<div class="stat stat-ratio"><span>' + esc(T('week.ratio')) + ' ' + helpLink('week', T('week.ratioHelp')) + '</span><b dir="ltr">' + fa(100 - week.hardPct) + ' / ' + fa(week.hardPct) + '</b>' +
+      '<div class="ratio-bar" aria-hidden="true"><i style="width:' + (100 - week.hardPct) + '%"></i></div></div>') +
       '</div>';
 
     var keys = week.days.map(function (d) { return d.date; });
@@ -682,6 +694,21 @@
       return;
     }
     if (e.target.closest('[data-apply-level]')) { applyFitnessLevel(); return; }
+    var zf = e.target.closest('[data-zero-feel]');
+    if (zf) {
+      var zwk = C.buildWeek(state.profile, today());
+      state.profile.zeroWeeks = state.profile.zeroWeeks || {};
+      state.profile.zeroWeeks[zwk.start] = { feel: zf.dataset.zeroFeel, src: 'user' };
+      save(); showToast(T('zero.toastSaved')); route();
+      return;
+    }
+    if (e.target.closest('[data-zero-graduate]')) {
+      // سطح ۱: کمتر از سه ماه سابقه، حجم تقریبی ۳ جلسه × ۱۵ دقیقه
+      var zp = state.profile;
+      zp.experience = 'lt3m'; zp.currentWeeklyKm = 8; zp.structured = false; zp.startDate = C.dateKey(today());
+      save(); showToast(T('zero.toastGraduated')); viewWeekOffset = 0; route();
+      return;
+    }
   });
 
   app.addEventListener('submit', function (e) {
@@ -691,18 +718,46 @@
     var rpe = f.querySelector('input[name=rpe]:checked');
     var pace = f.querySelector('input[name=pace]:checked');
     var err = f.querySelector('.form-errors');
-    if (!rpe || (f.dataset.type !== 'runwalk' && !pace)) {
+    var noPace = f.dataset.type === 'runwalk' || f.dataset.type === 'walkrun';
+    if (!rpe || (!noPace && !pace)) {
       err.hidden = false;
-      err.textContent = T(f.dataset.type !== 'runwalk' ? 'post.errBoth' : 'post.errRpe');
+      err.textContent = T(noPace ? 'post.errRpe' : 'post.errBoth');
       return;
     }
     var key = f.dataset.postrunForm;
     state.done[key] = true;
     state.postRuns[key] = { rpe: Number(rpe.value), pace: pace ? pace.value : null, easy: true, type: f.dataset.type, at: new Date().toISOString() };
+    // سطح ۰: جلسه‌ی خیلی سخت → هفته «سخت» حساب می‌شه (مگه اینکه خود کاربر جواب داده باشه)
+    if (f.dataset.type === 'walkrun' && Number(rpe.value) >= 8) {
+      var zw = state.profile.zeroWeeks = state.profile.zeroWeeks || {}, wk = C.dateKey(C.weekStart(C.parseDate(key)));
+      if (!zw[wk] || zw[wk].src !== 'user') zw[wk] = { feel: 'hard', src: 'rpe' };
+    }
     postRunOpen = null;
     save();
     route();
   });
+
+  // سطح ۰: پیشرفت تا ۱۵ دقیقه دویدن پیوسته + سؤال هفتگی (پیشرفت هفته‌ی بعد رو تعیین می‌کنه)
+  function zeroCard(p, now) {
+    var wk = C.buildWeek(p, now);
+    var stage = wk.zeroStage || 0, fin = wk.zeroFinal;
+    if (stage >= fin) {
+      return '<section class="card zero-card zero-ready"><h3>' + esc(T('zero.readyTitle')) + '</h3><p>' + esc(T('zero.readyText')) + '</p>' +
+        '<button type="button" class="btn btn-primary" data-zero-graduate="1">' + tt('zero.readyBtn') + '</button></section>';
+    }
+    var html = '<section class="card zero-card"><h3>' + esc(T('zero.cardTitle')) + '</h3>' +
+      '<p class="zero-stage"><b>' + tt('zero.stage', { n: stage + 1, total: fin + 1 }) + '</b> · ' + tt('zero.weeksLeft', { n: fin - stage }) + '</p>' +
+      '<div class="zero-bar" aria-hidden="true"><i style="width:' + Math.round((stage + 1) / (fin + 1) * 100) + '%"></i></div>';
+    if (wk.weekIndex >= 0) {
+      var f = (p.zeroWeeks || {})[wk.start];
+      html += '<p class="sub-legend">' + esc(T('zero.q')) + ' <span class="small muted">' + esc(T('zero.qHint')) + '</span></p><div class="chips">' +
+        ['easy', 'ok', 'hard'].map(function (k) {
+          return '<button type="button" class="chip-btn" data-zero-feel="' + k + '" aria-pressed="' + !!(f && f.feel === k) + '">' + esc(T('zero.' + k)) + '</button>';
+        }).join('') + '</div>' +
+        (f ? '<p class="small muted">' + esc(T(f.src === 'rpe' ? 'zero.autoHard' : 'zero.answer.' + f.feel)) + '</p>' : '');
+    }
+    return html + '</section>';
+  }
 
   // کارت «به‌روزرسانی فیتنس» روی داشبورد: یادآوری تایم‌تست، الگوی RPE بالا، پیشنهاد تغییر سطح
   function fitnessNotesCard(p, now) {
@@ -936,11 +991,11 @@
   // =====================================================================
   var GUIDE_ORDER = ['start', 'levels', 'week', 'sessions', 'intensity', 'fitness', 'checkin', 'goals', 'places', 'data'];
   function guideSections() {
-    var levelRows = C.LEVELS.slice(1).map(function (L) {
-      return '<tr><td>' + fa(L.n) + '</td><td>' + esc(L.name) + '</td><td dir="ltr">' + fa(L.km[1] === Infinity ? L.km[0] + '+' : L.km[0] + '–' + L.km[1]) + '</td><td>' + esc(L.tier) + '</td></tr>';
+    var levelRows = C.LEVELS.map(function (L) {
+      return '<tr><td>' + fa(L.n) + '</td><td>' + esc(L.name) + '</td><td dir="ltr">' + fa(L.km[1] === Infinity ? L.km[0] + '+' : L.km[1] === 0 ? '0' : L.km[0] + '–' + L.km[1]) + '</td><td>' + esc(L.tier) + '</td></tr>';
     }).join('');
-    var tiers = ['A', 'B', 'C', 'D', 'E'].map(function (k) {
-      var ns = C.LEVELS.slice(1).filter(function (L) { return L.tier === k; }).map(function (L) { return fa(L.n); });
+    var tiers = ['0', 'A', 'B', 'C', 'D', 'E'].map(function (k) {
+      var ns = C.LEVELS.filter(function (L) { return L.tier === k; }).map(function (L) { return fa(L.n); });
       return '<li><b>' + esc(T('guide.levelOf', { ns: ns.join(T('guide.levelJoin')) })) + '</b> ' + esc(C.TIER_INFO[k]) + '</li>';
     }).join('');
     var ultraRows = ['flat', 'rolling', 'hilly', 'mountain'].map(function (k) {
