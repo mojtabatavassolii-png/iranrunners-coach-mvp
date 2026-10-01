@@ -508,3 +508,6 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 }
 .chip-btn[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
 @media (min-width: 720px) { .week-stats-zero { grid-template-columns: repeat(3, 1fr); } }
+.reason-block { background: var(--info-soft); border: 1px solid var(--info-line); border-radius: 12px; padding: 4px 14px 10px; margin: 6px 0 10px; }
+.pb-intro { margin-bottom: 4px; }
+.start-preview { color: var(--brand-deep); font-weight: 700; margin-top: 6px; }

@@ -166,13 +166,59 @@
   }
 
   /*
+   * حجم فعلی از دو عدد: حجم هفته‌ی اخیر و میانگین هفتگی ماه اخیر (۴ هفته).
+   *  - میانگین وزنی = ۷۰٪ میانگین ماه + ۳۰٪ هفته‌ی اخیر (میانگین ماه پایدارتره)
+   *  - افت شدید (هفته‌ی اخیر < ۶۰٪ میانگین و حداقل ۵ کیلومتر کمتر) → دلیلش پرسیده می‌شه:
+   *      سفر / دلیل موقتی دیگه: فیتنس سر جاشه → سطح از میانگین ماه، شروع از ۷۵٪ میانگین، برگشت تا میانگین
+   *      آسیب / بیماری: سطح از میانگین وزنی، شروع از ۵۰٪ میانگین، برگشت تدریجی تا میانگین
+   *      بدون دلیل خاص (کاهش واقعی): سطح از میانگین وزنی، شروع از ۵۰٪ میانگین، سقف رشد عادی
+   *  - جهش (هفته‌ی اخیر > ۱۵۰٪ میانگین): سطح و شروع از میانگین وزنی (یه هفته‌ی استثنایی برنامه رو سنگین نکنه)
+   * پروفایل‌های قدیمی که فقط currentWeeklyKm دارن مثل قبل رفتار می‌کنن.
+   */
+  function volumeGap(last, avg) {
+    if (avg - last >= 5 && last < avg * 0.6) return 'drop';
+    if (last - avg >= 5 && last > avg * 1.5) return 'rise';
+    return null;
+  }
+  function volumeInfo(profile) {
+    var cw = Number(profile.currentWeeklyKm) || 0;
+    if (profile.lastWeekKm == null || profile.monthAvgKm == null || profile.experience === 'never') {
+      return { start: cw, level: cw, weighted: cw, ceiling: null, gap: null, reason: null, last: cw, avg: cw };
+    }
+    var last = Number(profile.lastWeekKm) || 0, avg = Number(profile.monthAvgKm) || 0;
+    var w = floor05(0.7 * avg + 0.3 * last);
+    var gap = volumeGap(last, avg);
+    var out = { last: last, avg: avg, weighted: w, gap: gap, reason: null, level: w, start: w, ceiling: null };
+    if (gap === 'drop') {
+      var reason = profile.volumeReason || 'none';
+      out.reason = reason;
+      if (reason === 'travel' || reason === 'other') {
+        out.level = avg; out.start = Math.max(last, floor05(avg * 0.75)); out.ceiling = avg;
+      } else {
+        out.start = Math.max(last, floor05(avg * 0.5));
+        out.ceiling = reason === 'none' ? null : avg;
+      }
+    }
+    return out;
+  }
+  function volumeNote(v) {
+    if (!v.gap) return null;
+    var p = { last: v.last, avg: v.avg, w: v.weighted, start: v.start };
+    if (v.gap === 'rise') return T('levelNote.rise', p);
+    if (v.reason === 'travel' || v.reason === 'other') { p.reason = T('volReason.' + v.reason); return T('levelNote.dropTemp', p); }
+    if (v.reason === 'injury' || v.reason === 'illness') { p.reason = T('volReason.' + v.reason); return T('levelNote.dropHealth', p); }
+    return T('levelNote.dropReal', p);
+  }
+
+  /*
    * تعیین سطح:
    *  ۱) سطح تقریبی از حجم فعلی، محدود به سابقه و تجربه‌ی تمرین ساختاریافته
    *  ۲) اگه رکورد وارد شده: VDOT → سطح. رکورد اولویت داره (فیتنس واقعی)
    *  ۳) اگه رکورد خیلی سریع‌تر از حجم باشه (۲+ سطح فاصله): افزایش حجم با احتیاط
    */
   function assessLevel(profile) {
-    var km = Number(profile.currentWeeklyKm) || 0;
+    var vi = volumeInfo(profile);
+    var km = vi.level;
     var exp = profile.experience || 'gt3y';
     // «هیچ‌وقت ندویده‌ام»: همیشه سطح ۰، بدون توجه به حجم یا رکورد
     if (exp === 'never') return { level: 0, volLevel: 0, vdot: null, pbLevel: null, cautious: false, notes: [], source: 'never', info: LEVELS[0] };
@@ -203,6 +249,9 @@
         out.notes.push(T('levelNote.pbLower'));
       }
     }
+    var vn = volumeNote(vi);
+    if (vn) out.notes.push(vn);
+    out.volume = vi;
     out.info = LEVELS[out.level];
     return out;
   }
@@ -486,7 +535,7 @@
     return { deload: deload, steps: steps };
   }
 
-  function startKm(profile) { return Math.max(5, floor05(Number(profile.currentWeeklyKm) || 0)); }
+  function startKm(profile) { return Math.max(5, floor05(volumeInfo(profile).start)); }
 
   // سقف رشد: حالت عادی = حجم فعلی × ضریب احتیاط، محدود به سقف سطح.
   // حالت احتیاط (رکورد خیلی سریع‌تر از حجم): حداکثر ۳۰٪ بالاتر و نه بیشتر از کف حجم سطح. هیچ‌وقت کمتر از حجم فعلی نیست.
@@ -494,6 +543,9 @@
     a = a || assessLevel(profile);
     var s = startKm(profile);
     var cap = a.cautious ? Math.min(s * 1.3, Math.max(s, a.info.km[0])) : Math.min(s * growthLimit(profile), a.info.maxKm);
+    // افت موقت (سفر، آسیب، بیماری): اجازه‌ی برگشت تا میانگین قبلی ماه
+    var vc = volumeInfo(profile).ceiling;
+    if (vc) cap = Math.max(cap, Math.min(vc, a.info.maxKm || vc));
     return Math.max(s, floor05(cap));
   }
   // نرخ رشد هفتگی: ۱۰٪، در حالت احتیاط ۵٪
@@ -514,7 +566,7 @@
   // سطح ۱: زمان دویدن هر جلسه از حجم فعلی (حدود ۸ دقیقه برای هر کیلومتر) شروع می‌شه
   function runWalkMinutes(profile, weekIdx, nSessions) {
     var pr = progression(weekIdx);
-    var km = Number(profile.currentWeeklyKm) || 0;
+    var km = volumeInfo(profile).start;
     var start = clamp(km * 8 / Math.max(1, nSessions), 8, 30);
     var cap = profile.injury && profile.injury.trim() ? Math.min(30, Math.max(12, start * 1.5)) : 30;
     var runMin = Math.min(cap, start * Math.pow(1.1, pr.steps));
@@ -1374,6 +1426,8 @@
       if (goal.altitude >= 2000) out.push(T('warn.altitude', { alt: goal.altitude }));
       if (goal.netDownhill) out.push(T('warn.downhill'));
     }
+    if (a.volume && a.volume.reason === 'injury') out.push(T('warn.recentInjury'));
+    if (a.volume && a.volume.reason === 'illness') out.push(T('warn.recentIllness'));
     if (profile.injury && profile.injury.trim())
       out.push(T('warn.injury'));
     if (profile.age >= 50) out.push(T('warn.age50'));
@@ -1405,7 +1459,7 @@
     EASY_ADJUST_MAX: EASY_ADJUST_MAX,
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks,
     goalInfo: goalInfo, goalLabel: goalLabel, GOAL_TYPES: GOAL_TYPES, TERRAIN_LABELS: TERRAIN_LABELS,
-    ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage,
+    ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet
   };
   // متن‌هایی که به زبان فعلی بستگی دارن، موقع خوندن ترجمه می‌شن

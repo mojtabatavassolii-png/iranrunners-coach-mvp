@@ -495,6 +495,53 @@ test('تیپر و روز مسابقه برای اولترا', function () {
   assert.strictEqual(C.buildWeek(p, C.addDays(race, -7)).phase.key, 'taper');
 });
 
+// ---------- حجم هفته‌ی اخیر + میانگین ماه ----------
+function volProfile(last, avg, reason, over) {
+  return Object.assign(profileFor(4, { experience: 'gt3y', structured: true, pb: null }), { lastWeekKm: last, monthAvgKm: avg, volumeReason: reason }, over || {});
+}
+function weekKms(p, n) {
+  var out = [];
+  for (var w = 0; w < n; w++) out.push(C.buildWeek(p, C.addDays(C.parseDate(p.startDate), w * 7)).totalKm);
+  return out;
+}
+test('حجم: میانگین وزنی ۷۰٪ ماه + ۳۰٪ هفته؛ بدون فاصله‌ی زیاد، شروع = میانگین وزنی', function () {
+  var v = C.volumeInfo(volProfile(36, 40, null));
+  assert.strictEqual(v.gap, null); assert.strictEqual(v.weighted, 38.5); assert.strictEqual(v.start, 38.5);
+  assert.strictEqual(C.assessLevel(volProfile(36, 40, null)).level, 4);
+  // پروفایل قدیمی (فقط یک عدد) مثل قبل
+  assert.strictEqual(C.volumeInfo(profileFor(4)).start, profileFor(4).currentWeeklyKm);
+});
+test('حجم: افت به‌خاطر سفر → سطح از میانگین ماه، شروع ۷۵٪، برگشت تا میانگین با قانون ۱۰٪', function () {
+  var p = volProfile(10, 40, 'travel');
+  var v = C.volumeInfo(p), a = C.assessLevel(p);
+  assert.strictEqual(v.gap, 'drop'); assert.strictEqual(v.level, 40); assert.strictEqual(v.start, 30);
+  assert.strictEqual(a.level, 4);
+  assert(a.notes.some(function (n) { return n.indexOf('سفر') >= 0; }));
+  var k = weekKms(p, 8);
+  assert.strictEqual(k[0], 30);
+  assert.strictEqual(Math.max.apply(null, k), 40);
+  // قانون ۱۰٪ نسبت به آخرین هفته‌ی کامل (هفته‌ی سبک حساب نمی‌شه)
+  for (var i = 1; i < k.length; i++) assert(k[i] <= Math.max.apply(null, k.slice(0, i)) * 1.1 + 0.5, k.join(','));
+});
+test('حجم: افت به‌خاطر آسیب → سطح از میانگین وزنی، شروع ۵۰٪، هشدار پزشکی', function () {
+  var p = volProfile(10, 40, 'injury');
+  var v = C.volumeInfo(p);
+  assert.strictEqual(v.level, 31); assert.strictEqual(v.start, 20); assert.strictEqual(v.ceiling, 40);
+  assert.strictEqual(C.assessLevel(p).level, 3);
+  assert(C.profileWarnings(p, C.parseDate(p.startDate)).some(function (x) { return x.indexOf('آسیب‌دیدگی') >= 0; }));
+  assert.strictEqual(weekKms(p, 1)[0], 20);
+});
+test('حجم: افت بدون دلیل خاص = کاهش واقعی؛ جهش یک‌هفته‌ای سطح رو بالا نمی‌بره؛ رکورد ناسازگار → همون قانون احتیاط', function () {
+  var real = C.volumeInfo(volProfile(10, 40, 'none'));
+  assert.strictEqual(real.start, 20); assert.strictEqual(real.ceiling, null);
+  var rise = C.volumeInfo(volProfile(60, 30, null));
+  assert.strictEqual(rise.gap, 'rise'); assert.strictEqual(rise.start, 39); assert.strictEqual(C.assessLevel(volProfile(60, 30, null)).level, 4);
+  // رکورد خیلی سریع‌تر از حجم → سطح از رکورد + رشد با احتیاط
+  var fast = C.assessLevel(volProfile(10, 40, 'travel', { pb: { distanceKm: 10, timeSec: hms(0, 36) } }));
+  assert(fast.level >= 6 && fast.cautious);
+  assert(fast.notes.length >= 2);
+});
+
 // ---------- سطح ۰ ----------
 function zeroProfile(over) {
   return Object.assign({ age: 40, weightKg: 80, heightCm: 172, days: [0, 1, 2, 3, 4, 5, 6], locations: ['park'], injury: '',

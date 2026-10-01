@@ -181,7 +181,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=13" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=14" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -207,7 +207,8 @@
   // ۱. فرم اولیه
   // =====================================================================
   // فاصله‌های رایج برای رکورد؛ «other» = فاصله‌ی دلخواه
-  var PB_DISTANCES = [['5', 5], ['10', 10], ['21', 21.0975], ['42', 42.195], ['other', null]];
+  var PB_DISTANCES = [['m1500', 1.5], ['m3000', 3], ['5', 5], ['10', 10], ['21', 21.0975], ['42', 42.195], ['other', null]];
+  var VOL_REASONS = ['injury', 'illness', 'travel', 'other', 'none'];
   function pbDistanceKey(km) {
     if (!km) return '';
     for (var i = 0; i < PB_DISTANCES.length - 1; i++) if (Math.abs(PB_DISTANCES[i][1] - km) < 0.01) return PB_DISTANCES[i][0];
@@ -236,6 +237,10 @@
     var todayKey = C.dateKey(today());
     var pbKey = pbDistanceKey(pb.distanceKm);
     var req = ' <span class="req">' + esc(T('onb.required')) + '</span>';
+    // پروفایل‌های قدیمی فقط یک عدد حجم دارن: هر دو فیلد با همون پر می‌شن
+    var oldKm = p.currentWeeklyKm != null && (p.currentWeeklyKm > 0 || !migrating) && p.experience !== 'never' ? p.currentWeeklyKm : '';
+    var volLast = p.lastWeekKm != null && p.experience !== 'never' ? p.lastWeekKm : oldKm;
+    var volAvg = p.monthAvgKm != null && p.experience !== 'never' ? p.monthAvgKm : oldKm;
 
     function chip(name, value, label, checked, type) {
       return '<label class="chip"><input type="' + (type || 'checkbox') + '" name="' + name + '" value="' + value + '"' +
@@ -255,13 +260,21 @@
       Object.keys(C.EXPERIENCE).map(function (k) { return chip('experience', k, C.EXPERIENCE[k].label, p.experience === k, 'radio'); }).join('') + '</div>' +
       '<p class="alert alert-good zero-note" id="zero-note" hidden>' + esc(T('onb.zeroNote')) + '</p>' +
       '<div id="runner-fields">' +
-      '<div class="field"><label for="curkm">' + esc(T('onb.kmLabel')) + req + '</label>' +
-      '<input id="curkm" name="currentWeeklyKm" type="number" inputmode="decimal" min="0" max="400" step="0.5" required value="' +
-      esc(p.currentWeeklyKm != null && (p.currentWeeklyKm > 0 || !migrating) && p.experience !== 'never' ? p.currentWeeklyKm : '') + '">' +
-      '<small class="muted">' + esc(T('onb.kmHint')) + '</small></div>' +
+      '<div class="row2">' +
+      '<div class="field"><label for="lastkm">' + esc(T('onb.lastWeek')) + req + '</label>' +
+      '<input id="lastkm" name="lastWeekKm" type="number" inputmode="decimal" min="0" max="400" step="0.5" required value="' + esc(volLast) + '">' +
+      '<small class="muted">' + esc(T('onb.lastWeekHint')) + '</small></div>' +
+      '<div class="field"><label for="avgkm">' + esc(T('onb.monthAvg')) + req + '</label>' +
+      '<input id="avgkm" name="monthAvgKm" type="number" inputmode="decimal" min="0" max="400" step="0.5" required value="' + esc(volAvg) + '">' +
+      '<small class="muted">' + esc(T('onb.monthAvgHint')) + '</small></div></div>' +
+      '<div id="reason-block" class="reason-block" hidden><p class="sub-legend">' + esc(T('onb.reasonQ')) + req + '</p>' +
+      '<p class="small muted">' + esc(T('onb.reasonHint')) + '</p><div class="chips">' +
+      VOL_REASONS.map(function (k) { return chip('volumeReason', k, T('onb.reasons.' + k), p.volumeReason === k, 'radio'); }).join('') + '</div></div>' +
       '<p class="sub-legend">' + esc(T('onb.structQ')) + req + '</p><div class="chips">' +
       chip('structured', 'yes', T('app.yes'), p.structured === true, 'radio') + chip('structured', 'no', T('app.no'), p.structured === false, 'radio') + '</div>' +
       '<p class="sub-legend">' + esc(T('onb.pbQ')) + '</p>' +
+      '<p class="small pb-intro">' + esc(T('onb.pbIntro')) + '</p>' +
+      '<p class="small muted">' + esc(T('onb.pbOptional')) + '</p>' +
       '<div class="row3">' +
       '<div class="field"><label for="pbsel">' + esc(T('onb.pbDist')) + '</label><select id="pbsel" name="pbSel"><option value="">' + esc(T('onb.pbNone')) + '</option>' +
       PB_DISTANCES.map(function (d) { return '<option value="' + d[0] + '"' + (pbKey === d[0] ? ' selected' : '') + '>' + esc(T('pbDist.' + d[0])) + '</option>'; }).join('') +
@@ -339,19 +352,38 @@
       return { distanceKm: km, timeSec: tt2 };
     }
     function isNever() { var e = form.querySelector('input[name=experience]:checked'); return !!e && e.value === 'never'; }
+    // حجم: هفته‌ی اخیر و میانگین ماه؛ اگه افت شدید باشه، دلیلش لازمه
+    function readVolume() {
+      var l = form.lastWeekKm.value.trim(), a = form.monthAvgKm.value.trim();
+      if (l === '' || a === '') return null;
+      var last = Number(l), avg = Number(a);
+      if (!(last >= 0 && last <= 400 && avg >= 0 && avg <= 400)) return null;
+      var gap = C.volumeGap(last, avg);
+      var rs = form.querySelector('input[name=volumeReason]:checked');
+      return { last: last, avg: avg, gap: gap, reason: gap === 'drop' ? (rs ? rs.value : null) : null };
+    }
+    function volumeProfile(v) {
+      var vp = { lastWeekKm: v.last, monthAvgKm: v.avg, volumeReason: v.reason };
+      vp.currentWeeklyKm = C.volumeInfo(vp).start;
+      return vp;
+    }
     function readLevelInputs() {
       if (isNever()) return { currentWeeklyKm: 0, experience: 'never', structured: false, pb: null };
-      var kmRaw = form.currentWeeklyKm.value.trim();
+      var v = readVolume();
       var exp = form.querySelector('input[name=experience]:checked');
       var st = form.querySelector('input[name=structured]:checked');
-      if (kmRaw === '' || !exp || !st) return null;
+      if (!v || (v.gap === 'drop' && !v.reason) || !exp || !st) return null;
       var pbv = readPb();
-      return { currentWeeklyKm: Number(kmRaw), experience: exp.value, structured: st.value === 'yes', pb: pbv || null, pbInvalid: pbv === false };
+      var out = volumeProfile(v);
+      out.experience = exp.value; out.structured = st.value === 'yes'; out.pb = pbv || null; out.pbInvalid = pbv === false;
+      return out;
     }
     function syncLevel() {
       var never = isNever();
       document.getElementById('runner-fields').hidden = never;
       document.getElementById('zero-note').hidden = !never;
+      var vol = never ? null : readVolume();
+      document.getElementById('reason-block').hidden = !(vol && vol.gap === 'drop');
       var sel = form.pbSel.value;
       document.getElementById('pbother-field').hidden = sel !== 'other';
       document.getElementById('pbtime-field').hidden = !sel;
@@ -362,6 +394,7 @@
         return;
       }
       box.innerHTML = levelCard(C.assessLevel(inp)) +
+        (!never ? '<p class="small start-preview">' + tt('onb.startPreview', { n: Math.max(5, inp.currentWeeklyKm) }) + '</p>' : '') +
         (inp.pbInvalid ? '<p class="small form-hint">' + esc(T('onb.pbInvalid')) + '</p>' : '');
     }
     function syncRace() {
@@ -392,10 +425,17 @@
       var selDays = fd.getAll('days').map(Number);
       var selLocs = fd.getAll('locations');
       var never = fd.get('experience') === 'never';
-      var kmRaw = never ? '0' : String(fd.get('currentWeeklyKm') || '').trim();
-      var curKm = Number(kmRaw);
+      var volP = { lastWeekKm: 0, monthAvgKm: 0, volumeReason: null, currentWeeklyKm: 0 };
       if (!fd.get('experience')) errs.push(T('onb.err.exp'));
-      if (kmRaw === '' || !(curKm >= 0 && curKm <= 400)) errs.push(T('onb.err.km'));
+      if (!never) {
+        var lRaw = String(fd.get('lastWeekKm') || '').trim(), aRaw = String(fd.get('monthAvgKm') || '').trim();
+        if (lRaw === '' || !(Number(lRaw) >= 0 && Number(lRaw) <= 400)) errs.push(T('onb.err.lastWeek'));
+        if (aRaw === '' || !(Number(aRaw) >= 0 && Number(aRaw) <= 400)) errs.push(T('onb.err.monthAvg'));
+        var vol = readVolume();
+        if (vol && vol.gap === 'drop' && !vol.reason) errs.push(T('onb.err.reason'));
+        if (vol) volP = volumeProfile(vol);
+      }
+      var curKm = volP.currentWeeklyKm;
       if (!never && !fd.get('structured')) errs.push(T('onb.err.struct'));
       var pbObj = never ? null : readPb();
       if (pbObj === false) errs.push(T('onb.err.pb'));
@@ -432,7 +472,8 @@
         age: age, weightKg: w, heightCm: h,
         days: selDays.sort(), locations: selLocs,
         injury: String(fd.get('injury') || '').trim(),
-        currentWeeklyKm: curKm, experience: fd.get('experience'), structured: !never && fd.get('structured') === 'yes',
+        currentWeeklyKm: curKm, lastWeekKm: volP.lastWeekKm, monthAvgKm: volP.monthAvgKm, volumeReason: volP.volumeReason,
+        experience: fd.get('experience'), structured: !never && fd.get('structured') === 'yes',
         schemaVersion: SCHEMA_VERSION,
         goal: goalObj, pb: pbObj,
         hrMax: hrIn.max, hrRest: hrIn.rest,
@@ -446,7 +487,7 @@
         pbObj.date = same && p.pb.date ? p.pb.date : C.dateKey(today());
       }
       // تغییر سطح یا حجم فعلی = نقطه‌ی شروع جدید؛ بقیه‌ی تغییرات پیشرفت برنامه رو حفظ می‌کنن
-      var keep = editing && !migrating && p.startDate && p.currentWeeklyKm === curKm &&
+      var keep = editing && !migrating && p.startDate && p.currentWeeklyKm === curKm && p.monthAvgKm === next.monthAvgKm && p.lastWeekKm === next.lastWeekKm &&
         C.assessLevel(p).level === C.assessLevel(next).level;
       next.startDate = keep ? p.startDate : C.dateKey(today());
       state.profile = next;
@@ -705,7 +746,7 @@
     if (e.target.closest('[data-zero-graduate]')) {
       // سطح ۱: کمتر از سه ماه سابقه، حجم تقریبی ۳ جلسه × ۱۵ دقیقه
       var zp = state.profile;
-      zp.experience = 'lt3m'; zp.currentWeeklyKm = 8; zp.structured = false; zp.startDate = C.dateKey(today());
+      zp.experience = 'lt3m'; zp.currentWeeklyKm = zp.lastWeekKm = zp.monthAvgKm = 8; zp.volumeReason = null; zp.structured = false; zp.startDate = C.dateKey(today());
       save(); showToast(T('zero.toastGraduated')); viewWeekOffset = 0; route();
       return;
     }
@@ -784,7 +825,8 @@
     var km = C.weeklyVolume(p, Math.max(0, wk.weekIndex), true).km;
     var before = C.assessLevel(p).level;
     p.pb = { distanceKm: fit.entry.distanceKm, timeSec: fit.entry.timeSec, date: fit.entry.date };
-    p.currentWeeklyKm = km;
+    p.currentWeeklyKm = p.lastWeekKm = p.monthAvgKm = km;
+    p.volumeReason = null;
     p.startDate = C.dateKey(now);
     save();
     showToast(fa(T('toast.levelApplied', { to: C.assessLevel(p).level, from: before, km: km })));
@@ -1190,7 +1232,8 @@
       row('structured', esc(T(p.structured ? 'profile.structYes' : 'profile.structNo'))) +
       row('hr', hrz ? tt('profile.hrVal', { a: hrz.easy[0], b: hrz.easy[1] }) : muted('profile.notEntered')) +
       row('fitness', fit ? 'VDOT ' + t(fit.vdot.toFixed(1)) + ' · <a href="#fitness">' + esc(T('profile.details')) + '</a>' : '<a href="#fitness">' + esc(T('profile.registerTest')) + '</a>') +
-      row('km', tt('profile.kmVal', { n: p.currentWeeklyKm })) +
+      row('km', p.monthAvgKm != null && p.experience !== 'never' ? tt('profile.kmVal2', { last: p.lastWeekKm, avg: p.monthAvgKm, start: lv.volume ? lv.volume.start : p.currentWeeklyKm })
+        : tt('profile.kmVal', { n: p.currentWeeklyKm })) +
       row('body', tt('profile.bodyVal', { age: p.age, w: p.weightKg, h: p.heightCm }) + ' <span class="muted small">(BMI ' + t(bmi.toFixed(1)) + ')</span>') +
       row('days', esc(p.days.map(function (d) { return C.DAY_NAMES[d]; }).join(T('app.listSep')))) +
       row('locs', esc(p.locations.map(function (l) { return C.LOCATION_LABELS[l]; }).join(T('app.listSep')))) +

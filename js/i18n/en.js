@@ -32,8 +32,13 @@
       structuredCap: 'You haven\'t done structured training (intervals/tempo) yet, so your level was capped from {from} to {to}.',
       expCap: 'Based on your running history ({exp}), your level was capped from {from} to {to}.',
       cautious: 'We\'ll increase your volume cautiously, because your current mileage doesn\'t match your speed yet.',
-      pbLower: 'Your level comes from your best time, which reflects your real fitness better. Your current mileage is kept, but the intensity matches your speed.'
+      pbLower: 'Your level comes from your best time, which reflects your real fitness better. Your current mileage is kept, but the intensity matches your speed.',
+      dropTemp: 'Your last week ({last} km) was much lower than your monthly average ({avg} km) because of {reason}. Since this drop is temporary and your fitness is intact, your level is based on the monthly average. The plan starts at {start} km and returns to {avg} km within a few weeks (10% rule).',
+      dropHealth: 'Your last week ({last} km) was much lower than your monthly average ({avg} km) because of {reason}. Your level is set cautiously from the weighted average ({w} km). The plan starts at {start} km and builds back gradually (at most 10% a week) to {avg} km.',
+      dropReal: 'Your last week ({last} km) was much lower than your monthly average ({avg} km) for no particular reason, so your volume has genuinely dropped. Your level is based on the weighted average ({w} km) and the plan starts at {start} km.',
+      rise: 'Your last week ({last} km) was much higher than your monthly average ({avg} km). Your level and starting volume are based on the weighted average ({w} km), so one unusual week doesn\'t make the plan too heavy.'
     },
+    volReason: { injury: 'an injury', illness: 'illness', travel: 'travel', other: 'a temporary reason' },
 
     raceLabels: { 5: '5 km', 10: '10 km', 21: 'Half marathon (21.1 km)', 42: 'Marathon (42.2 km)' },
     goalTypes: { none: 'No specific goal', 5: '5 km', 10: '10 km', 21: 'Half marathon', 42: 'Marathon', ultra: 'Ultra & trail' },
@@ -277,6 +282,8 @@
       ultraEarly: 'At level {level}, long ultras and trail races are too early. For now the plan focuses on building a base and controlled hills; back-to-back runs unlock from level 5 with enough base.',
       altitude: 'The race is held at {alt} m altitude. At altitude, heart rate and breathing are higher for the same speed, so go by RPE. If you can, arrive a few days early or do at least one session at a similar altitude.',
       downhill: 'Your course has much more descent than climb, so downhill practice gets more weight to prepare your quads.',
+      recentInjury: 'You ran less last week because of an injury. Only start when you can walk and run without pain; if you still have pain, see a doctor or physiotherapist first.',
+      recentIllness: 'You ran less last week because of illness. Only start once you\'ve fully recovered; if you had a fever or a chest infection, wait a few more days.',
       injury: 'You\'ve recorded an injury or limitation. The plan starts from your current mileage and never goes more than 10% above it. Please consult a doctor or physiotherapist before starting.',
       age50: 'Over 50, volume grows more slowly (at most 20% above your current mileage). A heart check-up before starting is recommended.',
       under18: 'Under 18, this plan should be followed under the supervision of a parent or coach.',
@@ -326,7 +333,7 @@
       note: 'Your data stays on this device only.',
       logout: 'Log out'
     },
-    pbDist: { 5: '5 km', 10: '10 km', 21: 'Half marathon', 42: 'Marathon', other: 'Another distance' },
+    pbDist: { m1500: '1500 m', m3000: '3000 m', 5: '5 km', 10: '10 km', 21: 'Half marathon', 42: 'Marathon', other: 'Another distance' },
     level: {
       of10: 'of 10',
       title: 'Level {n}: {name}',
@@ -346,6 +353,16 @@
       s1: '1. Your current running',
       kmLabel: 'Right now, how many kilometres do you run per week on average?',
       kmHint: 'Average of the last few weeks; enter 0 if you don\'t run.',
+      lastWeek: 'Last week\'s volume (km)',
+      lastWeekHint: 'Your last complete week, Saturday to Friday.',
+      monthAvg: 'Last month\'s average (km per week)',
+      monthAvgHint: 'Weekly average over the past four weeks; e.g. 30+35+40+35 → 35.',
+      reasonQ: 'Last week was much lower than your monthly average. Was there a particular reason?',
+      reasonHint: 'Your answer tells us whether the drop is temporary or real, and where the plan should start.',
+      reasons: { injury: 'Injury', illness: 'Illness', travel: 'Travel', other: 'Another temporary reason', none: 'No particular reason; I\'m really running less' },
+      startPreview: 'The plan starts at {n} km per week.',
+      pbIntro: 'The best time you\'ve run over one of the distances below in the last six months, with a fairly serious effort (not an ordinary training run, but an official race or an all-out time trial).',
+      pbOptional: 'If you don\'t have one or aren\'t sure, leave this section empty; the system will estimate your level from your current training volume.',
       zeroNote: 'Great that you want to start! You don\'t need to know anything about kilometres or race times. Your plan starts with walking and adds very gentle running little by little; most people reach 15 minutes of continuous running within 4 to 8 weeks.',
       expQ: 'How long have you been running regularly?',
       structQ: 'Have you ever done structured training (intervals, tempo)?',
@@ -385,6 +402,9 @@
       toastNew: 'Your plan is ready!',
       err: {
         km: 'Enter how many kilometres you currently run per week on average (a number from 0 to 400).',
+        lastWeek: 'Enter last week\'s volume (0 to 400 km; enter 0 if you didn\'t run).',
+        monthAvg: 'Enter last month\'s average weekly volume (0 to 400 km).',
+        reason: 'Tell us whether last week\'s drop had a particular reason.',
         exp: 'Tell us how long you\'ve been running regularly.',
         struct: 'Tell us whether you\'ve done structured training (intervals, tempo).',
         pb: 'Best time: enter the distance and time completely and correctly (e.g. "3:25:00" or just "32500"), or choose "No best time".',
@@ -616,7 +636,7 @@
       warningsTitle: 'Important notes for you',
       rows: {
         level: 'Level', exp: 'Running history', structured: 'Structured training', hr: 'Heart rate', fitness: 'Current fitness',
-        km: 'Current mileage (starting point)', body: 'Age / weight / height', days: 'Free days', locs: 'Training locations',
+        km: 'Training volume', body: 'Age / weight / height', days: 'Free days', locs: 'Training locations',
         injury: 'Injury / limitation', goal: 'Race goal', pb: 'Best time', start: 'Plan start', stats: 'Stats'
       },
       levelVal: 'Level {n} of 10: {name}',
@@ -627,6 +647,7 @@
       details: 'Details and update',
       registerTest: 'Log a time trial',
       kmVal: '{n} km per week',
+      kmVal2: 'Last week {last} · monthly average {avg} · plan starts at {start} km',
       bodyVal: '{age} years · {w} kg · {h} cm',
       notRecorded: 'Not recorded',
       noDate: '(no date)',
