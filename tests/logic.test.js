@@ -397,14 +397,33 @@ test('هدف ۵/۱۰ کیلومتر: اینتروال کوتاه و متوسط،
     ['shortInt', 'midInt', 'speedFartlek', 'shortHills'].forEach(function (k) { assert(v[k], g + ' ' + k); });
     ['mpInt', 'longHills', 'thresholdInt'].forEach(function (k) { assert(!v[k], g + ' no ' + k); });
   });
+  // سطح ۶+: فارتلک مونا (۲×۹۰، ۴×۶۰، ۴×۳۰، ۴×۱۵ ثانیه با شناور هم‌طول)؛ زیر ۶: هرمی
   var s = weekAt(profileFor(6, { goal: goalOf('5') }), 1).days.find(function (d) { return d.spec && d.spec.type === 'speedFartlek'; });
-  assert(/۱-۲-۳-۴-۳-۲-۱/.test(s.steps[1]), s.steps[1]);
+  assert.strictEqual(s.steps.length, 4); assert(/^۲ × ۹۰ ثانیه/.test(s.steps[0]) && /^۴ × ۱۵ ثانیه/.test(s.steps[3]), s.steps.join(' | '));
+  assert(s.how.indexOf('پیوسته‌ست') >= 0 && s.wuCat === 'interval');
+  var s5 = weekAt(profileFor(5, { goal: goalOf('5') }), 1).days.find(function (d) { return d.spec && d.spec.type === 'speedFartlek'; });
+  assert(/۱-۲-۳-۴-۳-۲-۱/.test(s5.steps[0]), s5.steps[0]);
+});
+test('گرم کردن اختصاصی: بر اساس نوع جلسه و سطح، جدا از تمرین اصلی', function () {
+  function first(n, pred) {
+    for (var w = 0; w < 12; w++) { var d = weekAt(profileFor(n), w).days.find(pred); if (d) return d; }
+  }
+  var easy = first(5, function (d) { return d.type === 'easy'; });
+  assert(easy.warmup.lines.length === 1 && !easy.cooldown && /خیلی آروم/.test(easy.warmup.lines[0]));
+  var tempo = first(5, function (d) { return d.wuCat === 'tempo'; });
+  assert(/حرکات دینامیک/.test(tempo.warmup.lines.join(' ')) && /۳–۴ استراید|3–4 استراید/.test(tempo.warmup.lines.join(' ')), tempo.warmup.lines.join(' | '));
+  var int6 = first(6, function (d) { return d.wuCat === 'interval'; }), int8 = first(8, function (d) { return d.wuCat === 'interval'; });
+  assert(/باند/.test(int6.warmup.lines.join(' ')) && /4–6/.test(int6.warmup.lines.join(' ')));
+  assert(/A-skip/.test(int8.warmup.lines.join(' ')) && int8.warmup.lines.length > int6.warmup.lines.length);
+  var int3 = first(3, function (d) { return d.wuCat === 'interval'; });
+  assert(/^15 دقیقه/.test(int3.warmup.lines[0]) && !/باند/.test(int3.warmup.lines.join(' ')), int3.warmup.lines[0]);
+  [int6, tempo].forEach(function (d) { d.steps.forEach(function (x) { assert(!/گرم کردن|سرد کردن|استراید/.test(x), x); }); });
 });
 test('هدف نیمه‌ماراتن: اینتروال آستانه، اینتروال بلند، تمپوی پیوسته', function () {
   var v = variants(profileFor(6, { goal: goalOf('21') }), 9);
   ['thresholdInt', 'longInt', 'tempoRun'].forEach(function (k) { assert(v[k], k); });
   var th = weekAt(profileFor(6, { goal: goalOf('21') }), 0).days.find(function (d) { return d.spec && d.spec.type === 'thresholdInt'; });
-  assert(/^[34] × (8|9|10) دقیقه/.test(th.steps[1]), th.steps[1]);
+  assert(/^[34] × (8|9|10) دقیقه/.test(th.steps[0]), th.steps[0]);
 });
 test('هدف ماراتن: تمپوی بلند، اینتروال پیس ماراتن، فارتلک درازمدت، لانگ‌ران با پایان پیس ماراتن', function () {
   var v = variants(profileFor(6, { goal: goalOf('42') }), 9);
@@ -641,7 +660,7 @@ test('سطح ۰: فقط پیاده‌روی و دویدن سبک، ۳ جلسه،
     assert(d.minutes <= 30, d.minutes); assert(d.cheer && d.how.indexOf('RPE') < 0);
   });
   assert.strictEqual(w1.zeroStage, 0);
-  assert(/پیاده‌روی تند/.test(s[0].steps[1]), s[0].steps[1]);
+  assert(/پیاده‌روی تند/.test(s[0].steps[0]), s[0].steps[0]);
 });
 test('سطح ۰: «مناسب» → ۸ هفته تا ۱۵ دقیقه، «راحت» → ۴ هفته، «سخت» → تکرار مرحله', function () {
   function weeksTo(feel) {
@@ -659,7 +678,7 @@ test('سطح ۰: «مناسب» → ۸ هفته تا ۱۵ دقیقه، «راح�
   assert.strictEqual(weeksTo('hard'), 99);
   var last = C.buildWeek(zeroProfile(), C.addDays(C.parseDate('2026-09-26'), 7 * 7)).days.filter(function (d) { return d.type === 'walkrun'; })[0];
   assert.strictEqual(last.minutes, 25);
-  assert(/۱۵ دقیقه دویدن آروم و پیوسته/.test(last.steps[1]));
+  assert(/۱۵ دقیقه دویدن آروم و پیوسته/.test(last.steps[0]));
 });
 test('سطح ۰: بدون هشدار تمرین ساختاریافته و یادآوری تایم‌تست؛ مسابقه بدون تیپر روی جلسه‌ها', function () {
   var p = zeroProfile({ goal: goalOf('5', '2026-12-18') });

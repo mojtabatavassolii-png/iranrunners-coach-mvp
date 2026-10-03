@@ -118,6 +118,47 @@
       toastGraduated: 'Well done! Your plan continues at level 1 from today.'
     },
 
+    // ---------- Session-specific warm-up and cool-down ----------
+    wu: {
+      easyBasic: '5–10 min brisk walking or very slow running, then ease into your easy pace.',
+      easyJog: 'Run the first 5–10 minutes very slowly and ease into your easy pace; the session itself is low intensity, so no separate warm-up is needed.',
+      mobility: 'Before you start, 1–2 minutes of light mobility: leg swings and hip circles.',
+      coolLong: '5 min walking and light stretching.',
+      jog: '{min} min of slow running that gradually gets faster.',
+      drills: {
+        tempo: {
+          basic: 'Simple dynamic moves (about 20 s each): front-back and side leg swings, hip circles, gentle high knees.',
+          mid: 'Dynamic moves (20–30 m each): leg swings, walking lunges, hip circles, high knees.',
+          adv: 'Dynamic moves (20–30 m each): leg swings, walking lunges, hip circles, high knees, A-skips.'
+        },
+        interval: {
+          basic: 'Simple activation drills (about 20 m each): high knees, skips, butt kicks, walking lunges.',
+          mid: 'Activation drills (20–30 m each): high knees, skips, bounds, butt kicks, walking lunges with a torso twist.',
+          adv: 'Activation drills (20–30 m each): high knees, A- and B-skips, bounds, butt kicks, carioca, walking lunges with a torso twist.'
+        },
+        hills: {
+          basic: 'Leg and glute activation: 10 glute bridges, walking lunges, leg swings, high knees.',
+          mid: 'Leg and glute activation: single-leg glute bridges, walking lunges, skips, ankle pogo hops, high knees.',
+          adv: 'Leg and glute activation: single-leg glute bridges, walking lunges, ankle pogo hops, bounds and A-skips on a gentle incline.'
+        }
+      },
+      strides: {
+        tempo: '{n} × 20 s strides: accelerate gradually to near top speed, then ease off; full recovery between each (60–90 s walking or very easy jogging).',
+        interval: '{n} short strides accelerating to near the main session pace; full rest between each. Do the last one right before your first main rep.',
+        hills: '{n} short strides (one or two uphill) accelerating to near session speed; full rest between each.'
+      },
+      stridesAdv: 'Run the last two strides at exactly your rep pace.',
+      whyTempo: 'Purpose: prepare your neuromuscular system for a sustained effort.',
+      whyInterval: 'A short warm-up isn\'t enough for this session; don\'t start the first rep on cold legs.',
+      whyHills: 'Purpose: prepare your leg and glute muscles for explosive efforts.',
+      light: 'The first 15 minutes of the session are easy and build up gradually; they act as your warm-up.',
+      lightStrides: 'Before the first fast section: 2–3 short strides.',
+      cool: '{min} min easy running, then light stretching.',
+      raceShort: ['15 min easy running.', 'Activation drills: high knees, skips, butt kicks, walking lunges.', '4–6 strides up to near race pace; finish your warm-up 5–10 minutes before the start.'],
+      raceHalf: ['10 min easy running.', '2–3 short strides; save your energy for the race.'],
+      raceLong: ['5–10 min walking and very easy jogging; the first kilometres of the race are your warm-up.'],
+      raceCool: 'After the finish: walk, drink and have a snack.'
+    },
     // ---------- Session builders ----------
     rpe: {
       easy: 'Effort: easy (RPE 3–4 out of 10).',
@@ -183,8 +224,18 @@
         pyramidShort: 'Short pyramid: 1-2-3-2-1 min fast, 1 min easy between each',
         vPyramid: 'pyramid',
         oneone: '{n} times: 1 min fast + 1 min easy',
-        vOneone: '1-1 speed'
+        vOneone: '1-1 speed',
+        vMona: 'Mona',
+        monaSteps: ['2 × 90 s hard (around 5 km pace) + 90 s "float"', '4 × 60 s hard + 60 s float', '4 × 30 s hard + 30 s float', '4 × 15 s hard + 15 s float'],
+        monaHow: 'The "Mona" fartlek (named after Steve Moneghetti, devised by coach Chris Wardlaw): the main set is exactly 20 minutes with no stopping. Start the hard bits at about 5 km pace and, if you can, get a little quicker as they shorten. The "float" is a fairly quick jog (the fast end of your easy pace), never walking or standing; the floats are what make it hard.',
+        vLandmark: 'free, landmark-based',
+        landmark1: '{min} min of continuous running; {n} times along the way, surge to a landmark (a lamp post, the top of a rise, the next junction).',
+        landmark2: 'Vary the surges from 15 s to 2 min: some short and very fast, some longer at about 10 km pace.',
+        landmark3: 'After each surge, recover by jogging slowly until your breathing settles; don\'t stop. Keep the first and last 10 minutes surge-free.',
+        landmarkHow: 'Surge effort: RPE 6 to 9 depending on length; the shorter, the faster.',
       },
+      fartlekVsInterval: ' A fartlek is continuous: you never stop between the fast bits, and recovery is easy running; intervals have fuller rests and a stricter structure.',
+      intervalVsFartlek: ' Intervals have a precise structure and fuller rests between reps so each rep is high quality; a fartlek, by contrast, is continuous.',
       shortHills: { variant: 'short hills', main: '{reps} × about 100 m fast up a short hill (6–10% grade); walk back down', how: 'Effort: fast and powerful (RPE 8–9 out of 10).' },
       thresholdInt: { variant: 'threshold intervals', main: '{reps} × {min} min at threshold pace; 90 s to 2 min easy jog between reps' },
       longInt: { variant: 'long', main: '{reps} × {rep} m at a pace between 10 km and half marathon; 2–3 min jog between reps', how: 'Effort: hard but sustainable (RPE 7–8 out of 10).' },
@@ -250,7 +301,7 @@
         ultraHow: 'Race day! Don\'t try anything new (shoes, food, clothing). Pace by effort (RPE), not by pace; the first half should feel easy.',
         ultraEst: ' Very rough estimated time: about {time} (equivalent to {km} km of flat running).',
         ultraSteps: ['Start very conservatively; walk the steep climbs', 'Eat and drink every 30–45 minutes', 'Take the descents under control to save your quads for the finish', 'Check the mandatory race gear (water, headlamp, warm layer)'],
-        steps: ['10–15 min easy warm-up', 'Start the first kilometres a little slower than target pace', 'Use the water stations', 'After the finish: walk and drink'],
+        steps: ['Start the first kilometres a little slower than target pace', 'Use the water stations'],
         how: 'Race day! Don\'t try anything new (shoes, food, clothing).',
         pred: ' Predicted time (Riegel, from your latest time trial/best time): about {time}.',
         runwalk: ' Stick to your run-walk routine; the only goal is to reach the finish healthy.'
@@ -492,7 +543,7 @@
       note: 'Defaults: Persian → Solar Hijri and Saturday; English → Gregorian and Monday. Changing the first day of the week moves the plan\'s week boundaries (the long run falls on the last day of the week); your free days stay the same.',
       saved: 'Settings saved.'
     },
-    sess: { original: 'Original plan:' },
+    sess: { original: 'Original plan:', warmup: 'Warm-up', main: 'Main set', cooldown: 'Cool-down', about: 'about {n} min' },
     post: {
       summary: 'After the run: effort {rpe} out of 10',
       paceOk: ' · pace as planned',
@@ -791,7 +842,9 @@
             '<dt>Tempo</dt><dd>Continuous running at threshold pace (T): "hard but controlled".</dd>' +
             '<dt>Threshold intervals</dt><dd>Several 5–10 minute pieces at T pace with short rests.</dd>' +
             '<dt>Short / medium / long intervals</dt><dd>Reps of 400–800 m (5K pace), 1000–1600 m (5–10K pace) and 1600–2000 m (10K to half-marathon pace).</dd>' +
-            '<dt>Fartlek</dt><dd>Free changes of speed during a run (for example 1 min fast, 1 min easy).</dd>' +
+            '<dt>Fartlek</dt><dd>Changes of speed within one continuous run; recovery is easy running and you never stop. Types: 1-1 (1 min fast, 1 min easy), pyramid (1-2-3-4-3-2-1), <b>Mona</b> for level 6 and up (2×90, 4×60, 4×30, 4×15 s with an equal "float"; 20 minutes), and <b>free, landmark-based</b> (6 to 10 surges of 15 s to 2 min to landmarks such as lamp posts).</dd>' +
+            '<dt>Intervals vs fartlek</dt><dd>Intervals have a precise structure and fuller rests between reps; a fartlek is continuous.</dd>' +
+            '<dt>Session-specific warm-up</dt><dd>Every session has its own warm-up: easy and long runs just start slowly; tempo gets 10–15 min of building running + dynamic moves + 3–4 strides; intervals and speed get a fuller warm-up with activation drills and 4–6 strides; hills emphasise leg and glute activation. Lower levels get simpler, more gradual warm-ups; higher levels more compact ones with more drills.</dd>' +
             '<dt>Hills</dt><dd>Short uphill reps (power and speed) or long ones (strength endurance). Easy on the way down.</dd>' +
             '<dt>Downhill practice</dt><dd>Controlled descents to prepare your quads for mountain courses.</dd>' +
             '<dt>Steady</dt><dd>Continuous running a little faster than easy.</dd>' +

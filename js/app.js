@@ -269,7 +269,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=16" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=17" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -632,8 +632,20 @@
     if (s.original) {
       html += '<div class="sess-orig">' + esc(T('sess.original')) + ' <s>' + t(s.original.label + ' — ' + s.original.target) + '</s></div>';
     }
+    // گرم کردن اختصاصی همین جلسه، تمرین اصلی، سرد کردن؛ هر کدوم بخش جدا
+    var phases = s.warmup && s.warmup.lines && s.warmup.lines.length;
+    if (phases) {
+      html += '<div class="sess-phase sess-warmup"><h4>' + esc(T('sess.warmup')) +
+        (s.warmup.min ? ' <small>' + tt('sess.about', { n: s.warmup.min }) + '</small>' : '') + '</h4><ul>' +
+        s.warmup.lines.map(function (x) { return '<li>' + t(x) + '</li>'; }).join('') + '</ul></div>';
+    }
     if (s.steps && s.steps.length) {
-      html += '<ol class="sess-steps">' + s.steps.map(function (x) { return '<li>' + t(x) + '</li>'; }).join('') + '</ol>';
+      html += (phases ? '<div class="sess-phase sess-mainset"><h4>' + esc(T('sess.main')) + '</h4>' : '') +
+        '<ol class="sess-steps">' + s.steps.map(function (x) { return '<li>' + t(x) + '</li>'; }).join('') + '</ol>' + (phases ? '</div>' : '');
+    }
+    if (s.cooldown && s.cooldown.lines && s.cooldown.lines.length) {
+      html += '<div class="sess-phase sess-cooldown"><h4>' + esc(T('sess.cooldown')) + '</h4><ul>' +
+        s.cooldown.lines.map(function (x) { return '<li>' + t(x) + '</li>'; }).join('') + '</ul></div>';
     }
     if (s.how && s.type !== 'cancelled') html += '<p class="sess-how">' + t(s.how) + '</p>';
     if (s.talk && s.type !== 'cancelled') html += '<p class="talk-test">' + t(s.talk) + '</p>';
