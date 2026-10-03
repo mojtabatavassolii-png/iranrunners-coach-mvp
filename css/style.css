@@ -55,6 +55,11 @@ body {
   overflow-x: hidden;
 }
 body.modal-open { overflow: hidden; }
+/* تراز دوطرفه برای همه‌ی متن‌ها (فارسی و انگلیسی)؛ خط آخر هر پاراگراف طبق جهت زبان می‌مونه */
+body { text-align: justify; text-justify: inter-word; }
+:lang(en) p, :lang(en) li { hyphens: auto; -webkit-hyphens: auto; }
+/* عنوان‌ها، دکمه‌ها، فیلدها، جدول‌ها و منو تراز دوطرفه نمی‌گیرن */
+h1, h2, h3, h4, button, .btn, input, select, textarea, th, td, .main-nav, .chips, .chip, .scale, .badge { text-align: start; }
 a { color: var(--brand-deep); }
 h1, h2, h3 { line-height: 1.4; margin: 0 0 0.5em; font-weight: 800; }
 h1 { font-size: 1.55rem; }

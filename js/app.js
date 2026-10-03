@@ -237,8 +237,52 @@
     var pk = unackedPainToday();
     if (pk) openPainModal(pk);
   }
-  // صفحه‌ی آموزش اسکرول رو خودش مدیریت می‌کنه (رفتن به بخش هدف)
-  window.addEventListener('hashchange', function () { var toGuide = location.hash === '#guide'; route(); if (!toGuide) window.scrollTo(0, 0); });
+  // ---------- تاریخچه‌ی ناوبری ----------
+  // هر ورودی تاریخچه (history.state) عمق، صفحه‌ی مبدأ، موقعیت اسکرول و وضعیت نما (روز انتخاب‌شده، هفته/ماه، بخش‌های باز) رو نگه می‌داره؛
+  // با برگشت (دکمه‌ی مرورگر یا دکمه‌ی داخل برنامه) همون صفحه، همون روز و همون اسکرول برمی‌گرده.
+  try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (e) { /* */ }
+  var navDepth = 0;
+  function navState() { var s = history.state; return s && typeof s === 'object' && s.depth != null ? s : null; }
+  function setNav(s) { try { history.replaceState(s, ''); } catch (e) { /* */ } }
+  function snapshot() {
+    var s = navState();
+    if (!s) return;
+    s.y = Math.round(window.scrollY || 0);
+    s.ui = { day: selectedDay, wk: viewWeekOffset, mo: monthOffset,
+      open: Array.prototype.map.call(app.querySelectorAll('details[open][id]'), function (d) { return d.id; }) };
+    setNav(s);
+  }
+  function restore(s) {
+    if (s.ui) { selectedDay = s.ui.day; viewWeekOffset = s.ui.wk || 0; monthOffset = s.ui.mo || 0; }
+    route();
+    if (s.ui && s.ui.open) s.ui.open.forEach(function (id) { var d = document.getElementById(id); if (d) d.open = true; });
+    var y = s.y || 0;
+    window.scrollTo(0, y);
+    // اگه چیدمان بعد از رندر کمی جابه‌جا شد، یک بار دیگه
+    requestAnimationFrame(function () { if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y); });
+  }
+  // ذخیره‌ی موقعیت پیش از ترک صفحه (کلیک روی هر لینک داخلی) و حین اسکرول
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="#"]');
+    if (a) snapshot();
+  }, true);
+  // بعد از توقف اسکرول (debounce؛ Safari تعداد replaceState رو محدود می‌کنه)
+  var snapTimer = null;
+  window.addEventListener('scroll', function () {
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(snapshot, 250);
+  }, { passive: true });
+  window.addEventListener('hashchange', function (e) {
+    var s = navState();
+    if (s) { navDepth = s.depth; restore(s); return; } // برگشت یا جلو به ورودی‌ای که قبلاً دیده شده
+    navDepth += 1;
+    var from = e.oldURL && e.oldURL.indexOf('#') >= 0 ? e.oldURL.slice(e.oldURL.indexOf('#')) : '#plan';
+    setNav({ depth: navDepth, from: from });
+    // صفحه‌ی راهنما اسکرول رو خودش مدیریت می‌کنه (رفتن به بخش هدف)
+    var toGuide = location.hash === '#guide';
+    route();
+    if (!toGuide) window.scrollTo(0, 0);
+  });
 
   // لینک «؟» کنار هر بخش → صفحه‌ی آموزش، با باز شدن همون قسمت
   var guideTarget = null;
@@ -271,7 +315,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=18" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=19" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -1312,6 +1356,21 @@
     var words = html.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(function (w) { return w; }).length;
     return Math.max(1, Math.ceil(words / 200));
   }
+  // دکمه‌ی برگشت مقاله: اگه از جای دیگه‌ای از برنامه اومده، همون‌جا (history.back با اسکرول و روز قبلی)؛ وگرنه فهرست مقاله‌ها
+  function learnBack() {
+    var s = navState(), from = s && s.depth > 0 ? s.from : null;
+    var key = !from ? 'list' : from.indexOf('#learn/') === 0 ? 'article' : from === '#learn' ? 'list'
+      : ['plan', 'fitness', 'checkin', 'race', 'guide', 'profile'].indexOf(from.slice(1)) >= 0 ? from.slice(1) : 'other';
+    if (from === '#' || from === '') key = 'plan';
+    return '<a class="learn-back" href="#learn"' + (from ? ' data-nav-back="1"' : '') + '>' + chevron(isRtl() ? 'right' : 'left') +
+      esc(T('learn.backTo.' + key)) + '</a>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-nav-back]');
+    if (!b) return;
+    var s = navState();
+    if (s && s.depth > 0) { e.preventDefault(); history.back(); }
+  });
   function renderLearn(id) {
     if (id && LEARN_ORDER.indexOf(id) < 0) id = null;
     var html;
@@ -1326,7 +1385,7 @@
     } else {
       var a = T('learn.articles.' + id);
       var others = LEARN_ORDER.filter(function (k) { return k !== id; });
-      html = '<article class="card learn-article"><p><a class="learn-back" href="#learn">' + chevron(isRtl() ? 'right' : 'left') + esc(T('learn.back')) + '</a></p>' +
+      html = '<article class="card learn-article"><p>' + learnBack() + '</p>' +
         '<h1>' + esc(a.title) + '</h1><p class="small muted">' + tt('learn.readMin', { n: readMinutes(a.body) }) + '</p>' +
         '<p class="lead">' + esc(a.summary) + '</p><div class="learn-body">' + a.body + '</div></article>' +
         '<nav class="card learn-others" aria-label="' + esc(T('learn.others')) + '"><h2>' + esc(T('learn.others')) + '</h2><ul>' +
@@ -1648,5 +1707,7 @@
   }
 
   applyStatic();
-  route();
+  // بارگذاری دوباره‌ی صفحه: وضعیت ذخیره‌شده‌ی همین ورودی تاریخچه برمی‌گرده
+  var initNav = navState();
+  if (initNav) { navDepth = initNav.depth; restore(initNav); } else { setNav({ depth: 0, from: null }); route(); }
 })();
