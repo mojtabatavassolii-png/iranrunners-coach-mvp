@@ -199,7 +199,7 @@
       '<p class="small muted">' + tt('cycle.today', { day: info.day, phase: T('cycle.phase.' + info.phase) }) + '</p>' +
       '<p>' + t(line) + '</p>' +
       '<div class="actions"><button type="button" class="btn btn-ghost" data-period-started="1">' + esc(T('cycle.started')) + '</button></div>' +
-      '<p class="small muted">' + esc(T('cycle.estimate')) + '</p></section>';
+      '<p class="small muted">' + esc(T('cycle.estimate')) + '</p>' + learnMore(['cycle']) + '</section>';
   }
   function unackedPainToday() {
     var k = C.dateKey(today());
@@ -210,7 +210,7 @@
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
+  var VIEWS = { plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
   function route() {
     var loginMode = !isEntered();
     document.body.classList.toggle('login-mode', loginMode);
@@ -220,7 +220,9 @@
       renderLogin();
       return;
     }
-    var v = (location.hash || '#plan').slice(1);
+    var v = (location.hash || '#plan').slice(1), sub = null;
+    // مقاله‌ی آموزش: #learn/<شناسه>
+    if (v.indexOf('learn/') === 0) { sub = v.slice(6); v = 'learn'; }
     if (!state.profile || needsMigration()) v = 'onboarding';
     if (!VIEWS[v]) v = 'plan';
     var nav = document.getElementById('main-nav');
@@ -231,7 +233,7 @@
     nav.querySelectorAll('a').forEach(function (a) {
       if (a.dataset.view === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
-    VIEWS[v]();
+    VIEWS[v](sub);
     var pk = unackedPainToday();
     if (pk) openPainModal(pk);
   }
@@ -269,7 +271,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=17" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=18" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -650,6 +652,7 @@
     if (s.how && s.type !== 'cancelled') html += '<p class="sess-how">' + t(s.how) + '</p>';
     if (s.talk && s.type !== 'cancelled') html += '<p class="talk-test">' + t(s.talk) + '</p>';
     if (s.cheer) html += '<p class="cheer">' + t(s.cheer) + '</p>';
+    if (s.type !== 'cancelled') html += learnMore(SESSION_LEARN[s.type]);
     if (opts.hint && s.easyEffort && s.type !== 'walkrun') html += '<p class="day-hint">' + t(opts.hint.message) + '</p>';
     if (opts.key) html += postRunBlock(opts.key, s, opts.prefix || 'p');
     return html;
@@ -673,7 +676,7 @@
     var h = '<form class="postrun" data-postrun-form="' + key + '" data-type="' + s.type + '" novalidate>' +
       '<p class="sub-legend">' + esc(T('post.q1')) + '</p><div class="scale scale10" role="radiogroup" aria-label="' + esc(T('post.rpeAria')) + '">';
     for (var i = 1; i <= 10; i++) h += '<label class="scale-opt"><input type="radio" name="rpe" id="' + n + '-' + i + '" value="' + i + '"><span>' + fa(i) + '</span></label>';
-    h += '</div><div class="scale-ends"><span>' + esc(T('post.low')) + '</span><span>' + esc(T('post.high')) + '</span></div>';
+    h += '</div><div class="scale-ends"><span>' + esc(T('post.low')) + '</span><span>' + esc(T('post.high')) + '</span></div>' + learnMore(['rpe']);
     if (s.type !== 'runwalk' && s.type !== 'walkrun') {
       h += '<p class="sub-legend">' + esc(T('post.q2')) + '</p><div class="chips">' +
         '<label class="chip"><input type="radio" name="pace" value="ok"><span>' + esc(T('post.ok')) + '</span></label>' +
@@ -811,7 +814,7 @@
           (week.goal && week.goal.category === 'ultra' && week.vert ? '<small class="period-tag">' + tt('week.vert', { n: week.vert }) + '</small>' : '') + '</div>') +
       (zero ? '' : '<div class="stat stat-ratio"><span>' + esc(T('week.ratio')) + ' ' + helpLink('week', T('week.ratioHelp')) + '</span><b dir="ltr">' + fa(100 - week.hardPct) + ' / ' + fa(week.hardPct) + '</b>' +
       '<div class="ratio-bar" aria-hidden="true"><i style="width:' + (100 - week.hardPct) + '%"></i></div></div>') +
-      '</div>';
+      '</div>' + learnMore(zero ? ['tenpct'] : ['eighty', 'tenpct']);
 
     var keys = week.days.map(function (d) { return d.date; });
     if (keys.indexOf(selectedDay) < 0) {
@@ -1288,7 +1291,52 @@
   }
 
   // =====================================================================
-  // آموزش: همه‌ی توضیح‌ها یک‌جا، بخش به بخش (محتوا از دیکشنری)
+  // آموزش: مقاله‌های کوتاه علمی (محتوا از js/i18n/learn-*.js)، هر مقاله در #learn/<شناسه>
+  // =====================================================================
+  var LEARN_ORDER = ['vdot', 'rpe', 'eighty', 'types', 'fartleks', 'tenpct', 'warmup', 'cycle'];
+  // مقاله‌های مرتبط با هر نوع جلسه (لینک «بیشتر بدان» زیر جلسه)
+  var SESSION_LEARN = {
+    easy: ['eighty', 'rpe'], long: ['eighty', 'rpe'], runwalk: ['tenpct', 'rpe'], walkrun: ['tenpct', 'rpe'],
+    tempo: ['types', 'vdot', 'warmup'], interval: ['types', 'vdot', 'warmup'], reps: ['types', 'vdot', 'warmup'],
+    fartlek: ['fartleks', 'types', 'warmup'], hills: ['types', 'warmup'], race: ['vdot', 'warmup']
+  };
+  function learnTitle(id) { return T('learn.articles.' + id + '.title'); }
+  function learnMore(ids) {
+    if (!ids || !ids.length) return '';
+    return '<p class="learn-more"><span>' + esc(T('learn.more')) + '</span> ' + ids.map(function (id) {
+      return '<a href="#learn/' + id + '">' + esc(learnTitle(id)) + '</a>';
+    }).join('<span class="sep" aria-hidden="true"> · </span>') + '</p>';
+  }
+  // زمان مطالعه از تعداد کلمه‌ها (حدود ۲۰۰ کلمه در دقیقه)
+  function readMinutes(html) {
+    var words = html.replace(/<[^>]+>/g, ' ').split(/\s+/).filter(function (w) { return w; }).length;
+    return Math.max(1, Math.ceil(words / 200));
+  }
+  function renderLearn(id) {
+    if (id && LEARN_ORDER.indexOf(id) < 0) id = null;
+    var html;
+    if (!id) {
+      html = '<section class="card"><h1>' + esc(T('learn.title')) + '</h1><p class="lead">' + T('learn.intro') + '</p></section>' +
+        '<ul class="learn-list" aria-label="' + esc(T('learn.listAria')) + '">' + LEARN_ORDER.map(function (k, i) {
+          var a = T('learn.articles.' + k);
+          return '<li><a class="card learn-item" href="#learn/' + k + '"><span class="learn-num" aria-hidden="true">' + fa(i + 1) + '</span>' +
+            '<span class="learn-text"><b>' + esc(a.title) + '</b><span class="small muted">' + esc(a.summary) + '</span>' +
+            '<span class="learn-time">' + tt('learn.readMin', { n: readMinutes(a.body) }) + '</span></span></a></li>';
+        }).join('') + '</ul>';
+    } else {
+      var a = T('learn.articles.' + id);
+      var others = LEARN_ORDER.filter(function (k) { return k !== id; });
+      html = '<article class="card learn-article"><p><a class="learn-back" href="#learn">' + chevron(isRtl() ? 'right' : 'left') + esc(T('learn.back')) + '</a></p>' +
+        '<h1>' + esc(a.title) + '</h1><p class="small muted">' + tt('learn.readMin', { n: readMinutes(a.body) }) + '</p>' +
+        '<p class="lead">' + esc(a.summary) + '</p><div class="learn-body">' + a.body + '</div></article>' +
+        '<nav class="card learn-others" aria-label="' + esc(T('learn.others')) + '"><h2>' + esc(T('learn.others')) + '</h2><ul>' +
+        others.map(function (k) { return '<li><a href="#learn/' + k + '">' + esc(learnTitle(k)) + '</a></li>'; }).join('') + '</ul></nav>';
+    }
+    app.innerHTML = html;
+  }
+
+  // =====================================================================
+  // راهنما: همه‌ی توضیح‌ها یک‌جا، بخش به بخش (محتوا از دیکشنری)
   // =====================================================================
   var GUIDE_ORDER = ['start', 'levels', 'week', 'sessions', 'intensity', 'fitness', 'checkin', 'goals', 'cycle', 'places', 'data'];
   function guideSections() {
@@ -1344,7 +1392,7 @@
     var fit = C.currentFitness(p);
     var rem = C.fitnessReminder(p, now);
     var hr = C.hrZones(p);
-    var html = '<section class="card"><h1>' + esc(T('fit.title')) + ' ' + helpLink('fitness', T('fit.help')) + '</h1>';
+    var html = '<section class="card"><h1>' + esc(T('fit.title')) + ' ' + helpLink('fitness', T('fit.help')) + '</h1>' + learnMore(['vdot']);
     if (fit) {
       var e = fit.entry, weeks = Math.floor(C.daysBetween(C.parseDate(e.date), now) / 7);
       html += '<div class="fit-head"><div class="vdot-badge"><b>' + t(fit.vdot.toFixed(1)) + '</b><small>VDOT</small></div><div>' +

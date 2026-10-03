@@ -736,4 +736,36 @@ test('برنامه به انگلیسی: هیچ متن فارسی در جلسه�
   assert.strictEqual(C.TYPE_INFO.tempo.label, 'تمپو');
 });
 
+test('بخش آموزش: هشت مقاله‌ی دوزبانه با ساختار و طول یکسان', function () {
+  var lf = require('../js/i18n/learn-fa.js'), le = require('../js/i18n/learn-en.js');
+  var ids = ['vdot', 'rpe', 'eighty', 'types', 'fartleks', 'tenpct', 'warmup', 'cycle'];
+  assert.deepStrictEqual(Object.keys(lf.articles), ids);
+  assert.deepStrictEqual(Object.keys(le.articles), ids);
+  assert.deepStrictEqual(Object.keys(lf).sort(), Object.keys(le).sort());
+  function words(html) {
+    return html.replace(/<p class="learn-src">[\s\S]*?<\/p>/, '').replace(/<[^>]+>/g, ' ').split(/\s+/).filter(function (w) { return /[\p{L}\p{N}]/u.test(w); }).length;
+  }
+  ids.forEach(function (id) {
+    [lf, le].forEach(function (d) {
+      var a = d.articles[id];
+      assert(a.title && a.summary && a.body, id);
+      var n = words(a.body);
+      assert(n >= 300 && n <= 500, id + ': ' + n + ' کلمه');
+      assert(/<h3>/.test(a.body) && /class="learn-src"/.test(a.body), id);
+      // HTML متوازن (بدون تگ باز مونده)
+      ['p', 'ul', 'li', 'h3', 'b', 'i'].forEach(function (tag) {
+        var open = (a.body.match(new RegExp('<' + tag + '[ >]', 'g')) || []).length, close = (a.body.match(new RegExp('</' + tag + '>', 'g')) || []).length;
+        assert.strictEqual(open, close, id + ' <' + tag + '>');
+      });
+    });
+    assert.strictEqual(lf.articles[id].body.split('<h3>').length, le.articles[id].body.split('<h3>').length, id + ': تعداد زیرعنوان‌ها');
+    assert(!/[؀-ۿ]/.test(JSON.stringify(le.articles[id])), id + ': متن فارسی در نسخه‌ی انگلیسی');
+  });
+  // در دسترس از طریق t()
+  var I = C.i18n;
+  assert.strictEqual(I.t('learn.articles.vdot.title'), lf.articles.vdot.title);
+  I.setLang('en', false);
+  try { assert.strictEqual(I.t('learn.readMin', { n: 2 }), '2 min read'); } finally { I.setLang('fa', false); }
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

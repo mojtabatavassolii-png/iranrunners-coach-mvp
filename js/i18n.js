@@ -11,6 +11,8 @@
   var lang = 'fa';
 
   function register(code, dict) { dicts[code] = dict; }
+  // افزودن یک بخش جدا (مثل مقاله‌های آموزش) به دیکشنری یک زبان
+  function extend(code, key, part) { (dicts[code] = dicts[code] || {})[key] = part; }
 
   function lookup(code, key) {
     var v = dicts[code];
@@ -85,12 +87,14 @@
     return f ? f.format(d) : num(d.getFullYear() + '-' + (d.getMonth() + 1));
   }
 
-  var api = { register: register, t: t, has: has, getLang: getLang, setLang: setLang, savedLang: savedLang, dir: dir, num: num, date: date,
+  var api = { register: register, extend: extend, t: t, has: has, getLang: getLang, setLang: setLang, savedLang: savedLang, dir: dir, num: num, date: date,
     monthTitle: monthTitle, setCalendar: setCalendar, getCalendar: getCalendar, LANGS: LANGS };
 
   if (typeof module !== 'undefined' && module.exports) {
     register('fa', require('./i18n/fa.js'));
     register('en', require('./i18n/en.js'));
+    extend('fa', 'learn', require('./i18n/learn-fa.js'));
+    extend('en', 'learn', require('./i18n/learn-en.js'));
     module.exports = api;
   } else {
     root.CoachI18n = api;

@@ -580,3 +580,32 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .sess-mainset { background: var(--card); border: 1.5px solid var(--line); }
 .sess-cooldown { background: var(--c-long-bg); border-inline-start: 4px solid var(--c-long); }
 .sess-cooldown h4 { color: var(--c-long-ink); }
+
+/* ---------- آموزش: مقاله‌ها و لینک «بیشتر بدان» ---------- */
+.learn-more { font-size: 0.86rem; color: var(--muted); margin: 10px 0 0; line-height: 1.9; }
+.learn-more > span:first-child { font-weight: 600; margin-inline-end: 4px; }
+.learn-more a { color: var(--brand-deep); font-weight: 600; text-decoration: underline; text-decoration-color: var(--brand-light); text-underline-offset: 3px; }
+.learn-more a:hover { text-decoration-color: currentColor; }
+.learn-more .sep { color: var(--faint); }
+.lead { color: var(--muted); font-size: 1rem; line-height: 1.9; margin: 6px 0 0; }
+.learn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.learn-item { display: flex; gap: 14px; align-items: flex-start; text-decoration: none; color: inherit; margin: 0; transition: border-color .15s, transform .15s; border: 1px solid var(--line); }
+.learn-item:hover { border-color: var(--brand); transform: translateY(-1px); }
+.learn-item:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.learn-num { flex: none; display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 50%; background: var(--brand-soft); color: var(--brand-deep); font-weight: 700; }
+.learn-text { display: grid; gap: 4px; min-width: 0; }
+.learn-text b { font-size: 1.05rem; color: var(--text); }
+.learn-time { font-size: 0.78rem; color: var(--brand-deep); font-weight: 600; }
+.learn-back { display: inline-flex; align-items: center; gap: 4px; color: var(--brand-deep); font-weight: 600; text-decoration: none; }
+.learn-back .chev { width: 18px; height: 18px; }
+.learn-article h1 { margin-bottom: 2px; }
+.learn-body { margin-top: 8px; line-height: 2; }
+[dir=ltr] .learn-body { line-height: 1.75; }
+.learn-body h3 { margin: 22px 0 6px; font-size: 1.08rem; color: var(--brand-deep); }
+.learn-body ul { padding-inline-start: 22px; margin: 6px 0 10px; }
+.learn-body li { margin-bottom: 6px; }
+.learn-body .learn-src { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 0.82rem; color: var(--muted); line-height: 1.8; }
+.learn-others ul { margin: 6px 0 0; padding-inline-start: 22px; columns: 2 220px; }
+.learn-others li { margin-bottom: 6px; break-inside: avoid; }
+.learn-others a { color: var(--brand-deep); }
+.learn-others h2 { font-size: 1rem; }

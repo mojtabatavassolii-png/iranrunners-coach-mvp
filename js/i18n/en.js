@@ -358,7 +358,7 @@
       tagline: 'Your running plan · beta',
       metaDescription: 'Be Your Own Coach: a weekly running plan built on fixed training rules, no server.',
       navAria: 'Sections',
-      nav: { plan: 'Plan', checkin: 'Today\'s check-in', fitness: 'Fitness', race: 'Race goal', guide: 'Guide', profile: 'Profile' },
+      nav: { plan: 'Plan', checkin: 'Today\'s check-in', fitness: 'Fitness', race: 'Race goal', learn: 'Learn', guide: 'Guide', profile: 'Profile' },
       langSwitch: 'فارسی',
       langSwitchAria: 'Switch language to Persian',
       bannerAria: 'Medical notice',
