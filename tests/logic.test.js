@@ -255,16 +255,89 @@ test('Riegel و تبدیل زمان', function () {
 });
 
 // ---------- چک‌این ----------
-test('چک‌این: خستگی بالا → جلسه‌ی سخت به ایزی تبدیل می‌شه', function () {
-  var hard = weekAt(profileFor(6), 0).days.find(function (s) { return s.hard; });
-  var r = C.adaptSession(hard, { fatigue: 4, sleep: 4, pain: false }, null);
-  assert.strictEqual(r.session.type, 'easy');
-  assert(r.session.km <= hard.km);
+// پروفایل سناریو: شنبه، سه‌شنبه، پنجشنبه، جمعه → اینتروال سه‌شنبه
+function adaptProfile(over) {
+  return Object.assign({ age: 33, weightKg: 68, heightCm: 175, days: [0, 3, 5, 6], locations: ['park'], injury: '', currentWeeklyKm: 45, lastWeekKm: 45, monthAvgKm: 45,
+    experience: 'gt3y', structured: true, schemaVersion: 3, goal: goalOf('10', '2027-02-12'), pb: { distanceKm: 10, timeSec: hms(0, 44), date: '2026-09-01' }, startDate: '2026-09-26' }, over || {});
+}
+var ADAPT_TUE = '2026-10-06';
+function adaptOn(p, key, checkins) {
+  return C.adaptSession(C.sessionFor(p, C.parseDate(key)), checkins[key], null, C.paceZones(p), { profile: p, checkins: checkins });
+}
+function ck(f, sl, extra) { return Object.assign({ fatigue: f, sleep: sl, pain: false }, extra || {}); }
+test('چک‌این: درجه‌بندی تطبیق متناسب با شدت علائم', function () {
+  var p = adaptProfile(), base = C.sessionFor(p, C.parseDate(ADAPT_TUE));
+  assert.strictEqual(base.type, 'interval');
+  var on = function (c) { var m = {}; m[ADAPT_TUE] = c; return adaptOn(p, ADAPT_TUE, m); };
+  // خفیف: همون اینتروال با حجم کمتر
+  var mild = on(ck(3, 4));
+  assert.strictEqual(mild.adaptation.tier, 'mild');
+  assert.strictEqual(mild.session.type, 'interval');
+  assert(mild.session.hardKm < base.hardKm);
+  // متوسط (یک روز خستگی ۴ تصادفی): همون اینتروال، سبک‌تر از خفیف، با استراحت بیشتر
+  var mod = on(ck(4, 4));
+  assert.strictEqual(mod.adaptation.tier, 'moderate');
+  assert.strictEqual(mod.session.type, 'interval');
+  assert(mod.session.hardKm < mild.session.hardKm);
+  assert(mod.session.steps.some(function (x) { return /۵۰٪/.test(x); }));
+  // جدی: ایزی ران، و با خواب بد هم: استراحت فعال
+  assert.strictEqual(on(ck(5, 4)).session.type, 'easy');
+  assert.strictEqual(on(ck(5, 2)).session.type, 'rest');
+  // بدون علائم: بدون تغییر
+  assert.strictEqual(on(ck(2, 4)).adaptation, null);
 });
-test('چک‌این: خواب بد دو شب پشت‌سرهم → تبدیل؛ یک شب → بدون تغییر', function () {
+test('چک‌این: تاریخچه‌ی روزهای قبل واکنش رو تغییر می‌ده', function () {
+  var p = adaptProfile(), m = {};
+  // خستگی ۴ + خواب ضعیف + دو چک‌این قبلی خسته → تمپوی ملایم (نه ایزی، نه همون اینتروال)
+  m['2026-10-04'] = ck(3, 3); m['2026-10-05'] = ck(3, 3); m[ADAPT_TUE] = ck(4, 2, { hours: 5.5 });
+  var r = adaptOn(p, ADAPT_TUE, m);
+  assert.strictEqual(r.adaptation.tier, 'moderate');
+  assert.strictEqual(r.session.type, 'tempo');
+  assert(/5\.5/.test(r.adaptation.why) && /4/.test(r.adaptation.why), r.adaptation.why);
+  // خستگی بالا سه روز پشت‌سرهم → جدی
+  var m2 = {}; m2['2026-10-04'] = ck(4, 3); m2['2026-10-05'] = ck(4, 3); m2[ADAPT_TUE] = ck(4, 3);
+  var r2 = adaptOn(p, ADAPT_TUE, m2);
+  assert.strictEqual(r2.adaptation.tier, 'severe');
+  assert(['easy', 'rest'].indexOf(r2.session.type) >= 0);
+  // خواب: یک شب بد → خفیف (همون نوع)، دو شب → متوسط (نه ایزی)
+  var m3 = {}; m3[ADAPT_TUE] = ck(2, 2);
+  assert.strictEqual(adaptOn(p, ADAPT_TUE, m3).adaptation.tier, 'mild');
+  assert.strictEqual(adaptOn(p, ADAPT_TUE, m3).session.type, 'interval');
+  m3['2026-10-05'] = ck(2, 1);
+  var r3 = adaptOn(p, ADAPT_TUE, m3);
+  assert.strictEqual(r3.adaptation.tier, 'moderate');
+  assert.notStrictEqual(r3.session.type, 'easy');
+  // سازگاری با فراخوانی قدیمی (بدون تاریخچه)
   var hard = weekAt(profileFor(6), 0).days.find(function (s) { return s.hard; });
-  assert.strictEqual(C.adaptSession(hard, { fatigue: 2, sleep: 2 }, { sleep: 1 }).session.type, 'easy');
   assert.strictEqual(C.adaptSession(hard, { fatigue: 2, sleep: 2 }, { sleep: 4 }).session.type, hard.type);
+});
+test('چک‌این: توضیح علت و معلول، اثر روی هفته، جبران جزئی و خلاصه', function () {
+  var p = adaptProfile(), m = {};
+  m['2026-10-04'] = ck(3, 3); m['2026-10-05'] = ck(3, 3); m[ADAPT_TUE] = ck(4, 2);
+  var a = adaptOn(p, ADAPT_TUE, m).adaptation;
+  assert(a.why && a.action && a.impact, JSON.stringify(a));
+  assert.strictEqual(a.impactKind, 'makeup');
+  assert.strictEqual(a.makeupDay, '2026-10-08');
+  // پنجشنبه با حال خوب: افزودنی اختیاری استراید
+  m['2026-10-08'] = ck(2, 4);
+  var thu = adaptOn(p, '2026-10-08', m);
+  assert.strictEqual(thu.adaptation, null);
+  assert(thu.session.makeup && /استراید/.test(thu.session.makeup.text));
+  // پنجشنبه هنوز خسته: افزودنی نداره
+  m['2026-10-08'] = ck(3, 3);
+  assert(!adaptOn(p, '2026-10-08', m).session.makeup);
+  // نزدیک مسابقه: اطمینان‌دادن، بدون جبران
+  var pr = adaptProfile({ goal: goalOf('10', '2026-10-15') }), m4 = {};
+  var raceTue = '2026-10-06';
+  m4[raceTue] = ck(4, 4);
+  var ar = adaptOn(pr, raceTue, m4);
+  if (ar.adaptation && ar.adaptation.kind === 'downgrade') assert.strictEqual(ar.adaptation.impactKind, 'raceNear');
+  // خلاصه‌ی هفته
+  var done = { '2026-10-03': true };
+  var sum = C.weekAdaptSummary(p, m, done, C.parseDate(ADAPT_TUE));
+  assert.strictEqual(sum.asPlanned, 1);
+  assert.strictEqual(sum.adapted, 1);
+  assert(/۱۰ کیلومتر/.test(sum.text) && /درسته/.test(sum.text), sum.text);
 });
 test('چک‌این: درد → لغو با پیام دقیق', function () {
   var r = C.adaptSession(weekAt(profileFor(5), 0).days[0], { fatigue: 1, sleep: 5, pain: true }, null);

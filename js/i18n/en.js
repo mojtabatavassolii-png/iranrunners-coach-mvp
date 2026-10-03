@@ -319,12 +319,66 @@
     painMessage: 'This could be a sign of injury. The coach can\'t diagnose this. Please see a doctor.',
     adapt: {
       noTrain: 'Don\'t train today',
-      whyFatigue: 'Your fatigue is high ({n} out of 5)',
-      whySleep: 'You\'ve slept badly two nights in a row',
       race: '{why}. It\'s race day; make your goal "finish feeling good", not a PB. If you don\'t feel well, skipping it is also the right call.',
-      downgrade: '{why}, so today\'s {label} session was changed to a shorter easy run. Hard training on a tired body raises the risk of injury and brings less benefit. Check in again tomorrow.',
-      note: '{why}. Today\'s session is easy and hasn\'t changed, but if you\'re very tired, cut it short{extra} or rest.',
-      noteDouble: ' (for example, skip the evening run)'
+      tier: { mild: 'Light adjustment', moderate: 'Moderate adjustment', severe: 'Major adjustment' },
+      changed: 'Today\'s session was adjusted', kept: 'Session unchanged, with one tip',
+      whyL: 'Why?', actL: 'Decision:', impactL: 'Effect on your week and goal:',
+      because: 'Because {reasons},',
+      comma: ', ', and: ' and ',
+      r: {
+        fatigue: 'your fatigue today was {n} out of 5',
+        sleep: 'last night\'s sleep was poor ({n} out of 5)',
+        hours: 'you slept only {n} hours last night',
+        sleepStreak: 'you\'ve had {n} nights of poor sleep in a row',
+        streak3: { one: 'you were also a little tired at your previous check-in', other: 'you were also a little tired at your previous {n} check-ins' },
+        streak4: { one: 'your fatigue was also high at your previous check-in', other: 'your fatigue was also high at your previous {n} check-ins' }
+      },
+      mean: {
+        mild: 'your body is a little tired but still ready to train.',
+        moderate: 'this combination shows your body hasn\'t fully recovered yet.',
+        severe: 'this level of fatigue means your body needs recovery more than anything right now.',
+        accum: ' Fatigue has built up over several days, so today\'s response is stronger than it would be for one random tired day.'
+      },
+      risk: {
+        hard: 'If you do the full {label} session today, your injury risk goes up and the quality of the rest of the week\'s sessions drops.',
+        long: 'A full long run on a tired body needs days of recovery and weakens the rest of the week.',
+        easy: 'Even easy running, if long, delays recovery on a very tired body.',
+        mildHard: 'The full session is still possible, but a small cut keeps its quality and speeds up your recovery.'
+      },
+      act: {
+        fewer: 'Instead, do a lighter version of the same session: {main}. The session type and its purpose stay, just with less strain.',
+        fewerRest: ' Take about 50% more rest between reps.',
+        mildTempo: 'Instead, run a mild tempo: {main}. It still gives a training stimulus, but tires you far less than {label}.',
+        shorterLong: 'Instead, run a shorter long run: {km} km instead of {orig}, at a fully easy effort.',
+        shorterEasy: 'Shorten the session: {km} km instead of {orig}, at a very easy effort.',
+        easy: 'Instead, run a short {km} km easy run at a very easy effort.',
+        rest: 'Active rest today: 20–30 minutes of light walking or gentle movement. Your body gets stronger through recovery, not by training on fatigue.',
+        keepHard: 'The session stays. If the first rep or block feels harder than usual, drop one rep (or a few minutes of the fast part).',
+        keepLong: 'The session stays; keep the effort fully easy and drop the last few kilometres if the second half feels heavy.',
+        keepEasy: 'Today\'s session is easy and hasn\'t changed; keep the effort truly gentle and cut it short if you don\'t feel good.',
+        rwShorter: 'Today, do only about two-thirds of the session and walk the rest.',
+        dropPm: ' If today is a double day, skip the evening run.'
+      },
+      moreRestStep: 'Take about 50% more rest than usual between reps (easy jog).',
+      impact: {
+        raceNear: 'Your race is {n} days away. This change is small and won\'t have much effect on your readiness; your fitness was built over the past weeks, and now being fresh matters more than one session. Don\'t worry.',
+        tiny: 'This change is small and has no noticeable effect on this week\'s goals.',
+        makeup: 'This change took away part of this week\'s training. If you feel back to normal by {day} (fatigue 2 or lower and good sleep), {what} will be added to that day\'s easy run to make up part of it; a full make-up isn\'t needed or recommended.',
+        noRoom: 'There\'s no good opportunity to make it up this week, and there\'s no need: one lighter session doesn\'t change your multi-week training trend. Next week continues as planned.',
+        persist: ' If this fatigue continues for a few more days, look at your sleep, nutrition and stress, and see a doctor if it persists.'
+      },
+      what: { strides: '6 × 20 s strides (full recovery)', steady: '10 minutes at a steady effort (RPE 5–6)', km: 'about {n} km' },
+      makeupBox: {
+        title: 'Optional add-on',
+        text: 'Since you feel good today, you can add {what} at the end of this session to make up part of {day}\'s lighter training. It\'s optional; skip it if you don\'t feel good.'
+      },
+      summary: {
+        line: 'Your week so far: {a} as planned, {b} adjusted to how you felt.',
+        n: { one: '{n} session', other: '{n} sessions' },
+        ok: ' Your overall path toward {goal} is still on track.',
+        many: ' Several sessions this week were lightened; that\'s the right response, but if the fatigue continues, take next week easier. Your path toward {goal} can still be kept.'
+      },
+      goal: { race: 'the {race} on {date}', general: 'your overall fitness' }
     },
     warn: {
       structured: 'Since you haven\'t done structured training yet, the quality sessions in the first 4 weeks are simpler (gentle tempo and short intervals); after that you reach your full level.',
@@ -585,6 +639,7 @@
       ctaBtn: 'Pre-run check-in',
       preview: 'Preview the planned session',
       summary: 'Today\'s check-in: fatigue {f}/5 · sleep {s}/5 · pain: {p}',
+      hours: ' · {n} h of sleep',
       edit: 'Edit check-in',
       done: 'I did it',
       doneDone: '✓ Done'
@@ -642,6 +697,8 @@
       fLow: '1 = fresh',
       fHigh: '5 = very tired',
       sleepQ: 'Last night\'s sleep quality',
+      hoursQ: 'How many hours did you sleep? (optional)',
+      hoursPh: 'e.g. 7',
       sLow: '1 = very poor',
       sHigh: '5 = excellent',
       painQ: 'Do you feel any pain right now?',
@@ -650,7 +707,7 @@
       painNote: 'This means real pain (sharp, localised, or pain that gets worse when running), not general muscle soreness after training.',
       submit: 'Save check-in',
       err: { fatigue: 'Choose your fatigue level.', sleep: 'Choose your sleep quality.', pain: 'Answer the pain question.', where: 'Tell us where it hurts.' },
-      toastDown: 'Today\'s session was changed to an easy run.',
+      toastDown: 'Today\'s session was adjusted to your check-in; see why.',
       toastOk: 'Check-in saved.'
     },
     race: {
@@ -938,8 +995,12 @@
         },
         checkin: {
           title: 'Check-in and automatic adjustment',
-          body: '<ul><li><b>Fatigue 4 or 5</b>, or <b>two bad nights of sleep in a row</b> → today\'s hard session becomes a shorter easy run.</li>' +
-            '<li>Moderate fatigue or one bad night → the session stays, but you\'re advised to run the slower half of the easy range.</li>' +
+          body: '<p>Adjustments are graded and also take your last few check-ins into account (several tired days in a row are treated more seriously than one random tired day):</p>' +
+            '<ul><li><b>Light</b> (fatigue 3 or one poor night): the same session with less volume or fewer reps.</li>' +
+            '<li><b>Moderate</b> (fatigue 4, two poor nights, or fatigue 3 over several days): a lighter version of the same session with more rest; if several factors stack up, a mild tempo.</li>' +
+            '<li><b>Major</b> (fatigue 5, very poor sleep several nights running, or high fatigue over several days): a short easy run or active rest.</li>' +
+            '<li>Every adjustment shows its reason (cause, meaning, risk), the decision, its effect on your week and goal, and a weekly summary. If a hard session was lightened and you feel good later that week, a small optional add-on is suggested to make up part of it; close to a race no make-up is needed, and that\'s said plainly.</li>' +
+            '<li>Sleep hours in the check-in are optional; under 6 hours counts as poor sleep.</li>' +
             '<li><b>Pain</b> → today\'s session is cancelled and the message "{pain}" is shown, which only closes when you confirm it.</li>' +
             '<li>On race day the session doesn\'t change; you just get a reminder to aim to "finish feeling good".</li>' +
             '<li>After an easy run: if the effort was above 6 or the pace felt hard, you\'ll see a suggestion to slow your easy pace.</li></ul>'

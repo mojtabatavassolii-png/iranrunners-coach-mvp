@@ -674,3 +674,17 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .adh-legend li { display: flex; align-items: center; gap: 8px; text-align: start; }
 .adh-legend span { flex: 1; color: var(--muted); }
 .adh-legend b { font-weight: 700; }
+
+/* ---------- تطبیق درجه‌بندی‌شده با چک‌این ---------- */
+.adapt-box p { margin: 0 0 8px; }
+.adapt-box p:last-child { margin-bottom: 0; }
+.adapt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.adapt-tier { display: inline-block; font-size: 0.78rem; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: var(--c-tempo-bg); color: var(--c-tempo-ink); }
+.adapt-severe .adapt-tier { background: var(--accent-soft); color: var(--accent-deep); }
+.adapt-mild .adapt-tier { background: var(--brand-soft); color: var(--brand-deep); }
+.adapt-sum { border-top: 1px solid var(--line); padding-top: 8px; font-weight: 600; }
+.makeup-box { background: var(--brand-soft); border: 1px solid var(--brand-light); border-radius: 12px; padding: 10px 14px; margin: 10px 0; }
+.makeup-box strong { color: var(--brand-deep); }
+.makeup-box p { margin: 4px 0 0; }
+.field-inline { margin-top: 10px; max-width: 320px; }
+.field-inline input { max-width: 140px; }

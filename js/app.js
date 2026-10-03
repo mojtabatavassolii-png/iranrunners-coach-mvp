@@ -133,7 +133,7 @@
   }
   function effectiveSession(base) {
     var ci = state.checkins[base.date];
-    return withCycle(C.adaptSession(base, ci, prevCheckin(base.date), C.paceZones(state.profile)));
+    return withCycle(C.adaptSession(base, ci, prevCheckin(base.date), C.paceZones(state.profile), { profile: state.profile, checkins: state.checkins }));
   }
   // چرخه‌ی قاعدگی: فقط پیشنهاد؛ جلسه فقط با انتخاب خود کاربر (adapt / rest) عوض می‌شه
   function withCycle(r) {
@@ -315,7 +315,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=20" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=21" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -693,6 +693,7 @@
       html += '<div class="sess-phase sess-cooldown"><h4>' + esc(T('sess.cooldown')) + '</h4><ul>' +
         s.cooldown.lines.map(function (x) { return '<li>' + t(x) + '</li>'; }).join('') + '</ul></div>';
     }
+    if (s.makeup) html += '<div class="makeup-box"><strong>' + esc(T('adapt.makeupBox.title')) + '</strong><p>' + t(s.makeup.text) + '</p></div>';
     if (s.how && s.type !== 'cancelled') html += '<p class="sess-how">' + t(s.how) + '</p>';
     if (s.talk && s.type !== 'cancelled') html += '<p class="talk-test">' + t(s.talk) + '</p>';
     if (s.cheer) html += '<p class="cheer">' + t(s.cheer) + '</p>';
@@ -751,8 +752,15 @@
         '<p class="small">' + esc(T('pain.noRun')) + '</p></div>';
     }
     var cls = ad.kind === 'downgrade' ? 'alert-adapt' : 'alert-note';
-    return '<div class="alert ' + cls + '" role="status">' +
-      (ad.kind === 'downgrade' ? '<strong>' + esc(T('adaptBox.changed')) + '</strong>' : '') + '<p>' + t(ad.message) + '</p></div>';
+    if (!ad.tier || !ad.action) return '<div class="alert ' + cls + '" role="status"><p>' + t(ad.message) + '</p></div>';
+    // تطبیق درجه‌بندی‌شده: چرا → تصمیم → اثر روی هفته و هدف → خلاصه‌ی هفته
+    var sum = C.weekAdaptSummary(state.profile, state.checkins, state.done, C.parseDate(key));
+    return '<div class="alert ' + cls + ' adapt-box adapt-' + ad.tier + '" role="status">' +
+      '<p class="adapt-head"><span class="adapt-tier">' + esc(T('adapt.tier.' + ad.tier)) + '</span> <strong>' + esc(T(ad.kind === 'downgrade' ? 'adapt.changed' : 'adapt.kept')) + '</strong></p>' +
+      '<p><b>' + esc(T('adapt.whyL')) + '</b> ' + t(ad.why) + '</p>' +
+      '<p><b>' + esc(T('adapt.actL')) + '</b> ' + t(ad.action) + '</p>' +
+      (ad.impact ? '<p><b>' + esc(T('adapt.impactL')) + '</b> ' + t(ad.impact) + '</p>' : '') +
+      (ad.kind === 'downgrade' ? '<p class="adapt-sum">' + t(sum.text) + '</p>' : '') + '</div>';
   }
 
   function todayCard() {
@@ -789,6 +797,7 @@
       adaptationBox(r.adaptation, key) + cycleBox(r, key, key) +
       (s.type !== 'cancelled' ? sessionBody(s, { key: key, prefix: 'today', hint: C.easyDayHint(ci, prevCheckin(key)) }) : '') +
       '<p class="small muted">' + tt('today.summary', { f: ci.fatigue, s: ci.sleep, p: T(ci.pain ? 'app.yes' : 'app.no') }) +
+      (ci.hours ? tt('today.hours', { n: ci.hours }) : '') +
       (ci.pain ? '' : ' · <a href="#checkin">' + esc(T('today.edit')) + '</a>') + '</p>';
     return html + '</section>';
   }
@@ -1191,7 +1200,9 @@
       '<p class="muted">' + esc(T('checkin.planned', { day: base.dayName, date: faDate(key) })) + ' ' + badge(base.type, base.label) + ' ' + t(base.target) + '</p>' +
       '<form id="ci-form" novalidate>' +
       '<fieldset><legend>' + esc(T('checkin.fatigueQ')) + '</legend>' + scale('fatigue', T('checkin.fatigueQ'), T('checkin.fLow'), T('checkin.fHigh'), ci.fatigue) + '</fieldset>' +
-      '<fieldset><legend>' + esc(T('checkin.sleepQ')) + '</legend>' + scale('sleep', T('checkin.sleepQ'), T('checkin.sLow'), T('checkin.sHigh'), ci.sleep) + '</fieldset>' +
+      '<fieldset><legend>' + esc(T('checkin.sleepQ')) + '</legend>' + scale('sleep', T('checkin.sleepQ'), T('checkin.sLow'), T('checkin.sHigh'), ci.sleep) +
+      '<div class="field field-inline"><label for="ci-hours">' + esc(T('checkin.hoursQ')) + '</label>' +
+      '<input id="ci-hours" name="hours" type="text" inputmode="decimal" maxlength="4" dir="ltr" autocomplete="off" value="' + (ci.hours ? esc(fa(ci.hours)) : '') + '" placeholder="' + esc(T('checkin.hoursPh')) + '"></div></fieldset>' +
       '<fieldset><legend>' + esc(T('checkin.painQ')) + '</legend><div class="chips">' +
       '<label class="chip"><input type="radio" name="pain" value="no"' + (ci.pain === false ? ' checked' : '') + '><span>' + esc(T('app.no')) + '</span></label>' +
       '<label class="chip chip-danger"><input type="radio" name="pain" value="yes"><span>' + esc(T('app.yes')) + '</span></label></div>' +
@@ -1225,7 +1236,9 @@
         box.innerHTML = '<ul>' + errs.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
         return;
       }
+      var hours = parseFloat(String(fd.get('hours') || '').replace(/[۰-۹]/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }).replace('٫', '.'));
       state.checkins[key] = { fatigue: fatigue, sleep: sleep, pain: pain === 'yes', painWhere: pain === 'yes' ? where : '', at: new Date().toISOString() };
+      if (hours > 0 && hours <= 14) state.checkins[key].hours = Math.round(hours * 2) / 2;
       save();
       if (pain === 'yes') { openPainModal(key); return; }
       var r = effectiveSession(base);

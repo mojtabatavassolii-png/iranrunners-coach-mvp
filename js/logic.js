@@ -1379,6 +1379,8 @@
       s.dayShort = T('daysShort')[(date.getDay() + 1) % 7];
       s.label = TYPE_INFO[s.type].label + (s.variant ? ' (' + s.variant + ')' : '');
       s.hard = isHard(s.type);
+      // برای ساخت نسخه‌ی سبک‌تر همین جلسه در تطبیق با چک‌این (ذخیره/کپی نمی‌شه)
+      Object.defineProperty(s, '_ctx', { value: ctx, enumerable: false, configurable: true, writable: true });
       days.push(s);
     }
 
@@ -1456,9 +1458,196 @@
     return buildWeek(profile, date).days[persianDayIndex(date)];
   }
 
-  // ---------- تطبیق با چک‌این روزانه ----------
-
-  function adaptSession(session, checkin, prevCheckin, zones) {
+  // ---------- تطبیق هوشمند با چک‌این روزانه ----------
+  // درجه‌بندی‌شده (خفیف / متوسط / جدی) و آگاه از تاریخچه‌ی چند روز اخیر؛ درد همیشه = توقف کامل.
+  //  خفیف: خستگی ۳ یا یک شب خواب ضعیف → کاهش کوچک حجم/تکرار، همون نوع جلسه
+  //  متوسط: خستگی ۴، دو شب خواب ضعیف یا خستگی ۳ چندروزه → نسخه‌ی سبک‌تر همون جلسه، یا تمپوی ملایم اگه عوامل روی هم جمع شدن
+  //  جدی: خستگی ۵، خواب خیلی بد پشت‌سرهم یا خستگی بالای چندروزه → ایزی ران کوتاه یا استراحت فعال
+  // هر تصمیم با دلیل (علت → معنی → ریسک → تصمیم) و اثرش روی هفته و هدف توضیح داده می‌شه.
+  function poorSleep(c) { return !!c && (c.sleep <= 2 || (c.hours > 0 && c.hours < 6)); }
+  function veryPoorSleep(c) { return !!c && (c.sleep === 1 || (c.hours > 0 && c.hours < 5)); }
+  // hist: چک‌این روزهای قبل، از دیروز به عقب
+  function readiness(ci, hist) {
+    var F = Number(ci.fatigue) || 0, i;
+    var streak3 = 0, streak4 = 0, sleepStreak = poorSleep(ci) ? 1 : 0;
+    for (i = 0; i < hist.length && hist[i] && hist[i].fatigue >= 3; i++) streak3++;
+    for (i = 0; i < hist.length && hist[i] && hist[i].fatigue >= 4; i++) streak4++;
+    if (sleepStreak) for (i = 0; i < hist.length && poorSleep(hist[i]); i++) sleepStreak++;
+    var tier = null;
+    if (F >= 5 || (veryPoorSleep(ci) && sleepStreak >= 2) || (F >= 4 && streak4 >= 2) || (sleepStreak >= 3 && F >= 3)) tier = 'severe';
+    else if (F === 4 || sleepStreak >= 2 || (F === 3 && streak3 >= 2)) tier = 'moderate';
+    else if (F === 3 || poorSleep(ci)) tier = 'mild';
+    return {
+      tier: tier, F: F, S: Number(ci.sleep) || 0, H: Number(ci.hours) || 0, streak3: streak3, streak4: streak4, sleepStreak: sleepStreak,
+      // چند عامل هم‌زمان (خستگی بالا + خواب بد یا خستگی روزهای قبل) → واکنش یک درجه جدی‌تر
+      compound: (F >= 4 && (poorSleep(ci) || streak3 >= 1)) || (sleepStreak >= 2 && F >= 3),
+      rest: (F >= 5 && poorSleep(ci)) || (F >= 4 && streak4 >= 2) || sleepStreak >= 3,
+      fresh: F <= 2 && !poorSleep(ci) && !ci.pain
+    };
+  }
+  function joinList(parts) {
+    if (parts.length <= 1) return parts.join('');
+    return parts.slice(0, -1).join(T('adapt.comma')) + T('adapt.and') + parts[parts.length - 1];
+  }
+  function reasonText(r) {
+    var p = [];
+    if (r.F >= 3) p.push(T('adapt.r.fatigue', { n: r.F }));
+    if (r.sleepStreak >= 2) p.push(T('adapt.r.sleepStreak', { n: r.sleepStreak }));
+    else if (r.H > 0 && r.H < 6) p.push(T('adapt.r.hours', { n: r.H }));
+    else if (r.S && r.S <= 2) p.push(T('adapt.r.sleep', { n: r.S }));
+    if (r.streak4 >= 1) p.push(T('adapt.r.streak4', { n: r.streak4 }));
+    else if (r.streak3 >= 1 && r.F >= 3) p.push(T('adapt.r.streak3', { n: r.streak3 }));
+    return joinList(p);
+  }
+  // سه چک‌این آخر در ۴ روز گذشته (روز بدون چک‌این، مثلاً روز استراحت، رشته رو قطع نمی‌کنه)
+  function histFor(date, checkins, prevCheckin) {
+    if (!checkins || !date) return [prevCheckin || null];
+    var d = parseDate(date), out = [];
+    for (var i = 1; i <= 4 && out.length < 3; i++) { var c = checkins[dateKey(addDays(d, -i))]; if (c) out.push(c); }
+    return out;
+  }
+  var INTENSE = ['interval', 'reps', 'hills', 'fartlek'];
+  function withDay(n, s) {
+    n.date = s.date; n.dayName = s.dayName; n.dayShort = s.dayShort;
+    n.label = TYPE_INFO[n.type].label + (n.variant ? ' (' + n.variant + ')' : '');
+    n.hard = isHard(n.type); n.original = s;
+    return n;
+  }
+  // تکرار کوتاه‌تر وقتی تعداد تکرار به حداقل رسیده (مثلاً ۳ × ۱۰۰۰ → ۳ × ۸۰۰)
+  var REP_DOWN = { 2000: 1600, 1600: 1200, 1200: 1000, 1000: 800, 800: 600, 600: 400 };
+  function rebuild(s, factor, type, rep) {
+    var ctx = s._ctx;
+    if (!ctx || !s.spec) return null;
+    WU_LEVEL = ctx.level;
+    var spec = {};
+    for (var k in s.spec) spec[k] = s.spec[k];
+    if (type) { spec.type = type; delete spec.form; delete spec.rep; }
+    if (rep) spec.rep = rep;
+    return makeQuality(spec, s.specWeekly * factor, ctx);
+  }
+  // همون جلسه، سبک‌تر: اول تکرار کمتر، اگه نشد تکرار کوتاه‌تر
+  function lighter(s, factor, need) {
+    var a = rebuild(s, factor);
+    if (a && a.hardKm < s.hardKm * need) return a;
+    var rep = s.spec && (s.spec.rep || (s.spec.type === 'midInt' ? 1000 : s.spec.type === 'longInt' ? 1600 : s.spec.type === 'shortInt' ? 400 : 0));
+    while (rep && REP_DOWN[rep]) {
+      rep = REP_DOWN[rep];
+      var b = rebuild(s, factor, null, rep);
+      if (b && b.hardKm < s.hardKm * need) return b;
+    }
+    return null;
+  }
+  // نسخه‌ی تطبیق‌یافته‌ی جلسه بر اساس درجه؛ { session, act, params } یا null (بدون تغییر ساختاری)
+  function adaptedVersion(s, r, zones) {
+    var t = s.type, label = s.label;
+    var rw = t === 'runwalk' || t === 'walkrun';
+    if (r.tier === 'severe') {
+      if (r.rest || rw) return { session: { type: 'rest', km: null, hardKm: 0, target: T('cycle.activeRestTarget'), steps: [T('cycle.activeRestStep')], how: T('cycle.activeRestHow') }, act: 'rest' };
+      var ekm = Math.max(3, Math.min(t === 'easy' ? (s.km || 5) * 0.6 : 6, (s.km || 5) * 0.5));
+      return { session: makeEasy(ekm, zones), act: 'easy', params: { km: round05(Math.max(2, ekm)) } };
+    }
+    if (rw) return r.tier === 'moderate' ? { session: null, act: 'rwShorter' } : null;
+    if (t === 'long') {
+      var f = r.tier === 'moderate' ? 0.75 : 0.9;
+      var ctx = s._ctx;
+      if (!ctx || !s.km) return null;
+      var lg = makeLong(s.km * f, ctx, (s.segKm || 0) * f * 0.5, s.kind === 'mp' ? 'plain' : (s.kind || 'plain'), { vert: s.vert ? round10(s.vert * f) : 0 });
+      return { session: lg, act: 'shorterLong', params: { km: lg.km, orig: s.km } };
+    }
+    if (t === 'easy') {
+      if (r.tier === 'mild') return null;
+      var e = makeEasy((s.km || 5) * 0.8, zones);
+      return { session: e, act: 'shorterEasy', params: { km: e.km, orig: s.km } };
+    }
+    if (s.hard && s.spec) {
+      var intense = INTENSE.indexOf(t) >= 0;
+      if (r.tier === 'mild') {
+        var m = lighter(s, 0.8, 0.9);
+        return m ? { session: m, act: 'fewer', params: { label: label }, moreRest: false } : null;
+      }
+      // متوسط: اگه عوامل روی هم جمع شدن، جلسه‌ی شدید → تمپوی ملایم؛ وگرنه همون جلسه با حجم کمتر و استراحت بیشتر
+      if (!r.compound || !intense) {
+        var l = lighter(s, 0.6, 0.75);
+        if (l) return { session: l, act: 'fewer', params: { label: label }, moreRest: intense };
+      }
+      // تمپوی ملایم حداقل ۳ کیلومتر (دو تکه با جاگ بین‌شون)
+      var mt = rebuild(s, Math.max(intense ? 0.7 : 0.55, 3 / ((s.specWeekly * s.spec.share) || 3)), 'tempoMild');
+      if (mt) return { session: mt, act: 'mildTempo', params: { label: label } };
+    }
+    return null;
+  }
+  // پیدا کردن روز جبران جزئی در همون هفته: اولین ایزی ران حداقل دو روز بعد، که فرداش جلسه‌ی سخت نیست
+  // استراید کوتاهه و قبل از لانگ‌ران هم مشکلی نداره؛ بقیه‌ی افزودنی‌ها نه قبل از هیچ جلسه‌ی سختی
+  function makeupDay(week, idx, strides) {
+    for (var j = idx + 2; j < 7; j++) {
+      var s = week.days[j], next = week.days[j + 1];
+      if (s.type === 'easy' && !s.double && (!next || !next.hard || (strides && next.type === 'long'))) return j;
+    }
+    return -1;
+  }
+  function isStridesMakeup(orig, adapted) {
+    return lostStim(orig, adapted) >= 0.3 && INTENSE.indexOf(orig.type) >= 0;
+  }
+  // تحریک تمرینی وزن‌دار با شدت (تمپوی ملایم جای اینتروال رو کامل پر نمی‌کنه)
+  function stimulus(s) {
+    if (!s || !s.hardKm) return 0;
+    var w = INTENSE.indexOf(s.type) >= 0 ? 1 : s.type === 'tempo' ? (s.spec && s.spec.type === 'tempoMild' ? 0.5 : 0.8) : s.type === 'long' ? 0.6 : 0;
+    return s.hardKm * w;
+  }
+  function lostStim(orig, adapted) { return Math.max(0, stimulus(orig) - stimulus(adapted)); }
+  function makeupWhat(orig, adapted) {
+    var lostHard = lostStim(orig, adapted);
+    if (lostHard >= 0.3) return INTENSE.indexOf(orig.type) >= 0 ? T('adapt.what.strides') : T('adapt.what.steady');
+    var lostKm = (orig.km || 0) - (adapted && adapted.km || 0);
+    var x = round05(Math.min(lostKm / 3, 3));
+    return x >= 1 ? T('adapt.what.km', { n: x }) : null;
+  }
+  function weekImpact(profile, s, adapted, r) {
+    var date = parseDate(s.date), race = raceInfo(profile);
+    var toRace = race ? daysBetween(date, race.date) : null;
+    var out = { kind: null, text: '' };
+    var lostHard = lostStim(s, adapted), lostKm = (s.km || 0) - (adapted && adapted.km || 0);
+    if (toRace !== null && toRace >= 0 && toRace <= 14) out = { kind: 'raceNear', text: T('adapt.impact.raceNear', { n: toRace }) };
+    else if (lostHard < 0.3 && lostKm < 1.5) out = { kind: 'tiny', text: T('adapt.impact.tiny') };
+    else {
+      var week = buildWeek(profile, date), idx = persianDayIndex(date), j = makeupDay(week, idx, isStridesMakeup(s, adapted)), what = makeupWhat(s, adapted);
+      if (j >= 0 && what) out = { kind: 'makeup', day: week.days[j].date, text: T('adapt.impact.makeup', { day: week.days[j].dayName, what: what }) };
+      else out = { kind: 'noRoom', text: T('adapt.impact.noRoom') };
+    }
+    if (r.tier === 'severe' || r.streak4 >= 2 || r.sleepStreak >= 3) out.text += T('adapt.impact.persist');
+    return out;
+  }
+  // جبران جزئی روی روز D: اگه یک جلسه‌ی قبلی همین هفته سبک شده و روز جبرانش امروزه و امروز حالت خوبه
+  function makeupFor(session, ci, opts) {
+    if (!opts || !opts.profile || !opts.checkins || session.type !== 'easy' || !ci) return null;
+    var r = readiness(ci, histFor(session.date, opts.checkins));
+    if (!r.fresh) return null;
+    var d = parseDate(session.date), week = buildWeek(opts.profile, d), idx = persianDayIndex(d);
+    for (var i = 0; i < idx - 1; i++) {
+      var e = week.days[i], eci = opts.checkins[e.date];
+      if (!eci || eci.pain || ['rest', 'none'].indexOf(e.type) >= 0) continue;
+      var core = adaptCore(e, eci, histFor(e.date, opts.checkins), paceZones(opts.profile));
+      if (!core || !core.changed || !opts.profile) continue;
+      if (makeupDay(week, i, isStridesMakeup(e, core.session)) !== idx) continue;
+      var what = makeupWhat(e, core.session);
+      if (what) return { from: e.dayName, what: what, text: T('adapt.makeupBox.text', { day: e.dayName, what: what }) };
+    }
+    return null;
+  }
+  // هسته‌ی تصمیم (بدون اثر هفتگی): { session, changed, r, version }
+  function adaptCore(session, checkin, hist, zones) {
+    var r = readiness(checkin, hist);
+    if (!r.tier || ['rest', 'none', 'race', 'cancelled'].indexOf(session.type) >= 0) return { session: session, changed: false, r: r, version: null };
+    var v = adaptedVersion(session, r, zones);
+    if (v && v.session) {
+      var n = withDay(v.session, session);
+      if (v.moreRest) n.steps = n.steps.concat([T('adapt.moreRestStep')]);
+      return { session: n, changed: true, r: r, version: v };
+    }
+    return { session: session, changed: false, r: r, version: v };
+  }
+  // opts (اختیاری): { profile, checkins } برای تاریخچه، اثر هفتگی و جبران جزئی
+  function adaptSession(session, checkin, prevCheckin, zones, opts) {
     if (!checkin) return { session: session, adaptation: null };
     if (checkin.pain) {
       var c = {
@@ -1468,27 +1657,58 @@
       };
       return { session: c, adaptation: { kind: 'pain', message: T('painMessage') } };
     }
-    var highFatigue = checkin.fatigue >= 4;
-    var badSleep2 = checkin.sleep <= 2 && prevCheckin && prevCheckin.sleep <= 2;
-    if (!(highFatigue || badSleep2)) return { session: session, adaptation: null };
-
-    var why = highFatigue ? T('adapt.whyFatigue', { n: checkin.fatigue }) : T('adapt.whySleep');
+    var hist = histFor(session.date, opts && opts.checkins, prevCheckin);
+    var core = adaptCore(session, checkin, hist, zones), r = core.r;
+    if (!r.tier) {
+      var mk = makeupFor(session, checkin, opts);
+      if (mk) {
+        var ms = {};
+        for (var k in session) ms[k] = session[k];
+        ms.makeup = mk;
+        return { session: ms, adaptation: null };
+      }
+      return { session: session, adaptation: null };
+    }
+    if (session.type === 'rest' || session.type === 'none') return { session: session, adaptation: null };
+    var reasons = reasonText(r);
+    var why = T('adapt.because', { reasons: reasons });
     if (session.type === 'race') {
-      return { session: session, adaptation: { kind: 'caution', message: T('adapt.race', { why: why }) } };
+      return { session: session, adaptation: { kind: 'caution', tier: r.tier, message: T('adapt.race', { why: reasons }) } };
     }
-    if (session.hard) {
-      var km = session.km ? Math.max(Math.min(3, session.km), round05(session.km * 0.6)) : null;
-      var e = km ? makeEasy(km, zones || null) : makeRunWalk({ runTotal: 8, run: 1, walk: 2 }, 1);
-      e.date = session.date; e.dayName = session.dayName;
-      e.label = TYPE_INFO[e.type].label; e.hard = false; e.original = session;
-      var msg = T('adapt.downgrade', { why: why, label: session.label });
-      return { session: e, adaptation: { kind: 'downgrade', message: msg } };
-    }
-    if (session.type !== 'rest' && session.type !== 'none') {
-      return { session: session, adaptation: { kind: 'note', message:
-        T('adapt.note', { why: why, extra: session.double ? T('adapt.noteDouble') : '' }) } };
-    }
-    return { session: session, adaptation: null };
+    var v = core.version, act = v ? v.act : (session.hard ? 'keepHard' : session.type === 'long' ? 'keepLong' : 'keepEasy');
+    var meaning = T('adapt.mean.' + r.tier) + ((r.streak3 >= 2 || r.streak4 >= 1 || r.sleepStreak >= 2) && r.tier !== 'mild' ? T('adapt.mean.accum') : '');
+    var risk = !core.changed && !v ? '' : r.tier === 'mild' ? (session.hard ? T('adapt.risk.mildHard') : '') :
+      T(session.hard && session.type !== 'long' ? 'adapt.risk.hard' : session.type === 'long' ? 'adapt.risk.long' : 'adapt.risk.easy', { label: session.label });
+    var p = (v && v.params) || {};
+    var main = core.changed && core.session.steps && core.session.steps.length ? core.session.steps[0] : '';
+    var action = T('adapt.act.' + act, { label: session.label, main: main, km: p.km, orig: p.orig }) +
+      (v && v.moreRest ? T('adapt.act.fewerRest') : '') + (session.double && r.tier !== 'mild' ? T('adapt.act.dropPm') : '');
+    var impact = opts && opts.profile && core.changed ? weekImpact(opts.profile, session, core.session, r) : null;
+    var ad = {
+      kind: core.changed ? 'downgrade' : 'note', tier: r.tier, act: act,
+      why: why + ' ' + meaning + (risk ? ' ' + risk : ''), action: action,
+      impact: impact ? impact.text : '', impactKind: impact ? impact.kind : null, makeupDay: impact && impact.day || null
+    };
+    ad.message = ad.why + ' ' + ad.action + (ad.impact ? ' ' + ad.impact : '');
+    return { session: core.session, adaptation: ad };
+  }
+  // خلاصه‌ی هفته: جلسه‌های این هفته تا امروز (با چک‌این یا انجام‌شده) طبق برنامه / تعدیل‌شده
+  function weekAdaptSummary(profile, checkins, done, date) {
+    date = parseDate(dateKey(date));
+    var week = buildWeek(profile, date), zones = paceZones(profile), a = 0, b = 0;
+    week.days.forEach(function (s) {
+      if (s.date > dateKey(date) || ['rest', 'none'].indexOf(s.type) >= 0) return;
+      var ci = checkins[s.date];
+      if (!ci && !(done && done[s.date])) return;
+      if (ci && ci.pain) { b++; return; }
+      var r = ci ? adaptSession(s, ci, null, zones, { checkins: checkins }) : null;
+      if (r && r.adaptation && r.adaptation.kind === 'downgrade') b++; else a++;
+    });
+    var g = goalInfo(profile), race = raceInfo(profile);
+    var goal = race ? T('adapt.goal.race', { race: goalLabel(g), date: I18N.date(race.date) }) : T('adapt.goal.general');
+    var text = T('adapt.summary.line', { a: T('adapt.summary.n', { n: a }), b: T('adapt.summary.n', { n: b }) }) +
+      T(b >= 3 ? 'adapt.summary.many' : 'adapt.summary.ok', { goal: goal });
+    return { asPlanned: a, adapted: b, text: text };
   }
 
   // ---------- چرخه‌ی قاعدگی (اختیاری؛ فقط با رضایت و داده‌ی خود کاربر) ----------
@@ -1598,7 +1818,7 @@
       var k = dateKey(d), wk = dateKey(weekStart(d));
       if (!weeks[wk]) weeks[wk] = buildWeek(p, d);
       var base = weeks[wk].days[persianDayIndex(d)];
-      var ci = checkins[k], r = adaptSession(base, ci, checkins[dateKey(addDays(d, -1))], zones);
+      var ci = checkins[k], r = adaptSession(base, ci, checkins[dateKey(addDays(d, -1))], zones, { checkins: checkins });
       var eff = r.session, adapted = !!(r.adaptation && r.adaptation.kind === 'downgrade');
       var ch = choices[k];
       if ((ch === 'adapt' || ch === 'rest') && eff.type !== 'cancelled') {
@@ -1722,7 +1942,7 @@
     paceZones: paceZones, bmi: bmi, progression: progression, weeklyVolumeKm: weeklyVolumeKm,
     weeklyVolume: weeklyVolume, volumeCeiling: volumeCeiling, weekWorkouts: weekWorkouts, periodFor: periodFor,
     chooseSessionDays: chooseSessionDays, placeQuality: placeQuality, circDist: circDist,
-    buildWeek: buildWeek, sessionFor: sessionFor, adaptSession: adaptSession, isHard: isHard,
+    buildWeek: buildWeek, sessionFor: sessionFor, adaptSession: adaptSession, isHard: isHard, readiness: readiness, weekAdaptSummary: weekAdaptSummary,
     currentFitness: currentFitness, fitnessEntries: fitnessEntries, hrZones: hrZones, easyRunFeedback: easyRunFeedback,
     easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, fitnessReminder: fitnessReminder,
     fitnessLevelSuggestion: fitnessLevelSuggestion,
