@@ -1561,6 +1561,156 @@
   var LOCATION_TIPS = i18nMap(['park', 'gym', 'treadmill', 'road'], 'location.tips');
   var LOCATION_LABELS = i18nMap(['park', 'gym', 'treadmill', 'road'], 'location.labels');
 
+  // =====================================================================
+  // آنالیز پیشرفت: همه از داده‌ی واقعی کاربر (جلسه‌های انجام‌شده، چک‌این‌ها، RPE بعد از جلسه، رکوردها)
+  // =====================================================================
+  // RPE پیش‌فرض هر نوع جلسه (اگه کاربر بعد از جلسه RPE ثبت نکرده باشه)
+  var LOAD_RPE = { easy: 3.5, long: 4.5, runwalk: 3, walkrun: 2.5, tempo: 7, interval: 8, reps: 8, fartlek: 7, hills: 7, race: 9 };
+  // نسبت پیس میانگین جلسه به پیس ایزی (برای تخمین مدت از کیلومتر)
+  var LOAD_PACE = { tempo: 0.9, interval: 0.92, reps: 0.95, fartlek: 0.95, hills: 1.05, race: 0.85 };
+  var CTL_DAYS = 42, ATL_DAYS = 7;
+  function isRunType(t) { return !!t && ['rest', 'none', 'cancelled'].indexOf(t) < 0; }
+  function sessionMinutes(s, pE) {
+    if (!s) return 0;
+    if (s.minutes) return s.minutes;
+    return s.km ? s.km * pE * (LOAD_PACE[s.type] || 1) / 60 : 0;
+  }
+  // بار تمرینی جلسه = مدت (دقیقه) × RPE (روش session-RPE فاستر)
+  function sessionLoad(s, rpe, pE) {
+    if (!s || !isRunType(s.type)) return 0;
+    var r = Number(rpe) || (s.type === 'race' && s.rpeOnly ? 7 : LOAD_RPE[s.type]) || 4;
+    return sessionMinutes(s, pE) * r;
+  }
+  // خلاصه‌ی فشرده‌ی یک جلسه برای ذخیره موقع «انجام شد» (تا تاریخچه با تغییر بعدی پروفایل عوض نشه)
+  function sessionSnapshot(s) {
+    if (!s) return null;
+    var o = { type: s.type, km: s.km || 0 };
+    if (s.minutes) o.minutes = s.minutes;
+    if (s.vert) o.vert = s.vert;
+    if (s.rpeOnly) o.rpeOnly = true;
+    return o;
+  }
+  // وضعیت واقعی هر روز: برنامه، تطبیق با چک‌این و انتخاب چرخه، انجام شدن
+  function dayRecords(data, from, to) {
+    var p = data.profile, zones = paceZones(p), weeks = {}, out = [];
+    var checkins = data.checkins || {}, done = data.done || {}, logs = data.doneLog || {}, choices = data.cycleChoices || {};
+    for (var d = from; d <= to; d = addDays(d, 1)) {
+      var k = dateKey(d), wk = dateKey(weekStart(d));
+      if (!weeks[wk]) weeks[wk] = buildWeek(p, d);
+      var base = weeks[wk].days[persianDayIndex(d)];
+      var ci = checkins[k], r = adaptSession(base, ci, checkins[dateKey(addDays(d, -1))], zones);
+      var eff = r.session, adapted = !!(r.adaptation && r.adaptation.kind === 'downgrade');
+      var ch = choices[k];
+      if ((ch === 'adapt' || ch === 'rest') && eff.type !== 'cancelled') {
+        var sug = cycleSuggestion(eff, cycleInfo(p, d), zones);
+        var alt = sug && (ch === 'adapt' ? sug.alt : sug.rest);
+        if (alt) { eff = alt; adapted = true; }
+      }
+      var isDone = !!done[k];
+      out.push({ date: k, d: d, planned: base, eff: eff, adapted: adapted, pain: !!(ci && ci.pain), done: isDone,
+        actual: isDone ? (logs[k] || eff) : null, checkin: ci || null });
+    }
+    return out;
+  }
+  function firstDataDate(data) {
+    var p = data.profile, keys = Object.keys(data.done || {}).concat(Object.keys(data.checkins || {}));
+    var first = p.startDate || dateKey(new Date());
+    keys.forEach(function (k) { if (k < first) first = k; });
+    return parseDate(first);
+  }
+  function mean(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : null; }
+  // range: تعداد روز آخر (۲۸، ۹۱) یا null برای «از ابتدا»
+  function analytics(data, today, rangeDays) {
+    var p = data.profile;
+    if (!p) return null;
+    today = parseDate(dateKey(today));
+    var start = firstDataDate(data);
+    if (start > today) start = today;
+    var from = rangeDays ? addDays(today, -(rangeDays - 1)) : start;
+    if (from < start) from = start;
+    var fromKey = dateKey(from), todayKey = dateKey(today);
+    var level = assessLevel(p).level, P = paceSet(p, level), pE = P.pE || 390;
+    var recs = dayRecords(data, start, today);
+    var postRuns = data.postRuns || {};
+
+    // ---- بار تمرینی، CTL / ATL / TSB (میانگین نمایی؛ مقدار اولیه از حجم قبلی خود کاربر) ----
+    var priorKm = Number(p.monthAvgKm) || Number(p.currentWeeklyKm) || 0;
+    var seed = priorKm * pE / 60 * 4 / 7;
+    var kC = 1 - Math.exp(-1 / CTL_DAYS), kA = 1 - Math.exp(-1 / ATL_DAYS), ctl = seed, atl = seed;
+    var pmc = [];
+    recs.forEach(function (r) {
+      var post = postRuns[r.date];
+      var load = r.actual ? sessionLoad(r.actual, post && post.rpe, pE) : 0;
+      r.load = load;
+      ctl += (load - ctl) * kC;
+      atl += (load - atl) * kA;
+      if (r.date >= fromKey) pmc.push({ date: r.date, load: Math.round(load), ctl: ctl, atl: atl, tsb: ctl - atl });
+    });
+
+    // ---- حجم و صعود هفتگی + میانگین متحرک ۴ هفته (فقط هفته‌های کامل) ----
+    var weekMap = {}, weekKeys = [];
+    recs.forEach(function (r) {
+      var wk = dateKey(weekStart(r.d));
+      if (!weekMap[wk]) { weekMap[wk] = { start: wk, km: 0, vert: 0, runs: 0 }; weekKeys.push(wk); }
+      if (r.actual && isRunType(r.actual.type)) {
+        weekMap[wk].km += r.actual.km || 0;
+        weekMap[wk].vert += r.actual.vert || 0;
+        weekMap[wk].runs++;
+      }
+    });
+    var curWeek = dateKey(weekStart(today));
+    var allWeeks = weekKeys.map(function (k) { var w = weekMap[k]; w.km = Math.round(w.km * 10) / 10; w.partial = k === curWeek; return w; });
+    allWeeks.forEach(function (w, i) {
+      var full = allWeeks.slice(Math.max(0, i - 3), i + 1).filter(function (x) { return !x.partial; });
+      w.maKm = !w.partial && i >= 3 ? mean(full.map(function (x) { return x.km; })) : null;
+      w.maVert = !w.partial && i >= 3 ? mean(full.map(function (x) { return x.vert; })) : null;
+    });
+    var fromWeek = dateKey(weekStart(from));
+    var weeks = allWeeks.filter(function (w) { return w.start >= fromWeek; });
+
+    // ---- پیس در شدت‌های مختلف و پیش‌بینی مسابقه (از رکوردها و تایم‌تست‌ها) ----
+    var entries = fitnessEntries(p).map(function (e) { return { date: e.date, distanceKm: e.distanceKm, timeSec: e.timeSec, kind: e.kind || null, vdot: vdotFromRace(e.distanceKm, e.timeSec) }; });
+    var adj = clamp(Number(p.easyAdjustSec) || 0, 0, EASY_ADJUST_MAX);
+    function entryAt(k) { var e = null; entries.forEach(function (x) { if (x.date <= k) e = x; }); return e; }
+    function pacesOf(v) { return { e: paceAtPct(v, 0.70) + adj, t: paceAtPct(v, 0.88), i: paceAtPct(v, 0.98) }; }
+    var g = goalInfo(p), D = g.category !== 'ultra' ? RACE_DISTANCES[g.type] : null;
+    // نمونه‌ی هفتگی (آخر هر هفته یا امروز)
+    var samples = weeks.map(function (w) {
+      var end = addDays(parseDate(w.start), 6), k = end > today ? todayKey : dateKey(end);
+      var e = entryAt(k);
+      if (!e) return { date: k, week: w.start, vdot: null };
+      var pc = pacesOf(e.vdot);
+      return { date: k, week: w.start, vdot: e.vdot, e: pc.e, t: pc.t, i: pc.i, entry: e.date,
+        riegel: D ? riegel(e.timeSec, e.distanceKm, D) : null, vdotTime: D ? raceTimeFromVdot(e.vdot, D) : null };
+    });
+    var testsInRange = entries.filter(function (e) { return e.date >= fromKey && e.date <= todayKey; });
+
+    // ---- چک‌این‌ها ----
+    var checks = recs.filter(function (r) { return r.date >= fromKey && r.checkin; }).map(function (r) {
+      return { date: r.date, fatigue: Number(r.checkin.fatigue) || null, sleep: Number(r.checkin.sleep) || null, pain: !!r.checkin.pain };
+    });
+
+    // ---- پایبندی: جلسه‌های برنامه‌ریزی‌شده‌ی گذشته (امروز فقط اگه انجام یا لغو شده) ----
+    var adh = { planned: 0, completed: 0, adapted: 0, pain: 0, missed: 0 };
+    recs.forEach(function (r) {
+      if (r.date < fromKey || r.date < (p.startDate || '') || !isRunType(r.planned && r.planned.type)) return;
+      if (r.date === todayKey && !r.done && !r.pain) return;
+      adh.planned++;
+      if (r.pain) adh.pain++;
+      else if (r.done) adh[r.adapted ? 'adapted' : 'completed']++;
+      else adh.missed++;
+    });
+
+    return {
+      from: fromKey, today: todayKey, start: dateKey(start), days: Math.round(daysBetween(from, today)) + 1,
+      runsDone: recs.filter(function (r) { return r.date >= fromKey && r.actual && isRunType(r.actual.type); }).length,
+      weeks: weeks, pmc: pmc, samples: samples, tests: testsInRange, entriesCount: entries.length,
+      checkins: checks, adherence: adh,
+      goal: { type: g.type, category: g.category, km: D || g.km || null, ultra: g.category === 'ultra' },
+      paceKnown: entries.length > 0
+    };
+  }
+
   var api = {
     LEVELS: LEVELS, EXPERIENCE: EXPERIENCE, TIER_INFO: TIER_INFO, PERIOD_LABELS: PERIOD_LABELS,
     RACE_DISTANCES: RACE_DISTANCES, RACE_LABELS: RACE_LABELS,
@@ -1581,7 +1731,8 @@
     goalInfo: goalInfo, goalLabel: goalLabel, GOAL_TYPES: GOAL_TYPES, TERRAIN_LABELS: TERRAIN_LABELS,
     cycleInfo: cycleInfo, nextPeriod: nextPeriod, cycleSuggestion: cycleSuggestion, CYCLE_PHASES: CYCLE_PHASES,
     ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
-    ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet
+    ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,
+    analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS
   };
   // متن‌هایی که به زبان فعلی بستگی دارن، موقع خوندن ترجمه می‌شن
   Object.defineProperty(api, 'DAY_NAMES', { enumerable: true, get: dayNames });

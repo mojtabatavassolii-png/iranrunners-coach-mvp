@@ -19,7 +19,7 @@
 
   // ---------- وضعیت و ذخیره‌سازی ----------
   var memoryFallback = null;
-  function emptyState() { return { profile: null, checkins: {}, done: {}, ackPain: {}, postRuns: {}, cycleChoices: {} }; }
+  function emptyState() { return { profile: null, checkins: {}, done: {}, ackPain: {}, postRuns: {}, cycleChoices: {}, doneLog: {} }; }
   function load() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
@@ -42,7 +42,7 @@
   var SETTINGS_KEY = 'iranrunners-coach-settings';
   var WS_MAP = { sat: 6, sun: 0, mon: 1 };
   function loadSettings() {
-    var d = { calendar: 'auto', weekStart: 'auto', planView: 'week', cycleMarkers: true };
+    var d = { calendar: 'auto', weekStart: 'auto', planView: 'week', cycleMarkers: true, progressRange: '3m' };
     try { return Object.assign(d, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { return d; }
   }
   var settings = loadSettings();
@@ -210,7 +210,7 @@
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
+  var VIEWS = { plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, progress: renderProgress, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
   function route() {
     var loginMode = !isEntered();
     document.body.classList.toggle('login-mode', loginMode);
@@ -315,7 +315,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=19" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=20" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -798,6 +798,12 @@
       esc(T('pain.yesterdayText')) + '</div>';
   }
 
+  // «انجام شد» + خلاصه‌ی همون جلسه (بعد از تطبیق) تا نمودارهای پیشرفت با تغییر بعدی برنامه عوض نشن
+  function markDone(k) {
+    state.done[k] = true;
+    state.doneLog = state.doneLog || {};
+    state.doneLog[k] = C.sessionSnapshot(effectiveSession(C.sessionFor(state.profile, C.parseDate(k))).session);
+  }
   function doneButton(key, s) {
     var done = !!state.done[key];
     // جلسه‌ی ایزی: قبل از ثبت انجام، سؤال RPE و پیس پرسیده می‌شه
@@ -1011,7 +1017,10 @@
     var dn = e.target.closest('[data-done]');
     if (dn) {
       var k = dn.dataset.done;
-      if (state.done[k]) { delete state.done[k]; delete state.postRuns[k]; } else state.done[k] = true;
+      if (state.done[k]) { delete state.done[k]; delete state.postRuns[k]; if (state.doneLog) delete state.doneLog[k]; }
+      else {
+        markDone(k);
+      }
       save();
       route();
       return;
@@ -1072,7 +1081,7 @@
       return;
     }
     var key = f.dataset.postrunForm;
-    state.done[key] = true;
+    markDone(key);
     state.postRuns[key] = { rpe: Number(rpe.value), pace: pace ? pace.value : null, easy: true, type: f.dataset.type, at: new Date().toISOString() };
     // سطح ۰: جلسه‌ی خیلی سخت → هفته «سخت» حساب می‌شه (مگه اینکه خود کاربر جواب داده باشه)
     if (f.dataset.type === 'walkrun' && Number(rpe.value) >= 8) {
@@ -1333,6 +1342,338 @@
 
     app.innerHTML = html;
   }
+
+  // =====================================================================
+  // پیشرفت من: نمودارها از داده‌ی واقعی (C.analytics)؛ رسم با js/charts.js
+  // =====================================================================
+  // رنگ سری‌ها (پالت دسته‌ای اعتبارسنجی‌شده: آبی، نارنجی، فیروزه‌ای) و رنگ‌های وضعیت برای پایبندی
+  var SERIES = ['#2a78d6', '#eb6834', '#1baf7a'];
+  var STATUS = { completed: '#0ca30c', adapted: '#fab219', pain: '#d03b3b', missed: '#b9b8b0' };
+  var RANGES = { '4w': 28, '3m': 91, all: null };
+  var chartSpecs = {};
+  function kmTxt(x) { return fa(Math.round(x * 10) / 10); }
+  function paceTxt(sec) { return fa(C.formatDuration(Math.round(sec))); }
+  function secDiff(n) { return Math.round(Math.abs(n)); }
+  // عدد علامت‌دار؛ LRM تا منفی در متن راست‌به‌چپ جابه‌جا نشه
+  function signed(n) { n = Math.round(n); return '\u200e' + (n > 0 ? '+' : n < 0 ? '−' : '') + fa(Math.abs(n)); }
+  function statTile(label, value, sub) {
+    return '<div class="pstat"><span class="pstat-l">' + esc(label) + '</span><b>' + value + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';
+  }
+  function legendItem(color, label, kind) {
+    return '<span class="lg-item"><i class="ch-key ch-key-' + (kind || 'line') + '" style="background:' + color + '"></i>' + esc(label) + '</span>';
+  }
+  function dataTable(head, rows) {
+    return '<details class="ch-table"><summary>' + esc(T('progress.table')) + '</summary><div class="table-wrap"><table class="pred-table"><thead><tr>' +
+      head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div></details>';
+  }
+  function chartBox(id, spec) { chartSpecs[id] = spec; return '<div class="chart" id="ch-' + id + '"></div>'; }
+  function progCard(id, title, desc, body, extra) {
+    return '<section class="card pcard" id="p-' + id + '"><h2>' + esc(title) + '</h2><p class="small muted">' + esc(desc) + '</p>' + body + (extra || '') + '</section>';
+  }
+  function emptyNote(msg) { return '<p class="p-empty">' + esc(msg) + '</p>'; }
+  function weekLabel(k) { return faDate(k, true); }
+
+  function renderProgress() {
+    var SEP = T('progress.sep');
+    var rk = RANGES.hasOwnProperty(settings.progressRange) ? settings.progressRange : '3m';
+    var a = C.analytics(state, today(), RANGES[rk]);
+    var rtl = isRtl();
+    chartSpecs = {};
+    var html = '<section class="card"><h1>' + esc(T('progress.title')) + '</h1><p class="small muted">' + esc(T('progress.intro')) + '</p>' +
+      '<div class="seg prange" role="group" aria-label="' + esc(T('progress.rangeAria')) + '">' +
+      ['4w', '3m', 'all'].map(function (k) {
+        return '<button type="button" data-prange="' + k + '" aria-pressed="' + (k === rk) + '">' + esc(T('progress.r' + (k === '4w' ? '4w' : k === '3m' ? '3m' : 'All'))) + '</button>';
+      }).join('') + '</div></section>';
+
+    if (!a || (!a.runsDone && !a.checkins.length)) {
+      html += '<section class="card p-empty-all"><p>' + esc(T('progress.emptyAll')) + '</p><a class="btn btn-primary" href="#plan">' + esc(T('progress.emptyCta')) + '</a></section>';
+      app.innerHTML = html;
+      return;
+    }
+    var W = a.weeks, wkWithRuns = W.filter(function (w) { return w.runs > 0; }).length;
+
+    // ---- ۱. حجم هفتگی ----
+    (function () {
+      var body;
+      if (wkWithRuns < 2) body = emptyNote(T('progress.vol.empty'));
+      else {
+        var cur = W[W.length - 1], full = W.filter(function (w) { return !w.partial; });
+        var ma = full.length ? full[full.length - 1].maKm : null, maPrev = full.length > 4 ? full[full.length - 5].maKm : null;
+        var trend = ma != null && maPrev ? (ma > maPrev * 1.05 ? 'up' : ma < maPrev * 0.95 ? 'down' : 'flat') : null;
+        body = '<div class="pstats">' + statTile(T('progress.vol.thisWeek'), tt('progress.vol.val', { n: kmTxt(cur.km) })) +
+          (ma != null ? statTile(T('progress.vol.avg4'), tt('progress.vol.val', { n: kmTxt(ma) })) : '') +
+          (trend ? statTile(T('progress.vol.trend'), (trend === 'up' ? '↗ ' : trend === 'down' ? '↘ ' : '→ ') + esc(T('progress.vol.' + trend))) : '') + '</div>' +
+          '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.vol.bars'), 'bar') + legendItem(SERIES[1], T('progress.vol.ma')) + '</div>' +
+          chartBox('vol', {
+            rtl: rtl, n: W.length, aria: T('progress.vol.title'),
+            y: { min: 0, max: Math.max.apply(null, W.map(function (w) { return w.km; }).concat([5])), fmt: fa, label: T('progress.vol.unit') },
+            bars: { values: W.map(function (w) { return w.km; }), color: SERIES[0], faded: W.map(function (w) { return w.partial; }) },
+            lines: [{ values: W.map(function (w) { return w.maKm; }), color: SERIES[1], dots: 'last' }],
+            xLabels: function (i) { return weekLabel(W[i].start); }, xPx: 52,
+            tip: function (i) {
+              var w = W[i];
+              return { title: tt('progress.weekOf', { d: weekLabel(w.start) }) + (w.partial ? SEP + T('progress.partialTag') : ''), rows: [
+                { color: SERIES[0], kind: 'bar', label: T('progress.vol.bars'), value: T('progress.vol.val', { n: kmTxt(w.km) }) },
+                { color: SERIES[1], label: T('progress.vol.ma'), value: w.maKm != null ? T('progress.vol.val', { n: kmTxt(w.maKm) }) : '—' }] };
+            }
+          }) +
+          dataTable([T('progress.week'), T('progress.vol.bars'), T('progress.vol.ma')], W.map(function (w) {
+            return [esc(weekLabel(w.start)) + (w.partial ? ' <small class="muted">(' + esc(T('progress.partialTag')) + ')</small>' : ''), kmTxt(w.km), w.maKm != null ? kmTxt(w.maKm) : '—'];
+          }));
+      }
+      html += progCard('vol', T('progress.vol.title'), T('progress.vol.desc'), body, learnMore(['tenpct']));
+    })();
+
+    // ---- ۲. فیتنس و خستگی (CTL / ATL / TSB) ----
+    (function () {
+      var D = a.pmc, body;
+      if (D.length < 14 || a.runsDone < 3) body = emptyNote(T('progress.pmc.empty'));
+      else {
+        var last = D[D.length - 1], tsb = last.tsb;
+        var rel = last.ctl ? tsb / last.ctl : 0;
+        var st = rel > 0.05 ? 'fresh' : rel > -0.1 ? 'neutral' : rel > -0.3 ? 'tired' : 'veryTired';
+        var vals = [];
+        D.forEach(function (d) { vals.push(d.ctl, d.atl, d.tsb); });
+        var r1 = function (x) { return fa(Math.round(x)); };
+        body = '<div class="pstats">' + statTile(T('progress.pmc.ctl'), r1(last.ctl)) + statTile(T('progress.pmc.atl'), r1(last.atl)) +
+          statTile(T('progress.pmc.tsb'), signed(tsb), esc(T('progress.pmc.' + st))) + '</div>' +
+          '<ul class="pmc-keys">' +
+          [['ctl', 0], ['atl', 1], ['tsb', 2]].map(function (k) {
+            return '<li><i class="ch-key ch-key-line" style="background:' + SERIES[k[1]] + '"></i><b>' + esc(T('progress.pmc.' + k[0])) + ':</b> ' + esc(T('progress.pmc.' + k[0] + 'Desc')) + '</li>';
+          }).join('') + '</ul>' +
+          chartBox('pmc', {
+            rtl: rtl, n: D.length, aria: T('progress.pmc.title'), zero: true,
+            y: { min: Math.min(0, Math.min.apply(null, vals)), max: Math.max.apply(null, vals), fmt: function (v) { return v < 0 ? '−' + fa(-v) : fa(v); }, label: T('progress.pmc.unit') },
+            lines: [{ values: D.map(function (d) { return d.ctl; }), color: SERIES[0], dots: 'last' },
+              { values: D.map(function (d) { return d.atl; }), color: SERIES[1], dots: 'last' },
+              { values: D.map(function (d) { return d.tsb; }), color: SERIES[2], dots: 'last' }],
+            xLabels: function (i) { return faDate(D[i].date, true); }, xPx: 52,
+            tip: function (i) {
+              var d = D[i];
+              return { title: faDate(d.date) + (d.load ? SEP + T('progress.pmc.load') + ' ' + fa(d.load) : ''), rows: [
+                { color: SERIES[0], label: T('progress.pmc.ctl'), value: fa(Math.round(d.ctl)) },
+                { color: SERIES[1], label: T('progress.pmc.atl'), value: fa(Math.round(d.atl)) },
+                { color: SERIES[2], label: T('progress.pmc.tsb'), value: signed(d.tsb) }] };
+            }
+          }) +
+          dataTable([T('progress.date'), T('progress.pmc.load'), 'CTL', 'ATL', 'TSB'], D.filter(function (d, i) { return i % 7 === (D.length - 1) % 7; }).map(function (d) {
+            return [esc(faDate(d.date, true)), fa(d.load), fa(Math.round(d.ctl)), fa(Math.round(d.atl)), signed(d.tsb)];
+          }));
+      }
+      html += progCard('pmc', T('progress.pmc.title'), T('progress.pmc.desc'), body, learnMore(['rpe', 'eighty']));
+    })();
+
+    // ---- ۳. بهبود پیس ----
+    var S = a.samples.filter(function (s) { return s.vdot; });
+    var changed = S.length > 1 && S.some(function (s) { return s.entry !== S[0].entry; });
+    (function () {
+      var body;
+      if (a.entriesCount < 2 || !changed) body = emptyNote(T('progress.pace.empty'));
+      else {
+        var f = S[0], l = S[S.length - 1];
+        var diff = function (k) {
+          var dlt = l[k] - f[k];
+          return Math.abs(dlt) < 1 ? T('progress.pace.diffSame') : T(dlt < 0 ? 'progress.pace.diffFaster' : 'progress.pace.diffSlower', { n: fa(secDiff(dlt)) });
+        };
+        var marked = S.map(function (s, i) { return i === 0 || s.entry !== S[i - 1].entry; });
+        var vals = [];
+        S.forEach(function (s) { vals.push(s.e, s.t, s.i); });
+        body = '<div class="pstats">' + statTile(T('progress.pace.vdot'), '<span dir="ltr">' + fa(f.vdot.toFixed(1)) + ' → ' + fa(l.vdot.toFixed(1)) + '</span>') +
+          ['e', 't', 'i'].map(function (k) { return statTile(T('progress.pace.' + k), '<span dir="ltr">' + paceTxt(l[k]) + '</span>', esc(diff(k))); }).join('') + '</div>' +
+          '<div class="ch-legend">' + legendItem(SERIES[2], T('progress.pace.e')) + legendItem(SERIES[0], T('progress.pace.t')) + legendItem(SERIES[1], T('progress.pace.i')) +
+          '<span class="lg-item lg-note">' + esc(T('progress.pace.faster')) + '</span></div>' +
+          chartBox('pace', {
+            rtl: rtl, n: S.length, aria: T('progress.pace.title'),
+            y: { min: Math.min.apply(null, vals) - 5, max: Math.max.apply(null, vals) + 5, invert: true, fmt: paceTxt, label: T('progress.pace.unit') },
+            lines: [{ values: S.map(function (s) { return s.e; }), color: SERIES[2], step: true, dots: 'marked', marked: marked },
+              { values: S.map(function (s) { return s.t; }), color: SERIES[0], step: true, dots: 'marked', marked: marked },
+              { values: S.map(function (s) { return s.i; }), color: SERIES[1], step: true, dots: 'marked', marked: marked }],
+            xLabels: function (i) { return faDate(S[i].date, true); }, xPx: 52,
+            tip: function (i) {
+              var s = S[i];
+              return { title: faDate(s.date) + (marked[i] && i > 0 ? SEP + T('progress.pace.newTest') : ''), rows: [
+                { color: SERIES[2], label: T('progress.pace.e'), value: paceTxt(s.e) },
+                { color: SERIES[0], label: T('progress.pace.t'), value: paceTxt(s.t) },
+                { color: SERIES[1], label: T('progress.pace.i'), value: paceTxt(s.i) },
+                { color: 'transparent', label: 'VDOT', value: fa(s.vdot.toFixed(1)) }] };
+            }
+          }) +
+          dataTable([T('progress.date'), 'VDOT', T('progress.pace.e'), T('progress.pace.t'), T('progress.pace.i')], S.filter(function (s, i) { return marked[i]; }).map(function (s) {
+            return [esc(faDate(s.entry, true)), fa(s.vdot.toFixed(1)), paceTxt(s.e), paceTxt(s.t), paceTxt(s.i)];
+          }));
+      }
+      html += progCard('pace', T('progress.pace.title'), T('progress.pace.desc'), body, learnMore(['vdot']));
+    })();
+
+    // ---- ۴. چک‌این‌ها (روزانه در کل بازه؛ روزهای بدون چک‌این خالی) ----
+    (function () {
+      var CK = a.checkins, body;
+      if (CK.length < 5) body = emptyNote(T('progress.checkins.empty'));
+      else {
+        var days = [], byDate = {};
+        CK.forEach(function (c) { byDate[c.date] = c; });
+        for (var d = C.parseDate(a.from); C.dateKey(d) <= a.today; d = C.addDays(d, 1)) days.push(C.dateKey(d));
+        // بازه‌ی بلند: میانگین هفتگی (الگوهای چندهفته‌ای واضح‌تر)، بازه‌ی کوتاه: روزانه
+        var weekly = days.length > 35;
+        if (weekly) {
+          var wk = {}, order = [];
+          CK.forEach(function (c) {
+            var k = C.dateKey(C.weekStart(C.parseDate(c.date)));
+            if (!wk[k]) { wk[k] = { date: k, f: [], s: [], pain: 0 }; order.push(k); }
+            if (c.fatigue) wk[k].f.push(c.fatigue);
+            if (c.sleep) wk[k].s.push(c.sleep);
+            if (c.pain) wk[k].pain++;
+          });
+          var mean = function (x) { return x.length ? x.reduce(function (p, q) { return p + q; }, 0) / x.length : null; };
+          days = W.map(function (w) { return w.start; });
+          byDate = {};
+          days.forEach(function (k) { var x = wk[k]; if (x) byDate[k] = { date: k, fatigue: mean(x.f), sleep: mean(x.s), pain: x.pain, n: x.f.length }; });
+        }
+        var painIdx = [];
+        days.forEach(function (k, i) { if (byDate[k] && byDate[k].pain) painIdx.push(i); });
+        var avg = function (key) { var v = CK.map(function (c) { return c[key]; }).filter(function (x) { return x; }); return v.length ? v.reduce(function (x, y) { return x + y; }, 0) / v.length : 0; };
+        body = '<div class="pstats">' + statTile(T('progress.checkins.avgF'), tt('progress.checkins.of5', { n: avg('fatigue').toFixed(1) })) +
+          statTile(T('progress.checkins.avgS'), tt('progress.checkins.of5', { n: avg('sleep').toFixed(1) })) +
+          statTile(T('progress.checkins.painDays'), fa(CK.filter(function (c) { return c.pain; }).length)) + '</div>' +
+          '<div class="ch-legend">' + legendItem(SERIES[1], T('progress.checkins.fatigue')) + legendItem(SERIES[0], T('progress.checkins.sleep')) +
+          legendItem(STATUS.pain, T('progress.checkins.pain'), 'dot') + (weekly ? '<span class="lg-item lg-note">' + esc(T('progress.checkins.weeklyAvg')) + '</span>' : '') + '</div>' +
+          chartBox('ck', {
+            rtl: rtl, n: days.length, aria: T('progress.checkins.title'), height: 170,
+            y: { min: 1, max: 5, ticks: [1, 2, 3, 4, 5], fmt: fa },
+            lines: [{ values: days.map(function (k) { return byDate[k] ? byDate[k].fatigue : null; }), color: SERIES[1], dots: days.length <= 35 ? 'all' : 'none' },
+              { values: days.map(function (k) { return byDate[k] ? byDate[k].sleep : null; }), color: SERIES[0], dots: days.length <= 35 ? 'all' : 'none' }],
+            markers: { idx: painIdx, color: STATUS.pain, label: T('progress.checkins.pain') },
+            xLabels: function (i) { return faDate(days[i], true); }, xPx: 52,
+            tip: function (i) {
+              var c = byDate[days[i]], title = weekly ? T('progress.weekOf', { d: weekLabel(days[i]) }) + SEP + T('progress.checkins.weeklyAvg') : faDate(days[i]);
+              if (!c) return { title: title, rows: [{ color: 'transparent', label: '', value: '—' }] };
+              var v = function (x) { return x ? T('progress.checkins.of5', { n: weekly ? x.toFixed(1) : x }) : '—'; };
+              var rows = [{ color: SERIES[1], label: T('progress.checkins.fatigue'), value: v(c.fatigue) },
+                { color: SERIES[0], label: T('progress.checkins.sleep'), value: v(c.sleep) }];
+              if (c.pain) rows.push({ color: STATUS.pain, kind: 'dot', label: '', value: weekly ? T('progress.checkins.painN', { n: c.pain }) : T('progress.checkins.painYes') });
+              return { title: title, rows: rows.map(function (r) { r.value = fa(r.value); return r; }) };
+            }
+          }) +
+          dataTable([T('progress.date'), T('progress.checkins.fatigue'), T('progress.checkins.sleep'), T('progress.checkins.pain')], CK.slice().reverse().map(function (c) {
+            return [esc(faDate(c.date, true)), c.fatigue ? fa(c.fatigue) : '—', c.sleep ? fa(c.sleep) : '—', c.pain ? '● ' + esc(T('progress.checkins.painYes')) : '—'];
+          }));
+      }
+      html += progCard('ck', T('progress.checkins.title'), T('progress.checkins.desc'), body);
+    })();
+
+    // ---- ۵. پیش‌بینی زمان مسابقه (فقط هدف جاده‌ای با مسافت مشخص) ----
+    if (a.goal.km && !a.goal.ultra) (function () {
+      var race = C.RACE_LABELS[a.goal.type], body;
+      var P = S.filter(function (s) { return s.riegel; });
+      if (a.entriesCount < 2 || !changed || P.length < 2) body = emptyNote(T('progress.pred.empty'));
+      else {
+        var f = P[0], l = P[P.length - 1], dlt = l.riegel - f.riegel;
+        var vals = [];
+        P.forEach(function (s) { vals.push(s.riegel, s.vdotTime); });
+        var dTxt = Math.abs(dlt) < 1 ? T('progress.pred.same') : T(dlt < 0 ? 'progress.pred.better' : 'progress.pred.worse', { t: C.formatDuration(Math.round(Math.abs(dlt))) });
+        var marked = P.map(function (s, i) { return i === 0 || s.entry !== P[i - 1].entry; });
+        body = '<div class="pstats">' + statTile(T('progress.pred.now'), '<span dir="ltr">' + fa(C.formatDuration(Math.round(l.riegel))) + '</span>') +
+          statTile(T('progress.pred.delta'), fa(dTxt)) + '</div>' +
+          '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.pred.riegel')) + legendItem(SERIES[1], T('progress.pred.vdot')) +
+          '<span class="lg-item lg-note">' + esc(T('progress.pace.faster')) + '</span></div>' +
+          chartBox('pred', {
+            rtl: rtl, n: P.length, aria: T('progress.pred.title', { race: race }),
+            y: { min: Math.min.apply(null, vals) - 10, max: Math.max.apply(null, vals) + 10, invert: true, fmt: function (v) { return fa(C.formatDuration(Math.round(v))); } },
+            axisWidth: 58,
+            lines: [{ values: P.map(function (s) { return s.riegel; }), color: SERIES[0], step: true, dots: 'marked', marked: marked },
+              { values: P.map(function (s) { return s.vdotTime; }), color: SERIES[1], step: true, dots: 'marked', marked: marked }],
+            xLabels: function (i) { return faDate(P[i].date, true); }, xPx: 52,
+            tip: function (i) {
+              var s = P[i];
+              return { title: faDate(s.date), rows: [
+                { color: SERIES[0], label: T('progress.pred.riegel'), value: fa(C.formatDuration(Math.round(s.riegel))) },
+                { color: SERIES[1], label: T('progress.pred.vdot'), value: fa(C.formatDuration(Math.round(s.vdotTime))) }] };
+            }
+          }) +
+          dataTable([T('progress.date'), T('progress.pred.riegel'), T('progress.pred.vdot')], P.filter(function (s, i) { return marked[i]; }).map(function (s) {
+            return [esc(faDate(s.entry, true)), fa(C.formatDuration(Math.round(s.riegel))), fa(C.formatDuration(Math.round(s.vdotTime)))];
+          }));
+      }
+      html += progCard('pred', T('progress.pred.title', { race: race }), T('progress.pred.desc'), body, learnMore(['vdot']));
+    })();
+
+    // ---- ۶. صعود هفتگی (هدف تریل/اولترا) ----
+    if (a.goal.ultra) (function () {
+      var body;
+      if (wkWithRuns < 2) body = emptyNote(T('progress.vert.empty'));
+      else {
+        var cur = W[W.length - 1], full = W.filter(function (w) { return !w.partial; }), ma = full.length ? full[full.length - 1].maVert : null;
+        body = '<div class="pstats">' + statTile(T('progress.vert.thisWeek'), tt('progress.vert.val', { n: Math.round(cur.vert) })) +
+          (ma != null ? statTile(T('progress.vert.avg4'), tt('progress.vert.val', { n: Math.round(ma) })) : '') + '</div>' +
+          '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.vert.bars'), 'bar') + legendItem(SERIES[1], T('progress.vert.ma')) + '</div>' +
+          chartBox('vert', {
+            rtl: rtl, n: W.length, aria: T('progress.vert.title'),
+            y: { min: 0, max: Math.max.apply(null, W.map(function (w) { return w.vert; }).concat([100])), fmt: fa, label: T('progress.vert.unit') },
+            bars: { values: W.map(function (w) { return w.vert; }), color: SERIES[0], faded: W.map(function (w) { return w.partial; }) },
+            lines: [{ values: W.map(function (w) { return w.maVert; }), color: SERIES[1], dots: 'last' }],
+            xLabels: function (i) { return weekLabel(W[i].start); }, xPx: 52,
+            tip: function (i) {
+              var w = W[i];
+              return { title: tt('progress.weekOf', { d: weekLabel(w.start) }) + (w.partial ? SEP + T('progress.partialTag') : ''), rows: [
+                { color: SERIES[0], kind: 'bar', label: T('progress.vert.bars'), value: T('progress.vert.val', { n: fa(Math.round(w.vert)) }) },
+                { color: SERIES[1], label: T('progress.vert.ma'), value: w.maVert != null ? T('progress.vert.val', { n: fa(Math.round(w.maVert)) }) : '—' }] };
+            }
+          }) +
+          dataTable([T('progress.week'), T('progress.vert.bars'), T('progress.vert.ma')], W.map(function (w) {
+            return [esc(weekLabel(w.start)), fa(Math.round(w.vert)), w.maVert != null ? fa(Math.round(w.maVert)) : '—'];
+          }));
+      }
+      html += progCard('vert', T('progress.vert.title'), T('progress.vert.desc'), body, learnMore(['types']));
+    })();
+
+    // ---- ۷. پایبندی به برنامه ----
+    (function () {
+      var A = a.adherence, body;
+      if (!A.planned) body = emptyNote(T('progress.adh.empty'));
+      else {
+        var keys = ['completed', 'adapted', 'pain', 'missed'];
+        var pct = function (n) { return Math.round(n / A.planned * 100); };
+        var doneN = A.completed + A.adapted;
+        body = '<div class="adh-hero"><b dir="ltr">' + tt('progress.adh.pct', { n: pct(doneN) }) + '</b><span>' + esc(T('progress.adh.rate')) + SEP + tt('progress.adh.of', { n: doneN, total: A.planned }) + '</span></div>' +
+          '<div class="adh-bar" role="img" aria-label="' + esc(keys.map(function (k) { return T('progress.adh.' + k) + ' ' + pct(A[k]) + '%'; }).join('، ')) + '">' +
+          keys.filter(function (k) { return A[k]; }).map(function (k) {
+            return '<i title="' + esc(T('progress.adh.' + k)) + '" style="flex:' + A[k] + ';background:' + STATUS[k] + '"></i>';
+          }).join('') + '</div>' +
+          '<ul class="adh-legend">' + keys.map(function (k) {
+            return '<li><i class="ch-key ch-key-bar" style="background:' + STATUS[k] + '"></i><span>' + esc(T('progress.adh.' + k)) + '</span><b>' + tt('progress.adh.count', { n: A[k], p: pct(A[k]) }) + '</b></li>';
+          }).join('') + '</ul>';
+      }
+      html += progCard('adh', T('progress.adh.title'), T('progress.adh.desc'), body);
+    })();
+
+    app.innerHTML = html;
+    drawCharts();
+  }
+  // رسم بعد از قرار گرفتن در صفحه (عرض واقعی کادر) و دوباره با تغییر اندازه
+  function drawCharts() {
+    Object.keys(chartSpecs).forEach(function (id) {
+      var el = document.getElementById('ch-' + id), sp = chartSpecs[id];
+      if (!el) return;
+      var w = el.clientWidth || 600, n = sp.n;
+      sp.xTicks = window.CoachCharts.pickTicks(n, w, sp.xPx || 50, sp.xLabels);
+      window.CoachCharts.render(el, sp);
+    });
+  }
+  var resizeTimer = null, lastW = window.innerWidth;
+  window.addEventListener('resize', function () {
+    if (window.innerWidth === lastW) return;
+    lastW = window.innerWidth;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () { if (document.querySelector('.pcard .chart')) drawCharts(); }, 150);
+  });
+  app.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-prange]');
+    if (!b) return;
+    settings.progressRange = b.dataset.prange;
+    saveSettings();
+    renderProgress();
+  });
 
   // =====================================================================
   // آموزش: مقاله‌های کوتاه علمی (محتوا از js/i18n/learn-*.js)، هر مقاله در #learn/<شناسه>

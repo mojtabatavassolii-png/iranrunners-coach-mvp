@@ -768,4 +768,77 @@ test('بخش آموزش: هشت مقاله‌ی دوزبانه با ساختار
   try { assert.strictEqual(I.t('learn.readMin', { n: 2 }), '2 min read'); } finally { I.setLang('fa', false); }
 });
 
+// ---------- پیشرفت من (آنالیز) ----------
+function analyticsData(over) {
+  var p = profileFor(5, Object.assign({ goal: goalOf('10', '2027-03-12'), pb: { distanceKm: 10, timeSec: hms(0, 45), date: '2026-09-10' } }, over || {}));
+  var st = { profile: p, checkins: {}, done: {}, postRuns: {}, cycleChoices: {}, doneLog: {} };
+  // ۸ هفته: همه‌ی جلسه‌های دویدن انجام شده، به‌جز سه‌شنبه‌ها
+  for (var d = C.parseDate(p.startDate); d <= C.parseDate('2026-11-20'); d = C.addDays(d, 1)) {
+    var k = C.dateKey(d), s = C.sessionFor(p, d);
+    if (['rest', 'none'].indexOf(s.type) < 0 && d.getDay() !== 2) st.done[k] = true;
+  }
+  return st;
+}
+test('آنالیز: حجم هفتگی = جمع جلسه‌های انجام‌شده، میانگین ۴ هفته و بازه', function () {
+  var st = analyticsData(), today = C.parseDate('2026-11-20');
+  var a = C.analytics(st, today, null);
+  var w0 = a.weeks[0], sum = 0;
+  for (var i = 0; i < 7; i++) {
+    var d = C.addDays(C.parseDate(w0.start), i), s = C.sessionFor(st.profile, d);
+    if (st.done[C.dateKey(d)]) sum += s.km || 0;
+  }
+  assert(Math.abs(w0.km - sum) < 0.05, w0.km + ' vs ' + sum);
+  assert.strictEqual(a.weeks[a.weeks.length - 1].partial, true);
+  assert.strictEqual(a.weeks[2].maKm, null);
+  var w4 = a.weeks[4];
+  assert(Math.abs(w4.maKm - (a.weeks[1].km + a.weeks[2].km + a.weeks[3].km + a.weeks[4].km) / 4) < 1e-6);
+  // بازه‌ی ۴ هفته
+  var a4 = C.analytics(st, today, 28);
+  assert(a4.weeks.length <= 5 && a4.weeks.length >= 4, a4.weeks.length);
+  assert(a4.pmc.length === 28);
+  // خلاصه‌ی ذخیره‌شده بر محاسبه‌ی دوباره مقدمه (تاریخچه با تغییر برنامه عوض نمی‌شه)
+  var k = Object.keys(st.done)[0];
+  st.doneLog[k] = { type: 'easy', km: 99 };
+  assert(Math.abs(C.analytics(st, today, null).weeks[0].km - (sum - (C.sessionFor(st.profile, C.parseDate(k)).km || 0) + 99)) < 0.05);
+});
+test('آنالیز: CTL/ATL/TSB با میانگین نمایی ۴۲ و ۷ روزه', function () {
+  var st = analyticsData(), a = C.analytics(st, C.parseDate('2026-11-20'), null);
+  a.pmc.forEach(function (d) { assert(Math.abs(d.tsb - (d.ctl - d.atl)) < 1e-9); });
+  // یک هفته بدون تمرین: خستگی سریع‌تر از فیتنس افت می‌کنه، TSB بالا می‌ره
+  var b = C.analytics(st, C.parseDate('2026-11-27'), null), p = b.pmc, n = p.length;
+  var dAtl = p[n - 8].atl - p[n - 1].atl, dCtl = p[n - 8].ctl - p[n - 1].ctl;
+  assert(dAtl > dCtl && dCtl > 0, dAtl + ' ' + dCtl);
+  assert(p[n - 1].tsb > p[n - 8].tsb);
+  // بار جلسه = دقیقه × RPE؛ RPE ثبت‌شده‌ی کاربر جای پیش‌فرض رو می‌گیره
+  var e = { type: 'easy', km: 10 };
+  assert(Math.abs(C.sessionLoad(e, 5, 360) - 60 * 5) < 1e-9);
+  assert(Math.abs(C.sessionLoad(e, null, 360) - 60 * 3.5) < 1e-9);
+  assert.strictEqual(C.sessionLoad({ type: 'rest' }, 5, 360), 0);
+});
+test('آنالیز: پیس و پیش‌بینی مسابقه از رکوردها؛ چک‌این و پایبندی', function () {
+  var st = analyticsData({ fitnessTests: [{ date: '2026-10-24', distanceKm: 5, timeSec: hms(0, 21, 0), kind: 't5' }] });
+  st.checkins['2026-11-03'] = { fatigue: 5, sleep: 3, pain: false };   // سه‌شنبه؛ جلسه‌ی سخت تعدیل می‌شه
+  st.checkins['2026-11-05'] = { fatigue: 2, sleep: 4, pain: true };
+  st.done['2026-11-05'] = false; delete st.done['2026-11-05'];
+  var a = C.analytics(st, C.parseDate('2026-11-20'), null);
+  var first = a.samples[0], last = a.samples[a.samples.length - 1];
+  assert(last.vdot > first.vdot && last.e < first.e && last.t < first.t && last.i < first.i);
+  assert(Math.abs(last.riegel - C.riegel(hms(0, 21), 5, 10)) < 1e-6);
+  assert(Math.abs(first.riegel - hms(0, 45)) < 1e-6);
+  assert.strictEqual(a.checkins.length, 2);
+  var A = a.adherence;
+  assert.strictEqual(A.planned, A.completed + A.adapted + A.pain + A.missed);
+  var s5 = C.sessionFor(st.profile, C.parseDate('2026-11-05'));
+  assert.strictEqual(A.pain, ['rest', 'none'].indexOf(s5.type) < 0 ? 1 : 0);
+  assert(A.missed > 0); // سه‌شنبه‌ها انجام نشدن
+  // بدون هیچ داده‌ای: بدون خطا و خالی
+  var empty = C.analytics({ profile: st.profile, checkins: {}, done: {} }, C.parseDate('2026-09-27'), 91);
+  assert.strictEqual(empty.runsDone, 0);
+  assert.strictEqual(empty.checkins.length, 0);
+  // اولترا: صعود هفتگی از جلسه‌ها
+  var u = analyticsData({ goal: goalOf('ultra', '2027-03-12', { km: 60, gain: 3000 }) });
+  var au = C.analytics(u, C.parseDate('2026-11-20'), null);
+  assert(au.goal.ultra && au.weeks.some(function (w) { return w.vert > 0; }));
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

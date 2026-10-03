@@ -358,7 +358,7 @@
       tagline: 'Your running plan · beta',
       metaDescription: 'Be Your Own Coach: a weekly running plan built on fixed training rules, no server.',
       navAria: 'Sections',
-      nav: { plan: 'Plan', checkin: 'Today\'s check-in', fitness: 'Fitness', race: 'Race goal', learn: 'Learn', guide: 'Guide', profile: 'Profile' },
+      nav: { plan: 'Plan', checkin: 'Today\'s check-in', fitness: 'Fitness', race: 'Race goal', progress: 'My progress', learn: 'Learn', guide: 'Guide', profile: 'Profile' },
       langSwitch: 'فارسی',
       langSwitchAria: 'Switch language to Persian',
       bannerAria: 'Medical notice',
@@ -784,6 +784,67 @@
       restartQ: 'Restart the plan from week 1 (at your base volume)? Your check-ins are kept.',
       restartToast: 'The plan has restarted from today.',
       wipeQ: 'Delete all data (profile, check-ins, history) from this browser? This can\'t be undone.'
+    },
+
+    // ---------- My progress (charts) ----------
+    progress: {
+      title: 'My progress',
+      intro: 'Every chart is built from your own data: the sessions you marked done, your daily check-ins, the RPE you logged after runs, and your race results and time trials.',
+      rangeAria: 'Chart time range',
+      r4w: 'Last 4 weeks', r3m: 'Last 3 months', rAll: 'From the start',
+      emptyAll: 'After a few weeks of training, your progress charts will appear here. Mark each run as done and fill in your daily check-in so the data builds up.',
+      emptyCta: 'Go to the plan',
+      table: 'Show data table',
+      date: 'Date', week: 'Week',
+      weekOf: 'Week of {d}',
+      partialTag: 'in progress',
+      sep: ' · ',
+      vol: {
+        title: 'Weekly volume', desc: 'Kilometres from completed sessions each week, with a 4-week moving average.',
+        bars: 'Weekly km', ma: '4-week average', thisWeek: 'This week (so far)', avg4: '4-week average', trend: 'Trend',
+        up: 'Rising', down: 'Falling', flat: 'Steady', unit: 'km', val: '{n} km',
+        empty: 'After two weeks of logged training, your volume trend will appear here.'
+      },
+      pmc: {
+        title: 'Fitness and fatigue', desc: 'The standard CTL / ATL / TSB model. Each session\'s load = duration (minutes) × perceived effort (RPE).',
+        ctl: 'Fitness (CTL)', atl: 'Fatigue (ATL)', tsb: 'Form (TSB)',
+        ctlDesc: 'Weighted average of training load over the last 42 days; long-term fitness.',
+        atlDesc: 'Weighted average of load over the last 7 days; short-term fatigue.',
+        tsbDesc: 'Fitness minus fatigue; positive means you\'re fresh, negative means fatigue has built up.',
+        fresh: 'Fresh and ready', neutral: 'Balanced', tired: 'Fatigue building', veryTired: 'Heavy fatigue; take recovery seriously',
+        load: 'Session load', unit: 'load',
+        empty: 'After two weeks of logged training, your fitness and fatigue chart will appear here.'
+      },
+      pace: {
+        title: 'Pace improvement', desc: 'Easy, tempo and interval paces from the VDOT of each race result or time trial. Higher on the chart = faster.',
+        e: 'Easy', t: 'Tempo', i: 'Interval', vdot: 'VDOT', unit: 'min/km', faster: '↑ faster',
+        diffFaster: '{n} s faster', diffSlower: '{n} s slower', diffSame: 'No change', newTest: 'New result or time trial',
+        empty: 'You need at least two race results or time trials to see a pace trend. Log a time trial on the Fitness page every 4–6 weeks.'
+      },
+      checkins: {
+        title: 'Check-in trends', desc: 'Fatigue and sleep quality (1–5) and the days you reported pain; useful for spotting recurring patterns.',
+        fatigue: 'Fatigue', sleep: 'Sleep quality', pain: 'Pain', painYes: 'Pain reported',
+        avgF: 'Average fatigue', avgS: 'Average sleep', painDays: 'Pain days', of5: '{n} of 5',
+        weeklyAvg: 'weekly average', painN: { one: '{n} pain day', other: '{n} pain days' },
+        empty: 'After a few daily check-ins, your fatigue and sleep trends will appear here.'
+      },
+      pred: {
+        title: '{race} prediction trend', desc: 'Each week\'s prediction from your latest result or time trial up to that week. Higher on the chart = faster.',
+        riegel: 'Riegel formula', vdot: 'VDOT tables', now: 'Current prediction (Riegel)', delta: 'Change in this range',
+        better: '{t} faster', worse: '{t} slower', same: 'No change',
+        empty: 'You need at least two race results or time trials to see the prediction trend.'
+      },
+      vert: {
+        title: 'Weekly climbing', desc: 'Metres of ascent from completed sessions each week, with a 4-week moving average.',
+        bars: 'Weekly ascent', ma: '4-week average', unit: 'm', val: '{n} m', thisWeek: 'This week (so far)', avg4: '4-week average',
+        empty: 'After two weeks of logged training, your climbing trend will appear here.'
+      },
+      adh: {
+        title: 'Plan adherence', desc: 'Of the sessions planned in this range (up to today), how many you actually did.',
+        rate: 'completed', of: '{n} of {total} sessions', count: { one: '{n} session ({p}%)', other: '{n} sessions ({p}%)' }, pct: '{n}%',
+        completed: 'As planned', adapted: 'Adapted (fatigue, sleep or cycle)', pain: 'Cancelled for pain', missed: 'Not done',
+        empty: 'There are no past sessions in this range yet.'
+      }
     },
 
     // ---------- Guide page (HTML content) ----------
