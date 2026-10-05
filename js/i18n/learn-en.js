@@ -4,6 +4,7 @@
     title: 'Learn',
     intro: 'Short articles on the science your plan is built on, so you know <b>why</b> you do each session, not just <b>what</b> to do.',
     listAria: 'Articles',
+    guideSub: 'How the app works: levels, weekly rules, check-in, race goals and privacy',
     readMin: '{n} min read',
     backTo: { home: 'Back to today', progress: 'Back to progress', list: 'All articles', article: 'Previous article', plan: 'Back to plan', fitness: 'Back to fitness', checkin: 'Back to check-in', race: 'Back to race goal', guide: 'Back to guide', profile: 'Back to profile', other: 'Back' },
     more: 'Learn more:',

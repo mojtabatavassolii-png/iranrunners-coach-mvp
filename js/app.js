@@ -203,7 +203,7 @@
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, progress: renderProgress, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
+  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, settings: renderSettings, progress: renderProgress, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
   function route() {
     var loginMode = !isEntered();
     document.body.classList.toggle('login-mode', loginMode);
@@ -233,6 +233,15 @@
     // هشدار پزشکی فقط در صفحه‌ی چک‌این
     document.getElementById('medical-banner').hidden = v !== 'checkin';
     VIEWS[v](sub);
+    if (SUB_PAGES[v]) {
+      app.insertAdjacentHTML('afterbegin', backBar(v));
+      // هشدار پزشکی صفحه‌ی چک‌این زیر نوار برگشت
+      if (v === 'checkin') {
+        var mb = document.getElementById('medical-banner');
+        mb.hidden = true;
+        app.querySelector('.back-bar').insertAdjacentHTML('afterend', mb.outerHTML.replace(' id="medical-banner"', '').replace(' hidden', ''));
+      }
+    }
     animateView(v, tab);
     // رفتن مستقیم به یک بخش فرم (مثلاً «ویرایش داده‌های چرخه» از پروفایل)
     if (pendingFocus) {
@@ -244,14 +253,25 @@
     if (pk) openPainModal(pk);
   }
   var pendingFocus = null;
+  // «مشاهده جزئیات» از خانه: برنامه روی امروز، در هفته‌ی جاری
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-goto-today]')) { selectedDay = C.dateKey(today()); viewWeekOffset = 0; monthOffset = 0; }
+  }, true);
   document.addEventListener('click', function (e) {
     var f = e.target.closest && e.target.closest('[data-onb-focus]');
     if (f) pendingFocus = f.dataset.onbFocus === 'cycle' ? 'cycle-fieldset' : null;
   }, true);
+  // صفحه‌های فرعی: نوار برگشت بالای صفحه (برگشت واقعی تاریخچه، وگرنه تب مادر)
+  var SUB_PAGES = { checkin: '#home', race: '#home', fitness: '#progress', guide: '#learn', settings: '#profile' };
+  function backBar(v) {
+    var s = navState(), from = s && s.depth > 0 ? s.from : null;
+    return '<nav class="back-bar"><a class="learn-back" href="' + SUB_PAGES[v] + '"' + (from ? ' data-nav-back="1"' : '') + '>' +
+      chevron(isRtl() ? 'right' : 'left') + esc(T('app.back')) + '</a></nav>';
+  }
   // تب مادر هر صفحه
   var TABS = ['home', 'plan', 'progress', 'learn', 'profile'];
   var TAB_OF = { home: 'home', checkin: 'home', race: 'home', plan: 'plan', progress: 'progress', fitness: 'progress',
-    learn: 'learn', guide: 'profile', profile: 'profile' };
+    learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile' };
   // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
   var lastView = null, lastTab = null;
   function animateView(v, tab) {
@@ -346,7 +366,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=22" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=24" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -680,7 +700,7 @@
         hrMax: hrIn.max, hrRest: hrIn.rest,
         sex: sex, cycle: cycleObj,
         // تاریخچه‌ی فیتنس و تنظیم دستی پیس ایزی با ویرایش پروفایل حفظ می‌شن
-        fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0,
+        fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0, name: p.name || '',
         createdAt: p.createdAt || new Date().toISOString()
       };
       // تاریخ رکورد پایه: اگه تغییر نکرده، تاریخ قبلی؛ اگه جدیده، امروز
@@ -804,45 +824,6 @@
       (ad.kind === 'downgrade' ? '<p class="adapt-sum">' + t(sum.text) + '</p>' : '') + '</div>';
   }
 
-  function todayCard() {
-    var now = today(), key = C.dateKey(now);
-    var base = C.sessionFor(state.profile, now);
-    var ci = state.checkins[key];
-    var needsCheckin = ['rest', 'none'].indexOf(base.type) < 0;
-    var html = '<section class="card today-card"><div class="today-head"><div>' +
-      '<p class="eyebrow">' + esc(T('today.eyebrow', { day: base.dayName, date: faDate(key) })) + '</p>';
-
-    // یادآوری درد دیروز
-    var pc = prevCheckin(key);
-    var yesterdayPain = pc && pc.pain;
-
-    if (!needsCheckin) {
-      html += '<h2>' + badge(base.type, base.label) + '</h2></div></div>' + sessionBody(base);
-      if (yesterdayPain && !ci) html += painYesterdayBox();
-      return html + '</section>';
-    }
-    if (!ci) {
-      var rc = withCycle({ session: base, adaptation: null });
-      base = rc.session;
-      html += '<h2>' + badge(base.type, base.label) + ' <span class="pending">' + esc(T('today.waiting')) + '</span></h2></div></div>' +
-        (yesterdayPain ? painYesterdayBox() : '') + cycleBox(rc, key, key) +
-        '<div class="checkin-cta"><p>' + esc(T('today.cta')) + ' ' + helpLink('checkin', T('today.ctaHelp')) + '</p>' +
-        '<a class="btn btn-primary" href="#checkin">' + esc(T('today.ctaBtn')) + '</a></div>' +
-        '<details class="preview"><summary>' + esc(T('today.preview')) + '</summary>' + sessionBody(base) + '</details>';
-      return html + '</section>';
-    }
-    var r = effectiveSession(base);
-    var s = r.session;
-    html += '<h2>' + badge(s.type, s.label) + '</h2></div>' +
-      (s.type !== 'cancelled' ? doneButton(key, s) : '') + '</div>' +
-      adaptationBox(r.adaptation, key) + cycleBox(r, key, key) +
-      (s.type !== 'cancelled' ? sessionBody(s, { key: key, prefix: 'today', hint: C.easyDayHint(ci, prevCheckin(key)) }) : '') +
-      '<p class="small muted">' + tt('today.summary', { f: ci.fatigue, s: ci.sleep, p: T(ci.pain ? 'app.yes' : 'app.no') }) +
-      (ci.hours ? tt('today.hours', { n: ci.hours }) : '') +
-      (ci.pain ? '' : ' · <a href="#checkin">' + esc(T('today.edit')) + '</a>') + '</p>';
-    return html + '</section>';
-  }
-
   function painYesterdayBox() {
     return '<div class="alert alert-pain-soft" role="note"><strong>' + esc(T('pain.yesterdayStrong')) + '</strong> ' +
       esc(T('pain.yesterdayText')) + '</div>';
@@ -876,17 +857,13 @@
     // «قبلی» همیشه به سمت شروع خط اشاره می‌کنه: راست در فارسی، چپ در انگلیسی.
     var prevGlyph = chevron(isRtl() ? 'right' : 'left'), nextGlyph = chevron(isRtl() ? 'left' : 'right');
 
-    var html = '';
-    html += todayCard();
-    html += '<section class="card level-strip">' + levelCard(lv, true) + '</section>';
-    if (lv.level === 0) html += zeroCard(p, now);
-    html += cycleCard(now);
-    html += fitnessNotesCard(p, now);
-
-    html += '<div class="view-tabs" role="tablist" aria-label="' + esc(T('plan.viewAria')) + '">' +
+    // سربرگ صفحه: عنوان + هفتگی/ماهانه (تمرین امروز، چرخه و نکته‌های فیتنس در صفحه‌ی امروز هستن)
+    var html = '<header class="page-head"><h1>' + esc(T('tabs.plan')) + '</h1>' +
+      '<div class="view-tabs" role="tablist" aria-label="' + esc(T('plan.viewAria')) + '">' +
       ['week', 'month'].map(function (m) {
         return '<button type="button" role="tab" data-view-mode="' + m + '" aria-selected="' + (settings.planView === m) + '">' + esc(T('plan.' + m)) + '</button>';
-      }).join('') + '</div>';
+      }).join('') + '</div></header>';
+    if (lv.level === 0) html += zeroCard(p, now);
     if (settings.planView === 'month') {
       html += monthCard(p, now, todayKey, isRunWalk, prevGlyph, nextGlyph);
       app.innerHTML = html;
@@ -952,8 +929,10 @@
       (d === todayKey ? esc(T('week.todaySuffix')) : '') + '</p><h3>' + badge(ss.type, ss.label) + '</h3></div>' +
       (d <= todayKey && ['rest', 'none', 'cancelled'].indexOf(ss.type) < 0 && (d < todayKey || state.checkins[todayKey]) ? doneButton(d, ss) : '') +
       '</div>' +
+      (d === todayKey && !state.checkins[todayKey] && ['rest', 'none'].indexOf(ss.type) < 0 ?
+        '<div class="checkin-cta"><p>' + esc(T('today.cta')) + '</p><a class="btn btn-primary" href="#checkin">' + esc(T('home.startCheckin')) + '</a></div>' : '') +
       (rs.adaptation ? adaptationBox(rs.adaptation, d) : '') + cycleBox(rs, d, todayKey) +
-      (ss.type !== 'cancelled' ? sessionBody(ss, d <= todayKey && d !== todayKey ? { key: d, prefix: 'panel' } : {}) : '') +
+      (ss.type !== 'cancelled' ? sessionBody(ss, d < todayKey || (d === todayKey && state.checkins[todayKey]) ? { key: d, prefix: 'panel' } : {}) : '') +
       '</div>';
   }
 
@@ -1416,7 +1395,7 @@
     var r = ci ? effectiveSession(base) : withCycle({ session: base, adaptation: null });
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
       '<h1>' + esc(T(greetKey())) + '</h1></header>' +
-      homeToday(base, r.session, ci, key) + homeReadiness(ci, key, now) + homeSmart(r, key) +
+      homeToday(base, r.session, ci, key) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
       homeCycle(r, key, now) + homeProgress(now) + homeRace(now);
     app.innerHTML = '<div class="home">' + html + '</div>';
   }
@@ -1425,16 +1404,17 @@
     var main = cancelled ? T('home.cancelled') : (s.steps && s.steps[0]) || '';
     var wu = !cancelled && s.warmup && s.warmup.min ? T('home.withWarmup', { n: s.warmup.min }) : '';
     var cta;
-    if (cancelled) cta = '<a class="btn btn-outline btn-block" href="#plan">' + esc(T('home.details')) + '</a>';
+    if (cancelled) cta = '<a class="btn btn-outline btn-block" href="#plan" data-goto-today="1">' + esc(T('home.details')) + '</a>';
     else if (runDay && !ci) cta = '<a class="btn btn-primary btn-big btn-block" href="#checkin">' + esc(T('home.startCheckin')) + '</a>' +
-      '<p class="small muted center">' + esc(T('home.checkinHint')) + ' <a href="#plan">' + esc(T('home.preview')) + '</a></p>';
-    else if (runDay) cta = '<a class="btn btn-primary btn-big btn-block" href="#plan">' + esc(T('home.details')) + '</a>';
-    else cta = '<a class="btn btn-outline btn-block" href="#plan">' + esc(T('home.weekPlan')) + '</a>';
+      '<p class="small muted center">' + esc(T('home.checkinHint')) + ' <a href="#plan" data-goto-today="1">' + esc(T('home.preview')) + '</a></p>';
+    else if (runDay) cta = '<a class="btn btn-primary btn-big btn-block" href="#plan" data-goto-today="1">' + esc(T('home.details')) + '</a>';
+    else cta = '<a class="btn btn-outline btn-block" href="#plan" data-goto-today="1">' + esc(T('home.weekPlan')) + '</a>';
     return '<section class="card hcard hcard-today hc-' + s.type + '">' +
       '<div class="hcard-top"><span class="hcard-label">' + esc(T('home.todayTitle')) + '</span>' +
       (done ? '<span class="pill pill-done">✓ ' + esc(T('home.done')) + '</span>' : (s.original ? '<span class="pill pill-adapt">' + esc(T('home.adjusted')) + '</span>' : '')) + '</div>' +
       '<div class="today-main">' + badge(s.type, s.label) + (s.km ? '<b class="today-target">' + t(s.target) + '</b>' : (s.minutes ? '<b class="today-target">' + tt('home.minutes', { n: s.minutes }) + '</b>' : '')) + '</div>' +
       (main ? '<p class="today-sum">' + t(main) + (wu ? ' <span class="muted">' + t(wu) + '</span>' : '') + '</p>' : '') +
+      (!ci && runDay && prevCheckin(key) && prevCheckin(key).pain ? painYesterdayBox() : '') +
       cta + '</section>';
   }
   // وضعیت آمادگی: بدترِ دو نشانه (TSB از بار تمرینی، و چک‌این امروز با تاریخچه)
@@ -1556,11 +1536,12 @@
     var a = C.analytics(state, today(), RANGES[rk]);
     var rtl = isRtl();
     chartSpecs = {};
-    var html = '<section class="card"><h1>' + esc(T('progress.title')) + '</h1><p class="small muted">' + esc(T('progress.intro')) + '</p>' +
+    var html = '<header class="page-head"><h1>' + esc(T('progress.title')) + '</h1>' +
       '<div class="seg prange" role="group" aria-label="' + esc(T('progress.rangeAria')) + '">' +
       ['4w', '3m', 'all'].map(function (k) {
         return '<button type="button" data-prange="' + k + '" aria-pressed="' + (k === rk) + '">' + esc(T('progress.r' + (k === '4w' ? '4w' : k === '3m' ? '3m' : 'All'))) + '</button>';
-      }).join('') + '</div></section>';
+      }).join('') + '</div></header><p class="page-intro">' + esc(T('progress.intro')) + '</p>' +
+      (function () { var f = C.currentFitness(state.profile); return linkCard('#fitness', T('profile.linkFitness'), f ? 'VDOT ' + fa(f.vdot.toFixed(1)) + T('progress.sep') + T('profile.fitnessSub') : T('profile.registerTest')); })();
 
     if (!a || (!a.runsDone && !a.checkins.length)) {
       html += '<section class="card p-empty-all"><p>' + esc(T('progress.emptyAll')) + '</p><a class="btn btn-primary" href="#plan">' + esc(T('progress.emptyCta')) + '</a></section>';
@@ -1892,13 +1873,13 @@
     if (id && LEARN_ORDER.indexOf(id) < 0) id = null;
     var html;
     if (!id) {
-      html = '<section class="card"><h1>' + esc(T('learn.title')) + '</h1><p class="lead">' + T('learn.intro') + '</p></section>' +
+      html = '<header class="page-head"><h1>' + esc(T('learn.title')) + '</h1></header><p class="page-intro">' + T('learn.intro') + '</p>' +
         '<ul class="learn-list" aria-label="' + esc(T('learn.listAria')) + '">' + LEARN_ORDER.map(function (k, i) {
           var a = T('learn.articles.' + k);
           return '<li><a class="card learn-item" href="#learn/' + k + '"><span class="learn-num" aria-hidden="true">' + fa(i + 1) + '</span>' +
             '<span class="learn-text"><b>' + esc(a.title) + '</b><span class="small muted">' + esc(a.summary) + '</span>' +
             '<span class="learn-time">' + tt('learn.readMin', { n: readMinutes(a.body) }) + '</span></span></a></li>';
-        }).join('') + '</ul>';
+        }).join('') + '</ul>' + linkCard('#guide', T('app.nav.guide'), T('learn.guideSub'));
     } else {
       var a = T('learn.articles.' + id);
       var others = LEARN_ORDER.filter(function (k) { return k !== id; });
@@ -2102,25 +2083,6 @@
   }
 
   // نوع تقویم و روز شروع هفته؛ مستقل از زبان، ذخیره در localStorage
-  function settingsCard() {
-    function sel(id, name, cur, opts) {
-      return '<select id="' + id + '" name="' + name + '">' + opts.map(function (o) {
-        return '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
-      }).join('') + '</select>';
-    }
-    var D = C.DAY_NAMES;
-    var lang = I.getLang();
-    return '<section class="card settings-card"><h2>' + esc(T('settings.title')) + '</h2>' +
-      '<div class="field"><span class="field-label">' + esc(T('settings.language')) + '</span><div class="seg lang-seg" role="group" aria-label="' + esc(T('settings.language')) + '">' +
-      '<button type="button" data-setlang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '">فارسی</button>' +
-      '<button type="button" data-setlang="en" lang="en" aria-pressed="' + (lang === 'en') + '">English</button></div></div>' +
-      '<div class="row2"><div class="field"><label for="set-cal">' + esc(T('settings.calendar')) + '</label>' +
-      sel('set-cal', 'calendar', settings.calendar, [['auto', T('settings.auto')], ['jalali', T('settings.jalali')], ['gregorian', T('settings.gregorian')]]) + '</div>' +
-      '<div class="field"><label for="set-ws">' + esc(T('settings.weekStart')) + '</label>' +
-      sel('set-ws', 'weekStart', settings.weekStart, [['auto', T('settings.auto')], ['sat', D[0]], ['sun', D[1]], ['mon', D[2]]]) + '</div></div>' +
-      '<p class="small muted">' + tt('settings.current', { cal: T('settings.' + I.getCalendar()), day: C.DAY_NAMES[C.WEEK_ORDER[0]] }) + '</p>' +
-      '<p class="small muted">' + esc(T('settings.note')) + '</p></section>';
-  }
   function cycleSettings() {
     var p = state.profile;
     if (!p || p.sex !== 'female') return '';
@@ -2153,43 +2115,138 @@
     var b = e.target.closest && e.target.closest('[data-setlang]');
     if (b && b.dataset.setlang !== I.getLang()) switchLang(b.dataset.setlang);
   });
+  // ---------- عکس پروفایل: فقط در همین مرورگر (localStorage)، کوچک‌شده به ۳۰۰×۳۰۰ ----------
+  var AVATAR_KEY = 'iranrunners-coach-avatar', AVATAR_PX = 300, AVATAR_MAX_BYTES = 120 * 1024;
+  function getAvatar() { try { return localStorage.getItem(AVATAR_KEY); } catch (e) { return null; } }
+  function avatarHtml(size) {
+    var src = getAvatar(), p = state.profile, name = (p && p.name || '').trim();
+    if (src) return '<img class="avatar-img" src="' + esc(src) + '" alt="" width="' + size + '" height="' + size + '">';
+    if (name) return '<span class="avatar-initial" aria-hidden="true">' + esc(Array.from(name)[0].toUpperCase()) + '</span>';
+    // آیکون دونده
+    return '<svg class="avatar-runner" viewBox="0 0 24 24" width="' + Math.round(size * 0.5) + '" height="' + Math.round(size * 0.5) + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<circle cx="14.5" cy="4.5" r="2"/><path d="M8 21l3-6 3 2v5"/><path d="M6.5 12.5 9 9l4-.5 2.5 3.5 3 1"/><path d="M11 15l2-6.5"/></svg>';
+  }
+  // برش مربعی از وسط و کوچک کردن؛ JPEG با کیفیت کم‌شونده تا زیر سقف حجم بره
+  function shrinkImage(file, done, fail) {
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      var side = Math.min(img.naturalWidth, img.naturalHeight), out = Math.min(AVATAR_PX, side);
+      var c = document.createElement('canvas');
+      c.width = c.height = out;
+      var g = c.getContext('2d');
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, out, out);
+      var q = 0.85, data = c.toDataURL('image/jpeg', q);
+      while (data.length > AVATAR_MAX_BYTES * 1.37 && q > 0.4) { q -= 0.1; data = c.toDataURL('image/jpeg', q); }
+      done(data);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); fail(); };
+    img.src = url;
+  }
+  app.addEventListener('change', function (e) {
+    if (e.target.id !== 'avatar-file') return;
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    if (!/^image\//.test(f.type)) { showToast(T('profile.photoBad')); return; }
+    shrinkImage(f, function (data) {
+      try { localStorage.setItem(AVATAR_KEY, data); showToast(T('profile.photoSaved')); }
+      catch (err) { showToast(T('profile.photoFull')); }
+      route();
+    }, function () { showToast(T('profile.photoBad')); });
+  });
+  app.addEventListener('click', function (e) {
+    if (!(e.target.closest && e.target.closest('[data-avatar-remove]'))) return;
+    try { localStorage.removeItem(AVATAR_KEY); } catch (err) { /* */ }
+    route();
+  });
+
+  // کارت لینک یک‌خطی به یک صفحه‌ی فرعی
+  function linkCard(href, title, sub) {
+    return '<a class="card link-card" href="' + href + '"><span><b>' + esc(title) + '</b>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' +
+      chevron(isRtl() ? 'left' : 'right') + '</a>';
+  }
+
+  // ---------- پروفایل: فقط عکس، نام، سطح، هدف و ورود به تنظیمات ----------
   function renderProfile() {
-    var p = state.profile;
-    var bmi = C.bmi(p);
-    var lv = C.assessLevel(p), hrz = C.hrZones(p), fit = C.currentFitness(p), g = C.goalInfo(p);
+    var p = state.profile, lv = C.assessLevel(p), g = C.goalInfo(p), race = C.raceInfo(p), now = today();
+    var name = (p.name || '').trim(), hasPhoto = !!getAvatar();
+    var days = race ? Math.round(C.daysBetween(now, race.date)) : null;
+    app.innerHTML = '<section class="card pf-card">' +
+      '<label class="pf-avatar-btn" for="avatar-file" title="' + esc(T('profile.photoPick')) + '">' + avatarHtml(112) +
+      '<span class="pf-cam" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>' +
+      '<span class="sr-only">' + esc(T('profile.photoPick')) + '</span></label>' +
+      '<input type="file" id="avatar-file" accept="image/*" class="sr-only">' +
+      (hasPhoto ? '<button type="button" class="linklike small" data-avatar-remove="1">' + esc(T('profile.photoRemove')) + '</button>' : '') +
+      '<h1 class="pf-name">' + esc(name || T('profile.noName')) + '</h1>' +
+      (name ? '' : '<p class="small muted">' + esc(T('profile.noNameHint')) + '</p>') +
+      '<div class="pf-summary">' +
+      '<div><span>' + esc(T('profile.rows.level')) + '</span><b>' + tt('profile.levelNum', { n: lv.level }) + '</b><small>' + esc(lv.info.name) + '</small></div>' +
+      '<div><span>' + esc(T('profile.rows.goal')) + '</span><b>' + (g.type !== 'none' ? t(C.goalLabel(g)) : esc(T('profile.noGoal'))) + '</b>' +
+      (race && days >= 0 ? '<small>' + tt('profile.goalIn', { n: days }) + '</small>' : '') + '</div></div>' +
+      '<a class="btn btn-primary btn-big btn-block pf-settings" href="#settings">' +
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>' +
+      esc(T('settingsPage.title')) + '</a></section>';
+  }
+
+  // ---------- تنظیمات: دسته‌های جمع‌وبازشونده ----------
+  var SET_ICONS = {
+    lang: '<path d="M4 5h8M8 3v2M5.5 5c.8 3.5 3.3 6.2 6.5 7.5M11 5c-.8 4-3.4 7.2-7 8.5"/><path d="M13 21l4-9 4 9M14.5 18h5"/>',
+    cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    health: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+    person: '<circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/>',
+    data: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>'
+  };
+  var openSettings = {};
+  function setSection(id, icon, title, sub, body) {
+    return '<details class="card set-sec" id="set-' + id + '"' + (openSettings[id] ? ' open' : '') + '><summary>' +
+      '<span class="set-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + SET_ICONS[icon] + '</svg></span>' +
+      '<span class="set-head"><b>' + esc(title) + '</b><small>' + sub + '</small></span><span class="set-chev" aria-hidden="true"></span></summary>' +
+      '<div class="set-body">' + body + '</div></details>';
+  }
+  app.addEventListener('toggle', function (e) {
+    var d = e.target;
+    if (d.classList && d.classList.contains('set-sec')) openSettings[d.id.slice(4)] = d.open;
+  }, true);
+  function renderSettings() {
+    var p = state.profile, bmi = C.bmi(p);
+    var lv = C.assessLevel(p), hrz = C.hrZones(p), fit = C.currentFitness(p), g = C.goalInfo(p), c = p.cycle || {};
     var nCheck = Object.keys(state.checkins).length, nDone = Object.keys(state.done).length;
     var muted = function (key) { return '<span class="muted">' + esc(T(key)) + '</span>'; };
     function row(k, v) { return '<div class="kv"><dt>' + esc(T('profile.rows.' + k)) + '</dt><dd>' + v + '</dd></div>'; }
-    var c = p.cycle || {}, ICON_CHEV = chevron(isRtl() ? 'left' : 'right');
-    function link(href, key, sub) {
-      return '<li><a class="list-link" href="' + href + '"><span><b>' + esc(T(key)) + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span>' + ICON_CHEV + '</a></li>';
+    function sel(id, name, cur, opts) {
+      return '<select id="' + id + '" name="' + name + '">' + opts.map(function (o) {
+        return '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
+      }).join('') + '</select>';
     }
-    var html =
-      // ۱. اطلاعات شخصی
-      '<section class="card pf-hero"><div class="pf-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/></svg></div>' +
-      '<div class="pf-id"><h1>' + esc(T('profile.title')) + '</h1>' +
-      '<span class="pill pill-level">' + tt('profile.levelVal', { n: lv.level, name: lv.info.name }) + '</span></div>' +
-      '<dl class="pf-facts">' +
-      '<div><dt>' + esc(T('profile.rows.age')) + '</dt><dd>' + fa(p.age) + '</dd></div>' +
-      (p.sex && p.sex !== 'na' ? '<div><dt>' + esc(T('profile.rows.sex')) + '</dt><dd>' + esc(T('cycle.sex.' + p.sex)) + '</dd></div>' : '') +
-      '<div><dt>VDOT</dt><dd>' + (fit ? fa(fit.vdot.toFixed(1)) : '—') + '</dd></div>' +
-      '<div class="pf-goal"><dt>' + esc(T('profile.rows.goal')) + '</dt><dd>' + (g.type !== 'none' ? t(C.goalLabel(g)) + (g.date ? '<small>' + esc(faDate(g.date)) + '</small>' : '') : muted('profile.noGoal')) + '</dd></div>' +
-      '</dl><a class="btn btn-primary btn-block" href="#onboarding">' + esc(T('profile.editOnb')) + '</a>' +
-      '<p class="small muted center">' + esc(T('profile.editHint')) + '</p></section>' +
-      // ۲. تنظیمات زبان و تقویم
-      settingsCard() +
-      // ۳. چرخه‌ی قاعدگی (فقط وقتی جنسیت «زن» ثبت شده)
-      (p.sex === 'female' ? '<section class="card"><h2>' + esc(T('cycle.settingsTitle')) + '</h2>' + cycleSettings() +
-        (c.lastStart ? '<p class="small muted">' + tt('cycle.profileOn', { len: c.cycleLen, p: c.periodLen }) + T('progress.sep') + esc(T('profile.cycleLast', { d: faDate(c.lastStart) })) + '</p>' : '') +
-        '<a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.cycleEdit')) + '</a></section>' : '') +
-      // ۴. صفحه‌های بیشتر
-      '<section class="card"><h2>' + esc(T('profile.moreTitle')) + '</h2><ul class="link-list">' +
-      link('#checkin', 'app.nav.checkin') +
-      link('#fitness', 'profile.linkFitness', fit ? 'VDOT ' + fa(fit.vdot.toFixed(1)) : esc(T('profile.registerTest'))) +
-      (g.type !== 'none' ? link('#race', 'app.nav.race', t(C.goalLabel(g))) : '') +
-      link('#guide', 'app.nav.guide') + '</ul></section>' +
-      // ۵. جزئیات کامل
-      '<details class="card pf-details"><summary><h2>' + esc(T('profile.detailsTitle')) + '</h2></summary><dl class="kv-list">' +
+    var lang = I.getLang(), D = C.DAY_NAMES;
+    var html = '<header class="page-head"><h1>' + esc(T('settingsPage.title')) + '</h1></header>' +
+      // ۱. زبان و نمایش
+      setSection('lang', 'lang', T('settingsPage.lang'), esc(lang === 'fa' ? 'فارسی' : 'English'),
+        '<div class="field"><span class="field-label">' + esc(T('settings.language')) + '</span><div class="seg lang-seg" role="group" aria-label="' + esc(T('settings.language')) + '">' +
+        '<button type="button" data-setlang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '">فارسی</button>' +
+        '<button type="button" data-setlang="en" lang="en" aria-pressed="' + (lang === 'en') + '">English</button></div></div>') +
+      // ۲. تقویم
+      setSection('cal', 'cal', T('settingsPage.cal'), tt('settings.current', { cal: T('settings.' + I.getCalendar()), day: C.DAY_NAMES[C.WEEK_ORDER[0]] }),
+        '<div class="row2"><div class="field"><label for="set-cal">' + esc(T('settings.calendar')) + '</label>' +
+        sel('set-cal', 'calendar', settings.calendar, [['auto', T('settings.auto')], ['jalali', T('settings.jalali')], ['gregorian', T('settings.gregorian')]]) + '</div>' +
+        '<div class="field"><label for="set-ws">' + esc(T('settings.weekStart')) + '</label>' +
+        sel('set-ws', 'weekStart', settings.weekStart, [['auto', T('settings.auto')], ['sat', D[0]], ['sun', D[1]], ['mon', D[2]]]) + '</div></div>' +
+        '<p class="small muted">' + esc(T('settings.note')) + '</p>') +
+      // ۳. سلامت و چرخه
+      setSection('health', 'health', T('settingsPage.health'),
+        esc(p.sex === 'female' ? T(c.enabled ? 'settingsPage.cycleOn' : 'settingsPage.cycleOff') : T('settingsPage.cycleNA')),
+        (p.sex === 'female' ? cycleSettings() +
+          (c.lastStart ? '<p class="small muted">' + tt('cycle.profileOn', { len: c.cycleLen, p: c.periodLen }) + T('progress.sep') + esc(T('profile.cycleLast', { d: faDate(c.lastStart) })) + '</p>' : '') +
+          '<a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.cycleEdit')) + '</a>'
+          : '<p class="small muted">' + esc(T('settingsPage.cycleHint')) + '</p><a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.editOnb')) + '</a>')) +
+      // ۴. اطلاعات شخصی
+      setSection('person', 'person', T('settingsPage.person'), tt('settingsPage.personSub', { age: p.age, n: lv.level }),
+        '<div class="field"><label for="set-name">' + esc(T('settingsPage.name')) + '</label>' +
+        '<input id="set-name" type="text" maxlength="40" autocomplete="name" value="' + esc(p.name || '') + '" placeholder="' + esc(T('settingsPage.namePh')) + '"></div>' +
+        '<a class="btn btn-primary" href="#onboarding">' + esc(T('profile.editOnb')) + '</a>' +
+        '<p class="small muted">' + esc(T('profile.editHint')) + '</p>' +
+        '<dl class="kv-list">' +
       row('level', tt('profile.levelVal', { n: lv.level, name: lv.info.name }) +
         (lv.vdot ? ' <span class="muted small">(VDOT ' + t(lv.vdot.toFixed(1)) + ')</span>' : '')) +
       row('exp', esc(C.EXPERIENCE[p.experience] ? C.EXPERIENCE[p.experience].label : '—')) +
@@ -2208,28 +2265,33 @@
       row('pb', p.pb ? tt('profile.pbVal', { km: p.pb.distanceKm }) + ' <span dir="ltr">' + fa(C.formatDuration(p.pb.timeSec)) + '</span>' : muted('profile.notRecorded')) +
       row('start', esc(faDate(p.startDate))) +
       row('stats', tt('profile.statsVal', { c: nCheck, d: nDone })) +
-      '</dl></details>' +
-      // ۶. حساب و داده‌ها
-      '<section class="card"><h2>' + esc(T('profile.accountTitle')) + '</h2><div class="actions">' +
-      '<button type="button" class="btn btn-outline" id="restart">' + esc(T('profile.restart')) + '</button>' +
-      '<button type="button" class="btn btn-ghost" id="logout">' + esc(T('login.logout')) + '</button>' +
-      '<button type="button" class="btn btn-ghost danger-text" id="wipe">' + esc(T('profile.wipe')) + '</button>' +
-      '</div><div id="confirm-box" class="alert alert-note confirm-box" role="alertdialog" aria-live="polite" hidden>' +
-      '<p id="confirm-text"></p><div class="actions">' +
-      '<button type="button" class="btn btn-primary" id="confirm-yes">' + esc(T('profile.confirmYes')) + '</button>' +
-      '<button type="button" class="btn btn-ghost" id="confirm-no">' + esc(T('app.cancel')) + '</button></div></div>' +
-      '<p class="small muted">' + esc(T('app.footer')) + '</p></section>' +
-      warningsCard(C.profileWarnings(p, today()));
+        '</dl>' + '<div class="level-strip">' + levelCard(lv, true) + '</div>' + warningsCard(C.profileWarnings(p, today()))) +
+      // ۵. داده‌ها
+      setSection('data', 'data', T('settingsPage.data'), tt('profile.statsVal', { c: nCheck, d: nDone }),
+        '<p class="small muted">' + esc(T('app.footer')) + '</p><div class="actions">' +
+        '<button type="button" class="btn btn-outline" id="restart">' + esc(T('profile.restart')) + '</button>' +
+        '<button type="button" class="btn btn-ghost" id="logout">' + esc(T('login.logout')) + '</button></div>' +
+        '<div class="danger-zone"><b>' + esc(T('settingsPage.dangerTitle')) + '</b><p class="small">' + esc(T('settingsPage.dangerText')) + '</p>' +
+        '<button type="button" class="btn btn-danger-outline" id="wipe">' + esc(T('profile.wipe')) + '</button></div>' +
+        '<div id="confirm-box" class="alert confirm-box confirm-danger" role="alertdialog" aria-live="polite" hidden>' +
+        '<p id="confirm-text"></p>' +
+        '<label class="check-row" id="confirm-ack-row" hidden><input type="checkbox" id="confirm-ack"> <span>' + esc(T('settingsPage.wipeAck')) + '</span></label>' +
+        '<div class="actions"><button type="button" class="btn btn-primary" id="confirm-yes">' + esc(T('profile.confirmYes')) + '</button>' +
+        '<button type="button" class="btn btn-ghost" id="confirm-no">' + esc(T('app.cancel')) + '</button></div></div>');
     app.innerHTML = html;
 
-    // تایید داخل صفحه (به‌جای confirm مرورگر)
+    // تایید داخل صفحه؛ برای پاک کردن داده‌ها تیک «غیرقابل بازگشت» هم لازمه
     var pending = null;
-    function ask(text, action) {
+    function ask(text, action, needAck) {
       pending = action;
       document.getElementById('confirm-text').textContent = text;
+      document.getElementById('confirm-ack-row').hidden = !needAck;
+      document.getElementById('confirm-ack').checked = false;
+      document.getElementById('confirm-yes').disabled = !!needAck;
       document.getElementById('confirm-box').hidden = false;
-      document.getElementById('confirm-yes').focus();
+      document.getElementById(needAck ? 'confirm-ack' : 'confirm-yes').focus();
     }
+    document.getElementById('confirm-ack').addEventListener('change', function (e) { document.getElementById('confirm-yes').disabled = !e.target.checked; });
     document.getElementById('confirm-no').addEventListener('click', function () {
       pending = null;
       document.getElementById('confirm-box').hidden = true;
@@ -2253,13 +2315,19 @@
     document.getElementById('wipe').addEventListener('click', function () {
       ask(T('profile.wipeQ'), function () {
         state = emptyState();
-        try { localStorage.removeItem(STORE_KEY); } catch (e) { /* */ }
+        try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(AVATAR_KEY); } catch (e) { /* */ }
         memoryFallback = null;
         location.hash = '#onboarding';
         route();
-      });
+      }, true);
     });
   }
+  // نام (اختیاری)
+  app.addEventListener('change', function (e) {
+    if (e.target.id !== 'set-name') return;
+    state.profile.name = e.target.value.trim().slice(0, 40);
+    save(); showToast(T('settings.saved'));
+  });
 
   applyStatic();
   // بارگذاری دوباره‌ی صفحه: وضعیت ذخیره‌شده‌ی همین ورودی تاریخچه برمی‌گرده

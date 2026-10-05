@@ -182,7 +182,7 @@ legend + * { clear: both; }
 .sub-legend { font-weight: 700; margin: 14px 0 6px; }
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
 .field label { font-weight: 500; font-size: 0.92rem; }
-input[type=number], input[type=date], input:not([type]), select, textarea {
+input[type=number], input[type=date], input[type=text], input:not([type]), select, textarea {
   font: inherit; font-size: 1rem;
   padding: 10px 12px; border: 1.5px solid var(--field-line); border-radius: 10px; background: #fff; color: var(--text);
   width: 100%; min-height: 44px;
@@ -816,3 +816,80 @@ body.has-tabbar #app { max-width: 720px; margin: 0 auto; }
 .adapt-more[open] summary { margin-bottom: 8px; }
 .prog-note { margin: 0 0 4px; }
 body.has-tabbar .header-inner { max-width: 720px; }
+
+/* ---------- یکپارچه‌سازی صفحه‌ها در قالب اپ ---------- */
+body.has-tabbar .card { border-radius: 20px; box-shadow: 0 10px 28px -20px rgba(15, 42, 42, 0.35); padding: 16px 18px; margin-bottom: 14px; }
+@media (min-width: 720px) { body.has-tabbar .card { padding: 20px 24px; } }
+body.has-tabbar .home .card { margin-bottom: 0; }
+body.has-tabbar #app { padding-top: 14px; }
+.page-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 2px 2px 12px; }
+.page-head h1 { margin: 0; font-size: 1.45rem; }
+.page-head .view-tabs, .page-head .prange { margin: 0; }
+.page-intro { color: var(--muted); font-size: 0.9rem; margin: -4px 2px 14px; line-height: 1.8; }
+.back-bar { margin: 0 2px 10px; }
+.back-bar .learn-back { font-size: 0.95rem; }
+/* برنامه: کارت هفته و پنل روز جمع‌وجورتر */
+body.has-tabbar .week-card .week-head { margin-bottom: 8px; }
+body.has-tabbar .day-panel { border-radius: 16px; }
+.day-panel .checkin-cta { margin: 10px 0; }
+/* آموزش: فهرست کارتی هم‌سبک */
+body.has-tabbar .learn-item { margin: 0; }
+/* عنصرهایی که با فوکوس یا اسکرول نمایان می‌شن زیر نوار پایین نرن */
+html:has(body.has-tabbar) { scroll-padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); scroll-padding-top: 80px; }
+
+/* ---------- پروفایل ساده با عکس ---------- */
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.pf-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding-top: 24px !important; }
+.pf-avatar-btn {
+  position: relative; width: 112px; height: 112px; border-radius: 50%; cursor: pointer; display: grid; place-items: center;
+  background: var(--brand-soft); color: var(--brand); box-shadow: 0 0 0 4px #fff, 0 0 0 6px var(--brand-light);
+}
+.pf-avatar-btn:hover { box-shadow: 0 0 0 4px #fff, 0 0 0 6px var(--brand); }
+#avatar-file:focus-visible + * , .pf-avatar-btn:focus-within { outline: 3px solid var(--brand); outline-offset: 6px; }
+.avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.avatar-initial { font-size: 2.8rem; font-weight: 800; color: var(--brand-deep); line-height: 1; }
+.pf-cam { position: absolute; bottom: 2px; inset-inline-end: 2px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: #fff; box-shadow: 0 0 0 3px #fff; }
+.pf-name { margin: 6px 0 0; font-size: 1.5rem; }
+.pf-card .small.muted { margin: 0; text-align: center; }
+.pf-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin: 10px 0 6px; }
+.pf-summary > div { background: var(--bg); border-radius: 14px; padding: 10px 12px; display: grid; gap: 2px; text-align: start; }
+.pf-summary span { font-size: 0.75rem; color: var(--muted); }
+.pf-summary b { font-size: 1rem; }
+.pf-summary small { color: var(--brand-deep); font-weight: 600; font-size: 0.78rem; }
+.pf-settings { margin-top: 6px; gap: 10px; }
+.linklike.small { font-size: 0.85rem; }
+
+/* ---------- تنظیمات: دسته‌های جمع‌وبازشونده با آیکون ---------- */
+.set-sec { padding: 0 !important; overflow: hidden; }
+.set-sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+.set-sec > summary::-webkit-details-marker { display: none; }
+.set-sec > summary:focus-visible { outline: 3px solid var(--brand); outline-offset: -3px; border-radius: 20px; }
+.set-ico { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-deep); }
+.set-head { flex: 1; display: grid; gap: 2px; text-align: start; min-width: 0; }
+.set-head b { font-size: 1rem; }
+.set-head small { color: var(--muted); font-size: 0.8rem; }
+.set-chev { flex: none; width: 10px; height: 10px; border-right: 2px solid var(--faint); border-bottom: 2px solid var(--faint); transform: translateY(-2px) rotate(45deg); transition: transform .2s; margin-inline-end: 6px; }
+.set-sec[open] .set-chev { transform: translateY(2px) rotate(-135deg); }
+.set-sec[open] > summary { border-bottom: 1px solid var(--line); }
+.set-body { padding: 14px 16px 16px; display: grid; gap: 12px; }
+.set-body .field, .set-body p, .set-body .kv-list, .set-body .actions, .set-body .check-row { margin: 0; }
+.set-body .btn { justify-self: start; }
+.set-body .level-strip { border-top: 1px solid var(--line); padding-top: 12px; }
+#set-data .danger-zone { border: 1.5px solid var(--danger-soft); background: #fff8f7; border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; }
+.danger-zone b { color: var(--danger); }
+.btn-danger-outline { background: #fff; color: var(--danger); border-color: var(--danger); }
+.btn-danger-outline:hover { background: var(--danger); color: #fff; }
+.confirm-box .check-row { margin: 6px 0; }
+
+/* کارت لینک یک‌خطی (فیتنس در پیشرفت، راهنما در آموزش) */
+.link-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-decoration: none; color: var(--text); }
+.link-card span { display: grid; gap: 2px; text-align: start; }
+.link-card small { color: var(--muted); font-size: 0.82rem; }
+.link-card .chev { color: var(--faint); width: 20px; height: 20px; flex: none; }
+.link-card:hover b { color: var(--brand-deep); }
+body.has-tabbar .learn-list + .link-card { margin-top: 14px; }
+
+.confirm-danger { background: var(--danger-soft); color: var(--danger-text); border: 1.5px solid var(--danger); }
+.confirm-danger #confirm-yes { background: var(--danger); border-color: var(--danger); color: #fff; }
+.confirm-danger #confirm-yes:disabled { opacity: 0.4; }
+body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }

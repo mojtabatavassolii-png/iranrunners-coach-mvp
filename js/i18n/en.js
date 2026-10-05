@@ -412,6 +412,7 @@
       tagline: 'Your running plan · beta',
       metaDescription: 'Be Your Own Coach: a weekly running plan built on fixed training rules, no server.',
       navAria: 'Sections',
+      back: 'Back',
       nav: { plan: 'Plan', checkin: 'Today\'s check-in', fitness: 'Fitness', race: 'Race goal', progress: 'My progress', learn: 'Learn', guide: 'Guide', profile: 'Profile' },
       langSwitch: 'فارسی',
       langSwitchAria: 'Switch language to Persian',
@@ -816,6 +817,10 @@
       title: 'My profile',
       warningsTitle: 'Important notes for you',
       editOnb: 'Edit your details (setup form)',
+      photoPick: 'Choose a profile photo', photoRemove: 'Remove photo', photoSaved: 'Profile photo saved.',
+      photoBad: 'This image can\'t be read; please choose another photo.', photoFull: 'Browser storage is full; the photo wasn\'t saved.',
+      noName: 'Runner', noNameHint: 'Add your name in Settings, under "Personal details".',
+      levelNum: '{n} of 10', goalIn: { one: '{n} day to go', other: '{n} days to go' }, fitnessSub: 'log a time trial or new result',
       editHint: 'If your level, training volume or circumstances have changed, fill in the form again so the plan updates.',
       cycleLast: 'Last period started: {d}',
       cycleEdit: 'Edit cycle data',
@@ -851,6 +856,18 @@
       restartQ: 'Restart the plan from week 1 (at your base volume)? Your check-ins are kept.',
       restartToast: 'The plan has restarted from today.',
       wipeQ: 'Delete all data (profile, check-ins, history) from this browser? This can\'t be undone.'
+    },
+
+    // ---------- Settings page ----------
+    settingsPage: {
+      title: 'Settings',
+      lang: 'Language and display', cal: 'Calendar', health: 'Health and cycle', person: 'Personal details', data: 'Data',
+      cycleOn: 'Cycle adaptation is on', cycleOff: 'Cycle adaptation is off', cycleNA: 'For female users',
+      cycleHint: 'Menstrual cycle settings become available when "female" is selected as sex in the setup form.',
+      personSub: '{age} years old, level {n}',
+      name: 'Name (optional)', namePh: 'e.g. Sara',
+      dangerTitle: 'Delete all data', dangerText: 'Your profile, check-ins, completed sessions, results and profile photo will be removed from this browser. This can\'t be undone.',
+      wipeAck: 'I understand this can\'t be undone.'
     },
 
     // ---------- Bottom navigation and home page ----------
