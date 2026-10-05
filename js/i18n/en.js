@@ -587,7 +587,8 @@
       statsMin: { one: '{n} session · {min} min · {d} done', other: '{n} sessions · {min} min · {d} done' }
     },
     settings: {
-      title: 'Calendar settings',
+      title: 'Language and calendar',
+      language: 'Language',
       calendar: 'Calendar',
       weekStart: 'First day of the week',
       auto: 'Automatic (from language)',
@@ -814,7 +815,16 @@
     profile: {
       title: 'My profile',
       warningsTitle: 'Important notes for you',
+      editOnb: 'Edit your details (setup form)',
+      editHint: 'If your level, training volume or circumstances have changed, fill in the form again so the plan updates.',
+      cycleLast: 'Last period started: {d}',
+      cycleEdit: 'Edit cycle data',
+      moreTitle: 'More',
+      linkFitness: 'Fitness and time trials',
+      detailsTitle: 'Full profile details',
+      accountTitle: 'Account and data',
       rows: {
+        age: 'Age',
         level: 'Level', exp: 'Running history', structured: 'Structured training', hr: 'Heart rate', fitness: 'Current fitness',
         km: 'Training volume', body: 'Age / weight / height', days: 'Free days', locs: 'Training locations',
         sex: 'Sex', cycle: 'Cycle adaptation', injury: 'Injury / limitation', goal: 'Race goal', pb: 'Best time', start: 'Plan start', stats: 'Stats'
@@ -841,6 +851,32 @@
       restartQ: 'Restart the plan from week 1 (at your base volume)? Your check-ins are kept.',
       restartToast: 'The plan has restarted from today.',
       wipeQ: 'Delete all data (profile, check-ins, history) from this browser? This can\'t be undone.'
+    },
+
+    // ---------- Bottom navigation and home page ----------
+    tabs: { aria: 'Main sections', home: 'Today', plan: 'Plan', progress: 'Progress', learn: 'Learn', profile: 'Profile' },
+    home: {
+      date: '{day} {date}',
+      greet: { morning: 'Good morning', day: 'Good afternoon', evening: 'Good evening' },
+      todayTitle: 'Today\'s session', done: 'Done', adjusted: 'Adjusted',
+      cancelled: 'Don\'t train today because of pain.',
+      withWarmup: '(with about {n} min of warm-up)',
+      startCheckin: 'Start check-in', checkinHint: 'Before you train; under a minute.', preview: 'Preview session',
+      details: 'View details', weekPlan: 'This week\'s plan', minutes: '{n} min', more: 'More',
+      smartTitle: 'Coach message',
+      whyMore: 'Why? And the effect on your week and goal',
+      ready: {
+        title: 'Readiness',
+        fresh: 'You\'re ready today', ok: 'Well balanced; go ahead as planned', tired: 'Fatigue has built up; take today easy',
+        recover: 'Your body needs recovery', pain: 'You reported pain; rest today and see a doctor',
+        fromCheckin: 'Based on today\'s check-in and the days before.',
+        noData: 'As you log sessions and daily check-ins, your readiness will show up here.'
+      },
+      prog: {
+        title: 'This week', lastWeek: 'No sessions logged this week yet; last week:', none: 'Once you mark your first session as done, your weekly stats will appear here.',
+        km: '{n} km run', runs: { one: '{n} session', other: '{n} sessions' }, prev: 'last week {n} km', vdot: 'New result: VDOT went from {a} to {b}.'
+      },
+      race: { title: 'Race countdown', days: 'days to the {race}', today: 'It\'s race day!', taper: 'taper starts in {n} days' }
     },
 
     // ---------- My progress (charts) ----------

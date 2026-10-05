@@ -113,19 +113,12 @@
     if (md) md.setAttribute('content', T('app.metaDescription'));
     document.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = T(el.dataset.i18n); });
     document.querySelectorAll('[data-i18n-aria]').forEach(function (el) { el.setAttribute('aria-label', T(el.dataset.i18nAria)); });
-    var lt = document.getElementById('lang-toggle');
-    lt.textContent = T('app.langSwitch');
-    lt.setAttribute('aria-label', T('app.langSwitchAria'));
-    lt.lang = I.getLang() === 'fa' ? 'en' : 'fa';
   }
   function switchLang(code) {
     I.setLang(code);
     applyStatic();
     route();
   }
-  document.getElementById('lang-toggle').addEventListener('click', function () {
-    switchLang(I.getLang() === 'fa' ? 'en' : 'fa');
-  });
 
   // ---------- تطبیق جلسه با چک‌این ----------
   function prevCheckin(key) {
@@ -188,7 +181,7 @@
     }).join('') + '</div>';
   }
   // کارت داشبورد: فاز امروز و تخمین پریود بعدی (یادآوری چند روز قبل)
-  function cycleCard(now) {
+  function cycleCard(now, extra) {
     var np = C.nextPeriod(state.profile, now);
     if (!np) return '';
     var info = C.cycleInfo(state.profile, now);
@@ -199,7 +192,7 @@
       '<p class="small muted">' + tt('cycle.today', { day: info.day, phase: T('cycle.phase.' + info.phase) }) + '</p>' +
       '<p>' + t(line) + '</p>' +
       '<div class="actions"><button type="button" class="btn btn-ghost" data-period-started="1">' + esc(T('cycle.started')) + '</button></div>' +
-      '<p class="small muted">' + esc(T('cycle.estimate')) + '</p>' + learnMore(['cycle']) + '</section>';
+      '<p class="small muted">' + esc(T('cycle.estimate')) + '</p>' + (extra || '') + learnMore(['cycle']) + '</section>';
   }
   function unackedPainToday() {
     var k = C.dateKey(today());
@@ -210,33 +203,71 @@
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, progress: renderProgress, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
+  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, progress: renderProgress, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
   function route() {
     var loginMode = !isEntered();
     document.body.classList.toggle('login-mode', loginMode);
+    var tabbar = document.getElementById('tabbar');
     if (loginMode) {
-      document.getElementById('main-nav').hidden = true;
+      tabbar.hidden = true;
+      document.body.classList.remove('has-tabbar');
       document.getElementById('medical-banner').hidden = true;
       renderLogin();
+      lastView = null;
       return;
     }
-    var v = (location.hash || '#plan').slice(1), sub = null;
+    var v = (location.hash || '#home').slice(1), sub = null;
     // مقاله‌ی آموزش: #learn/<شناسه>
     if (v.indexOf('learn/') === 0) { sub = v.slice(6); v = 'learn'; }
     if (!state.profile || needsMigration()) v = 'onboarding';
-    if (!VIEWS[v]) v = 'plan';
-    var nav = document.getElementById('main-nav');
-    nav.hidden = !state.profile || v === 'onboarding' || needsMigration();
+    if (!VIEWS[v]) v = 'home';
+    // نوار پایین: همه‌جا به‌جز ورود و فرم اولیه؛ صفحه‌های فرعی زیر تب مادرشون فعال می‌شن
+    var tab = TAB_OF[v] || null;
+    tabbar.hidden = v === 'onboarding';
+    document.body.classList.toggle('has-tabbar', !tabbar.hidden);
+    tabbar.querySelectorAll('a').forEach(function (a) {
+      var on = a.dataset.tab === tab;
+      a.classList.toggle('is-active', on);
+      if (on && a.dataset.tab === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
     // هشدار پزشکی فقط در صفحه‌ی چک‌این
     document.getElementById('medical-banner').hidden = v !== 'checkin';
-    document.getElementById('nav-race').hidden = !(state.profile && C.goalInfo(state.profile).type !== 'none');
-    nav.querySelectorAll('a').forEach(function (a) {
-      if (a.dataset.view === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-    });
     VIEWS[v](sub);
+    animateView(v, tab);
+    // رفتن مستقیم به یک بخش فرم (مثلاً «ویرایش داده‌های چرخه» از پروفایل)
+    if (pendingFocus) {
+      var pf = pendingFocus;
+      pendingFocus = null;
+      setTimeout(function () { var el = document.getElementById(pf); if (el) el.scrollIntoView({ block: 'start' }); }, 0);
+    }
     var pk = unackedPainToday();
     if (pk) openPainModal(pk);
   }
+  var pendingFocus = null;
+  document.addEventListener('click', function (e) {
+    var f = e.target.closest && e.target.closest('[data-onb-focus]');
+    if (f) pendingFocus = f.dataset.onbFocus === 'cycle' ? 'cycle-fieldset' : null;
+  }, true);
+  // تب مادر هر صفحه
+  var TABS = ['home', 'plan', 'progress', 'learn', 'profile'];
+  var TAB_OF = { home: 'home', checkin: 'home', race: 'home', plan: 'plan', progress: 'progress', fitness: 'progress',
+    learn: 'learn', guide: 'profile', profile: 'profile' };
+  // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
+  var lastView = null, lastTab = null;
+  function animateView(v, tab) {
+    if (v === lastView) return;
+    var cls = 'view-in';
+    if (lastTab && tab && lastTab !== tab) {
+      var fwd = TABS.indexOf(tab) > TABS.indexOf(lastTab);
+      cls = (fwd !== isRtl()) ? 'view-in-end' : 'view-in-start';
+    }
+    lastView = v; lastTab = tab;
+    app.classList.remove('view-in', 'view-in-end', 'view-in-start');
+    void app.offsetWidth;
+    app.classList.add(cls);
+  }
+  app.addEventListener('animationend', function () { app.classList.remove('view-in', 'view-in-end', 'view-in-start'); });
+
   // ---------- تاریخچه‌ی ناوبری ----------
   // هر ورودی تاریخچه (history.state) عمق، صفحه‌ی مبدأ، موقعیت اسکرول و وضعیت نما (روز انتخاب‌شده، هفته/ماه، بخش‌های باز) رو نگه می‌داره؛
   // با برگشت (دکمه‌ی مرورگر یا دکمه‌ی داخل برنامه) همون صفحه، همون روز و همون اسکرول برمی‌گرده.
@@ -276,7 +307,7 @@
     var s = navState();
     if (s) { navDepth = s.depth; restore(s); return; } // برگشت یا جلو به ورودی‌ای که قبلاً دیده شده
     navDepth += 1;
-    var from = e.oldURL && e.oldURL.indexOf('#') >= 0 ? e.oldURL.slice(e.oldURL.indexOf('#')) : '#plan';
+    var from = e.oldURL && e.oldURL.indexOf('#') >= 0 ? e.oldURL.slice(e.oldURL.indexOf('#')) : '#home';
     setNav({ depth: navDepth, from: from });
     // صفحه‌ی راهنما اسکرول رو خودش مدیریت می‌کنه (رفتن به بخش هدف)
     var toGuide = location.hash === '#guide';
@@ -315,7 +346,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=21" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=22" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -331,7 +362,7 @@
     });
     document.getElementById('login-btn').addEventListener('click', function () {
       setEntered(true);
-      var target = state.profile && !needsMigration() ? '#plan' : '#onboarding';
+      var target = state.profile && !needsMigration() ? '#home' : '#onboarding';
       if (location.hash === target) route(); else location.hash = target;
       window.scrollTo(0, 0);
     });
@@ -665,7 +696,7 @@
       save();
       showToast(T(editing ? 'onb.toastEdit' : 'onb.toastNew'));
       viewWeekOffset = 0;
-      if (location.hash === '#plan') route(); else location.hash = '#plan';
+      if (location.hash === '#home') route(); else location.hash = '#home';
     });
   }
 
@@ -742,7 +773,7 @@
     return '<span class="badge badge-' + type + '">' + t(label) + '</span>';
   }
 
-  function adaptationBox(ad, key) {
+  function adaptationBox(ad, key, compact) {
     if (!ad) return '';
     if (ad.kind === 'pain') {
       var ci = state.checkins[key];
@@ -755,6 +786,16 @@
     if (!ad.tier || !ad.action) return '<div class="alert ' + cls + '" role="status"><p>' + t(ad.message) + '</p></div>';
     // تطبیق درجه‌بندی‌شده: چرا → تصمیم → اثر روی هفته و هدف → خلاصه‌ی هفته
     var sum = C.weekAdaptSummary(state.profile, state.checkins, state.done, C.parseDate(key));
+    if (compact) {
+      // کارت خانه: تصمیم جلوی چشم، دلیل و اثرش روی هفته با یک لمس
+      return '<div class="alert ' + cls + ' adapt-box adapt-' + ad.tier + '" role="status">' +
+        '<p class="adapt-head"><span class="adapt-tier">' + esc(T('adapt.tier.' + ad.tier)) + '</span> <strong>' + esc(T(ad.kind === 'downgrade' ? 'adapt.changed' : 'adapt.kept')) + '</strong></p>' +
+        '<p>' + t(ad.action) + '</p>' +
+        '<details class="adapt-more"><summary>' + esc(T('home.whyMore')) + '</summary>' +
+        '<p><b>' + esc(T('adapt.whyL')) + '</b> ' + t(ad.why) + '</p>' +
+        (ad.impact ? '<p><b>' + esc(T('adapt.impactL')) + '</b> ' + t(ad.impact) + '</p>' : '') +
+        (ad.kind === 'downgrade' ? '<p class="adapt-sum">' + t(sum.text) + '</p>' : '') + '</details></div>';
+    }
     return '<div class="alert ' + cls + ' adapt-box adapt-' + ad.tier + '" role="status">' +
       '<p class="adapt-head"><span class="adapt-tier">' + esc(T('adapt.tier.' + ad.tier)) + '</span> <strong>' + esc(T(ad.kind === 'downgrade' ? 'adapt.changed' : 'adapt.kept')) + '</strong></p>' +
       '<p><b>' + esc(T('adapt.whyL')) + '</b> ' + t(ad.why) + '</p>' +
@@ -1190,7 +1231,7 @@
         '<div class="alert alert-pain" role="alert"><strong>' + esc(T('checkin.painLocked')) + '</strong>' +
         '<p class="pain-msg">' + esc(C.PAIN_MESSAGE) + '</p>' +
         '<p class="small">' + esc(T('checkin.lockedText')) + '</p></div>' +
-        '<a class="btn btn-ghost" href="#plan">' + esc(T('checkin.back')) + '</a></section>';
+        '<a class="btn btn-ghost" href="#home">' + esc(T('checkin.back')) + '</a></section>';
       return;
     }
 
@@ -1212,7 +1253,7 @@
       '</fieldset>' +
       '<div id="ci-errors" class="form-errors" role="alert" hidden></div>' +
       '<div class="actions"><button type="submit" class="btn btn-primary">' + esc(T('checkin.submit')) + '</button>' +
-      '<a class="btn btn-ghost" href="#plan">' + esc(T('app.cancel')) + '</a></div>' +
+      '<a class="btn btn-ghost" href="#home">' + esc(T('app.cancel')) + '</a></div>' +
       '</form></section>';
 
     var form = document.getElementById('ci-form');
@@ -1243,7 +1284,7 @@
       if (pain === 'yes') { openPainModal(key); return; }
       var r = effectiveSession(base);
       showToast(T(r.adaptation && r.adaptation.kind === 'downgrade' ? 'checkin.toastDown' : 'checkin.toastOk'));
-      location.hash = '#plan';
+      location.hash = '#home';
     });
   }
 
@@ -1272,7 +1313,7 @@
       save();
       modalRoot.innerHTML = '';
       document.body.classList.remove('modal-open');
-      if (location.hash === '#plan') route(); else location.hash = '#plan';
+      if (location.hash === '#home') route(); else location.hash = '#home';
     });
     ack.focus();
   }
@@ -1354,6 +1395,128 @@
     }
 
     app.innerHTML = html;
+  }
+
+  // =====================================================================
+  // خانه / امروز: کارت‌های جمع‌وجور به ترتیب اولویت
+  // =====================================================================
+  function greetKey() {
+    var h = new Date().getHours();
+    return h < 12 ? 'home.greet.morning' : h < 17 ? 'home.greet.day' : 'home.greet.evening';
+  }
+  // سه چک‌این آخر در ۴ روز گذشته (همون منطق تطبیق)
+  function recentCheckins(key) {
+    var d = C.parseDate(key), out = [];
+    for (var i = 1; i <= 4 && out.length < 3; i++) { var c = state.checkins[C.dateKey(C.addDays(d, -i))]; if (c) out.push(c); }
+    return out;
+  }
+  function renderHome() {
+    var p = state.profile, now = today(), key = C.dateKey(now);
+    var base = C.sessionFor(p, now), ci = state.checkins[key];
+    var r = ci ? effectiveSession(base) : withCycle({ session: base, adaptation: null });
+    var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
+      '<h1>' + esc(T(greetKey())) + '</h1></header>' +
+      homeToday(base, r.session, ci, key) + homeReadiness(ci, key, now) + homeSmart(r, key) +
+      homeCycle(r, key, now) + homeProgress(now) + homeRace(now);
+    app.innerHTML = '<div class="home">' + html + '</div>';
+  }
+  function homeToday(base, s, ci, key) {
+    var runDay = ['rest', 'none'].indexOf(base.type) < 0, done = !!state.done[key], cancelled = s.type === 'cancelled';
+    var main = cancelled ? T('home.cancelled') : (s.steps && s.steps[0]) || '';
+    var wu = !cancelled && s.warmup && s.warmup.min ? T('home.withWarmup', { n: s.warmup.min }) : '';
+    var cta;
+    if (cancelled) cta = '<a class="btn btn-outline btn-block" href="#plan">' + esc(T('home.details')) + '</a>';
+    else if (runDay && !ci) cta = '<a class="btn btn-primary btn-big btn-block" href="#checkin">' + esc(T('home.startCheckin')) + '</a>' +
+      '<p class="small muted center">' + esc(T('home.checkinHint')) + ' <a href="#plan">' + esc(T('home.preview')) + '</a></p>';
+    else if (runDay) cta = '<a class="btn btn-primary btn-big btn-block" href="#plan">' + esc(T('home.details')) + '</a>';
+    else cta = '<a class="btn btn-outline btn-block" href="#plan">' + esc(T('home.weekPlan')) + '</a>';
+    return '<section class="card hcard hcard-today hc-' + s.type + '">' +
+      '<div class="hcard-top"><span class="hcard-label">' + esc(T('home.todayTitle')) + '</span>' +
+      (done ? '<span class="pill pill-done">✓ ' + esc(T('home.done')) + '</span>' : (s.original ? '<span class="pill pill-adapt">' + esc(T('home.adjusted')) + '</span>' : '')) + '</div>' +
+      '<div class="today-main">' + badge(s.type, s.label) + (s.km ? '<b class="today-target">' + t(s.target) + '</b>' : (s.minutes ? '<b class="today-target">' + tt('home.minutes', { n: s.minutes }) + '</b>' : '')) + '</div>' +
+      (main ? '<p class="today-sum">' + t(main) + (wu ? ' <span class="muted">' + t(wu) + '</span>' : '') + '</p>' : '') +
+      cta + '</section>';
+  }
+  // وضعیت آمادگی: بدترِ دو نشانه (TSB از بار تمرینی، و چک‌این امروز با تاریخچه)
+  var READY = { fresh: 0, ok: 1, tired: 2, recover: 3, pain: 4 };
+  function homeReadiness(ci, key, now) {
+    var a = C.analytics(state, now, 56);
+    var pm = a && a.pmc.length >= 14 && a.runsDone >= 3 ? a.pmc[a.pmc.length - 1] : null;
+    var st = null, why = [];
+    if (pm) {
+      var rel = pm.ctl ? pm.tsb / pm.ctl : 0;
+      st = rel > 0.05 ? 'fresh' : rel > -0.1 ? 'ok' : rel > -0.3 ? 'tired' : 'recover';
+    }
+    if (ci) {
+      var rd = ci.pain ? null : C.readiness(ci, recentCheckins(key));
+      var cs = ci.pain ? 'pain' : !rd.tier ? 'fresh' : rd.tier === 'mild' ? 'ok' : rd.tier === 'moderate' ? 'tired' : 'recover';
+      if (!st || READY[cs] > READY[st]) { st = cs; why.push(T('home.ready.fromCheckin')); }
+    }
+    if (!st) {
+      return '<section class="card hcard"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.ready.title')) + '</span></div>' +
+        '<p class="muted">' + esc(T('home.ready.noData')) + '</p></section>';
+    }
+    var sign = function (n) { n = Math.round(n); return '‎' + (n > 0 ? '+' : n < 0 ? '−' : '') + fa(Math.abs(n)); };
+    return '<section class="card hcard hcard-ready ready-' + st + '"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.ready.title')) + '</span>' +
+      '<a class="hcard-link" href="#progress">' + esc(T('home.more')) + '</a></div>' +
+      '<div class="ready-row"><span class="ready-dot" aria-hidden="true"></span><div><b class="ready-line">' + esc(T('home.ready.' + st)) + '</b>' +
+      (why.length ? '<span class="small muted">' + esc(why.join(' ')) + '</span>' : '') + '</div></div>' +
+      (pm ? '<div class="mini-stats">' +
+        '<div><span>' + esc(T('progress.pmc.tsb')) + '</span><b>' + sign(pm.tsb) + '</b></div>' +
+        '<div><span>' + esc(T('progress.pmc.ctl')) + '</span><b>' + fa(Math.round(pm.ctl)) + '</b></div>' +
+        '<div><span>' + esc(T('progress.pmc.atl')) + '</span><b>' + fa(Math.round(pm.atl)) + '</b></div></div>' : '') +
+      '</section>';
+  }
+  // پیام هوشمند: تطبیق امروز (با دلیلش)، درد، یا افزودنی اختیاری
+  function homeSmart(r, key) {
+    var s = r.session, inner = '';
+    if (r.adaptation) inner = adaptationBox(r.adaptation, key, true);
+    else if (s.makeup) inner = '<div class="makeup-box"><strong>' + esc(T('adapt.makeupBox.title')) + '</strong><p>' + t(s.makeup.text) + '</p></div>';
+    if (!inner) return '';
+    return '<section class="card hcard hcard-smart"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.smartTitle')) + '</span></div>' + inner + '</section>';
+  }
+  // چرخه: فقط وقتی فعاله و مرتبطه (روزهای پریود، نزدیک پریود بعدی، یا پیشنهاد برای جلسه‌ی امروز)
+  function homeCycle(r, key, now) {
+    var np = C.nextPeriod(state.profile, now);
+    if (!np) return '';
+    var box = cycleBox(r, key, key);
+    if (!(np.inPeriod || np.daysTo <= 5 || box)) return '';
+    return cycleCard(now, box);
+  }
+  function homeProgress(now) {
+    var a = C.analytics(state, now, 28), body;
+    var W = a ? a.weeks : [];
+    var cur = W[W.length - 1], prev = W.length > 1 ? W[W.length - 2] : null;
+    var everDone = Object.keys(state.done).length > 0;
+    if (!everDone) body = '<p class="muted">' + esc(T('home.prog.none')) + '</p>';
+    else {
+      // رکورد/تایم‌تست تازه با VDOT بهتر از قبلی
+      var E = C.fitnessEntries(state.profile), hl = '';
+      if (E.length >= 2) {
+        var l = E[E.length - 1], pv = E[E.length - 2];
+        var vl = C.vdotFromRace(l.distanceKm, l.timeSec), vp = C.vdotFromRace(pv.distanceKm, pv.timeSec);
+        if (C.daysBetween(C.parseDate(l.date), now) <= 21 && vl > vp + 0.05) hl = tt('home.prog.vdot', { a: vp.toFixed(1), b: vl.toFixed(1) });
+      }
+      // اول هفته (هنوز جلسه‌ای نیست): آمار هفته‌ی قبل
+      var lastWeek = (!cur || !cur.runs) && prev;
+      var w = lastWeek ? prev : cur;
+      body = (lastWeek ? '<p class="small muted prog-note">' + esc(T('home.prog.lastWeek')) + '</p>' : '') +
+        '<div class="prog-hero"><b>' + tt('home.prog.km', { n: w ? Math.round(w.km * 10) / 10 : 0 }) + '</b>' +
+        '<span class="muted">' + tt('home.prog.runs', { n: w ? w.runs : 0 }) + (!lastWeek && prev ? T('progress.sep') + tt('home.prog.prev', { n: Math.round(prev.km * 10) / 10 }) : '') + '</span></div>' +
+        (hl ? '<p class="prog-hl">' + hl + '</p>' : '');
+    }
+    return '<section class="card hcard"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.prog.title')) + '</span>' +
+      '<a class="hcard-link" href="#progress">' + esc(T('home.more')) + '</a></div>' + body + '</section>';
+  }
+  function homeRace(now) {
+    var race = C.raceInfo(state.profile);
+    if (!race) return '';
+    var days = Math.round(C.daysBetween(now, race.date));
+    if (days < 0) return '';
+    var taper = C.addDays(race.date, -C.taperWeeks(race.key) * 7), tDays = Math.round(C.daysBetween(now, taper));
+    return '<a class="card hcard hcard-race" href="#race"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.race.title')) + '</span></div>' +
+      '<div class="race-count"><b>' + fa(days) + '</b><span>' + esc(T(days === 0 ? 'home.race.today' : 'home.race.days', { race: C.goalLabel(C.goalInfo(state.profile)) })) + '</span></div>' +
+      '<p class="small muted">' + esc(faDate(C.dateKey(race.date))) + (tDays > 0 ? T('progress.sep') + tt('home.race.taper', { n: tDays }) : '') + '</p></a>';
   }
 
   // =====================================================================
@@ -1714,8 +1877,8 @@
   function learnBack() {
     var s = navState(), from = s && s.depth > 0 ? s.from : null;
     var key = !from ? 'list' : from.indexOf('#learn/') === 0 ? 'article' : from === '#learn' ? 'list'
-      : ['plan', 'fitness', 'checkin', 'race', 'guide', 'profile'].indexOf(from.slice(1)) >= 0 ? from.slice(1) : 'other';
-    if (from === '#' || from === '') key = 'plan';
+      : ['home', 'plan', 'progress', 'fitness', 'checkin', 'race', 'guide', 'profile'].indexOf(from.slice(1)) >= 0 ? from.slice(1) : 'other';
+    if (from === '#' || from === '') key = 'home';
     return '<a class="learn-back" href="#learn"' + (from ? ' data-nav-back="1"' : '') + '>' + chevron(isRtl() ? 'right' : 'left') +
       esc(T('learn.backTo.' + key)) + '</a>';
   }
@@ -1946,22 +2109,25 @@
       }).join('') + '</select>';
     }
     var D = C.DAY_NAMES;
+    var lang = I.getLang();
     return '<section class="card settings-card"><h2>' + esc(T('settings.title')) + '</h2>' +
+      '<div class="field"><span class="field-label">' + esc(T('settings.language')) + '</span><div class="seg lang-seg" role="group" aria-label="' + esc(T('settings.language')) + '">' +
+      '<button type="button" data-setlang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '">فارسی</button>' +
+      '<button type="button" data-setlang="en" lang="en" aria-pressed="' + (lang === 'en') + '">English</button></div></div>' +
       '<div class="row2"><div class="field"><label for="set-cal">' + esc(T('settings.calendar')) + '</label>' +
       sel('set-cal', 'calendar', settings.calendar, [['auto', T('settings.auto')], ['jalali', T('settings.jalali')], ['gregorian', T('settings.gregorian')]]) + '</div>' +
       '<div class="field"><label for="set-ws">' + esc(T('settings.weekStart')) + '</label>' +
       sel('set-ws', 'weekStart', settings.weekStart, [['auto', T('settings.auto')], ['sat', D[0]], ['sun', D[1]], ['mon', D[2]]]) + '</div></div>' +
       '<p class="small muted">' + tt('settings.current', { cal: T('settings.' + I.getCalendar()), day: C.DAY_NAMES[C.WEEK_ORDER[0]] }) + '</p>' +
-      '<p class="small muted">' + esc(T('settings.note')) + '</p>' + cycleSettings() + '</section>';
+      '<p class="small muted">' + esc(T('settings.note')) + '</p></section>';
   }
   function cycleSettings() {
     var p = state.profile;
     if (!p || p.sex !== 'female') return '';
     var c = p.cycle || {};
-    return '<h3 class="settings-sub">' + esc(T('cycle.settingsTitle')) + '</h3>' +
-      '<label class="check-row"><input type="checkbox" id="set-cycle"' + (c.enabled ? ' checked' : '') + (c.lastStart ? '' : ' disabled') + '> <span>' + esc(T('cycle.settingsEnabled')) + '</span></label>' +
+    return '<label class="check-row"><input type="checkbox" id="set-cycle"' + (c.enabled ? ' checked' : '') + (c.lastStart ? '' : ' disabled') + '> <span>' + esc(T('cycle.settingsEnabled')) + '</span></label>' +
       '<label class="check-row"><input type="checkbox" id="set-cymark"' + (settings.cycleMarkers !== false ? ' checked' : '') + (c.enabled ? '' : ' disabled') + '> <span>' + esc(T('cycle.settingsMarkers')) + '</span></label>' +
-      '<p class="small muted">' + esc(T(c.lastStart ? 'cycle.settingsEdit' : 'cycle.settingsNeedData')) + '</p>';
+      (c.lastStart ? '' : '<p class="small muted">' + esc(T('cycle.settingsNeedData')) + '</p>');
   }
   app.addEventListener('change', function (e) {
     var el = e.target;
@@ -1983,6 +2149,10 @@
     route();
   });
 
+  app.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-setlang]');
+    if (b && b.dataset.setlang !== I.getLang()) switchLang(b.dataset.setlang);
+  });
   function renderProfile() {
     var p = state.profile;
     var bmi = C.bmi(p);
@@ -1990,7 +2160,36 @@
     var nCheck = Object.keys(state.checkins).length, nDone = Object.keys(state.done).length;
     var muted = function (key) { return '<span class="muted">' + esc(T(key)) + '</span>'; };
     function row(k, v) { return '<div class="kv"><dt>' + esc(T('profile.rows.' + k)) + '</dt><dd>' + v + '</dd></div>'; }
-    app.innerHTML = '<section class="card"><h1>' + esc(T('profile.title')) + '</h1><dl class="kv-list">' +
+    var c = p.cycle || {}, ICON_CHEV = chevron(isRtl() ? 'left' : 'right');
+    function link(href, key, sub) {
+      return '<li><a class="list-link" href="' + href + '"><span><b>' + esc(T(key)) + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</span>' + ICON_CHEV + '</a></li>';
+    }
+    var html =
+      // ۱. اطلاعات شخصی
+      '<section class="card pf-hero"><div class="pf-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/></svg></div>' +
+      '<div class="pf-id"><h1>' + esc(T('profile.title')) + '</h1>' +
+      '<span class="pill pill-level">' + tt('profile.levelVal', { n: lv.level, name: lv.info.name }) + '</span></div>' +
+      '<dl class="pf-facts">' +
+      '<div><dt>' + esc(T('profile.rows.age')) + '</dt><dd>' + fa(p.age) + '</dd></div>' +
+      (p.sex && p.sex !== 'na' ? '<div><dt>' + esc(T('profile.rows.sex')) + '</dt><dd>' + esc(T('cycle.sex.' + p.sex)) + '</dd></div>' : '') +
+      '<div><dt>VDOT</dt><dd>' + (fit ? fa(fit.vdot.toFixed(1)) : '—') + '</dd></div>' +
+      '<div class="pf-goal"><dt>' + esc(T('profile.rows.goal')) + '</dt><dd>' + (g.type !== 'none' ? t(C.goalLabel(g)) + (g.date ? '<small>' + esc(faDate(g.date)) + '</small>' : '') : muted('profile.noGoal')) + '</dd></div>' +
+      '</dl><a class="btn btn-primary btn-block" href="#onboarding">' + esc(T('profile.editOnb')) + '</a>' +
+      '<p class="small muted center">' + esc(T('profile.editHint')) + '</p></section>' +
+      // ۲. تنظیمات زبان و تقویم
+      settingsCard() +
+      // ۳. چرخه‌ی قاعدگی (فقط وقتی جنسیت «زن» ثبت شده)
+      (p.sex === 'female' ? '<section class="card"><h2>' + esc(T('cycle.settingsTitle')) + '</h2>' + cycleSettings() +
+        (c.lastStart ? '<p class="small muted">' + tt('cycle.profileOn', { len: c.cycleLen, p: c.periodLen }) + T('progress.sep') + esc(T('profile.cycleLast', { d: faDate(c.lastStart) })) + '</p>' : '') +
+        '<a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.cycleEdit')) + '</a></section>' : '') +
+      // ۴. صفحه‌های بیشتر
+      '<section class="card"><h2>' + esc(T('profile.moreTitle')) + '</h2><ul class="link-list">' +
+      link('#checkin', 'app.nav.checkin') +
+      link('#fitness', 'profile.linkFitness', fit ? 'VDOT ' + fa(fit.vdot.toFixed(1)) : esc(T('profile.registerTest'))) +
+      (g.type !== 'none' ? link('#race', 'app.nav.race', t(C.goalLabel(g))) : '') +
+      link('#guide', 'app.nav.guide') + '</ul></section>' +
+      // ۵. جزئیات کامل
+      '<details class="card pf-details"><summary><h2>' + esc(T('profile.detailsTitle')) + '</h2></summary><dl class="kv-list">' +
       row('level', tt('profile.levelVal', { n: lv.level, name: lv.info.name }) +
         (lv.vdot ? ' <span class="muted small">(VDOT ' + t(lv.vdot.toFixed(1)) + ')</span>' : '')) +
       row('exp', esc(C.EXPERIENCE[p.experience] ? C.EXPERIENCE[p.experience].label : '—')) +
@@ -2009,17 +2208,19 @@
       row('pb', p.pb ? tt('profile.pbVal', { km: p.pb.distanceKm }) + ' <span dir="ltr">' + fa(C.formatDuration(p.pb.timeSec)) + '</span>' : muted('profile.notRecorded')) +
       row('start', esc(faDate(p.startDate))) +
       row('stats', tt('profile.statsVal', { c: nCheck, d: nDone })) +
-      '</dl><div class="actions">' +
-      '<a class="btn btn-primary" href="#onboarding">' + esc(T('profile.edit')) + '</a>' +
+      '</dl></details>' +
+      // ۶. حساب و داده‌ها
+      '<section class="card"><h2>' + esc(T('profile.accountTitle')) + '</h2><div class="actions">' +
       '<button type="button" class="btn btn-outline" id="restart">' + esc(T('profile.restart')) + '</button>' +
       '<button type="button" class="btn btn-ghost" id="logout">' + esc(T('login.logout')) + '</button>' +
       '<button type="button" class="btn btn-ghost danger-text" id="wipe">' + esc(T('profile.wipe')) + '</button>' +
       '</div><div id="confirm-box" class="alert alert-note confirm-box" role="alertdialog" aria-live="polite" hidden>' +
       '<p id="confirm-text"></p><div class="actions">' +
       '<button type="button" class="btn btn-primary" id="confirm-yes">' + esc(T('profile.confirmYes')) + '</button>' +
-      '<button type="button" class="btn btn-ghost" id="confirm-no">' + esc(T('app.cancel')) + '</button></div></div></section>' +
-      settingsCard() +
+      '<button type="button" class="btn btn-ghost" id="confirm-no">' + esc(T('app.cancel')) + '</button></div></div>' +
+      '<p class="small muted">' + esc(T('app.footer')) + '</p></section>' +
       warningsCard(C.profileWarnings(p, today()));
+    app.innerHTML = html;
 
     // تایید داخل صفحه (به‌جای confirm مرورگر)
     var pending = null;
@@ -2041,7 +2242,7 @@
       ask(T('profile.restartQ'), function () {
         state.profile.startDate = C.dateKey(today());
         save(); showToast(T('profile.restartToast'));
-        location.hash = '#plan';
+        location.hash = '#home';
       });
     });
     document.getElementById('logout').addEventListener('click', function () {
