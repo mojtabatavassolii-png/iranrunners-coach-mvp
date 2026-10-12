@@ -420,6 +420,7 @@
   // فاصله‌های رایج برای رکورد؛ «other» = فاصله‌ی دلخواه
   var PB_DISTANCES = [['m1500', 1.5], ['m3000', 3], ['5', 5], ['10', 10], ['21', 21.0975], ['42', 42.195], ['other', null]];
   var VOL_REASONS = ['injury', 'illness', 'travel', 'other', 'none'];
+  var ONB_STEPS = 5;
   function pbDistanceKey(km) {
     if (!km) return '';
     for (var i = 0; i < PB_DISTANCES.length - 1; i++) if (Math.abs(PB_DISTANCES[i][1] - km) < 0.01) return PB_DISTANCES[i][0];
@@ -459,113 +460,133 @@
         (checked ? ' checked' : '') + '><span>' + esc(label) + '</span></label>';
     }
 
+    // هر مرحله یک موضوع؛ همه‌ی فیلدها در یک فرم می‌مونن تا رفت‌وبرگشت بین مرحله‌ها چیزی رو پاک نکنه
+    function step(n, body) {
+      return '<section class="onb-step" data-step="' + n + '"' + (n === 1 ? '' : ' hidden') + ' aria-labelledby="onb-step-title-' + n + '">' +
+        '<header class="onb-step-head"><p class="onb-step-count">' + tt('onb.stepOf', { n: n, total: ONB_STEPS }) + '</p>' +
+        '<h2 id="onb-step-title-' + n + '" tabindex="-1">' + esc(T('onb.steps.' + n + '.t')) + '</h2>' +
+        '<p class="muted">' + esc(T('onb.steps.' + n + '.sub')) + '</p></header>' + body + '</section>';
+    }
+    var dots = '<ol class="onb-dots" aria-label="' + esc(T('onb.progressAria')) + '">' +
+      [1, 2, 3, 4, 5].map(function (n) {
+        return '<li><button type="button" class="onb-dot" data-goto-step="' + n + '" aria-label="' + esc(T('onb.stepOf', { n: n, total: ONB_STEPS }) + ' · ' + T('onb.steps.' + n + '.t')) + '"><span></span></button></li>';
+      }).join('') + '</ol>';
+
     app.innerHTML =
-      '<section class="card onboarding">' +
-      '<h1>' + esc(T(editing ? 'onb.titleEdit' : 'onb.titleNew')) + '</h1>' +
+      '<section class="card onboarding onb-wizard">' +
+      '<div class="onb-top">' +
+      '<p class="onb-kicker">' + esc(T(editing ? 'onb.titleEdit' : 'onb.titleNew')) + '</p>' + dots + '</div>' +
       (migrating ? '<div class="alert alert-adapt" role="status"><strong>' + esc(T('onb.migTitle')) + '</strong>' +
         '<p>' + esc(T('onb.migText')) + '</p></div>' : '') +
-      '<p class="muted">' + esc(T(editing ? 'onb.introEdit' : 'onb.introNew')) + '</p>' +
-      '<form id="onb" novalidate>' +
+      '<form id="onb" novalidate><div class="onb-stage">' +
 
-      '<fieldset><legend>' + esc(T('onb.s1')) + '</legend>' +
-      '<p class="sub-legend">' + esc(T('onb.expQ')) + req + '</p><div class="chips">' +
-      Object.keys(C.EXPERIENCE).map(function (k) { return chip('experience', k, C.EXPERIENCE[k].label, p.experience === k, 'radio'); }).join('') + '</div>' +
-      '<p class="alert alert-good zero-note" id="zero-note" hidden>' + esc(T('onb.zeroNote')) + '</p>' +
-      '<div id="runner-fields">' +
-      '<div class="row2">' +
-      '<div class="field"><label for="lastkm">' + esc(T('onb.lastWeek')) + req + '</label>' +
-      '<input id="lastkm" name="lastWeekKm" type="number" inputmode="decimal"' + limAttrs('vol', '0.5') + ' required' + kmField(volLast) + '>' +
-      '<small class="muted">' + esc(T('onb.lastWeekHint')) + '</small></div>' +
-      '<div class="field"><label for="avgkm">' + esc(T('onb.monthAvg')) + req + '</label>' +
-      '<input id="avgkm" name="monthAvgKm" type="number" inputmode="decimal"' + limAttrs('vol', '0.5') + ' required' + kmField(volAvg) + '>' +
-      '<small class="muted">' + esc(T('onb.monthAvgHint')) + '</small></div></div>' +
-      '<div id="reason-block" class="reason-block" hidden><p class="sub-legend">' + esc(T('onb.reasonQ')) + req + '</p>' +
-      '<p class="small muted">' + esc(T('onb.reasonHint')) + '</p><div class="chips">' +
-      VOL_REASONS.map(function (k) { return chip('volumeReason', k, T('onb.reasons.' + k), p.volumeReason === k, 'radio'); }).join('') + '</div></div>' +
-      '<p class="sub-legend">' + esc(T('onb.structQ')) + req + '</p><div class="chips">' +
-      chip('structured', 'yes', T('app.yes'), p.structured === true, 'radio') + chip('structured', 'no', T('app.no'), p.structured === false, 'radio') + '</div>' +
-      '<p class="sub-legend">' + esc(T('onb.pbQ')) + '</p>' +
-      '<p class="small pb-intro">' + esc(T('onb.pbIntro')) + '</p>' +
-      '<p class="small muted">' + esc(T('onb.pbOptional')) + '</p>' +
-      '<div class="row3">' +
-      '<div class="field"><label for="pbsel">' + esc(T('onb.pbDist')) + '</label><select id="pbsel" name="pbSel"><option value="">' + esc(T('onb.pbNone')) + '</option>' +
-      PB_DISTANCES.map(function (d) { return '<option value="' + d[0] + '"' + (pbKey === d[0] ? ' selected' : '') + '>' + esc(T('pbDist.' + d[0])) + '</option>'; }).join('') +
-      '</select></div>' +
-      '<div class="field" id="pbother-field"' + (pbKey === 'other' ? '' : ' hidden') + '><label for="pbother">' + esc(T('onb.pbOtherKm')) + '</label>' +
-      '<input id="pbother" name="pbOther" type="number" inputmode="decimal"' + limAttrs('dist', '0.1') + kmField(pbKey === 'other' ? pb.distanceKm : '') + '></div>' +
-      '<div class="field field-tpick" id="pbtime-field"' + (pbKey ? '' : ' hidden') + '><span class="field-label" id="pbtime-lbl">' + esc(T('onb.pbTime')) + '</span>' +
-      // انتخاب‌گر چرخشی؛ مقدار در input مخفی pbTime (h:mm:ss) — بدون دست زدن کاربر خالیه
-      window.CoachTimePicker.html({ id: 'pbtime', name: 'pbTime', sec: pb.timeSec || pbGuess(pb.distanceKm || 5), touched: !!pb.timeSec, preview: 'pbtime-read',
-        aria: T('onb.pbTime'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
-      '<small class="muted">' + esc(T('onb.pbTimeHint')) + '</small><small class="time-read" id="pbtime-read" aria-live="polite">' +
-      (pb.timeSec ? '= ' + fa(C.describeDuration(pb.timeSec)) : '') + '</small></div>' +
-      '</div></div>' +
-      '<div id="level-preview" aria-live="polite"></div>' +
-      '</fieldset>' +
+      // ۱. اطلاعات هویتی
+      step(1,
+        '<div class="row2">' +
+        '<div class="field"><label for="fname">' + esc(T('onb.firstName')) + '</label><input id="fname" name="firstName" type="text" maxlength="40" autocomplete="given-name" value="' + esc(p.name || '') + '" placeholder="' + esc(T('onb.firstNamePh')) + '"></div>' +
+        '<div class="field"><label for="lname">' + esc(T('onb.lastName')) + '</label><input id="lname" name="lastName" type="text" maxlength="40" autocomplete="family-name" value="' + esc(p.lastName || '') + '" placeholder="' + esc(T('onb.lastNamePh')) + '"></div>' +
+        '</div>' +
+        '<p class="sub-legend">' + esc(T('cycle.sexQ')) + '</p><div class="chips">' +
+        ['female', 'male', 'na'].map(function (k) { return chip('sex', k, T('cycle.sex.' + k), p.sex === k, 'radio'); }).join('') + '</div>' +
+        '<small class="muted">' + esc(T('cycle.sexHint')) + '</small>') +
 
-      '<fieldset><legend>' + esc(T('onb.s2')) + '</legend><div class="row3">' +
-      '<div class="field"><label for="age">' + esc(T('onb.age')) + '</label><input id="age" name="age" type="number" inputmode="numeric" min="12" max="90" required value="' + esc(p.age || '') + '"></div>' +
-      '<div class="field"><label for="weight">' + esc(T('onb.weight')) + '</label><input id="weight" name="weightKg" type="number" inputmode="decimal" min="30" max="250" required value="' + esc(p.weightKg || '') + '"></div>' +
-      '<div class="field"><label for="height">' + esc(T('onb.height')) + '</label><input id="height" name="heightCm" type="number" inputmode="numeric" min="120" max="230" required value="' + esc(p.heightCm || '') + '"></div>' +
+      // ۲. مشخصات بدنی (+ چرخه برای زنان)
+      step(2,
+        '<div class="row3">' +
+        '<div class="field"><label for="age">' + esc(T('onb.age')) + req + '</label><input id="age" name="age" type="number" inputmode="numeric" min="12" max="90" required value="' + esc(p.age || '') + '"></div>' +
+        '<div class="field"><label for="height">' + esc(T('onb.height')) + req + '</label><input id="height" name="heightCm" type="number" inputmode="numeric" min="120" max="230" required value="' + esc(p.heightCm || '') + '"></div>' +
+        '<div class="field"><label for="weight">' + esc(T('onb.weight')) + req + '</label><input id="weight" name="weightKg" type="number" inputmode="decimal" min="30" max="250" required value="' + esc(p.weightKg || '') + '"></div>' +
+        '</div>' +
+        '<fieldset id="cycle-fieldset" class="onb-sub" hidden><legend>' + esc(T('cycle.title')) + '</legend>' +
+        '<p class="small">' + esc(T('cycle.intro')) + '</p>' +
+        '<label class="check-row"><input type="checkbox" id="cyon" name="cycleOn"' + (cyc.enabled ? ' checked' : '') + '> <span>' + esc(T('cycle.enable')) + '</span></label>' +
+        '<div id="cycle-fields" hidden><div class="row3">' +
+        '<div class="field"><label for="cystart">' + esc(T('cycle.lastStart')) + '</label><input id="cystart" name="cycleStart" type="date" max="' + todayKey + '" value="' + esc(cyc.lastStart || '') + '">' +
+        '<small class="muted" id="cystart-fa"></small></div>' +
+        '<div class="field"><label for="cylen">' + esc(T('cycle.cycleLen')) + '</label><input id="cylen" name="cycleLen" type="number" inputmode="numeric" min="21" max="45" value="' + esc(cyc.cycleLen || 28) + '">' +
+        '<small class="muted">' + esc(T('cycle.cycleLenHint')) + '</small></div>' +
+        '<div class="field"><label for="cyplen">' + esc(T('cycle.periodLen')) + '</label><input id="cyplen" name="periodLen" type="number" inputmode="numeric" min="2" max="10" value="' + esc(cyc.periodLen || 5) + '"></div>' +
+        '</div><p class="small muted">' + esc(T('cycle.privacy')) + '</p></div>' +
+        '</fieldset>') +
+
+      // ۳. وضعیت فعلی دویدن
+      step(3,
+        '<p class="sub-legend">' + esc(T('onb.expQ')) + req + '</p><div class="chips">' +
+        Object.keys(C.EXPERIENCE).map(function (k) { return chip('experience', k, C.EXPERIENCE[k].label, p.experience === k, 'radio'); }).join('') + '</div>' +
+        '<p class="alert alert-good zero-note" id="zero-note" hidden>' + esc(T('onb.zeroNote')) + '</p>' +
+        '<div id="runner-fields">' +
+        '<div class="row2">' +
+        '<div class="field"><label for="lastkm">' + esc(T('onb.lastWeek')) + req + '</label>' +
+        '<input id="lastkm" name="lastWeekKm" type="number" inputmode="decimal"' + limAttrs('vol', '0.5') + ' required' + kmField(volLast) + '>' +
+        '<small class="muted">' + esc(T('onb.lastWeekHint')) + '</small></div>' +
+        '<div class="field"><label for="avgkm">' + esc(T('onb.monthAvg')) + req + '</label>' +
+        '<input id="avgkm" name="monthAvgKm" type="number" inputmode="decimal"' + limAttrs('vol', '0.5') + ' required' + kmField(volAvg) + '>' +
+        '<small class="muted">' + esc(T('onb.monthAvgHint')) + '</small></div></div>' +
+        '<div id="reason-block" class="reason-block" hidden><p class="sub-legend">' + esc(T('onb.reasonQ')) + req + '</p>' +
+        '<p class="small muted">' + esc(T('onb.reasonHint')) + '</p><div class="chips">' +
+        VOL_REASONS.map(function (k) { return chip('volumeReason', k, T('onb.reasons.' + k), p.volumeReason === k, 'radio'); }).join('') + '</div></div>' +
+        '<p class="sub-legend">' + esc(T('onb.structQ')) + req + '</p><div class="chips">' +
+        chip('structured', 'yes', T('app.yes'), p.structured === true, 'radio') + chip('structured', 'no', T('app.no'), p.structured === false, 'radio') + '</div>' +
+        '</div>' +
+        '<div class="field onb-injury"><label for="injury">' + esc(T('onb.injuryQ')) + '</label>' +
+        '<textarea id="injury" name="injury" rows="2" maxlength="300" placeholder="' + esc(T('onb.injuryPh')) + '">' + esc(p.injury || '') + '</textarea>' +
+        '<small class="muted">' + esc(T('onb.injuryLabel')) + '</small></div>') +
+
+      // ۴. بهترین رکورد اخیر
+      step(4,
+        '<p class="alert alert-good" id="pb-never" hidden>' + esc(T('onb.pbNever')) + '</p>' +
+        '<div id="pb-fields">' +
+        '<p class="small pb-intro">' + esc(T('onb.pbIntro')) + '</p>' +
+        '<p class="small muted">' + esc(T('onb.pbOptional')) + '</p>' +
+        '<div class="row2">' +
+        '<div class="field"><label for="pbsel">' + esc(T('onb.pbDist')) + '</label><select id="pbsel" name="pbSel"><option value="">' + esc(T('onb.pbNone')) + '</option>' +
+        PB_DISTANCES.map(function (d) { return '<option value="' + d[0] + '"' + (pbKey === d[0] ? ' selected' : '') + '>' + esc(T('pbDist.' + d[0])) + '</option>'; }).join('') +
+        '</select></div>' +
+        '<div class="field" id="pbother-field"' + (pbKey === 'other' ? '' : ' hidden') + '><label for="pbother">' + esc(T('onb.pbOtherKm')) + '</label>' +
+        '<input id="pbother" name="pbOther" type="number" inputmode="decimal"' + limAttrs('dist', '0.1') + kmField(pbKey === 'other' ? pb.distanceKm : '') + '></div>' +
+        '<div class="field field-tpick" id="pbtime-field"' + (pbKey ? '' : ' hidden') + '><span class="field-label" id="pbtime-lbl">' + esc(T('onb.pbTime')) + '</span>' +
+        // انتخاب‌گر چرخشی؛ مقدار در input مخفی pbTime (h:mm:ss) — بدون دست زدن کاربر خالیه
+        window.CoachTimePicker.html({ id: 'pbtime', name: 'pbTime', sec: pb.timeSec || pbGuess(pb.distanceKm || 5), touched: !!pb.timeSec, preview: 'pbtime-read',
+          aria: T('onb.pbTime'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
+        '<small class="muted">' + esc(T('onb.pbTimeHint')) + '</small><small class="time-read" id="pbtime-read" aria-live="polite">' +
+        (pb.timeSec ? '= ' + fa(C.describeDuration(pb.timeSec)) : '') + '</small></div>' +
+        '</div></div>' +
+        '<div id="level-preview" aria-live="polite"></div>') +
+
+      // ۵. هدف و بقیه‌ی اطلاعات تخصصی
+      step(5,
+        '<div class="field"><label for="gtype">' + esc(T('onb.goalType')) + '</label><select id="gtype" name="goalType">' +
+        // ترتیب صریح (کلیدهای عددی در Object.keys جلو می‌افتن)
+        ['none', '5', '10', '21', '42', 'ultra'].map(function (k) { return '<option value="' + k + '"' + (goal.type === k ? ' selected' : '') + '>' + esc(C.GOAL_TYPES[k]) + '</option>'; }).join('') +
+        '</select></div>' +
+        '<div id="goal-fields" class="race-fields"' + (goal.type === 'none' ? ' hidden' : '') + '>' +
+        '<div class="field"><label for="rdate">' + esc(T('onb.raceDate')) + '</label><input id="rdate" name="raceDate" type="date" min="' + todayKey + '" value="' + esc(goal.date || '') + '">' +
+        '<small class="muted" id="rdate-fa"></small></div>' +
+        '<div id="ultra-fields"' + (goal.type === 'ultra' ? '' : ' hidden') + '>' +
+        '<div class="row2"><div class="field"><label for="ukm">' + esc(T('onb.ultraKm')) + req + '</label>' +
+        '<input id="ukm" name="ultraKm" type="number" inputmode="decimal"' + limAttrs('ultra', '0.1') + kmField(goal.km || '') + '></div>' +
+        '<div class="field"><label for="ugain">' + esc(T('onb.ultraGain')) + req + '</label>' +
+        '<input id="ugain" name="ultraGain" type="number" inputmode="numeric" min="0" max="20000" step="10" value="' + esc(goal.type === 'ultra' ? goal.gain : '') + '"></div></div>' +
+        '<div class="row3"><div class="field"><label for="uloss">' + esc(T('onb.ultraLoss')) + '</label>' +
+        '<input id="uloss" name="ultraLoss" type="number" inputmode="numeric" min="0" max="20000" step="10" value="' + esc(goal.loss || '') + '"><small class="muted">' + esc(T('onb.ultraLossHint')) + '</small></div>' +
+        '<div class="field"><label for="uterrain">' + esc(T('onb.terrain')) + '</label><select id="uterrain" name="ultraTerrain"><option value="">' + esc(T('onb.notSelected')) + '</option>' +
+        Object.keys(C.TERRAIN_LABELS).map(function (k) { return '<option value="' + k + '"' + (goal.terrain === k ? ' selected' : '') + '>' + esc(C.TERRAIN_LABELS[k]) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label for="ualt">' + esc(T('onb.altitude')) + '</label>' +
+        '<input id="ualt" name="ultraAlt" type="number" inputmode="numeric" min="0" max="6000" step="10" value="' + esc(goal.altitude || '') + '"></div></div>' +
+        '<p id="ultra-ratio" class="ultra-ratio" aria-live="polite"></p>' +
+        '</div></div>' +
+        '<fieldset class="onb-sub"><legend>' + esc(T('onb.daysQ')) + req + '</legend><div class="chips">' +
+        C.WEEK_ORDER.map(function (i) { return chip('days', i, C.DAY_NAMES[i], days.indexOf(i) >= 0); }).join('') + '</div></fieldset>' +
+        '<fieldset class="onb-sub"><legend>' + esc(T('onb.locsQ')) + req + '</legend><div class="chips">' +
+        Object.keys(C.LOCATION_LABELS).map(function (k) { return chip('locations', k, C.LOCATION_LABELS[k], locs.indexOf(k) >= 0); }).join('') + '</div></fieldset>' +
+        '<fieldset class="onb-sub"><legend>' + esc(T('onb.hrQ')) + '</legend>' + hrFields(p) + '</fieldset>') +
+
       '</div>' +
-      '<p class="sub-legend">' + esc(T('cycle.sexQ')) + '</p><div class="chips">' +
-      ['female', 'male', 'na'].map(function (k) { return chip('sex', k, T('cycle.sex.' + k), p.sex === k, 'radio'); }).join('') + '</div>' +
-      '<small class="muted">' + esc(T('cycle.sexHint')) + '</small>' +
-      '</fieldset>' +
-
-      '<fieldset id="cycle-fieldset" hidden><legend>' + esc(T('cycle.title')) + '</legend>' +
-      '<p class="small">' + esc(T('cycle.intro')) + '</p>' +
-      '<label class="check-row"><input type="checkbox" id="cyon" name="cycleOn"' + (cyc.enabled ? ' checked' : '') + '> <span>' + esc(T('cycle.enable')) + '</span></label>' +
-      '<div id="cycle-fields" hidden><div class="row3">' +
-      '<div class="field"><label for="cystart">' + esc(T('cycle.lastStart')) + '</label><input id="cystart" name="cycleStart" type="date" max="' + todayKey + '" value="' + esc(cyc.lastStart || '') + '">' +
-      '<small class="muted" id="cystart-fa"></small></div>' +
-      '<div class="field"><label for="cylen">' + esc(T('cycle.cycleLen')) + '</label><input id="cylen" name="cycleLen" type="number" inputmode="numeric" min="21" max="45" value="' + esc(cyc.cycleLen || 28) + '">' +
-      '<small class="muted">' + esc(T('cycle.cycleLenHint')) + '</small></div>' +
-      '<div class="field"><label for="cyplen">' + esc(T('cycle.periodLen')) + '</label><input id="cyplen" name="periodLen" type="number" inputmode="numeric" min="2" max="10" value="' + esc(cyc.periodLen || 5) + '"></div>' +
-      '</div><p class="small muted">' + esc(T('cycle.privacy')) + '</p></div>' +
-      '</fieldset>' +
-
-      '<fieldset><legend>' + esc(T('onb.s3')) + '</legend><div class="chips">' +
-      C.WEEK_ORDER.map(function (i) { return chip('days', i, C.DAY_NAMES[i], days.indexOf(i) >= 0); }).join('') + '</div>' +
-      '</fieldset>' +
-
-      '<fieldset><legend>' + esc(T('onb.s4')) + '</legend><div class="chips">' +
-      Object.keys(C.LOCATION_LABELS).map(function (k) { return chip('locations', k, C.LOCATION_LABELS[k], locs.indexOf(k) >= 0); }).join('') +
-      '</div></fieldset>' +
-
-      '<fieldset><legend>' + esc(T('onb.s5')) + '</legend>' +
-      '<div class="field"><label for="injury">' + esc(T('onb.injuryLabel')) + '</label>' +
-      '<textarea id="injury" name="injury" rows="2" maxlength="300" placeholder="' + esc(T('onb.injuryPh')) + '">' + esc(p.injury || '') + '</textarea></div>' +
-      '</fieldset>' +
-
-      '<fieldset><legend>' + esc(T('onb.s6')) + '</legend>' +
-      '<div class="field"><label for="gtype">' + esc(T('onb.goalType')) + '</label><select id="gtype" name="goalType">' +
-      // ترتیب صریح (کلیدهای عددی در Object.keys جلو می‌افتن)
-      ['none', '5', '10', '21', '42', 'ultra'].map(function (k) { return '<option value="' + k + '"' + (goal.type === k ? ' selected' : '') + '>' + esc(C.GOAL_TYPES[k]) + '</option>'; }).join('') +
-      '</select></div>' +
-      '<div id="goal-fields" class="race-fields"' + (goal.type === 'none' ? ' hidden' : '') + '>' +
-      '<div class="field"><label for="rdate">' + esc(T('onb.raceDate')) + '</label><input id="rdate" name="raceDate" type="date" min="' + todayKey + '" value="' + esc(goal.date || '') + '">' +
-      '<small class="muted" id="rdate-fa"></small></div>' +
-      '<div id="ultra-fields"' + (goal.type === 'ultra' ? '' : ' hidden') + '>' +
-      '<div class="row2"><div class="field"><label for="ukm">' + esc(T('onb.ultraKm')) + req + '</label>' +
-      '<input id="ukm" name="ultraKm" type="number" inputmode="decimal"' + limAttrs('ultra', '0.1') + kmField(goal.km || '') + '></div>' +
-      '<div class="field"><label for="ugain">' + esc(T('onb.ultraGain')) + req + '</label>' +
-      '<input id="ugain" name="ultraGain" type="number" inputmode="numeric" min="0" max="20000" step="10" value="' + esc(goal.type === 'ultra' ? goal.gain : '') + '"></div></div>' +
-      '<div class="row3"><div class="field"><label for="uloss">' + esc(T('onb.ultraLoss')) + '</label>' +
-      '<input id="uloss" name="ultraLoss" type="number" inputmode="numeric" min="0" max="20000" step="10" value="' + esc(goal.loss || '') + '"><small class="muted">' + esc(T('onb.ultraLossHint')) + '</small></div>' +
-      '<div class="field"><label for="uterrain">' + esc(T('onb.terrain')) + '</label><select id="uterrain" name="ultraTerrain"><option value="">' + esc(T('onb.notSelected')) + '</option>' +
-      Object.keys(C.TERRAIN_LABELS).map(function (k) { return '<option value="' + k + '"' + (goal.terrain === k ? ' selected' : '') + '>' + esc(C.TERRAIN_LABELS[k]) + '</option>'; }).join('') + '</select></div>' +
-      '<div class="field"><label for="ualt">' + esc(T('onb.altitude')) + '</label>' +
-      '<input id="ualt" name="ultraAlt" type="number" inputmode="numeric" min="0" max="6000" step="10" value="' + esc(goal.altitude || '') + '"></div></div>' +
-      '<p id="ultra-ratio" class="ultra-ratio" aria-live="polite"></p>' +
-      '</div></div></fieldset>' +
-
-      '<fieldset><legend>' + esc(T('onb.s7')) + '</legend>' + hrFields(p) + '</fieldset>' +
-
       '<div id="onb-errors" class="form-errors" role="alert" hidden></div>' +
-      '<div class="actions">' +
-      '<button type="submit" class="btn btn-primary">' + esc(T(editing ? 'onb.submitEdit' : 'onb.submitNew')) + '</button>' +
-      (editing && !needsMigration() ? '<a class="btn btn-ghost" href="#profile">' + esc(T('app.cancel')) + '</a>' : '') +
+      '<div class="onb-nav">' +
+      '<button type="button" class="btn btn-ghost onb-back" id="onb-back">' + chevron(isRtl() ? 'right' : 'left') + '<span>' + esc(T('onb.back')) + '</span></button>' +
+      (editing && !needsMigration() ? '<a class="btn btn-ghost onb-cancel" id="onb-cancel" href="#profile">' + esc(T('app.cancel')) + '</a>' : '') +
+      '<button type="submit" class="btn btn-primary onb-next" id="onb-next"><span id="onb-next-lbl">' + esc(T('onb.next')) + '</span>' + chevron(isRtl() ? 'left' : 'right') + '</button>' +
       '</div></form></section>';
 
     var form = document.getElementById('onb');
@@ -615,6 +636,8 @@
       var never = isNever();
       document.getElementById('runner-fields').hidden = never;
       document.getElementById('zero-note').hidden = !never;
+      document.getElementById('pb-never').hidden = !never;
+      document.getElementById('pb-fields').hidden = never;
       var vol = never ? null : readVolume();
       document.getElementById('reason-block').hidden = !(vol && vol.gap === 'drop');
       var sel = form.pbSel.value;
@@ -664,67 +687,123 @@
     form.addEventListener('change', function () { syncRace(); syncLevel(); syncDate(); syncCycle(); });
     syncRace(); syncLevel(); syncDate(); syncCycle();
 
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
+    // ---------- مرحله‌ها: نشانگر پیشرفت، رفت‌وبرگشت و انیمیشن ----------
+    var cur = 1, maxSeen = editing ? ONB_STEPS : 1, busy = false;
+    function stepEl(n) { return form.querySelector('.onb-step[data-step="' + n + '"]'); }
+    function paintNav() {
+      app.querySelectorAll('.onb-dot').forEach(function (d) {
+        var n = Number(d.dataset.gotoStep);
+        d.classList.toggle('is-done', n < cur);
+        d.classList.toggle('is-current', n === cur);
+        d.parentNode.classList.toggle('is-done', n < cur);
+        d.disabled = n > maxSeen;
+        if (n === cur) d.setAttribute('aria-current', 'step'); else d.removeAttribute('aria-current');
+      });
+      document.getElementById('onb-back').classList.toggle('is-off', cur === 1);
+      document.getElementById('onb-back').disabled = cur === 1;
+      var last = cur === ONB_STEPS;
+      document.getElementById('onb-next-lbl').textContent = T(last ? (editing ? 'onb.submitEdit' : 'onb.submitNew') : 'onb.next');
+      document.getElementById('onb-next').classList.toggle('is-final', last);
+    }
+    function hideErrors() { var b = document.getElementById('onb-errors'); b.hidden = true; b.innerHTML = ''; }
+    function showErrors(list) {
+      var box = document.getElementById('onb-errors');
+      box.hidden = false;
+      box.innerHTML = '<ul>' + list.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+      box.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'center' });
+    }
+    function reducedMotion() { return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
+    function onShown(n) { if (n === 4) window.CoachTimePicker.refresh(stepEl(4)); }
+    function goStep(n, instant) {
+      if (busy || n === cur || n < 1 || n > ONB_STEPS) return;
+      var from = stepEl(cur), to = stepEl(n), fwd = n > cur;
+      hideErrors();
+      cur = n; maxSeen = Math.max(maxSeen, n);
+      paintNav();
+      var show = function () {
+        from.hidden = true; from.className = 'onb-step';
+        to.hidden = false; to.className = 'onb-step';
+        onShown(n);
+        if (!instant && !reducedMotion()) { void to.offsetWidth; to.classList.add(fwd ? 'onb-in-fwd' : 'onb-in-back'); }
+        // بالای کارت دیده بشه و فوکوس روی عنوان مرحله‌ی تازه (برای صفحه‌خوان)
+        var card = app.querySelector('.onb-wizard'), top = card.getBoundingClientRect().top + window.scrollY - 12;
+        if (window.scrollY > top) window.scrollTo({ top: top, behavior: instant || reducedMotion() ? 'auto' : 'smooth' });
+        if (!instant) document.getElementById('onb-step-title-' + n).focus({ preventScroll: true });
+        busy = false;
+      };
+      if (instant || reducedMotion()) { show(); return; }
+      busy = true;
+      from.classList.add(fwd ? 'onb-out-fwd' : 'onb-out-back');
+      setTimeout(show, 160);
+    }
+    app.querySelectorAll('.onb-dot').forEach(function (d) {
+      d.addEventListener('click', function () { goStep(Number(d.dataset.gotoStep)); });
+    });
+    document.getElementById('onb-back').addEventListener('click', function () { goStep(cur - 1); });
+    // «ویرایش داده‌های چرخه» از تنظیمات: مستقیم به مرحله‌ی مشخصات بدنی
+    if (pendingFocus === 'cycle-fieldset') goStep(2, true);
+    paintNav();
+
+    // همه‌ی ورودی‌ها رو بخون؛ هر خطا با شماره‌ی مرحله‌اش
+    function collect() {
       var fd = new FormData(form);
       var errs = [];
+      var E = function (st, msg) { errs.push({ step: st, msg: msg }); };
       var age = Number(fd.get('age')), w = Number(fd.get('weightKg')), h = Number(fd.get('heightCm'));
       var selDays = fd.getAll('days').map(Number);
       var selLocs = fd.getAll('locations');
       var never = fd.get('experience') === 'never';
       var volP = { lastWeekKm: 0, monthAvgKm: 0, volumeReason: null, currentWeeklyKm: 0 };
-      if (!fd.get('experience')) errs.push(T('onb.err.exp'));
-      if (!never) {
-        if (!inLim('vol', rawIn(form.lastWeekKm))) errs.push(fa(T('onb.err.lastWeek', limParams('vol'))));
-        if (!inLim('vol', rawIn(form.monthAvgKm))) errs.push(fa(T('onb.err.monthAvg', limParams('vol'))));
-        var vol = readVolume();
-        if (vol && vol.gap === 'drop' && !vol.reason) errs.push(T('onb.err.reason'));
-        if (vol) volP = volumeProfile(vol);
-      }
-      var curKm = volP.currentWeeklyKm;
-      if (!never && !fd.get('structured')) errs.push(T('onb.err.struct'));
-      var pbObj = never ? null : readPb();
-      if (pbObj === false) errs.push(T('onb.err.pb'));
-      var hrIn = readHr(form);
-      if (hrIn.error) errs.push(hrIn.error);
-      if (!(age >= 12 && age <= 90)) errs.push(T('onb.err.age'));
-      if (!(w >= 30 && w <= 250)) errs.push(T('onb.err.weight'));
-      if (!(h >= 120 && h <= 230)) errs.push(T('onb.err.height'));
-      if (!selDays.length) errs.push(T('onb.err.days'));
-      if (!selLocs.length) errs.push(T('onb.err.locs'));
+      // ۲. مشخصات بدنی
+      if (!(age >= 12 && age <= 90)) E(2, T('onb.err.age'));
+      if (!(h >= 120 && h <= 230)) E(2, T('onb.err.height'));
+      if (!(w >= 30 && w <= 250)) E(2, T('onb.err.weight'));
       // چرخه‌ی قاعدگی: فقط اگه «زن» انتخاب شده و کاربر خودش فعالش کرده
       var sex = fd.get('sex') || null, cycleObj = Object.assign({}, p.cycle || {}, { enabled: false });
       if (sex === 'female' && fd.get('cycleOn')) {
         var cs = String(fd.get('cycleStart') || ''), cl = Number(fd.get('cycleLen')), cp = Number(fd.get('periodLen'));
         var ago = cs ? C.daysBetween(C.parseDate(cs), today()) : -1;
-        if (!cs || ago < 0 || ago > 120) errs.push(T('cycle.err.lastStart'));
-        if (!(cl >= 21 && cl <= 45)) errs.push(T('cycle.err.cycleLen'));
-        if (!(cp >= 2 && cp <= 10)) errs.push(T('cycle.err.periodLen'));
+        if (!cs || ago < 0 || ago > 120) E(2, T('cycle.err.lastStart'));
+        if (!(cl >= 21 && cl <= 45)) E(2, T('cycle.err.cycleLen'));
+        if (!(cp >= 2 && cp <= 10)) E(2, T('cycle.err.periodLen'));
         cycleObj = { enabled: true, lastStart: cs, cycleLen: cl, periodLen: cp };
       }
+      // ۳. وضعیت فعلی دویدن
+      if (!fd.get('experience')) E(3, T('onb.err.exp'));
+      if (!never) {
+        if (!inLim('vol', rawIn(form.lastWeekKm))) E(3, fa(T('onb.err.lastWeek', limParams('vol'))));
+        if (!inLim('vol', rawIn(form.monthAvgKm))) E(3, fa(T('onb.err.monthAvg', limParams('vol'))));
+        var vol = readVolume();
+        if (vol && vol.gap === 'drop' && !vol.reason) E(3, T('onb.err.reason'));
+        if (vol) volP = volumeProfile(vol);
+        if (!fd.get('structured')) E(3, T('onb.err.struct'));
+      }
+      var curKm = volP.currentWeeklyKm;
+      // ۴. رکورد
+      var pbObj = never ? null : readPb();
+      if (pbObj === false) E(4, T('onb.err.pb'));
+      // ۵. هدف، روزها، محل، ضربان
       var gType = fd.get('goalType') || 'none', goalObj = { type: gType, date: null };
       if (gType !== 'none') {
         var rd = fd.get('raceDate');
-        if (rd && C.daysBetween(today(), C.parseDate(rd)) < 1) errs.push(T('onb.err.raceDate'));
+        if (rd && C.daysBetween(today(), C.parseDate(rd)) < 1) E(5, T('onb.err.raceDate'));
         goalObj.date = rd || null;
         if (gType === 'ultra') {
           var num = function (n) { var v = String(fd.get(n) || '').trim(); return v === '' ? null : Number(v); };
           var uk = kmIn(form.ultraKm), ug = num('ultraGain'), ul = num('ultraLoss'), ua = num('ultraAlt');
-          if (!inLim('ultra', rawIn(form.ultraKm))) errs.push(fa(T('onb.err.ultraKm', limParams('ultra'))));
-          if (ug === null || !(ug >= 0 && ug <= 20000)) errs.push(T('onb.err.ultraGain'));
-          if (ul !== null && !(ul >= 0 && ul <= 20000)) errs.push(T('onb.err.ultraLoss'));
-          if (ua !== null && !(ua >= 0 && ua <= 6000)) errs.push(T('onb.err.ultraAlt'));
+          if (!inLim('ultra', rawIn(form.ultraKm))) E(5, fa(T('onb.err.ultraKm', limParams('ultra'))));
+          if (ug === null || !(ug >= 0 && ug <= 20000)) E(5, T('onb.err.ultraGain'));
+          if (ul !== null && !(ul >= 0 && ul <= 20000)) E(5, T('onb.err.ultraLoss'));
+          if (ua !== null && !(ua >= 0 && ua <= 6000)) E(5, T('onb.err.ultraAlt'));
           goalObj.ultra = { km: uk, gain: ug, loss: ul, terrain: fd.get('ultraTerrain') || null, altitude: ua };
         }
       }
-      var box = document.getElementById('onb-errors');
-      if (errs.length) {
-        box.hidden = false;
-        box.innerHTML = '<ul>' + errs.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
-        box.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-      }
+      if (!selDays.length) E(5, T('onb.err.days'));
+      if (!selLocs.length) E(5, T('onb.err.locs'));
+      var hrIn = readHr(form);
+      if (hrIn.error) E(5, hrIn.error);
       var next = {
+        name: String(fd.get('firstName') || '').trim().slice(0, 40), lastName: String(fd.get('lastName') || '').trim().slice(0, 40),
         age: age, weightKg: w, heightCm: h,
         days: selDays.sort(), locations: selLocs,
         injury: String(fd.get('injury') || '').trim(),
@@ -735,9 +814,33 @@
         hrMax: hrIn.max, hrRest: hrIn.rest,
         sex: sex, cycle: cycleObj,
         // تاریخچه‌ی فیتنس و تنظیم دستی پیس ایزی با ویرایش پروفایل حفظ می‌شن
-        fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0, name: p.name || '',
+        fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0,
         createdAt: p.createdAt || new Date().toISOString()
       };
+      return { errs: errs, next: next, pbObj: pbObj, curKm: curKm };
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (busy) return;
+      var r = collect();
+      // مرحله‌های میانی: فقط خطاهای همین مرحله جلوی رفتن به بعدی رو می‌گیرن
+      if (cur < ONB_STEPS) {
+        var mine = r.errs.filter(function (x) { return x.step === cur; });
+        if (mine.length) { showErrors(mine.map(function (x) { return x.msg; })); return; }
+        goStep(cur + 1);
+        return;
+      }
+      if (r.errs.length) {
+        // اولین مرحله‌ای که خطا داره
+        var first = r.errs[0].step;
+        r.errs.forEach(function (x) { if (x.step < first) first = x.step; });
+        var list = r.errs.filter(function (x) { return x.step === first; }).map(function (x) { return x.msg; });
+        if (first !== cur) { goStep(first, true); }
+        showErrors(list);
+        return;
+      }
+      var next = r.next, pbObj = r.pbObj, curKm = r.curKm;
       // تاریخ رکورد پایه: اگه تغییر نکرده، تاریخ قبلی؛ اگه جدیده، امروز
       if (pbObj) {
         var same = p.pb && p.pb.distanceKm === pbObj.distanceKm && p.pb.timeSec === pbObj.timeSec;

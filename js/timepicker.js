@@ -49,6 +49,7 @@
     // فرم بسته شده (مثلاً بعد از ذخیره): رویدادی نفرست
     if (!pick.isConnected) return;
     var i = idxOf(w);
+    w._idx = i;
     w.setAttribute('aria-valuenow', i);
     if (!byUser || pick._silent) return;
     pick.classList.add('is-set');
@@ -62,6 +63,7 @@
   }
   function setWheel(w, i, smooth) {
     i = Math.max(0, Math.min(Number(w.dataset.max), i));
+    w._idx = i;
     if (smooth && 'scrollBehavior' in document.documentElement.style) w.scrollTo({ top: i * ITEM, behavior: 'smooth' });
     else w.scrollTop = i * ITEM;
     return i;
@@ -118,7 +120,15 @@
     wheels(pick).forEach(function (w) { setWheel(w, v[w.dataset.unit]); paint(w); });
     requestAnimationFrame(function () { pick._silent = false; });
   }
+  // وقتی چرخ‌ها داخل یک بخش پنهان (display:none) ساخته شدن، اسکرولشون اعمال نمی‌شه؛ بعد از نمایش دوباره تنظیم کن
+  function refresh(rootEl) {
+    Array.prototype.forEach.call((rootEl || document).querySelectorAll('.tpick[data-ready]'), function (pick) {
+      pick._silent = true;
+      wheels(pick).forEach(function (w) { if (w._idx != null && idxOf(w) !== w._idx) w.scrollTop = w._idx * ITEM; paint(w); });
+      requestAnimationFrame(function () { pick._silent = false; });
+    });
+  }
   function isSet(id) { var p = document.getElementById(id + '-picker'); return !!p && p.classList.contains('is-set'); }
 
-  root.CoachTimePicker = { html: html, init: init, preset: preset, isSet: isSet, ITEM: ITEM };
+  root.CoachTimePicker = { html: html, init: init, preset: preset, refresh: refresh, isSet: isSet, ITEM: ITEM };
 })(this);
