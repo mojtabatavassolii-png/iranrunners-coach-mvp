@@ -366,7 +366,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=25" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=26" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -467,9 +467,12 @@
       '</select></div>' +
       '<div class="field" id="pbother-field"' + (pbKey === 'other' ? '' : ' hidden') + '><label for="pbother">' + esc(T('onb.pbOtherKm')) + '</label>' +
       '<input id="pbother" name="pbOther" type="number" inputmode="decimal" min="1" max="100" step="0.1" value="' + esc(pbKey === 'other' ? pb.distanceKm : '') + '"></div>' +
-      '<div class="field" id="pbtime-field"' + (pbKey ? '' : ' hidden') + '><label for="pbtime">' + esc(T('onb.pbTime')) + '</label>' +
-      '<input id="pbtime" name="pbTime" dir="ltr" inputmode="numeric" autocomplete="off" placeholder="3:25:00" data-time-preview="pbtime-read" value="' + esc(pb.timeSec ? C.formatDuration(pb.timeSec) : '') + '">' +
-      '<small class="muted">' + esc(T('onb.pbTimeHint')) + '</small><small class="time-read" id="pbtime-read" aria-live="polite"></small></div>' +
+      '<div class="field field-tpick" id="pbtime-field"' + (pbKey ? '' : ' hidden') + '><span class="field-label" id="pbtime-lbl">' + esc(T('onb.pbTime')) + '</span>' +
+      // انتخاب‌گر چرخشی؛ مقدار در input مخفی pbTime (h:mm:ss) — بدون دست زدن کاربر خالیه
+      window.CoachTimePicker.html({ id: 'pbtime', name: 'pbTime', sec: pb.timeSec || pbGuess(pb.distanceKm || 5), touched: !!pb.timeSec, preview: 'pbtime-read',
+        aria: T('onb.pbTime'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
+      '<small class="muted">' + esc(T('onb.pbTimeHint')) + '</small><small class="time-read" id="pbtime-read" aria-live="polite">' +
+      (pb.timeSec ? '= ' + fa(C.describeDuration(pb.timeSec)) : '') + '</small></div>' +
       '</div></div>' +
       '<div id="level-preview" aria-live="polite"></div>' +
       '</fieldset>' +
@@ -540,7 +543,10 @@
       '</div></form></section>';
 
     var form = document.getElementById('onb');
+    window.CoachTimePicker.init(form);
 
+    // زمان شروع چرخ‌ها برای یک مسافت (حدود ۶ دقیقه در کیلومتر، گرد به دقیقه)
+    function pbGuess(km) { return Math.round(km * 360 / 60) * 60; }
     // خوندن رکورد از فرم؛ null = رکوردی وارد نشده، false = ناقص/نامعتبر
     function readPb() {
       var sel = form.pbSel.value;
@@ -589,6 +595,11 @@
       var sel = form.pbSel.value;
       document.getElementById('pbother-field').hidden = sel !== 'other';
       document.getElementById('pbtime-field').hidden = !sel;
+      // تا وقتی کاربر چرخ‌ها رو دست نزده، نقطه‌ی شروع چرخ‌ها = زمان معمول برای این مسافت
+      if (sel) {
+        var gkm = sel === 'other' ? Number(form.pbOther.value) : PB_DISTANCES.filter(function (d) { return d[0] === sel; })[0][1];
+        if (gkm > 0) window.CoachTimePicker.preset('pbtime', pbGuess(gkm));
+      }
       var box = document.getElementById('level-preview');
       var inp = readLevelInputs();
       if (!inp) {

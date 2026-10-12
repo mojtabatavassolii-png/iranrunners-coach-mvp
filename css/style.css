@@ -913,3 +913,40 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 /* حالت اپ نصب‌شده: فاصله از ناحیه‌ی امن بالای صفحه */
 @media (display-mode: standalone) { .site-header { padding-top: env(safe-area-inset-top, 0px); } }
 .modal.install-modal { border-top: 6px solid var(--brand); }
+
+/* ---------- انتخاب‌گر چرخشی زمان ---------- */
+.field-tpick { grid-column: 1 / -1; }
+.tpick {
+  --tp-item: 44px;
+  position: relative; display: flex; align-items: flex-start; justify-content: center; gap: 2px;
+  background: var(--card); border: 1.5px solid var(--field-line); border-radius: 16px; padding: 10px 8px 6px;
+  max-width: 340px; margin: 4px 0 6px; user-select: none; -webkit-user-select: none;
+}
+.tpick.is-set { border-color: var(--brand); }
+.tp-col { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+.tp-wheel {
+  height: calc(var(--tp-item) * 5); width: 100%; overflow-y: scroll; overscroll-behavior: contain;
+  scroll-snap-type: y mandatory; scrollbar-width: none; -ms-overflow-style: none; touch-action: pan-y;
+  -webkit-overflow-scrolling: touch; perspective: 600px; position: relative; z-index: 1; outline: none; border-radius: 12px;
+  /* کم‌رنگ شدن بالا و پایین چرخ */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 32%, #000 68%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 32%, #000 68%, transparent 100%);
+}
+.tp-wheel::-webkit-scrollbar { display: none; }
+.tp-wheel:focus-visible { box-shadow: 0 0 0 3px var(--brand-light); }
+.tp-pad { height: calc(var(--tp-item) * 2); }
+.tp-item {
+  height: var(--tp-item); display: grid; place-items: center; scroll-snap-align: center;
+  font-size: 1.35rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; cursor: pointer;
+  transform-origin: center; will-change: transform, opacity;
+}
+.tp-item.is-center { color: var(--text); font-weight: 800; font-size: 1.55rem; }
+/* نوار انتخاب وسط */
+.tp-band {
+  position: absolute; inset-inline: 8px; top: calc(10px + var(--tp-item) * 2); height: var(--tp-item);
+  background: var(--brand-soft); border-radius: 12px; pointer-events: none; z-index: 0;
+}
+.tpick.is-set .tp-band { background: var(--brand-light); }
+.tp-sep { align-self: flex-start; margin-top: calc(var(--tp-item) * 2); height: var(--tp-item); display: grid; place-items: center; font-size: 1.4rem; font-weight: 800; color: var(--text); position: relative; z-index: 1; }
+.tp-lbl { font-size: 0.78rem; color: var(--muted); margin-top: 4px; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .tp-wheel { scroll-behavior: auto; } }

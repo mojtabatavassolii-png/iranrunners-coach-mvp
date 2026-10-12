@@ -5,7 +5,7 @@
  * - بقیه (آیکون‌ها، فونت): کش و به‌روزرسانی در پس‌زمینه.
  * با هر انتشار، VERSION و نسخه‌ی فایل‌ها در index.html با هم بالا می‌رن (تست این هماهنگی رو بررسی می‌کنه).
  */
-var VERSION = '25';
+var VERSION = '26';
 var CACHE = 'coach-v' + VERSION;
 var SHELL = [
   './',
@@ -20,6 +20,7 @@ var SHELL = [
   'js/i18n/learn-en.js?v=' + VERSION,
   'js/logic.js?v=' + VERSION,
   'js/charts.js?v=' + VERSION,
+  'js/timepicker.js?v=' + VERSION,
   'js/app.js?v=' + VERSION,
   'img/logo.png?v=' + VERSION,
   'img/favicon.png',

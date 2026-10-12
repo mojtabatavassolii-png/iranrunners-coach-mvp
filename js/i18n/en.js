@@ -476,8 +476,8 @@
       pbDist: 'Distance',
       pbNone: 'No best time',
       pbOtherKm: 'Distance (km)',
-      pbTime: 'Time (h:mm:ss)',
-      pbTimeHint: 'e.g. "3:25:00" or "32500"',
+      pbTime: 'Finish time',
+      pbTimeHint: 'Swipe each column up or down to pick the hours, minutes and seconds of your result.',
       levelWait: 'Once you answer the required questions above, your level will appear here.',
       pbInvalid: 'The best time is incomplete or invalid and isn\'t being used for your level yet.',
       s2: '2. Body details',
@@ -513,7 +513,7 @@
         reason: 'Tell us whether last week\'s drop had a particular reason.',
         exp: 'Tell us how long you\'ve been running regularly.',
         struct: 'Tell us whether you\'ve done structured training (intervals, tempo).',
-        pb: 'Best time: enter the distance and time completely and correctly (e.g. "3:25:00" or just "32500"), or choose "No best time".',
+        pb: 'Best time: choose the distance and set its time with the hour, minute and second wheels, or choose "No best time".',
         age: 'Age must be between 12 and 90.',
         weight: 'Weight must be between 30 and 250 kg.',
         height: 'Height must be between 120 and 230 cm.',
@@ -857,6 +857,8 @@
       restartToast: 'The plan has restarted from today.',
       wipeQ: 'Delete all data (profile, check-ins, history) from this browser? This can\'t be undone.'
     },
+
+    tpick: { h: 'hours', m: 'min', s: 'sec' },
 
     // ---------- Install the app (PWA) ----------
     install: {
