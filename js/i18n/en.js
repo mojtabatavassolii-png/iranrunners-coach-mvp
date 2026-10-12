@@ -33,16 +33,16 @@
       expCap: 'Based on your running history ({exp}), your level was capped from {from} to {to}.',
       cautious: 'We\'ll increase your volume cautiously, because your current mileage doesn\'t match your speed yet.',
       pbLower: 'Your level comes from your best time, which reflects your real fitness better. Your current mileage is kept, but the intensity matches your speed.',
-      dropTemp: 'Your last week ({last} km) was much lower than your monthly average ({avg} km) because of {reason}. Since this drop is temporary and your fitness is intact, your level is based on the monthly average. The plan starts at {start} km and returns to {avg} km within a few weeks (10% rule).',
-      dropHealth: 'Your last week ({last} km) was much lower than your monthly average ({avg} km) because of {reason}. Your level is set cautiously from the weighted average ({w} km). The plan starts at {start} km and builds back gradually (at most 10% a week) to {avg} km.',
-      dropReal: 'Your last week ({last} km) was much lower than your monthly average ({avg} km) for no particular reason, so your volume has genuinely dropped. Your level is based on the weighted average ({w} km) and the plan starts at {start} km.',
-      rise: 'Your last week ({last} km) was much higher than your monthly average ({avg} km). Your level and starting volume are based on the weighted average ({w} km), so one unusual week doesn\'t make the plan too heavy.'
+      dropTemp: 'Your last week ({last:d} {u}) was much lower than your monthly average ({avg:d} {u}) because of {reason}. Since this drop is temporary and your fitness is intact, your level is based on the monthly average. The plan starts at {start:d} {u} and returns to {avg:d} {u} within a few weeks (10% rule).',
+      dropHealth: 'Your last week ({last:d} {u}) was much lower than your monthly average ({avg:d} {u}) because of {reason}. Your level is set cautiously from the weighted average ({w:d} {u}). The plan starts at {start:d} {u} and builds back gradually (at most 10% a week) to {avg:d} {u}.',
+      dropReal: 'Your last week ({last:d} {u}) was much lower than your monthly average ({avg:d} {u}) for no particular reason, so your volume has genuinely dropped. Your level is based on the weighted average ({w:d} {u}) and the plan starts at {start:d} {u}.',
+      rise: 'Your last week ({last:d} {u}) was much higher than your monthly average ({avg:d} {u}). Your level and starting volume are based on the weighted average ({w:d} {u}), so one unusual week doesn\'t make the plan too heavy.'
     },
     volReason: { injury: 'an injury', illness: 'illness', travel: 'travel', other: 'a temporary reason' },
 
     raceLabels: { 5: '5 km', 10: '10 km', 21: 'Half marathon (21.1 km)', 42: 'Marathon (42.2 km)' },
     goalTypes: { none: 'No specific goal', 5: '5 km', 10: '10 km', 21: 'Half marathon', 42: 'Marathon', ultra: 'Ultra & trail' },
-    goalUltra: 'Ultra/trail {km} km, {gain} m climb',
+    goalUltra: 'Ultra/trail {km:d} {u}, {gain} m climb',
     terrain: { technical: 'Technical mountain', trail: 'Easy trail', gravel: 'Gravel road', mixed: 'Mixed' },
     ultraClass: {
       flat: { label: 'Mostly flat (under 15 m of climb per km)', short: 'Mostly flat', emphasis: 'Aerobic endurance and steady-pace running; less hill work' },
@@ -60,7 +60,7 @@
       return: 'Post-race return', taper: 'Taper', deload: 'Easy week', first: 'First week', maintain: 'Holding volume', build: 'Building volume'
     },
 
-    pace: { range: '{a}–{b} min/km' },
+    pace: { range: '{a}–{b} {pu}' },
     talkTest: 'Talk test: you should be able to talk comfortably. If you can\'t, slow down, even below the target pace.',
     easyRpeWarning: 'This pace doesn\'t seem easy for you right now. We suggest setting your easy pace a little slower or logging a new time trial.',
     feedback: {
@@ -168,43 +168,43 @@
       reps: 'Effort: fast and relaxed (RPE 8 out of 10), full recovery.'
     },
     guideLine: { pace: ' Pace: {p}.', hr: ' Heart rate: {a}–{b}.' },
-    paceHint: { one: ' {label}: {a} min/km.', two: ' {label}: {a}–{b} min/km.' },
+    paceHint: { one: ' {label}: {a} {pu}.', two: ' {label}: {a}–{b} {pu}.' },
     lbl: {
       pace: 'Pace', paceT: 'T pace', paceI: 'I pace', paceReps: 'Rep pace', paceR: 'R pace', paceFast: 'Pace for the fast parts',
       pace5k: '5 km pace', paceFastParts: 'Pace for the fast sections', paceMarathon: 'Marathon pace', paceTempoPart: 'Tempo section pace'
     },
     s: {
-      km: '{n} km',
+      km: '{n:d} {u}',
       min: '{n} min',
-      wuKm: '{km} km easy warm-up',
+      wuKm: '{km:d} {u} easy warm-up',
       wuMin: '10 min easy running',
       wuStrides: ' + 4 short 20-second accelerations',
-      cdKm: '{km} km easy cool-down',
+      cdKm: '{km:d} {u} easy cool-down',
       runwalk: {
         warm: '5 min brisk walk to warm up',
         main: '{reps} times: {run} min very easy running + {walk} min walking',
         cool: '5 min easy walk to cool down',
         how: 'Run slowly enough that you never gasp for breath; if it gets hard, walk longer.'
       },
-      easy: '{km} km continuous easy running',
-      double: { variant: 'double day', target: '{am} + {pm} km', am: 'Morning: {n} km easy running', pm: 'Evening: {n} km easy running', how: ' Leave at least 6 hours between the two runs.' },
+      easy: '{km:d} {u} continuous easy running',
+      double: { variant: 'double day', target: '{am} + {pm:d} {u}', am: 'Morning: {n:d} {u} easy running', pm: 'Evening: {n:d} {u} easy running', how: ' Leave at least 6 hours between the two runs.' },
       strides: 'Finish with 6 × 20 s fast, relaxed and controlled strides, full recovery between each',
       hillSprints: 'Finish with 8 × 10 s uphill sprints (steep slope), 2 min full recovery',
       strength: '+ 30–40 min strength and plyometrics (squats, light deadlifts, lunges, short jumps)',
       tempo: {
-        mildMain: '{a} km at tempo rhythm, 2 min jog, {b} km at tempo rhythm',
-        main: '{km} km continuous at threshold pace (T)',
+        mildMain: '{a:d} {u} at tempo rhythm, 2 min jog, {b:d} {u} at tempo rhythm',
+        main: '{km:d} {u} continuous at threshold pace (T)',
         mildHow: 'Effort: a little slower than a full tempo (RPE 6–7 out of 10).',
         vMild: 'gentle', vT: 'threshold, T'
       },
-      cruise: { variant: 'cruise intervals, T', main: '{reps} × 1.6 km at threshold pace (T), 1 min rest between reps' },
+      cruise: { variant: 'cruise intervals, T', main: '{reps} × {rk:d} {u} at threshold pace (T), 1 min rest between reps' },
       interval: {
         restShort: '2–3 min walking or very easy jogging',
         restDaniels: 'easy jog for as long as the rep',
         rest90: '90 s easy jog',
         rest23: '2–3 min easy jog',
         rest3: '3 min easy jog',
-        warmKm: '{km} km warm-up + ',
+        warmKm: '{km:d} {u} warm-up + ',
         warmMin: '10 min easy running + ',
         strides4: '4 short 20-second accelerations',
         main: '{reps} × {rep} m, {rest} between reps',
@@ -213,7 +213,7 @@
       },
       reps: {
         variant: 'R pace',
-        warm: '{km} km warm-up + 4 short accelerations',
+        warm: '{km:d} {u} warm-up + 4 short accelerations',
         main: '{reps} × {rep} m at R pace, {rep} m easy jog between reps (full recovery)'
       },
       fartlek: { main: '{reps} times: 2 min fast (10 km rhythm) + 2 min easy running', how: 'Effort in the fast parts: RPE 7–8 out of 10.' },
@@ -241,7 +241,7 @@
       longInt: { variant: 'long', main: '{reps} × {rep} m at a pace between 10 km and half marathon; 2–3 min jog between reps', how: 'Effort: hard but sustainable (RPE 7–8 out of 10).' },
       tempoRun: { variant: 'continuous', main: '{min} min continuous at threshold pace (a pace you could hold for about an hour)' },
       longTempo: { variant: 'long continuous', main: '{min} min continuous at threshold pace or slightly slower', how: 'Effort: RPE 6–7 out of 10, no fading to the end.' },
-      mpInt: { variant: 'marathon-pace intervals', main: '{reps} × {km} km at exact marathon pace; 1 km easy running between reps', how: 'Effort: RPE 6–7 out of 10; exactly race rhythm.' },
+      mpInt: { variant: 'marathon-pace intervals', main: '{reps} × {km:d} {u} at exact marathon pace; {j:d} {u} easy running between reps', how: 'Effort: RPE 6–7 out of 10; exactly race rhythm.' },
       longFartlek: {
         variant: 'long',
         main: '{dur} min run including {n} 10-minute sections at marathon pace or slightly faster',
@@ -274,32 +274,32 @@
       },
       ultraLong: {
         day2Prefix: 'Second back-to-back day, on legs tired from yesterday: ',
-        main: '{km} km on trail or uneven ground, about {time} on your feet',
+        main: '{km:d} {u} on trail or uneven ground, about {time} on your feet',
         vert: 'Target total climb: about {vert} m (no big hill? repeat one climb several times)',
         hike: 'Power-hike the steep climbs; it\'s a race skill, not a weakness',
         fuel: 'Eat and drink every 30–45 minutes, using what you\'ll use on race day',
         how: 'Effort: easy (RPE 4–5 out of 10, by effort, not pace).',
         technical: ' If you can, run on technical trail.',
         day2How: ' Keep today easy too.',
-        targetVert: '{km} km, +{vert} m',
+        targetVert: '{km:d} {u}, +{vert} m',
         vDay1: 'back-to-back, day 1', vDay2: 'back-to-back, day 2', vTrail: 'trail'
       },
       long: {
-        plain: '{km} km steady running',
+        plain: '{km:d} {u} steady running',
         water: 'For more than 60 minutes, carry water',
-        easyKm: '{km} km easy',
-        mpEnd: 'Final {km} km at marathon pace (simulating late-race fatigue)',
+        easyKm: '{km:d} {u} easy',
+        mpEnd: 'Final {km:d} {u} at marathon pace (simulating late-race fatigue)',
         mpFuel: 'Practise your in-run fuelling as on race day',
-        tempoSplit: '{a} km tempo, 1 km easy, {b} km tempo',
-        restEasy: 'The rest, up to {km} km, easy',
-        lastTempo: 'Last {km} km at tempo rhythm',
+        tempoSplit: '{a:d} {u} tempo, {j:d} {u} easy, {b:d} {u} tempo',
+        restEasy: 'The rest, up to {km:d} {u}, easy',
+        lastTempo: 'Last {km:d} {u} at tempo rhythm',
         vMp: 'marathon-pace finish', vTempo: 'with tempo sections'
       },
       rest: 'Full rest, or a light walk / stretching',
       notStarted: 'The plan starts on your sign-up day.',
       race: {
         ultraHow: 'Race day! Don\'t try anything new (shoes, food, clothing). Pace by effort (RPE), not by pace; the first half should feel easy.',
-        ultraEst: ' Very rough estimated time: about {time} (equivalent to {km} km of flat running).',
+        ultraEst: ' Very rough estimated time: about {time} (equivalent to {km:d} {u} of flat running).',
         ultraSteps: ['Start very conservatively; walk the steep climbs', 'Eat and drink every 30–45 minutes', 'Take the descents under control to save your quads for the finish', 'Check the mandatory race gear (water, headlamp, warm layer)'],
         steps: ['Start the first kilometres a little slower than target pace', 'Use the water stations'],
         how: 'Race day! Don\'t try anything new (shoes, food, clothing).',
@@ -349,9 +349,9 @@
         fewer: 'Instead, do a lighter version of the same session: {main}. The session type and its purpose stay, just with less strain.',
         fewerRest: ' Take about 50% more rest between reps.',
         mildTempo: 'Instead, run a mild tempo: {main}. It still gives a training stimulus, but tires you far less than {label}.',
-        shorterLong: 'Instead, run a shorter long run: {km} km instead of {orig}, at a fully easy effort.',
-        shorterEasy: 'Shorten the session: {km} km instead of {orig}, at a very easy effort.',
-        easy: 'Instead, run a short {km} km easy run at a very easy effort.',
+        shorterLong: 'Instead, run a shorter long run: {km:d} {u} instead of {orig:d}, at a fully easy effort.',
+        shorterEasy: 'Shorten the session: {km:d} {u} instead of {orig:d}, at a very easy effort.',
+        easy: 'Instead, run a short {km:d} {u} easy run at a very easy effort.',
         rest: 'Active rest today: 20–30 minutes of light walking or gentle movement. Your body gets stronger through recovery, not by training on fatigue.',
         keepHard: 'The session stays. If the first rep or block feels harder than usual, drop one rep (or a few minutes of the fast part).',
         keepLong: 'The session stays; keep the effort fully easy and drop the last few kilometres if the second half feels heavy.',
@@ -367,7 +367,7 @@
         noRoom: 'There\'s no good opportunity to make it up this week, and there\'s no need: one lighter session doesn\'t change your multi-week training trend. Next week continues as planned.',
         persist: ' If this fatigue continues for a few more days, look at your sleep, nutrition and stress, and see a doctor if it persists.'
       },
-      what: { strides: '6 × 20 s strides (full recovery)', steady: '10 minutes at a steady effort (RPE 5–6)', km: 'about {n} km' },
+      what: { strides: '6 × 20 s strides (full recovery)', steady: '10 minutes at a steady effort (RPE 5–6)', km: 'about {n:d} {u}' },
       makeupBox: {
         title: 'Optional add-on',
         text: 'Since you feel good today, you can add {what} at the end of this session to make up part of {day}\'s lighter training. It\'s optional; skip it if you don\'t feel good.'
@@ -457,16 +457,16 @@
       introNew: 'You can edit this later from your profile.',
       required: '(required)',
       s1: '1. Your current running',
-      kmLabel: 'Right now, how many kilometres do you run per week on average?',
+      kmLabel: 'Right now, how many {uw} do you run per week on average?',
       kmHint: 'Average of the last few weeks; enter 0 if you don\'t run.',
-      lastWeek: 'Last week\'s volume (km)',
+      lastWeek: 'Last week\'s volume ({u})',
       lastWeekHint: 'Your last complete week, Saturday to Friday.',
-      monthAvg: 'Last month\'s average (km per week)',
+      monthAvg: 'Last month\'s average ({u} per week)',
       monthAvgHint: 'Weekly average over the past four weeks; e.g. 30+35+40+35 → 35.',
       reasonQ: 'Last week was much lower than your monthly average. Was there a particular reason?',
       reasonHint: 'Your answer tells us whether the drop is temporary or real, and where the plan should start.',
       reasons: { injury: 'Injury', illness: 'Illness', travel: 'Travel', other: 'Another temporary reason', none: 'No particular reason; I\'m really running less' },
-      startPreview: 'The plan starts at {n} km per week.',
+      startPreview: 'The plan starts at {n:d} {u} per week.',
       pbIntro: 'The best time you\'ve run over one of the distances below in the last six months, with a fairly serious effort (not an ordinary training run, but an official race or an all-out time trial).',
       pbOptional: 'If you don\'t have one or aren\'t sure, leave this section empty; the system will estimate your level from your current training volume.',
       zeroNote: 'Great that you want to start! You don\'t need to know anything about kilometres or race times. Your plan starts with walking and adds very gentle running little by little; most people reach 15 minutes of continuous running within 4 to 8 weeks.',
@@ -475,7 +475,7 @@
       pbQ: 'Your best recent time (optional)',
       pbDist: 'Distance',
       pbNone: 'No best time',
-      pbOtherKm: 'Distance (km)',
+      pbOtherKm: 'Distance ({u})',
       pbTime: 'Finish time',
       pbTimeHint: 'Swipe each column up or down to pick the hours, minutes and seconds of your result.',
       levelWait: 'Once you answer the required questions above, your level will appear here.',
@@ -493,7 +493,7 @@
       goalType: 'Target race type',
       raceDate: 'Race date (if you have a specific race)',
       raceDateEq: 'Solar Hijri date: {d}',
-      ultraKm: 'Race distance (km)',
+      ultraKm: 'Race distance ({u})',
       ultraGain: 'Total climb (metres of ascent)',
       ultraLoss: 'Total descent (m, optional)',
       ultraLossHint: 'If different from the climb',
@@ -507,9 +507,9 @@
       toastEdit: 'Plan updated.',
       toastNew: 'Your plan is ready!',
       err: {
-        km: 'Enter how many kilometres you currently run per week on average (a number from 0 to 400).',
-        lastWeek: 'Enter last week\'s volume (0 to 400 km; enter 0 if you didn\'t run).',
-        monthAvg: 'Enter last month\'s average weekly volume (0 to 400 km).',
+        km: 'Enter how many {uw} you currently run per week on average (a number from 0 to {max}).',
+        lastWeek: 'Enter last week\'s volume (0 to {max} {u}; enter 0 if you didn\'t run).',
+        monthAvg: 'Enter last month\'s average weekly volume (0 to {max} {u}).',
         reason: 'Tell us whether last week\'s drop had a particular reason.',
         exp: 'Tell us how long you\'ve been running regularly.',
         struct: 'Tell us whether you\'ve done structured training (intervals, tempo).',
@@ -520,7 +520,7 @@
         days: 'Choose at least one free day.',
         locs: 'Choose at least one training location.',
         raceDate: 'The race date must be after today (or leave it empty).',
-        ultraKm: 'Enter the trail race distance (10 to 400 km).',
+        ultraKm: 'Enter the trail race distance ({min} to {max} {u}).',
         ultraGain: 'Enter the race\'s total climb (metres of ascent); for a flat course enter 0 or a small number.',
         ultraLoss: 'Descent must be between 0 and 20,000 m.',
         ultraAlt: 'Altitude must be between 0 and 6,000 m.'
@@ -584,7 +584,7 @@
     plan: { week: 'Weekly view', month: 'Monthly view', viewAria: 'Plan view' },
     month: {
       prev: 'Previous month', next: 'Next month', back: 'Back to this month', gridAria: 'Month calendar',
-      stats: { one: '{n} session · {km} km · {d} done', other: '{n} sessions · {km} km · {d} done' },
+      stats: { one: '{n} session · {km:d} {u} · {d} done', other: '{n} sessions · {km:d} {u} · {d} done' },
       statsMin: { one: '{n} session · {min} min · {d} done', other: '{n} sessions · {min} min · {d} done' }
     },
     settings: {
@@ -597,8 +597,12 @@
       gregorian: 'Gregorian',
       current: 'Now: {cal} calendar, weeks start on {day}.',
       note: 'Defaults: Persian → Solar Hijri and Saturday; English → Gregorian and Monday. Changing the first day of the week moves the plan\'s week boundaries (the long run falls on the last day of the week); your free days stay the same.',
-      saved: 'Settings saved.'
+      saved: 'Settings saved.',
+      units: 'Distance units',
+      unitsNote: 'All distances, weekly volume and paces are shown in this unit. Race names (like 5 km and 10 km), time trials and metre-based interval reps stay as they are.'
     },
+    units: { km: 'km', mi: 'mi', word: { km: 'kilometres', mi: 'miles' }, pace: { km: 'min/km', mi: 'min/mi' }, short: { km: 'km', mi: 'mi' },
+      opt: { km: 'Kilometres (km)', mi: 'Miles (mi)' } },
     sess: { original: 'Original plan:', warmup: 'Warm-up', main: 'Main set', cooldown: 'Cool-down', about: 'about {n} min' },
     post: {
       summary: 'After the run: effort {rpe} out of 10',
@@ -661,7 +665,7 @@
       totalTime: 'Total time',
       nMin: '{n} min',
       volume: 'Total volume',
-      nKm: '{n} km',
+      nKm: '{n:d} {u}',
       vert: 'Climb: +{n} m',
       ratio: 'Easy / hard ratio',
       ratioHelp: 'The 80/20 rule',
@@ -673,7 +677,7 @@
     },
     toast: {
       slowed: 'Easy pace set {n} s slower than the VDOT calculation.',
-      levelApplied: 'The plan continues at level {to} (was {from}) with {km} km per week.'
+      levelApplied: 'The plan continues at level {to} (was {from}) with {km:d} {u} per week.'
     },
     fitNotes: {
       title: 'Fitness update',
@@ -739,10 +743,10 @@
       predTitle: 'Time prediction',
       predHelp: 'How is the prediction calculated?',
       predFor: 'Predicted time for {race}',
-      avgPace: 'Average pace: {p} min/km',
+      avgPace: 'Average pace: {p} {pu}',
       thDist: 'Distance',
       thTime: 'Predicted time',
-      thPace: 'Pace (min/km)',
+      thPace: 'Pace ({pu})',
       predNeed: 'Log a time trial or a recent best time to get a prediction.',
       newTestOrPb: 'Log a time trial or new best time'
     },
@@ -750,12 +754,12 @@
       title: 'Fitness and paces',
       help: 'VDOT and time trials',
       entry: { test: 'Time trial', race: 'Race', baseline: 'Baseline best time (at plan creation)', record: 'Best time' },
-      entryLine: '{label}: {km} km in',
+      entryLine: '{label}: {d} in',
       weeksAgo: { one: ' · {n} week ago', other: ' · {n} weeks ago' },
       thisWeek: ' · this week',
       none: 'No time trial or best time logged yet.',
       thPace: 'Pace',
-      thMinKm: 'min/km',
+      thMinKm: '{pu}',
       thFor: 'Used for',
       rows: {
         E: ['Easy (E)', 'Easy and long runs'],
@@ -779,7 +783,7 @@
       formHelp: 'How should I run a time trial?',
       kind: 'Type',
       kinds: { t2: '2 km time trial', t3: '3 km time trial', t5: '5 km time trial', race: 'Race or another distance' },
-      km: 'Distance (km)',
+      km: 'Distance ({u})',
       time: 'Time',
       timeHint: 'Swipe each column up or down to set your time.',
       date: 'Date',
@@ -793,9 +797,9 @@
       hrTitle: 'Heart rate (optional)',
       hrSave: 'Save heart rate',
       err: {
-        km: 'Enter a distance between 1 and 100 km.',
+        km: 'Enter a distance between {min} and {max} {u}.',
         time: 'Set your time by turning the hours, minutes and seconds wheels.',
-        impossible: 'That time isn\'t possible for {km} km ({d}); please check it.',
+        impossible: 'That time isn\'t possible for {km:d} {u} ({d}); please check it.',
         date: 'The date must be today or earlier.'
       },
       toast: 'VDOT: {vdot} · new easy range: {a} to {b}',
@@ -841,13 +845,13 @@
       notEntered: 'Not entered',
       details: 'Details and update',
       registerTest: 'Log a time trial',
-      kmVal: '{n} km per week',
-      kmVal2: 'Last week {last} · monthly average {avg} · plan starts at {start} km',
+      kmVal: '{n:d} {u} per week',
+      kmVal2: 'Last week {last:d} · monthly average {avg:d} · plan starts at {start:d} {u}',
       bodyVal: '{age} years · {w} kg · {h} cm',
       notRecorded: 'Not recorded',
       noDate: '(no date)',
       noGoal: 'No specific goal',
-      pbVal: '{km} km in',
+      pbVal: '{d} in',
       statsVal: '{c} check-ins · {d} sessions done',
       edit: 'Edit profile',
       restart: 'Restart the plan from this week',
@@ -887,7 +891,7 @@
     // ---------- Settings page ----------
     settingsPage: {
       title: 'Settings',
-      lang: 'Language and display', cal: 'Calendar', health: 'Health and cycle', person: 'Personal details', data: 'Data',
+      lang: 'Language and units', cal: 'Calendar', health: 'Health and cycle', person: 'Personal details', data: 'Data',
       cycleOn: 'Cycle adaptation is on', cycleOff: 'Cycle adaptation is off', cycleNA: 'For female users',
       cycleHint: 'Menstrual cycle settings become available when "female" is selected as sex in the setup form.',
       personSub: '{age} years old, level {n}',
@@ -917,7 +921,7 @@
       },
       prog: {
         title: 'This week', lastWeek: 'No sessions logged this week yet; last week:', none: 'Once you mark your first session as done, your weekly stats will appear here.',
-        km: '{n} km run', runs: { one: '{n} session', other: '{n} sessions' }, prev: 'last week {n} km', vdot: 'New result: VDOT went from {a} to {b}.'
+        km: '{n:d} {u} run', runs: { one: '{n} session', other: '{n} sessions' }, prev: 'last week {n:d} {u}', vdot: 'New result: VDOT went from {a} to {b}.'
       },
       race: { title: 'Race countdown', days: 'days to the {race}', today: 'It\'s race day!', taper: 'taper starts in {n} days' }
     },
@@ -936,9 +940,9 @@
       partialTag: 'in progress',
       sep: ' · ',
       vol: {
-        title: 'Weekly volume', desc: 'Kilometres from completed sessions each week, with a 4-week moving average.',
-        bars: 'Weekly km', ma: '4-week average', thisWeek: 'This week (so far)', avg4: '4-week average', trend: 'Trend',
-        up: 'Rising', down: 'Falling', flat: 'Steady', unit: 'km', val: '{n} km',
+        title: 'Weekly volume', desc: 'Distance from completed sessions each week, with a 4-week moving average.',
+        bars: 'Weekly {u}', ma: '4-week average', thisWeek: 'This week (so far)', avg4: '4-week average', trend: 'Trend',
+        up: 'Rising', down: 'Falling', flat: 'Steady', unit: '{u}', val: '{n} {u}',
         empty: 'After two weeks of logged training, your volume trend will appear here.'
       },
       pmc: {
@@ -953,7 +957,7 @@
       },
       pace: {
         title: 'Pace improvement', desc: 'Easy, tempo and interval paces from the VDOT of each race result or time trial. Higher on the chart = faster.',
-        e: 'Easy', t: 'Tempo', i: 'Interval', vdot: 'VDOT', unit: 'min/km', faster: '↑ faster',
+        e: 'Easy', t: 'Tempo', i: 'Interval', vdot: 'VDOT', unit: '{pu}', faster: '↑ faster',
         diffFaster: '{n} s faster', diffSlower: '{n} s slower', diffSame: 'No change', newTest: 'New result or time trial',
         empty: 'You need at least two race results or time trials to see a pace trend. Log a time trial on the Fitness page every 4–6 weeks.'
       },

@@ -24,9 +24,34 @@
     return v;
   }
 
+  // واحد مسافت: 'km' یا 'mi'. همه‌ی محاسبه‌ها به کیلومتره؛ تبدیل فقط موقع نمایش و ورودی.
+  var KM_PER_MI = 1.609344;
+  var units = 'km';
+  function setUnits(u) { if (u === 'km' || u === 'mi') units = u; }
+  function getUnits() { return units; }
+  function round1(x) { return Math.round(x * 10) / 10; }
+  // کیلومتر → عدد در واحد فعلی (مایل با یک رقم اعشار)
+  function dist(km) {
+    var n = Number(km);
+    if (units === 'km' || !isFinite(n)) return n;
+    return round1(n / KM_PER_MI);
+  }
+  // عدد در واحد فعلی (ورودی کاربر) → کیلومتر
+  function toKm(x) { var n = Number(x); return units === 'km' ? n : n * KM_PER_MI; }
+  // ثانیه در کیلومتر → ثانیه در واحد فعلی
+  function pace(secPerKm) { return units === 'km' ? secPerKm : Math.round(secPerKm * KM_PER_MI); }
+
+  // {x} جای‌گذاری ساده؛ {x:d} مسافت به کیلومتر که به واحد فعلی تبدیل می‌شه؛ {u} و {pu} برچسب واحد و پیس
   function fill(s, params) {
-    if (!params) return s;
-    return s.replace(/\{(\w+)\}/g, function (m, k) { return params[k] !== undefined && params[k] !== null ? String(params[k]) : m; });
+    if (s.indexOf('{') < 0) return s;
+    return s.replace(/\{(\w+)(?::(d))?\}/g, function (m, k, typ) {
+      if (k === 'u' && !(params && 'u' in params)) return t('units.' + units);
+      if (k === 'uw' && !(params && 'uw' in params)) return t('units.word.' + units);
+      if (k === 'pu' && !(params && 'pu' in params)) return t('units.pace.' + units);
+      if (!params || params[k] === undefined || params[k] === null) return m;
+      if (typ === 'd' && params[k] !== '' && isFinite(Number(params[k]))) return String(dist(params[k]));
+      return String(params[k]);
+    });
   }
 
   // مقدار خام (رشته، آرایه یا شیء)؛ برای جمع انگلیسی: { one: '...', other: '...' } با params.n
@@ -88,7 +113,8 @@
   }
 
   var api = { register: register, extend: extend, t: t, has: has, getLang: getLang, setLang: setLang, savedLang: savedLang, dir: dir, num: num, date: date,
-    monthTitle: monthTitle, setCalendar: setCalendar, getCalendar: getCalendar, LANGS: LANGS };
+    monthTitle: monthTitle, setCalendar: setCalendar, getCalendar: getCalendar, LANGS: LANGS,
+    setUnits: setUnits, getUnits: getUnits, dist: dist, toKm: toKm, pace: pace, KM_PER_MI: KM_PER_MI };
 
   if (typeof module !== 'undefined' && module.exports) {
     register('fa', require('./i18n/fa.js'));

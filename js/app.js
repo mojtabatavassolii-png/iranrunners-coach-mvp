@@ -42,7 +42,7 @@
   var SETTINGS_KEY = 'iranrunners-coach-settings';
   var WS_MAP = { sat: 6, sun: 0, mon: 1 };
   function loadSettings() {
-    var d = { calendar: 'auto', weekStart: 'auto', planView: 'week', cycleMarkers: true, progressRange: '3m' };
+    var d = { calendar: 'auto', weekStart: 'auto', planView: 'week', cycleMarkers: true, progressRange: '3m', units: 'km' };
     try { return Object.assign(d, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { return d; }
   }
   var settings = loadSettings();
@@ -50,6 +50,7 @@
   function applyCalendarSettings() {
     var isFa = I.getLang() === 'fa';
     I.setCalendar(settings.calendar === 'auto' ? (isFa ? 'jalali' : 'gregorian') : settings.calendar);
+    I.setUnits(settings.units);
     C.setWeekStart(settings.weekStart === 'auto' ? (isFa ? WS_MAP.sat : WS_MAP.mon) : WS_MAP[settings.weekStart]);
   }
 
@@ -83,6 +84,31 @@
     });
   }
   function t(s) { return esc(fa(s)); }
+  // ---------- واحد مسافت (کیلومتر/مایل): ذخیره همیشه به کیلومتر، نمایش و ورودی به واحد انتخابی ----------
+  function isMi() { return I.getUnits() === 'mi'; }
+  function uShort() { return T('units.short.' + I.getUnits()); }
+  function dKm(km) { return I.dist(km); }
+  // بازه‌ی مجاز ورودی‌ها به واحد کاربر
+  var LIM = { vol: [[0, 400], [0, 250]], ultra: [[10, 400], [6, 250]], dist: [[1, 100], [0.6, 62]] };
+  function lim(k) { return LIM[k][isMi() ? 1 : 0]; }
+  function limAttrs(k, step) { var l = lim(k); return ' min="' + l[0] + '" max="' + l[1] + '" step="' + (isMi() ? '0.1' : step) + '"'; }
+  // مقدار اولیه‌ی فیلد: عدد به واحد کاربر + کیلومتر اصلی (تا اگه کاربر دست نزد، عدد دقیق حفظ بشه)
+  function kmField(km) { return km === '' || km == null ? ' value=""' : ' value="' + esc(dKm(km)) + '" data-km="' + esc(km) + '"'; }
+  function rawIn(el) { var v = String(el.value).trim(); return v === '' ? null : Number(v); }
+  function kmIn(el) {
+    var v = rawIn(el);
+    if (v === null || !isFinite(v)) return v;
+    if (el.dataset.km && Number(dKm(el.dataset.km)) === v) return Number(el.dataset.km);
+    return isMi() ? Math.round(I.toKm(v) * 100) / 100 : v;
+  }
+  function inLim(k, v) { var l = lim(k); return v !== null && v >= l[0] && v <= l[1]; }
+  function limParams(k) { var l = lim(k); return { min: l[0], max: l[1] }; }
+  // اسم مسافت: مسافت‌های استاندارد مسابقه با اسم خودشون («۱۰ کیلومتر»، «نیمه‌ماراتن»)، بقیه به واحد کاربر
+  function distName(km) {
+    var k = pbDistanceKey(km);
+    return ['5', '10', '21', '42'].indexOf(k) >= 0 ? T('pbDist.' + k) : dKm(Math.round(km * 100) / 100) + ' ' + T('units.' + I.getUnits());
+  }
+  function paceFmt(secPerKm) { return C.formatDuration(I.pace(Math.round(secPerKm))); }
   // متن ترجمه‌شده با اعداد بومی و امن برای HTML
   function tt(key, params) { return t(T(key, params)); }
   function faDate(key, short) { return I.date(C.parseDate(key), short); }
@@ -448,10 +474,10 @@
       '<div id="runner-fields">' +
       '<div class="row2">' +
       '<div class="field"><label for="lastkm">' + esc(T('onb.lastWeek')) + req + '</label>' +
-      '<input id="lastkm" name="lastWeekKm" type="number" inputmode="decimal" min="0" max="400" step="0.5" required value="' + esc(volLast) + '">' +
+      '<input id="lastkm" name="lastWeekKm" type="number" inputmode="decimal"' + limAttrs('vol', '0.5') + ' required' + kmField(volLast) + '>' +
       '<small class="muted">' + esc(T('onb.lastWeekHint')) + '</small></div>' +
       '<div class="field"><label for="avgkm">' + esc(T('onb.monthAvg')) + req + '</label>' +
-      '<input id="avgkm" name="monthAvgKm" type="number" inputmode="decimal" min="0" max="400" step="0.5" required value="' + esc(volAvg) + '">' +
+      '<input id="avgkm" name="monthAvgKm" type="number" inputmode="decimal"' + limAttrs('vol', '0.5') + ' required' + kmField(volAvg) + '>' +
       '<small class="muted">' + esc(T('onb.monthAvgHint')) + '</small></div></div>' +
       '<div id="reason-block" class="reason-block" hidden><p class="sub-legend">' + esc(T('onb.reasonQ')) + req + '</p>' +
       '<p class="small muted">' + esc(T('onb.reasonHint')) + '</p><div class="chips">' +
@@ -466,7 +492,7 @@
       PB_DISTANCES.map(function (d) { return '<option value="' + d[0] + '"' + (pbKey === d[0] ? ' selected' : '') + '>' + esc(T('pbDist.' + d[0])) + '</option>'; }).join('') +
       '</select></div>' +
       '<div class="field" id="pbother-field"' + (pbKey === 'other' ? '' : ' hidden') + '><label for="pbother">' + esc(T('onb.pbOtherKm')) + '</label>' +
-      '<input id="pbother" name="pbOther" type="number" inputmode="decimal" min="1" max="100" step="0.1" value="' + esc(pbKey === 'other' ? pb.distanceKm : '') + '"></div>' +
+      '<input id="pbother" name="pbOther" type="number" inputmode="decimal"' + limAttrs('dist', '0.1') + kmField(pbKey === 'other' ? pb.distanceKm : '') + '></div>' +
       '<div class="field field-tpick" id="pbtime-field"' + (pbKey ? '' : ' hidden') + '><span class="field-label" id="pbtime-lbl">' + esc(T('onb.pbTime')) + '</span>' +
       // انتخاب‌گر چرخشی؛ مقدار در input مخفی pbTime (h:mm:ss) — بدون دست زدن کاربر خالیه
       window.CoachTimePicker.html({ id: 'pbtime', name: 'pbTime', sec: pb.timeSec || pbGuess(pb.distanceKm || 5), touched: !!pb.timeSec, preview: 'pbtime-read',
@@ -522,7 +548,7 @@
       '<small class="muted" id="rdate-fa"></small></div>' +
       '<div id="ultra-fields"' + (goal.type === 'ultra' ? '' : ' hidden') + '>' +
       '<div class="row2"><div class="field"><label for="ukm">' + esc(T('onb.ultraKm')) + req + '</label>' +
-      '<input id="ukm" name="ultraKm" type="number" inputmode="decimal" min="10" max="400" step="0.1" value="' + esc(goal.km || '') + '"></div>' +
+      '<input id="ukm" name="ultraKm" type="number" inputmode="decimal"' + limAttrs('ultra', '0.1') + kmField(goal.km || '') + '></div>' +
       '<div class="field"><label for="ugain">' + esc(T('onb.ultraGain')) + req + '</label>' +
       '<input id="ugain" name="ultraGain" type="number" inputmode="numeric" min="0" max="20000" step="10" value="' + esc(goal.type === 'ultra' ? goal.gain : '') + '"></div></div>' +
       '<div class="row3"><div class="field"><label for="uloss">' + esc(T('onb.ultraLoss')) + '</label>' +
@@ -551,9 +577,10 @@
     function readPb() {
       var sel = form.pbSel.value;
       if (!sel) return null;
-      var km = sel === 'other' ? Number(form.pbOther.value) : PB_DISTANCES.filter(function (d) { return d[0] === sel; })[0][1];
+      if (sel === 'other' && !inLim('dist', rawIn(form.pbOther))) return false;
+      var km = sel === 'other' ? kmIn(form.pbOther) : PB_DISTANCES.filter(function (d) { return d[0] === sel; })[0][1];
       var tt2 = C.parseTime(form.pbTime.value);
-      if (!(km >= 1 && km <= 100) || !tt2) return false;
+      if (!(km > 0) || !tt2) return false;
       // سرعت غیرممکن (سریع‌تر از رکورد جهانی) یا خیلی کند
       var v = km / (tt2 / 3600);
       if (v > 26 || v < 3) return false;
@@ -562,10 +589,8 @@
     function isNever() { var e = form.querySelector('input[name=experience]:checked'); return !!e && e.value === 'never'; }
     // حجم: هفته‌ی اخیر و میانگین ماه؛ اگه افت شدید باشه، دلیلش لازمه
     function readVolume() {
-      var l = form.lastWeekKm.value.trim(), a = form.monthAvgKm.value.trim();
-      if (l === '' || a === '') return null;
-      var last = Number(l), avg = Number(a);
-      if (!(last >= 0 && last <= 400 && avg >= 0 && avg <= 400)) return null;
+      if (!inLim('vol', rawIn(form.lastWeekKm)) || !inLim('vol', rawIn(form.monthAvgKm))) return null;
+      var last = kmIn(form.lastWeekKm), avg = kmIn(form.monthAvgKm);
       var gap = C.volumeGap(last, avg);
       var rs = form.querySelector('input[name=volumeReason]:checked');
       return { last: last, avg: avg, gap: gap, reason: gap === 'drop' ? (rs ? rs.value : null) : null };
@@ -597,7 +622,7 @@
       document.getElementById('pbtime-field').hidden = !sel;
       // تا وقتی کاربر چرخ‌ها رو دست نزده، نقطه‌ی شروع چرخ‌ها = زمان معمول برای این مسافت
       if (sel) {
-        var gkm = sel === 'other' ? Number(form.pbOther.value) : PB_DISTANCES.filter(function (d) { return d[0] === sel; })[0][1];
+        var gkm = sel === 'other' ? kmIn(form.pbOther) : PB_DISTANCES.filter(function (d) { return d[0] === sel; })[0][1];
         if (gkm > 0) window.CoachTimePicker.preset('pbtime', pbGuess(gkm));
       }
       var box = document.getElementById('level-preview');
@@ -615,7 +640,7 @@
       document.getElementById('goal-fields').hidden = gt === 'none';
       document.getElementById('ultra-fields').hidden = gt !== 'ultra';
       var out = document.getElementById('ultra-ratio');
-      var km = Number(form.ultraKm.value), gain = form.ultraGain.value === '' ? null : Number(form.ultraGain.value);
+      var km = kmIn(form.ultraKm), gain = form.ultraGain.value === '' ? null : Number(form.ultraGain.value);
       if (gt === 'ultra' && km > 0 && gain !== null && gain >= 0) {
         var info = C.ULTRA_CLASS_INFO[C.ultraClass(gain / km)];
         out.innerHTML = tt('onb.ultraRatio', { r: Math.round(gain / km) }) + '<b>' + esc(info.short) + '</b>';
@@ -650,9 +675,8 @@
       var volP = { lastWeekKm: 0, monthAvgKm: 0, volumeReason: null, currentWeeklyKm: 0 };
       if (!fd.get('experience')) errs.push(T('onb.err.exp'));
       if (!never) {
-        var lRaw = String(fd.get('lastWeekKm') || '').trim(), aRaw = String(fd.get('monthAvgKm') || '').trim();
-        if (lRaw === '' || !(Number(lRaw) >= 0 && Number(lRaw) <= 400)) errs.push(T('onb.err.lastWeek'));
-        if (aRaw === '' || !(Number(aRaw) >= 0 && Number(aRaw) <= 400)) errs.push(T('onb.err.monthAvg'));
+        if (!inLim('vol', rawIn(form.lastWeekKm))) errs.push(fa(T('onb.err.lastWeek', limParams('vol'))));
+        if (!inLim('vol', rawIn(form.monthAvgKm))) errs.push(fa(T('onb.err.monthAvg', limParams('vol'))));
         var vol = readVolume();
         if (vol && vol.gap === 'drop' && !vol.reason) errs.push(T('onb.err.reason'));
         if (vol) volP = volumeProfile(vol);
@@ -685,8 +709,8 @@
         goalObj.date = rd || null;
         if (gType === 'ultra') {
           var num = function (n) { var v = String(fd.get(n) || '').trim(); return v === '' ? null : Number(v); };
-          var uk = num('ultraKm'), ug = num('ultraGain'), ul = num('ultraLoss'), ua = num('ultraAlt');
-          if (!(uk >= 10 && uk <= 400)) errs.push(T('onb.err.ultraKm'));
+          var uk = kmIn(form.ultraKm), ug = num('ultraGain'), ul = num('ultraLoss'), ua = num('ultraAlt');
+          if (!inLim('ultra', rawIn(form.ultraKm))) errs.push(fa(T('onb.err.ultraKm', limParams('ultra'))));
           if (ug === null || !(ug >= 0 && ug <= 20000)) errs.push(T('onb.err.ultraGain'));
           if (ul !== null && !(ul >= 0 && ul <= 20000)) errs.push(T('onb.err.ultraLoss'));
           if (ua !== null && !(ua >= 0 && ua <= 6000)) errs.push(T('onb.err.ultraAlt'));
@@ -915,7 +939,7 @@
       var s = r.session, d = s.date;
       var sel = d === selectedDay;
       var cls = 'day day-' + s.type + (d === todayKey ? ' is-today' : '') + (d < todayKey ? ' is-past' : '') + (sel ? ' is-selected' : '') + cycleMarkClass(d);
-      var shortT = s.km ? fa(String(s.km)) + '<small>' + esc(T('app.kmUnit')) + '</small>' : (s.minutes ? fa(s.minutes) + '<small>' + esc(T('week.minUnit')) + '</small>' : '—');
+      var shortT = s.km ? fa(String(dKm(s.km))) + '<small>' + esc(uShort()) + '</small>' : (s.minutes ? fa(s.minutes) + '<small>' + esc(T('week.minUnit')) + '</small>' : '—');
       html += '<button type="button" role="tab" id="tab-' + d + '" aria-controls="day-panel" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '" class="' + cls + '" data-day="' + d + '">' +
         '<span class="day-name"><span class="full">' + esc(s.dayName) + '</span><span class="short">' + esc(s.dayShort || s.dayName.charAt(0)) + '</span></span>' +
         '<span class="day-date">' + esc(faDate(d, true)) + '</span>' +
@@ -995,7 +1019,7 @@
     days.forEach(function (r) {
       var s = r.session, d = s.date, date = C.parseDate(d);
       var rest = ['rest', 'none'].indexOf(s.type) >= 0;
-      var amount = s.km ? fa(s.km) : (s.minutes ? fa(s.minutes) + "'" : '');
+      var amount = s.km ? fa(dKm(s.km)) : (s.minutes ? fa(s.minutes) + "'" : '');
       html += '<button type="button" class="mday day-' + s.type + (rest ? ' mday-rest' : '') + (d === todayKey ? ' is-today' : '') + (d < todayKey ? ' is-past' : '') +
         (d === selectedDay ? ' is-selected' : '') + cycleMarkClass(d) + '" data-mday="' + d + '" aria-pressed="' + (d === selectedDay) + '" aria-label="' + esc(faDate(d) + ' · ' + s.label) + '">' +
         '<span class="mday-num">' + fa(dayOfMonth(date)) + '</span>' +
@@ -1374,11 +1398,11 @@
         var pred = C.riegel(pb.timeSec, pb.distanceKm, g.km);
         html += '<div class="prediction"><span>' + tt('race.predFor', { race: C.RACE_LABELS[g.type] }) + '</span>' +
           '<b dir="ltr">' + fa(C.formatDuration(pred)) + '</b>' +
-          '<small>' + tt('race.avgPace', { p: C.formatDuration(pred / g.km) }) + '</small></div>' +
+          '<small>' + tt('race.avgPace', { p: paceFmt(pred / g.km) }) + '</small></div>' +
           '<div class="table-wrap"><table class="pred-table"><thead><tr><th>' + esc(T('race.thDist')) + '</th><th>' + esc(T('race.thTime')) + '</th><th>' + esc(T('race.thPace')) + '</th></tr></thead><tbody>' +
           Object.keys(C.RACE_DISTANCES).map(function (k) {
             var d = C.RACE_DISTANCES[k], tm = C.riegel(pb.timeSec, pb.distanceKm, d);
-            return '<tr' + (k === g.type ? ' class="hl"' : '') + '><td>' + t(C.RACE_LABELS[k]) + '</td><td dir="ltr">' + fa(C.formatDuration(tm)) + '</td><td dir="ltr">' + fa(C.formatDuration(tm / d)) + '</td></tr>';
+            return '<tr' + (k === g.type ? ' class="hl"' : '') + '><td>' + t(C.RACE_LABELS[k]) + '</td><td dir="ltr">' + fa(C.formatDuration(tm)) + '</td><td dir="ltr">' + fa(paceFmt(tm / d)) + '</td></tr>';
           }).join('') + '</tbody></table></div>';
       } else html += '<p>' + esc(T('race.predNeed')) + '</p>';
       html += '<a class="btn btn-outline" href="#fitness">' + esc(T('race.newTestOrPb')) + '</a></section>';
@@ -1519,7 +1543,7 @@
   var STATUS = { completed: '#0ca30c', adapted: '#fab219', pain: '#d03b3b', missed: '#b9b8b0' };
   var RANGES = { '4w': 28, '3m': 91, all: null };
   var chartSpecs = {};
-  function kmTxt(x) { return fa(Math.round(x * 10) / 10); }
+  function kmTxt(x) { return fa(dKm(Math.round(x * 10) / 10)); }
   function paceTxt(sec) { return fa(C.formatDuration(Math.round(sec))); }
   function secDiff(n) { return Math.round(Math.abs(n)); }
   // عدد علامت‌دار؛ LRM تا منفی در متن راست‌به‌چپ جابه‌جا نشه
@@ -1576,9 +1600,9 @@
           '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.vol.bars'), 'bar') + legendItem(SERIES[1], T('progress.vol.ma')) + '</div>' +
           chartBox('vol', {
             rtl: rtl, n: W.length, aria: T('progress.vol.title'),
-            y: { min: 0, max: Math.max.apply(null, W.map(function (w) { return w.km; }).concat([5])), fmt: fa, label: T('progress.vol.unit') },
-            bars: { values: W.map(function (w) { return w.km; }), color: SERIES[0], faded: W.map(function (w) { return w.partial; }) },
-            lines: [{ values: W.map(function (w) { return w.maKm; }), color: SERIES[1], dots: 'last' }],
+            y: { min: 0, max: Math.max.apply(null, W.map(function (w) { return dKm(w.km); }).concat([isMi() ? 3 : 5])), fmt: fa, label: T('progress.vol.unit') },
+            bars: { values: W.map(function (w) { return dKm(w.km); }), color: SERIES[0], faded: W.map(function (w) { return w.partial; }) },
+            lines: [{ values: W.map(function (w) { return w.maKm == null ? null : dKm(w.maKm); }), color: SERIES[1], dots: 'last' }],
             xLabels: function (i) { return weekLabel(W[i].start); }, xPx: 52,
             tip: function (i) {
               var w = W[i];
@@ -1634,7 +1658,10 @@
     })();
 
     // ---- ۳. بهبود پیس ----
-    var S = a.samples.filter(function (s) { return s.vdot; });
+    // پیس‌ها به ثانیه در واحد کاربر (کیلومتر یا مایل)
+    var S = a.samples.filter(function (s) { return s.vdot; }).map(function (s) {
+      return Object.assign({}, s, { e: I.pace(s.e), t: I.pace(s.t), i: I.pace(s.i) });
+    });
     var changed = S.length > 1 && S.some(function (s) { return s.entry !== S[0].entry; });
     (function () {
       var body;
@@ -1965,7 +1992,7 @@
     if (fit) {
       var e = fit.entry, weeks = Math.floor(C.daysBetween(C.parseDate(e.date), now) / 7);
       html += '<div class="fit-head"><div class="vdot-badge"><b>' + t(fit.vdot.toFixed(1)) + '</b><small>VDOT</small></div><div>' +
-        '<p>' + tt('fit.entryLine', { label: T('fit.entry.' + (e.kind || 'record')), km: Math.round(e.distanceKm * 100) / 100 }) + ' <span dir="ltr">' + fa(C.formatDuration(e.timeSec)) + '</span></p>' +
+        '<p>' + tt('fit.entryLine', { label: T('fit.entry.' + (e.kind || 'record')), d: distName(e.distanceKm) }) + ' <span dir="ltr">' + fa(C.formatDuration(e.timeSec)) + '</span></p>' +
         '<p class="small muted">' + esc(faDate(e.date)) + (weeks > 0 ? tt('fit.weeksAgo', { n: weeks }) : esc(T('fit.thisWeek'))) + '</p></div></div>';
     } else {
       html += '<p>' + esc(T('fit.none')) + '</p>';
@@ -1976,7 +2003,7 @@
       var adj = z.easyAdjustSec, P = C.paceSet(p, C.assessLevel(p).level);
       var row = function (key, a, b) {
         var r = T('fit.rows.' + key);
-        return '<tr' + (key === 'E' ? ' class="hl"' : '') + '><td>' + t(r[0]) + '</td><td dir="ltr">' + fa(C.formatDuration(a) + (b ? ' – ' + C.formatDuration(b) : '')) + '</td><td>' + t(r[1]) + '</td></tr>';
+        return '<tr' + (key === 'E' ? ' class="hl"' : '') + '><td>' + t(r[0]) + '</td><td dir="ltr">' + fa(paceFmt(a) + (b ? ' – ' + paceFmt(b) : '')) + '</td><td>' + t(r[1]) + '</td></tr>';
       };
       html += '<div class="table-wrap"><table class="pred-table pace-table"><thead><tr><th>' + esc(T('fit.thPace')) + '</th><th>' + esc(T('fit.thMinKm')) + '</th><th>' + esc(T('fit.thFor')) + '</th></tr></thead><tbody>' +
         row('E', z.easy[0], z.easy[1]) +
@@ -2008,7 +2035,7 @@
     html += '<section class="card"><h2>' + esc(T('fit.formTitle')) + ' ' + helpLink('fitness', T('fit.formHelp')) + '</h2>' +
       '<form id="fit-form" novalidate><div class="row3">' +
       '<div class="field"><label for="fk">' + esc(T('fit.kind')) + '</label><select id="fk" name="kind">' + TEST_KINDS.map(function (k) { return '<option value="' + k[0] + '">' + esc(T('fit.kinds.' + k[0])) + '</option>'; }).join('') + '</select></div>' +
-      '<div class="field" id="fkm-field" hidden><label for="fkm">' + esc(T('fit.km')) + '</label><input id="fkm" name="km" type="number" inputmode="decimal" min="1" max="100" step="0.1"></div>' +
+      '<div class="field" id="fkm-field" hidden><label for="fkm">' + esc(T('fit.km')) + '</label><input id="fkm" name="km" type="number" inputmode="decimal"' + limAttrs('dist', '0.1') + '></div>' +
       '<div class="field field-tpick"><span class="field-label" id="ft-lbl">' + esc(T('fit.time')) + '</span>' +
       window.CoachTimePicker.html({ id: 'ft', name: 'time', sec: fitGuess(2), touched: false, preview: 'ft-read',
         aria: T('fit.time'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
@@ -2023,7 +2050,7 @@
       html += '<section class="card"><h2>' + esc(T('fit.history')) + '</h2><div class="table-wrap"><table class="pred-table"><thead><tr><th>' + esc(T('fit.thDate')) + '</th><th>' + esc(T('fit.thKind')) + '</th><th>' + esc(T('fit.thDist')) + '</th><th>' + esc(T('fit.thTime')) + '</th><th>VDOT</th><th></th></tr></thead><tbody>' +
         list.map(function (e, i) {
           var idx = (p.fitnessTests || []).indexOf((p.fitnessTests || []).filter(function (x) { return x.date === e.date && x.timeSec === e.timeSec && x.distanceKm === e.distanceKm; })[0]);
-          return '<tr' + (i === 0 ? ' class="hl"' : '') + '><td>' + esc(faDate(e.date, true)) + '</td><td>' + esc(e.kind ? T('fit.entry.' + e.kind) : '—') + '</td><td>' + t(Math.round(e.distanceKm * 100) / 100) + ' ' + esc(T('app.kmUnit')) + '</td>' +
+          return '<tr' + (i === 0 ? ' class="hl"' : '') + '><td>' + esc(faDate(e.date, true)) + '</td><td>' + esc(e.kind ? T('fit.entry.' + e.kind) : '—') + '</td><td>' + t(distName(e.distanceKm)) + '</td>' +
             '<td dir="ltr">' + fa(C.formatDuration(e.timeSec)) + '</td><td>' + t(C.vdotFromRace(e.distanceKm, e.timeSec).toFixed(1)) + '</td>' +
             '<td>' + (e.kind !== 'baseline' && idx >= 0 ? '<button type="button" class="linklike" data-del-test="' + idx + '">' + esc(T('fit.del')) + '</button>' : '') + '</td></tr>';
         }).join('') + '</tbody></table></div></section>';
@@ -2039,7 +2066,7 @@
     window.CoachTimePicker.init(form);
     // تا کاربر چرخ‌ها رو نچرخونده، روی زمان حدودی همون فاصله بمونن
     function presetFit() {
-      var kind = form.kind.value, km = kind === 'race' ? Number(form.km.value) : TEST_KINDS.filter(function (k) { return k[0] === kind; })[0][1];
+      var kind = form.kind.value, km = kind === 'race' ? kmIn(form.km) : TEST_KINDS.filter(function (k) { return k[0] === kind; })[0][1];
       if (km >= 1 && km <= 100) window.CoachTimePicker.preset('ft', fitGuess(km));
     }
     form.kind.addEventListener('change', function () { document.getElementById('fkm-field').hidden = form.kind.value !== 'race'; presetFit(); });
@@ -2048,11 +2075,11 @@
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();
       var kind = form.kind.value;
-      var km = kind === 'race' ? Number(form.km.value) : TEST_KINDS.filter(function (k) { return k[0] === kind; })[0][1];
+      var km = kind === 'race' ? kmIn(form.km) : TEST_KINDS.filter(function (k) { return k[0] === kind; })[0][1];
       var tm = C.parseTime(form.time.value), date = form.date.value;
       var err = document.getElementById('fit-err');
       var v = km && tm ? km / (tm / 3600) : 0;
-      if (!(km >= 1 && km <= 100)) { err.hidden = false; err.textContent = T('fit.err.km'); return; }
+      if (kind === 'race' && !inLim('dist', rawIn(form.km))) { err.hidden = false; err.textContent = fa(T('fit.err.km', limParams('dist'))); return; }
       if (!tm) { err.hidden = false; err.textContent = T('fit.err.time'); return; }
       if (v > 26 || v < 3) { err.hidden = false; err.textContent = fa(T('fit.err.impossible', { km: km, d: C.describeDuration(tm) })); return; }
       if (!date || date > todayKey) { err.hidden = false; err.textContent = T('fit.err.date'); return; }
@@ -2063,7 +2090,7 @@
       save();
       var after = C.paceZones(p);
       var arrow = isRtl() ? ' ← ' : ' → ';
-      showToast(fa(T('fit.toast', { vdot: (before && before.vdot ? before.vdot.toFixed(1) + arrow : '') + after.vdot.toFixed(1), a: C.formatDuration(after.easy[0]), b: C.formatDuration(after.easy[1]) })));
+      showToast(fa(T('fit.toast', { vdot: (before && before.vdot ? before.vdot.toFixed(1) + arrow : '') + after.vdot.toFixed(1), a: paceFmt(after.easy[0]), b: paceFmt(after.easy[1]) })));
       renderFitness();
     });
     var slow = document.getElementById('fit-slow'), reset = document.getElementById('fit-reset');
@@ -2141,6 +2168,11 @@
   app.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-setlang]');
     if (b && b.dataset.setlang !== I.getLang()) switchLang(b.dataset.setlang);
+    var ub = e.target.closest && e.target.closest('[data-setunits]');
+    if (ub && ub.dataset.setunits !== settings.units) {
+      settings.units = ub.dataset.setunits; saveSettings(); I.setUnits(settings.units);
+      showToast(T('settings.saved')); route();
+    }
   });
   // ---------- عکس پروفایل: فقط در همین مرورگر (localStorage)، کوچک‌شده به ۳۰۰×۳۰۰ ----------
   var AVATAR_KEY = 'iranrunners-coach-avatar', AVATAR_PX = 300, AVATAR_MAX_BYTES = 120 * 1024;
@@ -2250,10 +2282,13 @@
     var lang = I.getLang(), D = C.DAY_NAMES;
     var html = '<header class="page-head"><h1>' + esc(T('settingsPage.title')) + '</h1></header>' +
       // ۱. زبان و نمایش
-      setSection('lang', 'lang', T('settingsPage.lang'), esc(lang === 'fa' ? 'فارسی' : 'English'),
+      setSection('lang', 'lang', T('settingsPage.lang'), esc((lang === 'fa' ? 'فارسی' : 'English') + T('progress.sep') + T('units.' + I.getUnits())),
         '<div class="field"><span class="field-label">' + esc(T('settings.language')) + '</span><div class="seg lang-seg" role="group" aria-label="' + esc(T('settings.language')) + '">' +
         '<button type="button" data-setlang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '">فارسی</button>' +
-        '<button type="button" data-setlang="en" lang="en" aria-pressed="' + (lang === 'en') + '">English</button></div></div>') +
+        '<button type="button" data-setlang="en" lang="en" aria-pressed="' + (lang === 'en') + '">English</button></div></div>' +
+        '<div class="field"><span class="field-label" id="units-lbl">' + esc(T('settings.units')) + '</span><div class="seg" role="group" aria-labelledby="units-lbl">' +
+        ['km', 'mi'].map(function (u) { return '<button type="button" data-setunits="' + u + '" aria-pressed="' + (I.getUnits() === u) + '">' + esc(T('units.opt.' + u)) + '</button>'; }).join('') +
+        '</div><small class="muted">' + esc(T('settings.unitsNote')) + '</small></div>') +
       // نصب اپلیکیشن
       setSection('install', 'install', T('install.title'), esc(T('install.short.' + installMode())), installSectionBody()) +
       // ۲. تقویم
@@ -2292,7 +2327,7 @@
       (p.sex === 'female' ? row('cycle', p.cycle && p.cycle.enabled ? tt('cycle.profileOn', { len: p.cycle.cycleLen, p: p.cycle.periodLen }) : muted('cycle.profileOff')) : '') +
       row('injury', p.injury ? t(p.injury) : muted('profile.notRecorded')) +
       row('goal', g.type !== 'none' ? t(C.goalLabel(g)) + (g.date ? ' — ' + esc(faDate(g.date)) : ' <span class="muted small">' + esc(T('profile.noDate')) + '</span>') : muted('profile.noGoal')) +
-      row('pb', p.pb ? tt('profile.pbVal', { km: p.pb.distanceKm }) + ' <span dir="ltr">' + fa(C.formatDuration(p.pb.timeSec)) + '</span>' : muted('profile.notRecorded')) +
+      row('pb', p.pb ? tt('profile.pbVal', { d: distName(p.pb.distanceKm) }) + ' <span dir="ltr">' + fa(C.formatDuration(p.pb.timeSec)) + '</span>' : muted('profile.notRecorded')) +
       row('start', esc(faDate(p.startDate))) +
       row('stats', tt('profile.statsVal', { c: nCheck, d: nDone })) +
         '</dl>' + '<div class="level-strip">' + levelCard(lv, true) + '</div>' + warningsCard(C.profileWarnings(p, today()))) +

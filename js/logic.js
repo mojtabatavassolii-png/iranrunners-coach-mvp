@@ -418,7 +418,7 @@
   }
   function paceText(range) {
     if (!range) return '';
-    return T('pace.range', { a: formatDuration(range[0]), b: formatDuration(range[1]) });
+    return T('pace.range', { a: formatDuration(I18N.pace(range[0])), b: formatDuration(I18N.pace(range[1])) });
   }
 
   // ---------- ضربان قلب (اختیاری) ----------
@@ -888,7 +888,7 @@
     return {
       type: 'tempo', km: round05(hardKm + wuKm + reps * 0.2), hardKm: hardKm, cruise: true, variant: T('s.cruise.variant'),
       target: T('s.km', { n: round05(hardKm + wuKm + reps * 0.2) }),
-      steps: [T('s.cruise.main', { reps: reps })],
+      steps: [T('s.cruise.main', { reps: reps, rk: 1.6 })],
       how: rpeLine('tempo') + paceNote(T('lbl.paceT'), zones && zones.tempo)
     };
   }
@@ -964,7 +964,8 @@
   // پیس فقط وقتی نشون داده می‌شه که از تایم‌تست واقعی باشه، و نه در تمرین‌های تریل (اون‌جا RPE و زمان ملاکه)
   function paceHint(ctx, label, a, b) {
     if (!ctx.P.known || ctx.rpeOnly) return '';
-    return b ? T('paceHint.two', { label: label, a: formatDuration(a), b: formatDuration(b) }) : T('paceHint.one', { label: label, a: formatDuration(a) });
+    var P = I18N.pace;
+    return b ? T('paceHint.two', { label: label, a: formatDuration(P(a)), b: formatDuration(P(b)) }) : T('paceHint.one', { label: label, a: formatDuration(P(a)) });
   }
   function sess(type, variant, hardKm, totalKm, steps, how, extra) {
     var km = Math.max(round05(totalKm), round05(hardKm));
@@ -1074,7 +1075,7 @@
   function makeMpInt(main, ctx) {
     var repKm = main >= 13 ? 5 : (main >= 10 ? 4 : 3), reps = clamp(Math.floor(main / repKm + 1e-9), 2, 4), hard = reps * repKm;
     return sess('tempo', T('s.mpInt.variant'), hard, hard + ctx.wu + (reps - 1),
-      [T('s.mpInt.main', { reps: reps, km: repKm })],
+      [T('s.mpInt.main', { reps: reps, km: repKm, j: 1 })],
       T('s.mpInt.how') + paceHint(ctx, T('lbl.pace'), ctx.P.pM - 3, ctx.P.pM + 3));
   }
   // فارتلک درازمدت: یک ران ۶۰ تا ۹۰ دقیقه‌ای با چند بخش ۱۰ دقیقه‌ای پیس ماراتن یا کمی سریع‌تر
@@ -1180,7 +1181,7 @@
     } else {
       var half = floor05(segKm / 2);
       st = segKm >= 3
-        ? [T('s.long.easyKm', { km: round05((km - segKm) / 2) }), T('s.long.tempoSplit', { a: half, b: round05(segKm - half) }), T('s.long.restEasy', { km: km })]
+        ? [T('s.long.easyKm', { km: round05((km - segKm) / 2) }), T('s.long.tempoSplit', { a: half, b: round05(segKm - half), j: 1 }), T('s.long.restEasy', { km: km })]
         : [T('s.long.easyKm', { km: round05(km - segKm) }), T('s.long.lastTempo', { km: segKm })];
       extra = paceNote(T('lbl.paceTempoPart'), zones && zones.tempo);
     }
