@@ -781,7 +781,7 @@
       kinds: { t2: '2 km time trial', t3: '3 km time trial', t5: '5 km time trial', race: 'Race or another distance' },
       km: 'Distance (km)',
       time: 'Time',
-      timeHint: 'e.g. "9:40" or "940"',
+      timeHint: 'Swipe each column up or down to set your time.',
       date: 'Date',
       submit: 'Save and recalculate paces',
       history: 'Fitness history',
@@ -794,7 +794,7 @@
       hrSave: 'Save heart rate',
       err: {
         km: 'Enter a distance between 1 and 100 km.',
-        time: 'Enter the time as "9:40" or just the digits "940".',
+        time: 'Set your time by turning the hours, minutes and seconds wheels.',
         impossible: 'That time isn\'t possible for {km} km ({d}); please check it.',
         date: 'The date must be today or earlier.'
       },

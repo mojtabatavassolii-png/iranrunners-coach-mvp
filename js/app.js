@@ -2000,11 +2000,18 @@
 
     // فرم ثبت تایم‌تست/رکورد تازه
     var todayKey = C.dateKey(now);
+    // نقطه‌ی شروع چرخ‌ها: پیش‌بینی از VDOT فعلی، وگرنه حدود ۶ دقیقه در هر کیلومتر
+    function fitGuess(km) {
+      var f = C.currentFitness(p), sec = f ? C.raceTimeFromVdot(f.vdot, km) : km * 360;
+      return Math.round(sec / 5) * 5;
+    }
     html += '<section class="card"><h2>' + esc(T('fit.formTitle')) + ' ' + helpLink('fitness', T('fit.formHelp')) + '</h2>' +
       '<form id="fit-form" novalidate><div class="row3">' +
       '<div class="field"><label for="fk">' + esc(T('fit.kind')) + '</label><select id="fk" name="kind">' + TEST_KINDS.map(function (k) { return '<option value="' + k[0] + '">' + esc(T('fit.kinds.' + k[0])) + '</option>'; }).join('') + '</select></div>' +
       '<div class="field" id="fkm-field" hidden><label for="fkm">' + esc(T('fit.km')) + '</label><input id="fkm" name="km" type="number" inputmode="decimal" min="1" max="100" step="0.1"></div>' +
-      '<div class="field"><label for="ft">' + esc(T('fit.time')) + '</label><input id="ft" name="time" dir="ltr" inputmode="numeric" autocomplete="off" placeholder="9:40" data-time-preview="ft-read">' +
+      '<div class="field field-tpick"><span class="field-label" id="ft-lbl">' + esc(T('fit.time')) + '</span>' +
+      window.CoachTimePicker.html({ id: 'ft', name: 'time', sec: fitGuess(2), touched: false, preview: 'ft-read',
+        aria: T('fit.time'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
       '<small class="muted">' + esc(T('fit.timeHint')) + '</small><small class="time-read" id="ft-read" aria-live="polite"></small></div>' +
       '<div class="field"><label for="fd">' + esc(T('fit.date')) + '</label><input id="fd" name="date" type="date" max="' + todayKey + '" value="' + todayKey + '"></div>' +
       '</div><p id="fit-err" class="form-errors" role="alert" hidden></p>' +
@@ -2029,7 +2036,15 @@
     app.innerHTML = html;
 
     var form = document.getElementById('fit-form');
-    form.kind.addEventListener('change', function () { document.getElementById('fkm-field').hidden = form.kind.value !== 'race'; });
+    window.CoachTimePicker.init(form);
+    // تا کاربر چرخ‌ها رو نچرخونده، روی زمان حدودی همون فاصله بمونن
+    function presetFit() {
+      var kind = form.kind.value, km = kind === 'race' ? Number(form.km.value) : TEST_KINDS.filter(function (k) { return k[0] === kind; })[0][1];
+      if (km >= 1 && km <= 100) window.CoachTimePicker.preset('ft', fitGuess(km));
+    }
+    form.kind.addEventListener('change', function () { document.getElementById('fkm-field').hidden = form.kind.value !== 'race'; presetFit(); });
+    form.km.addEventListener('change', presetFit);
+    form.time.addEventListener('change', function () { document.getElementById('fit-err').hidden = true; });
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();
       var kind = form.kind.value;
