@@ -914,4 +914,31 @@ test('آنالیز: پیس و پیش‌بینی مسابقه از رکوردها
   assert(au.goal.ultra && au.weeks.some(function (w) { return w.vert > 0; }));
 });
 
+// ---------- PWA ----------
+test('PWA: مانیفست، آیکون‌ها و هماهنگی کش سرویس‌ورکر با index.html', function () {
+  var fs = require('fs'), path = require('path'), root = path.join(__dirname, '..');
+  var m = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
+  assert.strictEqual(m.display, 'standalone');
+  assert(m.name && m.short_name && m.start_url && m.theme_color && m.background_color);
+  ['192x192', '512x512'].forEach(function (sz) {
+    assert(m.icons.some(function (i) { return i.sizes === sz && i.purpose === 'any'; }), sz);
+    assert(m.icons.some(function (i) { return i.sizes === sz && i.purpose === 'maskable'; }), sz + ' maskable');
+  });
+  m.icons.forEach(function (i) {
+    var buf = fs.readFileSync(path.join(root, i.src));
+    // ابعاد واقعی PNG (IHDR)
+    assert.strictEqual(buf.readUInt32BE(16) + 'x' + buf.readUInt32BE(20), i.sizes, i.src);
+  });
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8'), sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  var ver = /var VERSION = '(\d+)'/.exec(sw)[1];
+  var assets = (html.match(/(?:src|href)="([^"#:]+\?v=\d+)"/g) || []).map(function (x) { return x.replace(/^(src|href)="|"$/g, ''); });
+  assert(assets.length >= 10);
+  assets.forEach(function (a) {
+    assert.strictEqual(a.split('?v=')[1], ver, 'نسخه‌ی ' + a + ' با VERSION سرویس‌ورکر یکی نیست');
+    assert(sw.indexOf("'" + a.split('?v=')[0] + "?v=' + VERSION") >= 0, a + ' در فهرست کش نیست');
+    assert(fs.existsSync(path.join(root, a.split('?')[0])), a);
+  });
+  assert(/rel="manifest"/.test(html) && /apple-mobile-web-app-capable/.test(html) && /apple-touch-icon/.test(html) && /theme-color/.test(html));
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

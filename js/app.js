@@ -366,7 +366,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=24" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="img/logo.png?v=25" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -1395,6 +1395,7 @@
     var r = ci ? effectiveSession(base) : withCycle({ session: base, adaptation: null });
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
       '<h1>' + esc(T(greetKey())) + '</h1></header>' +
+      '<div data-install-slot="home">' + installBanner() + '</div>' +
       homeToday(base, r.session, ci, key) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
       homeCycle(r, key, now) + homeProgress(now) + homeRace(now);
     app.innerHTML = '<div class="home">' + html + '</div>';
@@ -1405,7 +1406,7 @@
     var wu = !cancelled && s.warmup && s.warmup.min ? T('home.withWarmup', { n: s.warmup.min }) : '';
     var cta;
     if (cancelled) cta = '<a class="btn btn-outline btn-block" href="#plan" data-goto-today="1">' + esc(T('home.details')) + '</a>';
-    else if (runDay && !ci) cta = '<a class="btn btn-primary btn-big btn-block" href="#checkin">' + esc(T('home.startCheckin')) + '</a>' +
+    else if (runDay && !ci && !done) cta = '<a class="btn btn-primary btn-big btn-block" href="#checkin">' + esc(T('home.startCheckin')) + '</a>' +
       '<p class="small muted center">' + esc(T('home.checkinHint')) + ' <a href="#plan" data-goto-today="1">' + esc(T('home.preview')) + '</a></p>';
     else if (runDay) cta = '<a class="btn btn-primary btn-big btn-block" href="#plan" data-goto-today="1">' + esc(T('home.details')) + '</a>';
     else cta = '<a class="btn btn-outline btn-block" href="#plan" data-goto-today="1">' + esc(T('home.weekPlan')) + '</a>';
@@ -2195,6 +2196,7 @@
     cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
     health: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
     person: '<circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/>',
+    install: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v8M8.8 11.8 12 15l3.2-3.2"/>',
     data: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>'
   };
   var openSettings = {};
@@ -2226,6 +2228,8 @@
         '<div class="field"><span class="field-label">' + esc(T('settings.language')) + '</span><div class="seg lang-seg" role="group" aria-label="' + esc(T('settings.language')) + '">' +
         '<button type="button" data-setlang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '">فارسی</button>' +
         '<button type="button" data-setlang="en" lang="en" aria-pressed="' + (lang === 'en') + '">English</button></div></div>') +
+      // نصب اپلیکیشن
+      setSection('install', 'install', T('install.title'), esc(T('install.short.' + installMode())), installSectionBody()) +
       // ۲. تقویم
       setSection('cal', 'cal', T('settingsPage.cal'), tt('settings.current', { cal: T('settings.' + I.getCalendar()), day: C.DAY_NAMES[C.WEEK_ORDER[0]] }),
         '<div class="row2"><div class="field"><label for="set-cal">' + esc(T('settings.calendar')) + '</label>' +
@@ -2328,6 +2332,101 @@
     state.profile.name = e.target.value.trim().slice(0, 40);
     save(); showToast(T('settings.saved'));
   });
+
+  // =====================================================================
+  // نصب اپلیکیشن (PWA): اندروید/کروم با پنجره‌ی نصب مستقیم، آیفون با راهنمای «افزودن به صفحه‌ی اصلی»
+  // =====================================================================
+  var installEvt = null, INSTALL_DISMISS_KEY = 'iranrunners-coach-install-dismissed';
+  function isStandalone() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  }
+  function isIos() {
+    var ua = navigator.userAgent || '';
+    return /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  }
+  // 'installed' | 'prompt' (نصب مستقیم) | 'ios' (راهنما) | 'other' (از منوی مرورگر)
+  function installMode() {
+    if (isStandalone()) return 'installed';
+    if (installEvt) return 'prompt';
+    if (isIos()) return 'ios';
+    return 'other';
+  }
+  function installDismissed() { try { return !!localStorage.getItem(INSTALL_DISMISS_KEY); } catch (e) { return false; } }
+  var DL_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v8M8.8 11.8 12 15l3.2-3.2"/></svg>';
+  // بنر صفحه‌ی امروز: فقط وقتی نصب ممکنه (اندروید یا آیفون) و کاربر نبسته
+  function installBanner() {
+    var m = installMode();
+    if ((m !== 'prompt' && m !== 'ios') || installDismissed()) return '';
+    return '<section class="card hcard install-card" role="region" aria-label="' + esc(T('install.title')) + '">' +
+      '<button type="button" class="install-x" data-install-dismiss="1" aria-label="' + esc(T('install.dismiss')) + '">×</button>' +
+      '<div class="install-row"><img src="img/icon-192.png" alt="" width="52" height="52"><div><b>' + esc(T('install.bannerTitle')) + '</b>' +
+      '<p class="small muted">' + esc(T('install.bannerText')) + '</p></div></div>' +
+      '<button type="button" class="btn btn-primary btn-block" data-install="1">' + DL_ICON + esc(T(m === 'ios' ? 'install.how' : 'install.btn')) + '</button></section>';
+  }
+  // بخش تنظیمات: همیشه، با وضعیت فعلی
+  function installSectionBody() {
+    var m = installMode();
+    return '<p>' + esc(T('install.status.' + m)) + '</p>' +
+      (m === 'prompt' || m === 'ios' ? '<button type="button" class="btn btn-primary" data-install="1">' + DL_ICON + esc(T(m === 'ios' ? 'install.how' : 'install.btn')) + '</button>' : '') +
+      (m === 'other' ? '<p class="small muted">' + esc(T('install.otherHelp')) + '</p>' : '') +
+      '<p class="small muted">' + esc(T('install.offline')) + '</p>';
+  }
+  function refreshInstallUi() {
+    var b = document.querySelector('[data-install-slot="home"]');
+    if (b) b.innerHTML = installBanner();
+    var s = document.querySelector('#set-install .set-body');
+    if (s) {
+      s.innerHTML = installSectionBody();
+      var sm = document.querySelector('#set-install .set-head small');
+      if (sm) sm.textContent = T('install.short.' + installMode());
+    }
+  }
+  function openIosGuide() {
+    var share = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
+    var plus = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg>';
+    modalRoot.innerHTML = '<div class="modal-backdrop" id="ios-guide"><div class="modal install-modal" role="dialog" aria-modal="true" aria-labelledby="ig-title">' +
+      '<img src="img/icon-192.png" alt="" width="64" height="64" class="install-modal-icon">' +
+      '<h2 id="ig-title">' + esc(T('install.iosTitle')) + '</h2>' +
+      '<ol class="install-steps">' +
+      '<li><span class="step-ico">' + share + '</span><span>' + T('install.iosStep1') + '</span></li>' +
+      '<li><span class="step-ico">' + plus + '</span><span>' + T('install.iosStep2') + '</span></li>' +
+      '<li><span class="step-ico step-txt">' + esc(T('install.iosAdd')) + '</span><span>' + T('install.iosStep3') + '</span></li></ol>' +
+      '<p class="small muted">' + esc(T('install.iosNote')) + '</p>' +
+      '<button type="button" class="btn btn-primary btn-block" data-install-close="1">' + esc(T('install.close')) + '</button></div></div>';
+    document.body.classList.add('modal-open');
+    modalRoot.querySelector('[data-install-close]').focus();
+  }
+  function closeIosGuide() {
+    if (!document.getElementById('ios-guide')) return;
+    modalRoot.innerHTML = '';
+    document.body.classList.remove('modal-open');
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.closest && t.closest('[data-install]')) {
+      if (installEvt) {
+        var ev = installEvt;
+        ev.prompt();
+        ev.userChoice.then(function (r) { installEvt = null; if (r && r.outcome === 'accepted') showToast(T('install.done')); refreshInstallUi(); });
+      } else if (isIos()) openIosGuide();
+      return;
+    }
+    if (t.closest && t.closest('[data-install-dismiss]')) {
+      try { localStorage.setItem(INSTALL_DISMISS_KEY, new Date().toISOString()); } catch (err) { /* */ }
+      refreshInstallUi();
+      return;
+    }
+    if (t.closest && t.closest('[data-install-close]')) { closeIosGuide(); return; }
+    if (t.id === 'ios-guide') closeIosGuide();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeIosGuide(); });
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvt = e; refreshInstallUi(); });
+  window.addEventListener('appinstalled', function () { installEvt = null; showToast(T('install.done')); refreshInstallUi(); });
+
+  // سرویس‌ورکر: فقط روی HTTPS یا localhost
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () { /* بدون کش آفلاین ادامه می‌ده */ }); });
+  }
 
   applyStatic();
   // بارگذاری دوباره‌ی صفحه: وضعیت ذخیره‌شده‌ی همین ورودی تاریخچه برمی‌گرده

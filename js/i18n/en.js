@@ -858,6 +858,30 @@
       wipeQ: 'Delete all data (profile, check-ins, history) from this browser? This can\'t be undone.'
     },
 
+    // ---------- Install the app (PWA) ----------
+    install: {
+      title: 'Install the app',
+      bannerTitle: 'Install Be Your Own Coach on your phone',
+      bannerText: 'It opens from your home screen like a real app, loads faster and works offline.',
+      btn: 'Install app', how: 'How do I install on iPhone?', dismiss: 'Close', done: 'The app is installed.',
+      short: { installed: 'Installed', prompt: 'Ready to install', ios: 'Install via Safari', other: 'From the browser menu' },
+      status: {
+        installed: 'The app is installed on this device and is open in app mode.',
+        prompt: 'You can install the app on this device right now.',
+        ios: 'iPhone doesn\'t support automatic install; it takes a few taps in Safari to add it to your home screen.',
+        other: 'This browser hasn\'t offered us a direct install button.'
+      },
+      otherHelp: 'In Chrome or Edge on Android or a computer, open the browser menu (three dots) and choose "Install app" or "Add to Home screen". If the app is already installed, the option won\'t appear.',
+      offline: 'Once installed, the app opens without internet too. As before, your data stays only on this device.',
+      iosTitle: 'Install on iPhone',
+      iosStep1: 'In <b>Safari</b>, tap the <b>Share</b> button (a square with an up arrow) in the bottom bar.',
+      iosStep2: 'Scroll down the list and choose <b>Add to Home Screen</b>.',
+      iosAdd: 'Add',
+      iosStep3: 'Tap <b>Add</b> at the top. The "Be Your Own Coach" icon appears on your home screen.',
+      iosNote: 'If you opened this page in another browser, open the link in Safari first.',
+      close: 'Got it'
+    },
+
     // ---------- Settings page ----------
     settingsPage: {
       title: 'Settings',

@@ -893,3 +893,23 @@ body.has-tabbar .learn-list + .link-card { margin-top: 14px; }
 .confirm-danger #confirm-yes { background: var(--danger); border-color: var(--danger); color: #fff; }
 .confirm-danger #confirm-yes:disabled { opacity: 0.4; }
 body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
+
+/* ---------- نصب اپلیکیشن (PWA) ---------- */
+.install-card { position: relative; background: linear-gradient(135deg, #ffffff, var(--brand-soft)); }
+.install-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding-inline-end: 26px; }
+.install-row img { border-radius: 14px; flex: none; box-shadow: 0 4px 12px -6px rgba(15, 42, 42, 0.4); }
+.install-row b { display: block; font-size: 1rem; }
+.install-row p { margin: 2px 0 0; }
+.install-x { position: absolute; top: 8px; inset-inline-end: 8px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: transparent; color: var(--muted); font-size: 1.4rem; line-height: 1; cursor: pointer; }
+.install-x:hover { background: var(--panel); }
+.btn svg { flex: none; }
+.install-modal { text-align: start; }
+.install-modal h2 { color: var(--text); margin-top: 6px; }
+.install-modal-icon { border-radius: 16px; display: block; box-shadow: 0 6px 16px -8px rgba(15, 42, 42, 0.45); }
+.install-steps { list-style: none; padding: 0 !important; margin: 12px 0; display: grid; gap: 12px; counter-reset: st; }
+.install-steps li { display: flex; align-items: center; gap: 12px; }
+.step-ico { flex: none; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--info-soft); color: var(--info); }
+.step-txt { font-weight: 800; font-size: 0.95rem; }
+/* حالت اپ نصب‌شده: فاصله از ناحیه‌ی امن بالای صفحه */
+@media (display-mode: standalone) { .site-header { padding-top: env(safe-area-inset-top, 0px); } }
+.modal.install-modal { border-top: 6px solid var(--brand); }
