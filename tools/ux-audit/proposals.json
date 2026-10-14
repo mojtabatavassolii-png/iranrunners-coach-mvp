@@ -1,0 +1,71 @@
+[
+  {
+    "id": "UX-01", "screen": "onb-1", "width": 360, "lang": "fa",
+    "crop": ".onb-nav", "fullWidth": true, "pad": 20,
+    "css": ".onb-nav{flex-wrap:wrap;row-gap:6px}.onb-cancel{order:3;flex:1 0 100%;justify-content:center}"
+  },
+  {
+    "id": "UX-02", "screen": "home", "width": 360, "lang": "fa",
+    "crop": ".home > section.hcard", "pad": 10,
+    "css": ".btn-primary{background:#d4412c}.btn-primary:hover{background:#b8361f}"
+  },
+  {
+    "id": "UX-03", "screen": "home", "width": 360, "lang": "fa",
+    "crop": "#tabbar", "fixed": true, "pad": 0,
+    "css": ":root{--faint:#5f7673}.tabbar a{font-size:0.8rem}"
+  },
+  {
+    "id": "UX-04", "screen": "onb-1", "width": 360, "lang": "fa",
+    "crop": ".site-footer", "pad": 0,
+    "css": ":root{--faint:#5f7673}"
+  },
+  {
+    "id": "UX-05", "screen": "plan-week", "width": 360, "lang": "fa",
+    "crop": ".week-stats", "pad": 16,
+    "prep": "(()=>{const s=document.createElement('style');s.textContent='.help-link{outline:2px dashed #e5007e;outline-offset:0}';s.id='demo';document.head.appendChild(s)})()",
+    "css": ".help-link{position:relative}.help-link::after{content:'';position:absolute;inset:-14px;border-radius:50%}",
+    "js": "document.getElementById('demo').textContent='.help-link::after{outline:2px dashed #e5007e}'"
+  },
+  {
+    "id": "UX-06", "screen": "plan-week", "width": 360, "lang": "fa",
+    "crop": ".week-grid", "pad": 10,
+    "css": "@media (max-width:759px){.day-target small{display:none}.day-date{font-size:.72rem;color:var(--text)}.today-tag{font-size:.68rem}}.day.is-past:not(.is-selected){opacity:1}.day.is-past:not(.is-selected) .day-name,.day.is-past:not(.is-selected) .day-target{color:var(--muted)}"
+  },
+  {
+    "id": "UX-07", "screen": "plan-month", "width": 360, "lang": "fa",
+    "crop": ".month-grid", "pad": 8, "maxHeight": 330,
+    "css": "@media (max-width:519px){.mday-amt{font-size:.75rem;color:var(--text);font-weight:600}}.mday.is-past:not(.is-selected){opacity:1}"
+  },
+  {
+    "id": "UX-08", "screen": "home", "width": 360, "lang": "fa",
+    "crop": ".home-head", "pad": 0, "scroll": false, "fullWidth": true,
+    "prep": "(()=>{const h=document.querySelector('.site-header');const a=document.querySelector('.home-head');a.style.paddingTop='0'})()",
+    "css": ".brand-text small{color:#fff}.eyebrow{color:var(--brand-deep)}"
+  },
+  {
+    "id": "UX-09", "screen": "home", "width": 360, "lang": "fa",
+    "crop": ".hcard-race", "pad": 6,
+    "css": ".hcard-race .hcard-label,.hcard-race .small.muted{color:#fff}"
+  },
+  {
+    "id": "UX-10", "screen": "plan-week", "width": 360, "lang": "fa",
+    "crop": "#day-panel .sess-warmup", "pad": 6,
+    "css": "@media (max-width:599px){body{text-align:start}.learn-article p,.guide-body p{text-align:justify}}"
+  },
+  {
+    "id": "UX-11", "screen": "profile", "width": 360, "lang": "fa",
+    "crop": ".pf-card", "pad": 6,
+    "css": ".pf-card .btn-primary{background:transparent;color:var(--brand-deep);border:1.5px solid var(--brand)}.pf-card .btn-primary:hover{background:var(--brand-soft)}",
+    "js": "(()=>{const h=document.querySelector('.pf-card p.small.muted');if(h)h.innerHTML='نامت رو از <a href=\"#onboarding\">ویرایش پروفایل</a> اضافه کن.'})()"
+  },
+  {
+    "id": "UX-12", "screen": "plan-week", "width": 360, "lang": "fa",
+    "crop": ".stat-ratio", "pad": 8,
+    "css": ".stat{padding:10px 12px}.stat > span{display:flex;align-items:center;gap:4px;white-space:nowrap}"
+  },
+  {
+    "id": "UX-13", "screen": "onb-1", "width": 320, "lang": "fa",
+    "crop": ".onb-top", "pad": 8, "fullWidth": true,
+    "css": ".onb-dot{width:36px;height:36px}.onb-dots li:not(:last-child)::after{width:14px}"
+  }
+]

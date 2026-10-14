@@ -843,7 +843,7 @@
       editOnb: 'Edit your details (setup form)',
       photoPick: 'Choose a profile photo', photoRemove: 'Remove photo', photoSaved: 'Profile photo saved.',
       photoBad: 'This image can\'t be read; please choose another photo.', photoFull: 'Browser storage is full; the photo wasn\'t saved.',
-      noName: 'Runner', noNameHint: 'Add your name in Settings, under "Personal details".',
+      noName: 'Runner', noNameHint: 'Add your name in {link}.', noNameLink: 'Edit profile',
       levelNum: '{n} of 10', goalIn: { one: '{n} day to go', other: '{n} days to go' }, fitnessSub: 'log a time trial or new result',
       editHint: 'If your level, training volume or circumstances have changed, fill in the form again so the plan updates.',
       cycleLast: 'Last period started: {d}',

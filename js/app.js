@@ -2332,7 +2332,8 @@
   // ---------- پروفایل: فقط عکس، نام، سطح، هدف و ورود به تنظیمات ----------
   function renderProfile() {
     var p = state.profile, lv = C.assessLevel(p), g = C.goalInfo(p), race = C.raceInfo(p), now = today();
-    var name = (p.name || '').trim(), hasPhoto = !!getAvatar();
+    // نام کامل (نام خانوادگی از مرحله‌ی ۱ فرم)
+    var name = [p.name, p.lastName].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' '), hasPhoto = !!getAvatar();
     var days = race ? Math.round(C.daysBetween(now, race.date)) : null;
     app.innerHTML = '<section class="card pf-card">' +
       '<label class="pf-avatar-btn" for="avatar-file" title="' + esc(T('profile.photoPick')) + '">' + avatarHtml(112) +
@@ -2341,12 +2342,13 @@
       '<input type="file" id="avatar-file" accept="image/*" class="sr-only">' +
       (hasPhoto ? '<button type="button" class="linklike small" data-avatar-remove="1">' + esc(T('profile.photoRemove')) + '</button>' : '') +
       '<h1 class="pf-name">' + esc(name || T('profile.noName')) + '</h1>' +
-      (name ? '' : '<p class="small muted">' + esc(T('profile.noNameHint')) + '</p>') +
+      (name ? '' : '<p class="small muted">' + esc(T('profile.noNameHint')).replace('{link}', '<a href="#onboarding">' + esc(T('profile.noNameLink')) + '</a>') + '</p>') +
       '<div class="pf-summary">' +
       '<div><span>' + esc(T('profile.rows.level')) + '</span><b>' + tt('profile.levelNum', { n: lv.level }) + '</b><small>' + esc(lv.info.name) + '</small></div>' +
       '<div><span>' + esc(T('profile.rows.goal')) + '</span><b>' + (g.type !== 'none' ? t(C.goalLabel(g)) : esc(T('profile.noGoal'))) + '</b>' +
       (race && days >= 0 ? '<small>' + tt('profile.goalIn', { n: days }) + '</small>' : '') + '</div></div>' +
-      '<a class="btn btn-primary btn-big btn-block pf-settings" href="#settings">' +
+      // تنظیمات اقدام اصلی نیست؛ مرجانی فقط برای اقدام اصلی
+      '<a class="btn btn-outline btn-big btn-block pf-settings" href="#settings">' +
       '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>' +
       esc(T('settingsPage.title')) + '</a></section>';
   }

@@ -1,0 +1,7 @@
+{
+  "name": "coach-ux-audit",
+  "private": true,
+  "description": "Repeatable UX/UI audit for the Be Your Own Coach app (not part of the deployed app).",
+  "scripts": { "audit": "node audit.js" },
+  "devDependencies": { "playwright": "1.63.0" }
+}
