@@ -1786,10 +1786,29 @@
     if (plan.mode === 'rest') {
       return { type: 'rest', km: null, hardKm: 0, target: T('cycle.fullRestTarget'), steps: [T('cycle.fullRestStep')], how: T('cycle.fullRestHow') };
     }
-    if (!isHard(t)) return null;
-    var km = session.km ? Math.max(Math.min(4, session.km), round05(session.km * (plan.info.heavy ? 0.5 : 0.65))) : 4;
-    return makeEasy(km, zones || null, T('cycle.periodEasyNote'));
+    // «فقط سبک» = هم شدت و هم حجم: همه‌ی جلسه‌های دویدن (حتی ایزی ران) به ۶۵٪ حجم، روزهای ۱ و ۲ به ۵۰٪،
+    // و هیچ جلسه‌ای در روزهای پریود بیشتر از ۱۰ کیلومتر نیست (لانگ‌ران ۲۰ کیلومتری ایزی ران ۱۳ کیلومتری نمی‌شه)
+    var f = plan.info.heavy ? PERIOD_EASY_HEAVY : PERIOD_EASY_FACTOR;
+    if (!session.km && session.minutes) {
+      // جلسه‌های زمانی (دو-پیاده): کوتاه‌تر، حداقل ۱۰ دقیقه
+      var min = Math.max(10, Math.round(session.minutes * f / 5) * 5);
+      if (min >= session.minutes) return null;
+      var tm = JSON.parse(JSON.stringify(session));
+      delete tm.original;
+      tm.minutes = min; tm.target = T('s.min', { n: min });
+      tm.steps = [T('cycle.periodShortSteps', { min: min })].concat(tm.steps || []);
+      tm.how = (tm.how ? tm.how + ' ' : '') + T('cycle.periodEasyNote');
+      tm.periodCut = { from: session.minutes, to: min, unit: 'min' };
+      return tm;
+    }
+    if (!session.km) return null;
+    var km = Math.min(PERIOD_MAX_KM, Math.max(Math.min(3, session.km), round05(session.km * f)));
+    if (km >= session.km && !isHard(t)) return null;
+    var e = makeEasy(Math.min(km, session.km), zones || null, T('cycle.periodEasyNote'));
+    e.periodCut = { from: session.km, to: e.km, unit: 'km', intensity: isHard(t) };
+    return e;
   }
+  var PERIOD_EASY_FACTOR = 0.65, PERIOD_EASY_HEAVY = 0.5, PERIOD_MAX_KM = 10;
   // دوره‌های پیش رو (دوره‌ی فعلی هم اگه الان پریوده) برای تنظیم دستی در پروفایل
   function periodsAhead(profile, today, n) {
     var c = cycleSettings(profile);

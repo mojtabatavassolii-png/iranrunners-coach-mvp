@@ -174,7 +174,10 @@
     if (pp) {
       var ps = C.periodSession(s, pp, C.paceZones(state.profile));
       r.cycle.period = pp; r.cycle.label = s.label;
-      r.cycle.result = ps ? ps.type === 'rest' ? 'rest' : 'easy' : s.type === 'race' ? 'race' : pp.mode === 'normal' && s.hard ? 'normal' : null;
+      var cut = ps && ps.periodCut;
+      r.cycle.cut = cut || null;
+      r.cycle.result = ps ? ps.type === 'rest' ? 'rest' : !cut ? 'easy' : cut.unit === 'min' ? 'shorterMin' : cut.intensity ? 'easy' : 'shorter'
+        : s.type === 'race' ? 'race' : pp.mode === 'normal' && s.hard ? 'normal' : null;
       if (ps) r.session = dressAlt(ps, s);
       return r;
     }
@@ -193,7 +196,7 @@
     if (c.period) {
       var pd = c.period;
       return '<div class="alert cycle-box" role="status"><p>' + t(T('cycle.periodBox', { day: pd.info.day, mode: T('cycle.modeShort.' + pd.mode), src: T('cycle.src.' + (pd.overridden ? 'override' : 'def')) })) +
-        (c.result ? ' ' + esc(T('cycle.periodResult.' + c.result, { label: c.label })) : '') + '</p>' +
+        (c.result ? ' ' + t(T('cycle.periodResult.' + c.result, { label: c.label, from: c.cut && c.cut.from, to: c.cut && c.cut.to })) : '') + '</p>' +
         '<a class="linklike" href="#profile" data-focus-period="1">' + esc(T('cycle.periodChange')) + '</a></div>';
     }
     if (!c.sug) return '';
@@ -1045,15 +1048,23 @@
       (viewWeekOffset !== 0 ? ' · <button type="button" class="linklike" data-week="0">' + esc(T('week.back')) + '</button>' : '') + '</p></div>' +
       '<button type="button" class="btn btn-icon" data-week="1" aria-label="' + esc(T('week.next')) + '">' + nextGlyph + '</button></div>';
 
-    var runDays = week.days.filter(function (d) { return ['rest', 'none'].indexOf(d.type) < 0; }).length;
+    // آمار هفته از جلسه‌های واقعی (بعد از تطبیق با چک‌این و روزهای پریود)؛ اگه با برنامه‌ی اصلی فرق داشت، اون هم نشون داده می‌شه
+    var resolved = week.days.map(function (d) { return effectiveSession(d); });
+    var active = resolved.filter(function (r) { return ['rest', 'none', 'cancelled'].indexOf(r.session.type) < 0; });
+    var runDays = active.length;
+    var effKm = Math.round(active.reduce(function (x, r) { return x + (r.session.km || 0); }, 0) * 10) / 10;
+    var effMin = active.reduce(function (x, r) { return x + (r.session.minutes || 0); }, 0);
+    var kmChanged = Math.abs(effKm - week.totalKm) > 0.05, minChanged = effMin !== week.totalMin;
     var zero = lv.level === 0;
     html += '<div class="week-stats' + (zero ? ' week-stats-zero' : '') + '">' +
       (zero ? '<div class="stat"><span>' + esc(T('zero.stageLabel')) + '</span><b>' + tt('zero.stage', { n: (week.zeroStage || 0) + 1, total: week.zeroFinal + 1 }) + '</b></div>'
         : '<div class="stat"><span>' + esc(T('week.phase')) + ' ' + helpLink('week', T('week.phaseHelp')) + '</span><b>' + t(week.phase.label) + '</b>' +
       (week.periodLabel ? '<small class="period-tag">' + esc(week.periodLabel) + '</small>' : '') + '</div>') +
       '<div class="stat"><span>' + esc(T('week.sessions')) + '</span><b>' + tt('week.nSessions', { n: runDays }) + '</b></div>' +
-      (isRunWalk ? '<div class="stat"><span>' + esc(T('week.totalTime')) + '</span><b>' + tt('week.nMin', { n: week.totalMin }) + '</b></div>'
-        : '<div class="stat"><span>' + esc(T('week.volume')) + '</span><b>' + tt('week.nKm', { n: week.totalKm }) + '</b>' +
+      (isRunWalk ? '<div class="stat"><span>' + esc(T('week.totalTime')) + '</span><b>' + tt('week.nMin', { n: effMin }) + '</b>' +
+          (minChanged ? '<small class="period-tag">' + tt('week.plannedMin', { n: week.totalMin }) + '</small>' : '') + '</div>'
+        : '<div class="stat"><span>' + esc(T('week.volume')) + '</span><b>' + tt('week.nKm', { n: effKm }) + '</b>' +
+          (kmChanged ? '<small class="period-tag">' + tt('week.plannedKm', { n: week.totalKm }) + '</small>' : '') +
           (week.goal && week.goal.category === 'ultra' && week.vert ? '<small class="period-tag">' + tt('week.vert', { n: week.vert }) + '</small>' : '') + '</div>') +
       (zero ? '' : '<div class="stat stat-ratio"><span>' + esc(T('week.ratio')) + ' ' + helpLink('week', T('week.ratioHelp')) + '</span><b dir="ltr">' + fa(100 - week.hardPct) + ' / ' + fa(week.hardPct) + '</b>' +
       '<div class="ratio-bar" aria-hidden="true"><i style="width:' + (100 - week.hardPct) + '%"></i></div></div>') +
@@ -1064,7 +1075,6 @@
       selectedDay = keys.indexOf(todayKey) >= 0 ? todayKey :
         (week.days.filter(function (d) { return ['rest', 'none'].indexOf(d.type) < 0; })[0] || week.days[0]).date;
     }
-    var resolved = week.days.map(function (d) { return effectiveSession(d); });
     html += '<div class="week-grid" role="tablist" aria-label="' + esc(T('week.daysAria')) + '">';
     resolved.forEach(function (r) {
       var s = r.session, d = s.date;

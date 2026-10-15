@@ -953,7 +953,7 @@ function hardDayIn(p, from, to) {
   }
   return null;
 }
-test('پریود: حالت «فقط سبک» جلسه‌ی سخت رو به ایزی ران کوتاه‌تر تبدیل می‌کنه و ایزی ران رو دست نمی‌زنه', function () {
+test('پریود: حالت «فقط سبک» جلسه‌ی سخت رو به ایزی ران کوتاه‌تر تبدیل می‌کنه', function () {
   var p = periodProfile('easy');
   var h = hardDayIn(p, '2026-10-29', '2026-11-02');
   assert(h, 'یه جلسه‌ی سخت در دوره‌ی پریود لازمه');
@@ -963,8 +963,26 @@ test('پریود: حالت «فقط سبک» جلسه‌ی سخت رو به ای
   var alt = C.periodSession(h.s, plan, C.paceZones(p));
   assert.strictEqual(alt.type, 'easy');
   assert(alt.km <= h.s.km);
-  var easy = { type: 'easy', km: 6, hard: false };
-  assert.strictEqual(C.periodSession(easy, plan, null), null);
+  assert(alt.periodCut && alt.periodCut.intensity);
+});
+test('پریود: «فقط سبک» حجم رو هم کم می‌کنه، نه فقط شدت (لانگ‌ران، ایزی ران، جلسه‌ی زمانی)', function () {
+  var normal = { mode: 'easy', info: { heavy: false } }, heavy = { mode: 'easy', info: { heavy: true } };
+  // لانگ‌ران ۱۴ کیلومتری نباید ۱۴ کیلومتر بمونه
+  var l = C.periodSession({ type: 'long', km: 14, hard: true }, normal, null);
+  assert.strictEqual(l.type, 'easy'); assert.strictEqual(l.km, 9);
+  assert.deepStrictEqual([l.periodCut.from, l.periodCut.to], [14, 9]);
+  assert.strictEqual(C.periodSession({ type: 'long', km: 14, hard: true }, heavy, null).km, 7);
+  // سقف ۱۰ کیلومتر در روزهای پریود
+  assert.strictEqual(C.periodSession({ type: 'long', km: 20, hard: true }, normal, null).km, 10);
+  // ایزی ران هم کوتاه‌تر می‌شه؛ ایزی ران خیلی کوتاه دست نمی‌خوره
+  var e = C.periodSession({ type: 'easy', km: 8 }, normal, null);
+  assert.strictEqual(e.km, 5); assert.strictEqual(e.periodCut.intensity, false);
+  assert.strictEqual(C.periodSession({ type: 'easy', km: 3 }, normal, null), null);
+  // دو-پیاده: مدت کمتر، حداقل ۱۰ دقیقه
+  var rw = C.periodSession({ type: 'runwalk', minutes: 30, km: null, steps: ['x'] }, normal, null);
+  assert.strictEqual(rw.minutes, 20); assert.strictEqual(rw.periodCut.unit, 'min');
+  assert.strictEqual(C.periodSession({ type: 'runwalk', minutes: 30, km: null, steps: ['x'] }, heavy, null).minutes, 15);
+  assert.strictEqual(C.periodSession({ type: 'walkrun', minutes: 12, km: null, steps: [] }, normal, null).minutes, 10);
 });
 test('پریود: «استراحت کامل» هر جلسه‌ی دویدن رو استراحت می‌کنه؛ «عادی» هیچ تغییری نمی‌ده؛ مسابقه هیچ‌وقت', function () {
   var pr = periodProfile('rest'), d = C.parseDate('2026-10-30');
