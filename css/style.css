@@ -1043,3 +1043,27 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 [dir=rtl] .onb-out-fwd { animation-name: onb-out-to-end; }
 [dir=rtl] .onb-out-back { animation-name: onb-out-to-start; }
 @media (prefers-reduced-motion: reduce) { .onb-in-fwd, .onb-in-back, .onb-out-fwd, .onb-out-back { animation: none; } }
+
+/* ---------- تمرین در روزهای پریود ---------- */
+.chips-stack { flex-direction: column; align-items: stretch; }
+.chips-stack .chip span { display: block; width: 100%; }
+.pill-race { background: var(--accent-soft); color: var(--accent-deep); }
+.period-card { border-inline-start: 6px solid var(--cy-period); }
+.period-card h2 { margin-bottom: var(--sp-2); }
+.period-def { margin-bottom: var(--sp-1); }
+.period-row { border-top: 1px solid var(--line); padding-top: var(--sp-3); margin-top: var(--sp-3); display: grid; gap: var(--sp-2); }
+.period-row.is-custom .period-when b::after { content: " •"; color: var(--cy-period); }
+.period-when { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.period-opts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+@media (min-width: 520px) { .period-opts { grid-template-columns: repeat(4, 1fr); } }
+.period-opts-3 { grid-template-columns: 1fr; }
+@media (min-width: 520px) { .period-opts-3 { grid-template-columns: repeat(3, 1fr); } }
+.period-opts button {
+  font: inherit; font-weight: 700; font-size: var(--fs-md); min-height: 44px; padding: 6px 10px; cursor: pointer;
+  border: 1.5px solid var(--field-line); border-radius: 12px; background: var(--card); color: var(--text);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.3; text-align: center;
+}
+.period-opts button small { font-weight: 500; font-size: var(--fs-xs); color: var(--muted); }
+.period-opts button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+.period-opts button[aria-pressed="true"] small { color: #fff; }
+.period-opts button:hover:not([aria-pressed="true"]) { border-color: var(--brand); }

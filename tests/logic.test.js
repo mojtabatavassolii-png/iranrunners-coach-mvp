@@ -941,4 +941,68 @@ test('PWA: مانیفست، آیکون‌ها و هماهنگی کش سرویس�
   assert(/rel="manifest"/.test(html) && /apple-mobile-web-app-capable/.test(html) && /apple-touch-icon/.test(html) && /theme-color/.test(html));
 });
 
+// ---------- روزهای پریود: تنظیم خودکار و تغییر دستی یک دوره ----------
+function periodProfile(mode, over) {
+  // شروع آخرین پریود ۲۰۲۶-۱۰-۰۱، چرخه‌ی ۲۸ روزه، پریود ۵ روزه → دوره‌ها: ۱۰-۰۱، ۱۰-۲۹، ۱۱-۲۶ ...
+  return profileFor(5, Object.assign({ sex: 'female', cycle: { enabled: true, lastStart: '2026-10-01', cycleLen: 28, periodLen: 5, periodMode: mode } }, over || {}));
+}
+function hardDayIn(p, from, to) {
+  for (var d = C.parseDate(from); d <= C.parseDate(to); d = C.addDays(d, 1)) {
+    var s = C.sessionFor(p, d);
+    if (s && s.hard && s.type !== 'race') return { d: d, s: s };
+  }
+  return null;
+}
+test('پریود: حالت «فقط سبک» جلسه‌ی سخت رو به ایزی ران کوتاه‌تر تبدیل می‌کنه و ایزی ران رو دست نمی‌زنه', function () {
+  var p = periodProfile('easy');
+  var h = hardDayIn(p, '2026-10-29', '2026-11-02');
+  assert(h, 'یه جلسه‌ی سخت در دوره‌ی پریود لازمه');
+  var plan = C.periodPlan(p, h.d);
+  assert.strictEqual(plan.mode, 'easy');
+  assert.strictEqual(plan.start, '2026-10-29');
+  var alt = C.periodSession(h.s, plan, C.paceZones(p));
+  assert.strictEqual(alt.type, 'easy');
+  assert(alt.km <= h.s.km);
+  var easy = { type: 'easy', km: 6, hard: false };
+  assert.strictEqual(C.periodSession(easy, plan, null), null);
+});
+test('پریود: «استراحت کامل» هر جلسه‌ی دویدن رو استراحت می‌کنه؛ «عادی» هیچ تغییری نمی‌ده؛ مسابقه هیچ‌وقت', function () {
+  var pr = periodProfile('rest'), d = C.parseDate('2026-10-30');
+  var plan = C.periodPlan(pr, d);
+  assert.strictEqual(C.periodSession({ type: 'easy', km: 6 }, plan, null).type, 'rest');
+  assert.strictEqual(C.periodSession({ type: 'race', km: 10, hard: true }, plan, null), null);
+  var pn = periodProfile('normal');
+  assert.strictEqual(C.periodSession({ type: 'tempo', km: 8, hard: true }, C.periodPlan(pn, d), null), null);
+  // بیرون از روزهای پریود هیچ تنظیمی نیست
+  assert.strictEqual(C.periodPlan(pr, C.parseDate('2026-11-10')), null);
+});
+test('پریود: بدون انتخاب حالت، تنظیم خودکار نیست (همون پیشنهاد روزانه‌ی قبلی)', function () {
+  var p = periodProfile(undefined);
+  assert.strictEqual(C.periodPlan(p, C.parseDate('2026-10-30')), null);
+});
+test('پریود: تغییر دستی فقط همون دوره رو عوض می‌کنه و پیش‌فرض ماه‌های بعد ثابت می‌مونه', function () {
+  var p = periodProfile('easy');
+  p.cycle.periodOverrides = { '2026-10-29': 'rest' };
+  assert.strictEqual(C.periodPlan(p, C.parseDate('2026-10-31')).mode, 'rest');
+  assert.strictEqual(C.periodPlan(p, C.parseDate('2026-10-31')).overridden, true);
+  assert.strictEqual(C.periodPlan(p, C.parseDate('2026-11-27')).mode, 'easy');
+  assert.strictEqual(C.periodPlan(p, C.parseDate('2026-11-27')).overridden, false);
+  var ahead = C.periodsAhead(p, C.parseDate('2026-10-15'), 3);
+  assert.deepStrictEqual(ahead.map(function (e) { return e.start + ':' + e.mode; }), ['2026-10-29:rest', '2026-11-26:easy', '2026-12-24:easy']);
+});
+test('پریود: اگه شروع واقعی چند روز با تخمین فرق کنه، تغییر دستی هنوز به همون دوره می‌خوره', function () {
+  var p = periodProfile('easy');
+  p.cycle.periodOverrides = { '2026-10-29': 'rest' };
+  p.cycle.lastStart = '2026-10-27'; // «پریودم امروز شروع شد» دو روز زودتر
+  var plan = C.periodPlan(p, C.parseDate('2026-10-28'));
+  assert.strictEqual(plan.start, '2026-10-27');
+  assert.strictEqual(plan.mode, 'rest');
+  assert.strictEqual(C.periodPlan(p, C.parseDate('2026-11-24')).mode, 'easy');
+});
+test('پریود: آمار و نمودارها همون جلسه‌ی تنظیم‌شده رو می‌بینن', function () {
+  var p = periodProfile('rest');
+  var recs = C.dayRecords({ profile: p, checkins: {}, done: {} }, C.parseDate('2026-10-29'), C.parseDate('2026-11-02'));
+  recs.forEach(function (r) { if (r.planned.type !== 'race') assert(['rest', 'none'].indexOf(r.eff.type) >= 0, r.date + ' ' + r.eff.type); });
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

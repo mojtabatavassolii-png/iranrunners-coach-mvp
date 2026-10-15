@@ -1748,6 +1748,58 @@
   }
   var CYCLE_PHASES = ['period', 'follicular', 'ovulation', 'luteal', 'lateLuteal'];
 
+  // ---------- روزهای پریود: تنظیم خودکار برنامه طبق انتخاب کاربر ----------
+  // cycle.periodMode = پیش‌فرض: 'normal' (طبق برنامه) | 'easy' (فقط سبک) | 'rest' (استراحت کامل)
+  // cycle.periodOverrides = { تاریخ شروع تخمینی یک دوره: حالت }؛ فقط همون دوره، پیش‌فرض ماه‌های بعد دست نمی‌خوره.
+  // تخمین شروع با «پریودم امروز شروع شد» چند روز جابه‌جا می‌شه، پس تا ۷ روز اختلاف هنوز همون دوره‌ست
+  // (کوتاه‌ترین چرخه ۲۱ روزه، پس دو دوره هیچ‌وقت با هم قاطی نمی‌شن).
+  var PERIOD_MODES = ['normal', 'easy', 'rest'];
+  function periodOverrideFor(profile, start) {
+    var ov = (profile.cycle && profile.cycle.periodOverrides) || {}, best = null, bestD = 8;
+    Object.keys(ov).forEach(function (k) {
+      if (PERIOD_MODES.indexOf(ov[k]) < 0) return;
+      var d = Math.abs(daysBetween(parseDate(k), start));
+      if (d < bestD) { best = { key: k, mode: ov[k] }; bestD = d; }
+    });
+    return best;
+  }
+  function periodEntry(profile, start, current) {
+    var c = cycleSettings(profile), def = profile.cycle.periodMode, o = periodOverrideFor(profile, start);
+    var known = PERIOD_MODES.indexOf(def) >= 0;
+    return { start: dateKey(start), end: dateKey(addDays(start, c.P - 1)), current: !!current, def: known ? def : null,
+      mode: o ? o.mode : (known ? def : null), overridden: !!o, overrideKey: o ? o.key : null };
+  }
+  // تنظیم یک روز مشخص؛ null = روز پریود نیست یا کاربر هنوز حالتی انتخاب نکرده (همون پیشنهاد روزانه‌ی قبلی)
+  function periodPlan(profile, date) {
+    var info = cycleInfo(profile, date);
+    if (!info || info.phase !== 'period') return null;
+    var e = periodEntry(profile, addDays(date, -(info.day - 1)), true);
+    if (!e.mode) return null;
+    e.info = info;
+    return e;
+  }
+  // جلسه‌ی جایگزین یک روز پریود؛ null = بدون تغییر (حالت عادی، روز استراحت، جلسه‌ی از قبل سبک، یا مسابقه که هیچ‌وقت خودکار عوض نمی‌شه)
+  function periodSession(session, plan, zones) {
+    if (!plan || !session || plan.mode === 'normal') return null;
+    var t = session.type;
+    if (t === 'race' || t === 'rest' || t === 'none' || t === 'cancelled') return null;
+    if (plan.mode === 'rest') {
+      return { type: 'rest', km: null, hardKm: 0, target: T('cycle.fullRestTarget'), steps: [T('cycle.fullRestStep')], how: T('cycle.fullRestHow') };
+    }
+    if (!isHard(t)) return null;
+    var km = session.km ? Math.max(Math.min(4, session.km), round05(session.km * (plan.info.heavy ? 0.5 : 0.65))) : 4;
+    return makeEasy(km, zones || null, T('cycle.periodEasyNote'));
+  }
+  // دوره‌های پیش رو (دوره‌ی فعلی هم اگه الان پریوده) برای تنظیم دستی در پروفایل
+  function periodsAhead(profile, today, n) {
+    var c = cycleSettings(profile);
+    if (!c) return [];
+    var info = cycleInfo(profile, today), inP = info.phase === 'period';
+    var first = inP ? addDays(today, -(info.day - 1)) : info.nextStart, out = [];
+    for (var i = 0; i < n; i++) out.push(periodEntry(profile, addDays(first, i * c.L), i === 0 && inP));
+    return out;
+  }
+
   // ---------- هشدارهای پروفایل ----------
   function profileWarnings(profile, today) {
     var out = [];
@@ -1821,8 +1873,11 @@
       var base = weeks[wk].days[persianDayIndex(d)];
       var ci = checkins[k], r = adaptSession(base, ci, checkins[dateKey(addDays(d, -1))], zones, { checkins: checkins });
       var eff = r.session, adapted = !!(r.adaptation && r.adaptation.kind === 'downgrade');
-      var ch = choices[k];
-      if ((ch === 'adapt' || ch === 'rest') && eff.type !== 'cancelled') {
+      var ch = choices[k], pp = periodPlan(p, d);
+      if (pp) {
+        var ps = periodSession(eff, pp, zones);
+        if (ps) { eff = ps; adapted = true; }
+      } else if ((ch === 'adapt' || ch === 'rest') && eff.type !== 'cancelled') {
         var sug = cycleSuggestion(eff, cycleInfo(p, d), zones);
         var alt = sug && (ch === 'adapt' ? sug.alt : sug.rest);
         if (alt) { eff = alt; adapted = true; }
@@ -1951,6 +2006,7 @@
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks,
     goalInfo: goalInfo, goalLabel: goalLabel, GOAL_TYPES: GOAL_TYPES, TERRAIN_LABELS: TERRAIN_LABELS,
     cycleInfo: cycleInfo, nextPeriod: nextPeriod, cycleSuggestion: cycleSuggestion, CYCLE_PHASES: CYCLE_PHASES,
+    periodPlan: periodPlan, periodSession: periodSession, periodsAhead: periodsAhead, PERIOD_MODES: PERIOD_MODES, dayRecords: dayRecords,
     ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,
     analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS

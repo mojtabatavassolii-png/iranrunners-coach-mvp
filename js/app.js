@@ -154,30 +154,48 @@
     var ci = state.checkins[base.date];
     return withCycle(C.adaptSession(base, ci, prevCheckin(base.date), C.paceZones(state.profile), { profile: state.profile, checkins: state.checkins }));
   }
-  // چرخه‌ی قاعدگی: فقط پیشنهاد؛ جلسه فقط با انتخاب خود کاربر (adapt / rest) عوض می‌شه
+  // جلسه‌ی جایگزین با همون روز و برچسب نوع
+  function dressAlt(alt, s) {
+    alt = JSON.parse(JSON.stringify(alt));
+    alt.date = s.date; alt.dayName = s.dayName; alt.dayShort = s.dayShort;
+    alt.label = C.TYPE_INFO[alt.type].label; alt.hard = false; alt.original = s;
+    return alt;
+  }
+  // چرخه‌ی قاعدگی:
+  //  روزهای پریود: اگه کاربر حالت تمرین رو انتخاب کرده (پیش‌فرض یا فقط برای همین دوره)، برنامه خودکار تنظیم می‌شه
+  //  بقیه‌ی روزها (و کاربرهای بدون انتخاب): فقط پیشنهاد؛ جلسه فقط با انتخاب خود کاربر (adapt / rest) عوض می‌شه
   function withCycle(r) {
     var s = r.session;
     if (!s || s.type === 'cancelled' || !s.date) return r;
     var info = C.cycleInfo(state.profile, C.parseDate(s.date));
     if (!info) return r;
     r.cycle = { info: info };
+    var pp = C.periodPlan(state.profile, C.parseDate(s.date));
+    if (pp) {
+      var ps = C.periodSession(s, pp, C.paceZones(state.profile));
+      r.cycle.period = pp; r.cycle.label = s.label;
+      r.cycle.result = ps ? ps.type === 'rest' ? 'rest' : 'easy' : s.type === 'race' ? 'race' : pp.mode === 'normal' && s.hard ? 'normal' : null;
+      if (ps) r.session = dressAlt(ps, s);
+      return r;
+    }
     var sug = C.cycleSuggestion(s, info, C.paceZones(state.profile));
     if (!sug) { if (info.phase === 'follicular' && s.hard && s.type !== 'race') r.cycle.note = 'follicular'; return r; }
     var ch = (state.cycleChoices || {})[s.date];
     r.cycle.sug = sug; r.cycle.choice = ch; r.cycle.label = s.label;
     var alt = ch === 'adapt' ? sug.alt : (ch === 'rest' ? sug.rest : null);
-    if (alt) {
-      alt = JSON.parse(JSON.stringify(alt));
-      alt.date = s.date; alt.dayName = s.dayName; alt.dayShort = s.dayShort;
-      alt.label = C.TYPE_INFO[alt.type].label; alt.hard = false; alt.original = s;
-      r.session = alt;
-    }
+    if (alt) r.session = dressAlt(alt, s);
     return r;
   }
   function cycleBox(r, key, todayKey) {
     var c = r && r.cycle;
     if (!c || key < todayKey) return '';
     if (c.note === 'follicular') return '<p class="cycle-note small">' + esc(T('cycle.follicularNote')) + '</p>';
+    if (c.period) {
+      var pd = c.period;
+      return '<div class="alert cycle-box" role="status"><p>' + t(T('cycle.periodBox', { day: pd.info.day, mode: T('cycle.modeShort.' + pd.mode), src: T('cycle.src.' + (pd.overridden ? 'override' : 'def')) })) +
+        (c.result ? ' ' + esc(T('cycle.periodResult.' + c.result, { label: c.label })) : '') + '</p>' +
+        '<a class="linklike" href="#profile" data-focus-period="1">' + esc(T('cycle.periodChange')) + '</a></div>';
+    }
     if (!c.sug) return '';
     var when = key === todayKey ? T('cycle.when.today') : T('cycle.when.date', { d: faDate(key) });
     if (c.choice) {
@@ -212,7 +230,8 @@
     if (!np) return '';
     var info = C.cycleInfo(state.profile, now);
     var soon = !np.inPeriod && np.daysTo <= 5;
-    var line = np.inPeriod ? T('cycle.inPeriod', { day: np.day })
+    var pp = np.inPeriod ? C.periodPlan(state.profile, now) : null;
+    var line = pp ? T('cycle.inPeriodMode', { day: np.day, mode: T('cycle.modeShort.' + pp.mode) }) : np.inPeriod ? T('cycle.inPeriod', { day: np.day })
       : T(soon ? 'cycle.nextSoon' : 'cycle.next', { date: faDate(C.dateKey(np.next)), n: np.daysTo });
     return '<section class="card cycle-card' + (soon || np.inPeriod ? ' cycle-soon' : '') + '"><h3>' + esc(T('cycle.cardTitle')) + '</h3>' +
       '<p class="small muted">' + tt('cycle.today', { day: info.day, phase: T('cycle.phase.' + info.phase) }) + '</p>' +
@@ -286,6 +305,7 @@
   document.addEventListener('click', function (e) {
     var f = e.target.closest && e.target.closest('[data-onb-focus]');
     if (f) pendingFocus = f.dataset.onbFocus === 'cycle' ? 'cycle-fieldset' : null;
+    if (e.target.closest && e.target.closest('[data-focus-period]')) pendingFocus = 'period-card';
   }, true);
   // صفحه‌های فرعی: نوار برگشت بالای صفحه (برگشت واقعی تاریخچه، وگرنه تب مادر)
   var SUB_PAGES = { checkin: '#home', race: '#home', fitness: '#progress', guide: '#learn', settings: '#profile' };
@@ -506,7 +526,12 @@
         '<div class="field"><label for="cylen">' + esc(T('cycle.cycleLen')) + '</label><input id="cylen" name="cycleLen" type="number" inputmode="numeric" min="21" max="45" value="' + esc(cyc.cycleLen || 28) + '">' +
         '<small class="muted">' + esc(T('cycle.cycleLenHint')) + '</small></div>' +
         '<div class="field"><label for="cyplen">' + esc(T('cycle.periodLen')) + '</label><input id="cyplen" name="periodLen" type="number" inputmode="numeric" min="2" max="10" value="' + esc(cyc.periodLen || 5) + '"></div>' +
-        '</div><p class="small muted">' + esc(T('cycle.privacy')) + '</p></div>' +
+        '</div>' +
+        // تمرین در روزهای پریود: پیش‌فرض برای هر ماه (برای یک دوره‌ی خاص از پروفایل قابل تغییره)
+        '<p class="sub-legend" id="pmode-q">' + esc(T('cycle.periodQ')) + req + '</p><div class="chips chips-stack" role="radiogroup" aria-labelledby="pmode-q">' +
+        C.PERIOD_MODES.map(function (k) { return chip('periodMode', k, T('cycle.mode.' + k), cyc.periodMode === k, 'radio'); }).join('') + '</div>' +
+        '<small class="muted">' + esc(T('cycle.periodQHint')) + '</small>' +
+        '<p class="small muted">' + esc(T('cycle.privacy')) + '</p></div>' +
         '</fieldset>') +
 
       // ۳. وضعیت فعلی دویدن
@@ -766,7 +791,10 @@
         if (!cs || ago < 0 || ago > 120) E(2, T('cycle.err.lastStart'));
         if (!(cl >= 21 && cl <= 45)) E(2, T('cycle.err.cycleLen'));
         if (!(cp >= 2 && cp <= 10)) E(2, T('cycle.err.periodLen'));
-        cycleObj = { enabled: true, lastStart: cs, cycleLen: cl, periodLen: cp };
+        var pm = fd.get('periodMode');
+        if (C.PERIOD_MODES.indexOf(pm) < 0) E(2, T('cycle.err.periodMode'));
+        // تغییرهای دستی دوره‌ها با ویرایش پروفایل حفظ می‌شن
+        cycleObj = { enabled: true, lastStart: cs, cycleLen: cl, periodLen: cp, periodMode: pm, periodOverrides: (p.cycle && p.cycle.periodOverrides) || {} };
       }
       // ۳. وضعیت فعلی دویدن
       if (!fd.get('experience')) E(3, T('onb.err.exp'));
@@ -1216,6 +1244,26 @@
       state.cycleChoices = state.cycleChoices || {};
       state.cycleChoices[cc.dataset.date] = cc.dataset.cycleChoice;
       save(); route();
+      return;
+    }
+    // تنظیم یک دوره‌ی پریود (فقط همون دوره) یا پیش‌فرض
+    var pm = e.target.closest('[data-period-mode]');
+    if (pm) {
+      var cy = state.profile.cycle, ov = cy.periodOverrides = cy.periodOverrides || {};
+      if (pm.dataset.periodKey) delete ov[pm.dataset.periodKey];
+      if (pm.dataset.periodMode !== 'default') ov[pm.dataset.periodStart] = pm.dataset.periodMode;
+      // تنظیم دوره‌های تموم‌شده دیگه لازم نیست
+      Object.keys(ov).forEach(function (k) { if (C.daysBetween(C.parseDate(k), today()) > 60) delete ov[k]; });
+      save();
+      showToast(T(pm.dataset.periodMode === 'default' ? 'cycle.pcReset' : 'cycle.pcSaved', { d: faDate(pm.dataset.periodStart, true) }));
+      pendingFocus = 'period-card'; route();
+      return;
+    }
+    var pdf = e.target.closest('[data-period-default]');
+    if (pdf) {
+      state.profile.cycle.periodMode = pdf.dataset.periodDefault;
+      save(); showToast(T('cycle.pcDefaultSaved'));
+      pendingFocus = 'period-card'; route();
       return;
     }
     var cu = e.target.closest('[data-cycle-undo]');
@@ -2350,7 +2398,39 @@
       // تنظیمات اقدام اصلی نیست؛ مرجانی فقط برای اقدام اصلی
       '<a class="btn btn-outline btn-big btn-block pf-settings" href="#settings">' +
       '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>' +
-      esc(T('settingsPage.title')) + '</a></section>';
+      esc(T('settingsPage.title')) + '</a></section>' + periodCard(p, now, race);
+  }
+  // تمرین در روزهای پریود: پیش‌فرض + تغییر دستی فقط برای یک دوره‌ی مشخص (مثلاً نزدیک مسابقه)
+  function periodCard(p, now, race) {
+    if (!C.cycleInfo(p, now)) return '';
+    var c = p.cycle, def = C.PERIOD_MODES.indexOf(c.periodMode) >= 0 ? c.periodMode : null;
+    var html = '<section class="card period-card" id="period-card" aria-labelledby="period-card-h"><h2 id="period-card-h">' + esc(T('cycle.pcTitle')) + '</h2>';
+    var foot = '<p class="small muted">' + esc(T('cycle.pcEstimate')) + '</p></section>';
+    if (!def) {
+      return html + '<p>' + esc(T('cycle.pcDefaultNone')) + '</p><div class="period-opts period-opts-3">' +
+        C.PERIOD_MODES.map(function (m) { return '<button type="button" data-period-default="' + m + '">' + esc(T('cycle.mode.' + m)) + '</button>'; }).join('') + '</div>' + foot;
+    }
+    html += '<p class="period-def">' + esc(T('cycle.pcDefault', { mode: T('cycle.modeShort.' + def) })) +
+      ' <a href="#onboarding" data-onb-focus="cycle">' + esc(T('cycle.pcEditDefault')) + '</a></p>' +
+      '<p class="small muted">' + esc(T('cycle.pcIntro')) + '</p>';
+    html += C.periodsAhead(p, now, 3).map(function (e) {
+      var badges = '';
+      if (e.current) badges += '<span class="pill pill-level">' + esc(T('cycle.pcNow')) + '</span>';
+      if (race) {
+        var toRace = C.daysBetween(C.parseDate(e.end), race.date);
+        if (C.daysBetween(C.parseDate(e.start), race.date) >= 0 && toRace <= 0) badges += '<span class="pill pill-race">' + esc(T('cycle.pcRaceIn')) + '</span>';
+        else if (toRace > 0 && toRace <= 10) badges += '<span class="pill pill-race">' + tt('cycle.pcRaceAfter', { n: toRace }) + '</span>';
+      }
+      var cur = e.overridden ? e.mode : 'default';
+      var opts = [['default', T('cycle.pcUseDefault'), T('cycle.modeShort.' + def)]].concat(C.PERIOD_MODES.map(function (m) { return [m, T('cycle.modeShort.' + m), '']; }));
+      var range = T('cycle.pcRange', { a: faDate(e.start, true), b: faDate(e.end, true) });
+      return '<div class="period-row' + (e.overridden ? ' is-custom' : '') + '"><div class="period-when"><b>' + t(range) + '</b>' + badges + '</div>' +
+        '<div class="period-opts" role="group" aria-label="' + esc(T('cycle.pcAria', { d: faDate(e.start, true) })) + '">' + opts.map(function (o) {
+          return '<button type="button" data-period-start="' + e.start + '" data-period-key="' + esc(e.overrideKey || '') + '" data-period-mode="' + o[0] + '" aria-pressed="' + (cur === o[0]) + '">' +
+            esc(o[1]) + (o[2] ? '<small>' + esc(o[2]) + '</small>' : '') + '</button>';
+        }).join('') + '</div></div>';
+    }).join('');
+    return html + foot;
   }
 
   // ---------- تنظیمات: دسته‌های جمع‌وبازشونده ----------

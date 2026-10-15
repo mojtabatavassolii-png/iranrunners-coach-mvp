@@ -561,7 +561,8 @@
       err: {
         lastStart: 'Enter the first day of your last period (today or earlier, at most 120 days ago).',
         cycleLen: 'Cycle length must be between 21 and 45 days.',
-        periodLen: 'Period length must be between 2 and 10 days.'
+        periodLen: 'Period length must be between 2 and 10 days.',
+        periodMode: 'Choose how you can train on period days.'
       },
       phase: { period: 'Period days', follicular: 'Follicular phase', ovulation: 'Around ovulation', luteal: 'Luteal phase', lateLuteal: 'Days before your period' },
       when: { today: 'today', date: 'on {d}' },
@@ -599,7 +600,40 @@
       settingsNeedData: 'To turn this on, first enter the first day of your last period under "Edit profile".',
       profileRow: 'Cycle adaptation',
       profileOn: 'On · {len}-day cycle, {p}-day period',
-      profileOff: 'Off'
+      profileOff: 'Off',
+      periodQ: 'On period days, how can you train?',
+      periodQHint: 'Your period days are adjusted automatically every month based on this. In your profile you can decide differently for a specific period (for example close to a race).',
+      mode: { normal: 'Normal training, as planned', easy: 'Light training and easy runs only', rest: 'No training; full rest' },
+      modeShort: { normal: 'Normal', easy: 'Light only', rest: 'Rest' },
+      fullRestTarget: 'Full rest',
+      fullRestStep: 'No training today; rest.',
+      fullRestHow: 'Following your setting, period days are rest days. A short walk or gentle stretching is fine if you feel like it, but not required.',
+      periodEasyNote: 'Made lighter for your period, following your setting; if you feel good, running a little more is fine.',
+      periodBox: 'Probably day {day} of your period. Setting for this period: "{mode}"{src}.',
+      src: { def: ' (default)', override: ' (this period only)' },
+      periodResult: {
+        easy: '"{label}" was automatically changed to a lighter easy run.',
+        rest: '"{label}" was automatically changed to rest.',
+        normal: 'Your original plan stays; if you don\'t feel good during the run, cut it short.',
+        race: 'It\'s race day; race plans are never changed automatically.'
+      },
+      periodChange: 'Change for this period',
+      inPeriodMode: 'You\'re probably on day {day} of your period. Plan for these days: "{mode}".',
+      pcTitle: 'Training on period days',
+      pcDefault: 'Default for every month: "{mode}"',
+      pcDefaultNone: 'You haven\'t chosen how to train on period days yet. Pick one so those days are adjusted automatically:',
+      pcEditDefault: 'Change default',
+      pcIntro: 'You can decide separately for each period, for example close to a race or if this month is different. The change affects only that period; your default for later months stays the same.',
+      pcRange: '{a} – {b}',
+      pcNow: 'Now',
+      pcRaceIn: 'Race during this period',
+      pcRaceAfter: { one: 'Race {n} day later', other: 'Race {n} days later' },
+      pcUseDefault: 'Default',
+      pcAria: 'Setting for the period starting {d}',
+      pcSaved: 'Saved for the period starting {d}.',
+      pcReset: 'The period starting {d} is back to your default.',
+      pcDefaultSaved: 'Default for period days saved.',
+      pcEstimate: 'Dates are estimates; tapping "My period started today" on the Today page makes them more accurate.'
     },
     plan: { week: 'Weekly view', month: 'Monthly view', viewAria: 'Plan view' },
     month: {
