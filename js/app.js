@@ -2455,7 +2455,7 @@
     html += '<p class="period-def">' + esc(T('cycle.pcDefault', { mode: T('cycle.modeShort.' + def) })) +
       ' <a href="#onboarding" data-onb-focus="cycle">' + esc(T('cycle.pcEditDefault')) + '</a></p>' +
       '<p class="small muted">' + esc(T('cycle.pcIntro')) + '</p>';
-    html += C.periodsAhead(p, now, 3).map(function (e) {
+    html += C.periodsAhead(p, now, 1).map(function (e) {
       var badges = '';
       if (e.current) badges += '<span class="pill pill-level">' + esc(T('cycle.pcNow')) + '</span>';
       if (race) {
