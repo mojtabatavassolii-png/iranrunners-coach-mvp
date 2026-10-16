@@ -211,7 +211,8 @@ function probe(screenW) {
       const ox = cs(e).overflowX;
       if (ox === 'auto' || ox === 'scroll' || ox === 'hidden' || ox === 'clip') return;
     }
-    const par = el.parentElement;
+    // برچسب‌های داخل نمودار (SVG) می‌تونن تا لبه‌ی کارت برن؛ ملاک لبه‌ی کارته، نه خود نمودار
+    const par = el.closest('svg') && el.tagName !== 'svg' ? el.closest('.card') : el.parentElement;
     if (!par || par.id === 'app') return;
     const r = el.getBoundingClientRect(), pr = par.getBoundingClientRect();
     const over = Math.max(pr.left - r.left, r.right - pr.right);

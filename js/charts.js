@@ -77,7 +77,8 @@
       s += '<text class="ch-tick" x="' + axisX + '" y="' + y + '" dy="0.35em" text-anchor="' + anchor + '">' + esc(spec.y.fmt ? spec.y.fmt(tv) : tv) + '</text>';
     });
     if (spec.y.label) {
-      s += '<text class="ch-unit" x="' + axisX + '" y="12" text-anchor="' + anchor + '">' + esc(spec.y.label) + '</text>';
+      // از لبه‌ی بیرونی نمودار به سمت داخل، تا برچسب‌های بلند (مثل «دقیقه در کیلومتر») بیرون نزنن
+      s += '<text class="ch-unit" x="' + (spec.rtl ? g.W - 2 : 2) + '" y="12" text-anchor="' + (spec.rtl ? 'end' : 'start') + '">' + esc(spec.y.label) + '</text>';
     }
     // خط پایه
     var baseY = (spec.y.invert ? g.top : g.top + g.plotH).toFixed(1);
