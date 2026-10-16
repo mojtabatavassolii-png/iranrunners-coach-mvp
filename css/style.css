@@ -831,7 +831,6 @@ body.has-tabbar #app { max-width: 720px; margin: 0 auto; }
 .pf-facts dt { font-size: var(--fs-xs); color: var(--muted); }
 .pf-facts dd { margin: 2px 0 0; font-weight: 700; display: grid; }
 .pf-facts dd small { font-weight: 500; color: var(--muted); font-size: var(--fs-xs); }
-.pf-goal { grid-column: 1 / -1; }
 .seg { display: inline-flex; gap: 4px; background: var(--panel); border-radius: 999px; padding: 4px; }
 .seg button { font: inherit; font-weight: 700; border: 0; background: transparent; color: var(--muted); padding: 8px 18px; border-radius: 999px; cursor: pointer; min-height: 44px; }
 .seg button[aria-pressed="true"] { background: var(--brand); color: #fff; }
