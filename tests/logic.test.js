@@ -1023,4 +1023,21 @@ test('پریود: آمار و نمودارها همون جلسه‌ی تنظیم
   recs.forEach(function (r) { if (r.planned.type !== 'race') assert(['rest', 'none'].indexOf(r.eff.type) >= 0, r.date + ' ' + r.eff.type); });
 });
 
+// ---------- مسافت و زمان واقعی ثبت‌شده با «انجام شد» ----------
+test('انجام‌شده: مسافت و زمان واقعی جای عدد برنامه رو در آمار می‌گیرن', function () {
+  var log = { type: 'easy', km: 8, actual: { km: 7.2, sec: 2700 } };
+  var d = C.doneSession(log);
+  assert.strictEqual(d.km, 7.2); assert.strictEqual(d.realMin, 45);
+  assert.strictEqual(Math.round(C.actualPace(log)), 375);
+  assert.strictEqual(C.doneSession({ type: 'easy', km: 8 }).km, 8);       // بدون عدد واقعی = همون برنامه
+  assert.strictEqual(C.actualPace({ type: 'easy', km: 8, actual: { km: 8 } }), null);
+  // نمودارها: حجم هفته از مسافت واقعی
+  var p = profileFor(4);
+  var day = C.parseDate('2026-10-05'), s = C.sessionFor(p, day);
+  var k = C.dateKey(day), logs = {}; logs[k] = Object.assign(C.sessionSnapshot(s), { actual: { km: 3.3, sec: 1200 } });
+  var data = { profile: p, checkins: {}, done: {}, doneLog: logs }; data.done[k] = true;
+  var rec = C.dayRecords(data, day, day)[0];
+  assert.strictEqual(rec.actual.km, 3.3);
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

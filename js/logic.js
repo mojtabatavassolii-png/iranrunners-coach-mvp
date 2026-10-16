@@ -1864,6 +1864,7 @@
   function isRunType(t) { return !!t && ['rest', 'none', 'cancelled'].indexOf(t) < 0; }
   function sessionMinutes(s, pE) {
     if (!s) return 0;
+    if (s.realMin) return s.realMin;   // زمان واقعی ثبت‌شده
     if (s.minutes) return s.minutes;
     return s.km ? s.km * pE * (LOAD_PACE[s.type] || 1) / 60 : 0;
   }
@@ -1872,6 +1873,20 @@
     if (!s || !isRunType(s.type)) return 0;
     var r = Number(rpe) || (s.type === 'race' && s.rpeOnly ? 7 : LOAD_RPE[s.type]) || 4;
     return sessionMinutes(s, pE) * r;
+  }
+  // جلسه‌ی انجام‌شده با مسافت و زمان واقعی (اگه کاربر موقع «انجام شد» وارد کرده)؛ وگرنه همون نسخه‌ی برنامه
+  // log.actual = { km, sec } — هر کدوم اختیاری
+  function doneSession(log) {
+    if (!log || !log.actual) return log;
+    var o = Object.assign({}, log), a = log.actual;
+    if (a.km > 0) o.km = a.km;
+    if (a.sec > 0) o.realMin = a.sec / 60;
+    return o;
+  }
+  // پیس واقعی (ثانیه در هر کیلومتر) وقتی هم مسافت و هم زمان ثبت شده
+  function actualPace(log) {
+    var a = log && log.actual;
+    return a && a.km > 0 && a.sec > 0 ? a.sec / a.km : null;
   }
   // خلاصه‌ی فشرده‌ی یک جلسه برای ذخیره موقع «انجام شد» (تا تاریخچه با تغییر بعدی پروفایل عوض نشه)
   function sessionSnapshot(s) {
@@ -1903,7 +1918,7 @@
       }
       var isDone = !!done[k];
       out.push({ date: k, d: d, planned: base, eff: eff, adapted: adapted, pain: !!(ci && ci.pain), done: isDone,
-        actual: isDone ? (logs[k] || eff) : null, checkin: ci || null });
+        actual: isDone ? doneSession(logs[k] || eff) : null, checkin: ci || null });
     }
     return out;
   }
@@ -2025,6 +2040,7 @@
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks,
     goalInfo: goalInfo, goalLabel: goalLabel, GOAL_TYPES: GOAL_TYPES, TERRAIN_LABELS: TERRAIN_LABELS,
     cycleInfo: cycleInfo, nextPeriod: nextPeriod, cycleSuggestion: cycleSuggestion, CYCLE_PHASES: CYCLE_PHASES,
+    doneSession: doneSession, actualPace: actualPace,
     periodPlan: periodPlan, periodSession: periodSession, periodsAhead: periodsAhead, PERIOD_MODES: PERIOD_MODES, dayRecords: dayRecords,
     ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,

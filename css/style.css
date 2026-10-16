@@ -1073,3 +1073,9 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .pf-sec-head h2 { margin: 0; font-size: var(--fs-xl); }
 .pf-sec-head p { margin: 2px 0 0; }
 .done-tag { display: block; margin-top: 4px; font-size: var(--fs-xs); font-weight: 700; color: var(--c-easy-ink); }
+/* ---------- مسافت و زمان واقعی بعد از جلسه ---------- */
+.actual-fs { border: 0; border-top: 0; padding: 0; margin: 0 0 var(--sp-2); }
+.actual-fs legend { font-size: var(--fs-base); }
+.actual-fs input[name=actKm] { max-width: 200px; }
+.actual-line { margin: var(--sp-3) 0 var(--sp-1); }
+.actual-line b { color: var(--brand-deep); }

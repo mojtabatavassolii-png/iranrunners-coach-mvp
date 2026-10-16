@@ -164,9 +164,9 @@
       if (!off(s.type)) { o.n++; o.km += s.km || 0; o.min += s.minutes || 0; }
       // انجام‌شده: هر روزی که «انجام دادم» خورده، با همون جلسه‌ای که موقع ثبت ذخیره شده (حتی اگه برنامه بعداً جابه‌جا شده باشه)
       if (!state.done[k]) return;
-      var log = (state.doneLog || {})[k] || s;
+      var log = C.doneSession((state.doneLog || {})[k] || s);
       if (off(log.type)) return;
-      o.d++; o.dkm += log.km || 0; o.dmin += log.minutes || 0;
+      o.d++; o.dkm += log.km || 0; o.dmin += Math.round(log.realMin || log.minutes || 0);
     });
     o.km = Math.round(o.km * 10) / 10; o.dkm = Math.round(o.dkm * 10) / 10;
     return o;
@@ -298,6 +298,7 @@
     // هشدار پزشکی فقط در صفحه‌ی چک‌این
     document.getElementById('medical-banner').hidden = v !== 'checkin';
     VIEWS[v](sub);
+    window.CoachTimePicker.init(app);
     if (SUB_PAGES[v]) {
       app.insertAdjacentHTML('afterbegin', backBar(v));
       // هشدار پزشکی صفحه‌ی چک‌این زیر نوار برگشت
@@ -940,32 +941,64 @@
     return html;
   }
 
-  // ---------- بعد از جلسه‌ی ایزی: RPE و پیس ----------
+  // ---------- بعد از جلسه: مسافت و زمان واقعی (اختیاری) + برای ایزی ران، RPE و پیس ----------
   var postRunOpen = null;
+  // زمان شروع چرخ‌ها: مدت برنامه یا مسافت × وسط بازه‌ی ایزی
+  function guessSec(s) {
+    if (s.minutes) return s.minutes * 60;
+    var z = C.paceZones(state.profile), pace = z && z.easy ? (z.easy[0] + z.easy[1]) / 2 : 360;
+    return Math.round((s.km || 5) * pace / 60) * 60;
+  }
+  // خط «ثبت‌شده» برای جلسه‌ی انجام‌شده (فقط وقتی کاربر عدد واقعی وارد کرده)
+  function actualLine(key) {
+    var log = (state.doneLog || {})[key], a = log && log.actual;
+    if (!a) return '';
+    var parts = [];
+    if (a.km > 0) parts.push(tt('post.actKmVal', { km: Math.round(a.km * 100) / 100 }) + (log.km && Math.abs(log.km - a.km) >= 0.05 ? ' <span class="muted">' + tt('post.actPlan', { km: log.km }) + '</span>' : ''));
+    if (a.sec > 0) parts.push('<span dir="ltr">' + fa(C.formatDuration(a.sec)) + '</span>');
+    var pace = C.actualPace(log);
+    if (pace) parts.push(tt('post.actPace', { p: paceFmt(pace) }));
+    return '<p class="actual-line"><b>' + esc(T('post.actRecorded')) + '</b> ' + parts.join(T('progress.sep')) + '</p>';
+  }
   function postRunBlock(key, s, prefix) {
-    if (!s.easyEffort) return '';
-    var post = state.postRuns[key];
-    if (state.done[key] && post) {
-      var fb = C.easyRunFeedback(post, s.type);
-      if (!fb) return '';
-      var cls = fb.kind === 'ok' ? 'alert-good' : (fb.kind === 'warn' ? 'alert-adapt' : 'alert-note');
-      return '<div class="alert ' + cls + ' postrun-fb" role="status"><p class="small muted">' + tt('post.summary', { rpe: post.rpe }) +
-        (post.pace === 'ok' ? esc(T('post.paceOk')) : post.pace === 'fast' ? esc(T('post.paceFast')) : '') + '</p><p>' + t(fb.message) + '</p>' +
-        (fb.kind === 'warn' ? easyActions() : '') + '</div>';
+    var post = state.postRuns[key], done = !!state.done[key], out = '';
+    if (done && postRunOpen !== key) {
+      out += actualLine(key) + '<button type="button" class="linklike small" data-postrun="' + key + '">' + esc(T((state.doneLog || {})[key] && state.doneLog[key].actual ? 'post.actEdit' : 'post.actAdd')) + '</button>';
+      if (s.easyEffort && post) {
+        var fb = C.easyRunFeedback(post, s.type);
+        if (fb) {
+          var cls = fb.kind === 'ok' ? 'alert-good' : (fb.kind === 'warn' ? 'alert-adapt' : 'alert-note');
+          out += '<div class="alert ' + cls + ' postrun-fb" role="status"><p class="small muted">' + tt('post.summary', { rpe: post.rpe }) +
+            (post.pace === 'ok' ? esc(T('post.paceOk')) : post.pace === 'fast' ? esc(T('post.paceFast')) : '') + '</p><p>' + t(fb.message) + '</p>' +
+            (fb.kind === 'warn' ? easyActions() : '') + '</div>';
+        }
+      }
+      return out;
     }
     if (postRunOpen !== key) return '';
-    var n = 'rpe-' + prefix;
-    var h = '<form class="postrun" data-postrun-form="' + key + '" data-type="' + s.type + '" novalidate>' +
-      '<p class="sub-legend">' + esc(T('post.q1')) + '</p><div class="scale scale10" role="radiogroup" aria-label="' + esc(T('post.rpeAria')) + '">';
-    for (var i = 1; i <= 10; i++) h += '<label class="scale-opt"><input type="radio" name="rpe" id="' + n + '-' + i + '" value="' + i + '"><span>' + fa(i) + '</span></label>';
-    h += '</div><div class="scale-ends"><span>' + esc(T('post.low')) + '</span><span>' + esc(T('post.high')) + '</span></div>' + learnMore(['rpe']);
-    if (s.type !== 'runwalk' && s.type !== 'walkrun') {
-      h += '<p class="sub-legend">' + esc(T('post.q2')) + '</p><div class="chips">' +
-        '<label class="chip"><input type="radio" name="pace" value="ok"><span>' + esc(T('post.ok')) + '</span></label>' +
-        '<label class="chip"><input type="radio" name="pace" value="fast"><span>' + esc(T('post.fast')) + '</span></label>' +
-        '<label class="chip"><input type="radio" name="pace" value="unknown"><span>' + esc(T('post.unknown')) + '</span></label></div>';
+    var a = ((state.doneLog || {})[key] || {}).actual || {};
+    var n = 'rpe-' + prefix, timeBased = !s.km && s.minutes;
+    var h = '<form class="postrun" data-postrun-form="' + key + '" data-type="' + s.type + '" data-easy="' + (s.easyEffort ? 1 : 0) + '" novalidate>' +
+      '<fieldset class="actual-fs"><legend>' + esc(T('post.actTitle')) + '</legend><p class="small muted">' + esc(T('post.actHint')) + '</p>' +
+      '<div class="field"><label for="act-km-' + prefix + '">' + esc(T('post.actKm')) + '</label>' +
+      '<input id="act-km-' + prefix + '" name="actKm" type="number" inputmode="decimal" min="0" step="0.01" placeholder="' + esc(s.km ? fa(dKm(s.km)) : '') + '"' +
+      ' value="' + (a.km > 0 ? esc(dKm(Math.round(a.km * 100) / 100)) : '') + '"></div>' +
+      '<div class="field field-tpick"><span class="field-label">' + esc(T('post.actTime')) + '</span>' +
+      window.CoachTimePicker.html({ id: 'act-time-' + prefix, name: 'actTime', sec: a.sec || guessSec(s), touched: a.sec > 0, preview: 'act-time-read-' + prefix,
+        aria: T('post.actTime'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
+      '<small class="muted">' + esc(T('post.actTimeHint')) + '</small><small class="time-read" id="act-time-read-' + prefix + '" aria-live="polite">' +
+      (a.sec > 0 ? '= ' + fa(C.describeDuration(a.sec)) : '') + '</small></div></fieldset>';
+    if (s.easyEffort) {
+      h += '<p class="sub-legend">' + esc(T('post.q1')) + '</p><div class="scale scale10" role="radiogroup" aria-label="' + esc(T('post.rpeAria')) + '">';
+      for (var i = 1; i <= 10; i++) h += '<label class="scale-opt"><input type="radio" name="rpe" id="' + n + '-' + i + '" value="' + i + '"' + (post && post.rpe === i ? ' checked' : '') + '><span>' + fa(i) + '</span></label>';
+      h += '</div><div class="scale-ends"><span>' + esc(T('post.low')) + '</span><span>' + esc(T('post.high')) + '</span></div>' + learnMore(['rpe']);
+      if (s.type !== 'runwalk' && s.type !== 'walkrun') {
+        h += '<p class="sub-legend">' + esc(T('post.q2')) + '</p><div class="chips">' + ['ok', 'fast', 'unknown'].map(function (v) {
+          return '<label class="chip"><input type="radio" name="pace" value="' + v + '"' + (post && post.pace === v ? ' checked' : '') + '><span>' + esc(T('post.' + v)) + '</span></label>';
+        }).join('') + '</div>';
+      }
     }
-    return h + '<p class="form-errors" hidden></p><div class="actions"><button type="submit" class="btn btn-primary">' + esc(T('post.submit')) + '</button>' +
+    return h + '<p class="form-errors" hidden></p><div class="actions"><button type="submit" class="btn btn-primary">' + esc(T(done ? 'post.submit' : 'post.saveDone')) + '</button>' +
       '<button type="button" class="btn btn-ghost" data-postrun-cancel="1">' + esc(T('app.cancel')) + '</button></div></form>';
   }
   function easyActions() {
@@ -1023,8 +1056,8 @@
   }
   function doneButton(key, s) {
     var done = !!state.done[key];
-    // جلسه‌ی ایزی: قبل از ثبت انجام، سؤال RPE و پیس پرسیده می‌شه
-    if (!done && s && s.easyEffort) {
+    // قبل از ثبت انجام: فرم مسافت و زمان واقعی (اختیاری)؛ برای جلسه‌ی ایزی سؤال RPE و پیس هم هست
+    if (!done && s) {
       return '<button type="button" class="btn btn-outline" data-postrun="' + key + '" aria-expanded="' + (postRunOpen === key) + '">' + esc(T('today.done')) + '</button>';
     }
     return '<button type="button" class="btn ' + (done ? 'btn-done' : 'btn-outline') + '" data-done="' + key + '" aria-pressed="' + done + '">' +
@@ -1314,17 +1347,28 @@
     var rpe = f.querySelector('input[name=rpe]:checked');
     var pace = f.querySelector('input[name=pace]:checked');
     var err = f.querySelector('.form-errors');
+    var easy = f.dataset.easy === '1';
     var noPace = f.dataset.type === 'runwalk' || f.dataset.type === 'walkrun';
-    if (!rpe || (!noPace && !pace)) {
+    var errs = [];
+    // مسافت و زمان واقعی: هر دو اختیاری؛ خالی = ثبت نمی‌شه
+    var kmRaw = rawIn(f.actKm), km = kmRaw === null ? null : (isMi() ? Math.round(I.toKm(kmRaw) * 100) / 100 : kmRaw);
+    var sec = C.parseTime(f.actTime.value) || null;
+    if (km !== null && !(km >= 0.5 && km <= 100)) errs.push(fa(T('post.errKm', { min: dKm(0.5), max: Math.round(dKm(100)) })));
+    if (sec !== null && !(sec >= 60 && sec <= 86400)) errs.push(T('post.errTime'));
+    if (km && sec && !errs.length && (sec / km < 120 || sec / km > 1200)) errs.push(fa(T('post.errPace', { p: paceFmt(sec / km) })));
+    if (easy && (!rpe || (!noPace && !pace))) errs.push(T(noPace ? 'post.errRpe' : 'post.errBoth'));
+    if (errs.length) {
       err.hidden = false;
-      err.textContent = T(noPace ? 'post.errRpe' : 'post.errBoth');
+      err.textContent = errs.join(' ');
       return;
     }
     var key = f.dataset.postrunForm;
-    markDone(key);
-    state.postRuns[key] = { rpe: Number(rpe.value), pace: pace ? pace.value : null, easy: true, type: f.dataset.type, at: new Date().toISOString() };
+    if (!state.done[key]) markDone(key);
+    var log = state.doneLog[key];
+    if (km || sec) { log.actual = {}; if (km) log.actual.km = km; if (sec) log.actual.sec = sec; } else delete log.actual;
+    if (easy) state.postRuns[key] = { rpe: Number(rpe.value), pace: pace ? pace.value : null, easy: true, type: f.dataset.type, at: new Date().toISOString() };
     // سطح ۰: جلسه‌ی خیلی سخت → هفته «سخت» حساب می‌شه (مگه اینکه خود کاربر جواب داده باشه)
-    if (f.dataset.type === 'walkrun' && Number(rpe.value) >= 8) {
+    if (easy && f.dataset.type === 'walkrun' && Number(rpe.value) >= 8) {
       var zw = state.profile.zeroWeeks = state.profile.zeroWeeks || {}, wk = C.dateKey(C.weekStart(C.parseDate(key)));
       if (!zw[wk] || zw[wk].src !== 'user') zw[wk] = { feel: 'hard', src: 'rpe' };
     }

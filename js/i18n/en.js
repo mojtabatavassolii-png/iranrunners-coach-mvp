@@ -677,7 +677,22 @@
       errBoth: 'Choose the session effort and your pace.',
       errRpe: 'Choose the session effort.',
       slower10: 'Make my easy pace 10 s slower',
-      newTest: 'Log a new time trial'
+      newTest: 'Log a new time trial',
+      actTitle: 'Actual distance and time (optional)',
+      actHint: 'If you recorded this run on a watch or another app, enter the real numbers so your stats and charts are more accurate. Left empty, the planned volume is used.',
+      actKm: 'Actual distance ({u})',
+      actTime: 'Actual time',
+      actTimeHint: 'Turn the wheels; if you leave them, no time is saved.',
+      saveDone: 'Mark as done',
+      actRecorded: 'Recorded:',
+      actKmVal: '{km:d} {u}',
+      actPlan: '(plan: {km:d} {u})',
+      actPace: 'pace {p} {pu}',
+      actAdd: '+ Add actual distance and time',
+      actEdit: 'Edit distance and time',
+      errKm: 'Actual distance must be between {min} and {max} {u} (or leave it empty).',
+      errTime: 'Actual time must be between 1 minute and 24 hours.',
+      errPace: 'That time doesn\'t look right for this distance (pace {p} {pu}); please check it.'
     },
     pain: {
       cancelled: 'Today\'s session is cancelled.',
