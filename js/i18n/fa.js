@@ -639,8 +639,8 @@
     plan: { week: 'نمای هفتگی', month: 'نمای ماهانه', viewAria: 'نوع نمایش برنامه' },
     month: {
       prev: 'ماه قبل', next: 'ماه بعد', back: 'برگشت به این ماه', gridAria: 'تقویم ماه',
-      stats: '{n} جلسه · {km:d} {u} · {d} انجام‌شده',
-      statsMin: '{n} جلسه · {min} دقیقه · {d} انجام‌شده'
+      stats: 'انجام‌شده: {d} از {n} جلسه · {dkm:d} از {km:d} {u}',
+      statsMin: 'انجام‌شده: {d} از {n} جلسه · {dmin} از {min} دقیقه'
     },
     settings: {
       title: 'زبان و تقویم',
@@ -722,6 +722,9 @@
       volume: 'حجم کل',
       nKm: '{n:d} {u}',
       plannedKm: 'برنامه‌ی اصلی: {n:d} {u}',
+      doneSessions: '{n} از {total} انجام شد',
+      doneKm: '{n:d} {u} انجام شد',
+      doneMin: '{n} دقیقه انجام شد',
       plannedMin: 'برنامه‌ی اصلی: {n} دقیقه',
       vert: 'ارتفاع‌گیری: +{n} متر',
       ratio: 'نسبت آسان / سخت',

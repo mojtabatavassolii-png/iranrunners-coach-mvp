@@ -1072,3 +1072,4 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .pf-sec-head { margin: var(--sp-6) 0 var(--sp-2); }
 .pf-sec-head h2 { margin: 0; font-size: var(--fs-xl); }
 .pf-sec-head p { margin: 2px 0 0; }
+.done-tag { display: block; margin-top: 4px; font-size: var(--fs-xs); font-weight: 700; color: var(--c-easy-ink); }

@@ -641,8 +641,8 @@
     plan: { week: 'Weekly view', month: 'Monthly view', viewAria: 'Plan view' },
     month: {
       prev: 'Previous month', next: 'Next month', back: 'Back to this month', gridAria: 'Month calendar',
-      stats: { one: '{n} session · {km:d} {u} · {d} done', other: '{n} sessions · {km:d} {u} · {d} done' },
-      statsMin: { one: '{n} session · {min} min · {d} done', other: '{n} sessions · {min} min · {d} done' }
+      stats: { one: 'Done: {d} of {n} session · {dkm:d} of {km:d} {u}', other: 'Done: {d} of {n} sessions · {dkm:d} of {km:d} {u}' },
+      statsMin: { one: 'Done: {d} of {n} session · {dmin} of {min} min', other: 'Done: {d} of {n} sessions · {dmin} of {min} min' }
     },
     settings: {
       title: 'Language and calendar',
@@ -724,6 +724,9 @@
       volume: 'Total volume',
       nKm: '{n:d} {u}',
       plannedKm: 'Original plan: {n:d} {u}',
+      doneSessions: '{n} of {total} done',
+      doneKm: '{n:d} {u} done',
+      doneMin: '{n} min done',
       plannedMin: 'Original plan: {n} min',
       vert: 'Climb: +{n} m',
       ratio: 'Easy / hard ratio',

@@ -154,6 +154,23 @@
     var ci = state.checkins[base.date];
     return withCycle(C.adaptSession(base, ci, prevCheckin(base.date), C.paceZones(state.profile), { profile: state.profile, checkins: state.checkins }));
   }
+  // آمار «انجام‌شده» از داده‌ی واقعی: جلسه‌هایی که کاربر «انجام دادم» زده، با حجمی که همون لحظه ثبت شده
+  // (بعد از تطبیق با چک‌این و روزهای پریود)؛ در کنار برنامه‌ی همون بازه
+  function doneStats(list) {
+    var o = { n: 0, km: 0, min: 0, d: 0, dkm: 0, dmin: 0 };
+    var off = function (t) { return ['rest', 'none', 'cancelled'].indexOf(t) >= 0; };
+    list.forEach(function (r) {
+      var s = r.session, k = s.date;
+      if (!off(s.type)) { o.n++; o.km += s.km || 0; o.min += s.minutes || 0; }
+      // انجام‌شده: هر روزی که «انجام دادم» خورده، با همون جلسه‌ای که موقع ثبت ذخیره شده (حتی اگه برنامه بعداً جابه‌جا شده باشه)
+      if (!state.done[k]) return;
+      var log = (state.doneLog || {})[k] || s;
+      if (off(log.type)) return;
+      o.d++; o.dkm += log.km || 0; o.dmin += log.minutes || 0;
+    });
+    o.km = Math.round(o.km * 10) / 10; o.dkm = Math.round(o.dkm * 10) / 10;
+    return o;
+  }
   // جلسه‌ی جایگزین با همون روز و برچسب نوع
   function dressAlt(alt, s) {
     alt = JSON.parse(JSON.stringify(alt));
@@ -1050,20 +1067,21 @@
 
     // آمار هفته از جلسه‌های واقعی (بعد از تطبیق با چک‌این و روزهای پریود)؛ اگه با برنامه‌ی اصلی فرق داشت، اون هم نشون داده می‌شه
     var resolved = week.days.map(function (d) { return effectiveSession(d); });
-    var active = resolved.filter(function (r) { return ['rest', 'none', 'cancelled'].indexOf(r.session.type) < 0; });
-    var runDays = active.length;
-    var effKm = Math.round(active.reduce(function (x, r) { return x + (r.session.km || 0); }, 0) * 10) / 10;
-    var effMin = active.reduce(function (x, r) { return x + (r.session.minutes || 0); }, 0);
+    var ws = doneStats(resolved);
+    var runDays = ws.n, effKm = ws.km, effMin = ws.min;
     var kmChanged = Math.abs(effKm - week.totalKm) > 0.05, minChanged = effMin !== week.totalMin;
     var zero = lv.level === 0;
     html += '<div class="week-stats' + (zero ? ' week-stats-zero' : '') + '">' +
       (zero ? '<div class="stat"><span>' + esc(T('zero.stageLabel')) + '</span><b>' + tt('zero.stage', { n: (week.zeroStage || 0) + 1, total: week.zeroFinal + 1 }) + '</b></div>'
         : '<div class="stat"><span>' + esc(T('week.phase')) + ' ' + helpLink('week', T('week.phaseHelp')) + '</span><b>' + t(week.phase.label) + '</b>' +
       (week.periodLabel ? '<small class="period-tag">' + esc(week.periodLabel) + '</small>' : '') + '</div>') +
-      '<div class="stat"><span>' + esc(T('week.sessions')) + '</span><b>' + tt('week.nSessions', { n: runDays }) + '</b></div>' +
+      '<div class="stat"><span>' + esc(T('week.sessions')) + '</span><b>' + tt('week.nSessions', { n: runDays }) + '</b>' +
+        (runDays ? '<small class="done-tag">' + tt('week.doneSessions', { n: ws.d, total: runDays }) + '</small>' : '') + '</div>' +
       (isRunWalk ? '<div class="stat"><span>' + esc(T('week.totalTime')) + '</span><b>' + tt('week.nMin', { n: effMin }) + '</b>' +
+          (ws.d ? '<small class="done-tag">' + tt('week.doneMin', { n: ws.dmin }) + '</small>' : '') +
           (minChanged ? '<small class="period-tag">' + tt('week.plannedMin', { n: week.totalMin }) + '</small>' : '') + '</div>'
         : '<div class="stat"><span>' + esc(T('week.volume')) + '</span><b>' + tt('week.nKm', { n: effKm }) + '</b>' +
+          (ws.d ? '<small class="done-tag">' + tt('week.doneKm', { n: ws.dkm }) + '</small>' : '') +
           (kmChanged ? '<small class="period-tag">' + tt('week.plannedKm', { n: week.totalKm }) + '</small>' : '') +
           (week.goal && week.goal.category === 'ultra' && week.vert ? '<small class="period-tag">' + tt('week.vert', { n: week.vert }) + '</small>' : '') + '</div>') +
       (zero ? '' : '<div class="stat stat-ratio"><span>' + esc(T('week.ratio')) + ' ' + helpLink('week', T('week.ratioHelp')) + '</span><b dir="ltr">' + fa(100 - week.hardPct) + ' / ' + fa(week.hardPct) + '</b>' +
@@ -1141,15 +1159,12 @@
       var firstRun = days.filter(function (r) { return ['rest', 'none'].indexOf(r.session.type) < 0; })[0];
       selectedDay = keys.indexOf(todayKey) >= 0 ? todayKey : (firstRun || days[0]).session.date;
     }
-    var active = days.filter(function (r) { return ['rest', 'none', 'cancelled'].indexOf(r.session.type) < 0; });
-    var km = active.reduce(function (x, r) { return x + (r.session.km || 0); }, 0);
-    var min = active.reduce(function (x, r) { return x + (r.session.minutes || 0); }, 0);
-    var done = days.filter(function (r) { return state.done[r.session.date]; }).length;
+    var ms = doneStats(days);
 
     var html = '<section class="card week-card month-card"><div class="week-head">' +
       '<button type="button" class="btn btn-icon" data-month="-1" aria-label="' + esc(T('month.prev')) + '">' + prevGlyph + '</button>' +
       '<div class="week-title"><h2>' + t(I.monthTitle(C.addDays(mb.first, 14))) + '</h2>' +
-      '<p class="muted">' + tt(timeBased ? 'month.statsMin' : 'month.stats', { n: active.length, km: Math.round(km * 2) / 2, min: min, d: done }) +
+      '<p class="muted">' + tt(timeBased ? 'month.statsMin' : 'month.stats', { n: ms.n, km: ms.km, min: ms.min, d: ms.d, dkm: ms.dkm, dmin: ms.dmin }) +
       (monthOffset !== 0 ? ' · <button type="button" class="linklike" data-month="0">' + esc(T('month.back')) + '</button>' : '') + '</p></div>' +
       '<button type="button" class="btn btn-icon" data-month="1" aria-label="' + esc(T('month.next')) + '">' + nextGlyph + '</button></div>';
 
