@@ -118,6 +118,10 @@
         s += '<text class="ch-tick" x="' + axisX + '" y="' + my + '" dy="0.35em" text-anchor="' + anchor + '">' + esc(spec.markers.label) + '</text>';
       }
     }
+    // نمودار هنوز داده نداره: یک برچسب کوتاه وسط ناحیه‌ی رسم (به‌جای متن توضیحی جدا)
+    if (spec.emptyLabel) {
+      s += '<text class="ch-empty" x="' + (g.left + g.plotW / 2).toFixed(1) + '" y="' + (g.top + g.plotH / 2).toFixed(1) + '" dy="0.35em" text-anchor="middle">' + esc(spec.emptyLabel) + '</text>';
+    }
     // لایه‌ی تعامل
     s += '<line class="ch-cross" x1="0" x2="0" y1="' + g.top + '" y2="' + (g.top + g.plotH + g.stripH) + '" visibility="hidden"/>';
     s += '<rect class="ch-hit" x="' + g.left + '" y="' + g.top + '" width="' + g.plotW + '" height="' + (g.plotH + g.stripH) + '" fill="transparent"/>';

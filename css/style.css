@@ -695,14 +695,14 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .pmc-keys li { display: flex; gap: 8px; align-items: baseline; }
 .pmc-keys .ch-key { transform: translateY(-3px); }
 .pmc-keys b { color: var(--text); white-space: nowrap; }
-.p-empty { background: var(--bg); border: 1px dashed var(--field-line); border-radius: 12px; padding: 18px; color: var(--muted); margin: 0; }
-.p-empty-all { text-align: center; }
-.p-empty-all p { text-align: center; color: var(--muted); max-width: 520px; margin: 6px auto 16px; line-height: 1.9; }
+/* نمودار هنوز خالی: یک برچسب کوتاه وسط ناحیه‌ی رسم */
+.ch-empty { fill: var(--muted); font-size: var(--fs-sm); font-weight: 600; }
 .adh-hero { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .adh-hero b { font-size: var(--fs-display); font-weight: 800; line-height: 1; color: var(--text); }
 .adh-hero span { color: var(--muted); }
 .adh-bar { display: flex; gap: 2px; height: 16px; border-radius: 6px; overflow: hidden; background: #fff; }
 .adh-bar i { display: block; min-width: 4px; }
+.adh-bar.is-empty { background: var(--line); }
 .adh-legend { list-style: none; padding: 0; margin: 12px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 6px 16px; font-size: var(--fs-md); }
 .adh-legend li { display: flex; align-items: center; gap: 8px; text-align: start; }
 .adh-legend span { flex: 1; color: var(--muted); }
@@ -1103,4 +1103,4 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .tod-vals { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--fs-md); color: var(--text); }
 .tod-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .tod-bar i { display: block; height: 100%; background: var(--brand); border-radius: 3px; }
-.tod-sofar { margin: 0; }
+.tod-sofar { margin: 0 0 var(--sp-2); }

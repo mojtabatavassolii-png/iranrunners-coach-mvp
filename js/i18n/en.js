@@ -905,7 +905,7 @@
       photoPick: 'Choose a profile photo', photoRemove: 'Remove photo', photoSaved: 'Profile photo saved.',
       photoBad: 'This image can\'t be read; please choose another photo.', photoFull: 'Browser storage is full; the photo wasn\'t saved.',
       noName: 'Runner', noNameHint: 'Add your name in {link}.', noNameLink: 'Edit profile',
-      charts: { title: 'Training summary', sub: 'Last {n} weeks', empty: 'Your training charts will appear here after a few completed sessions.', more: 'All charts', moreSub: 'Pace, check-ins and other time ranges on the Progress page' },
+      charts: { title: 'Training summary', sub: 'Last {n} weeks', more: 'All charts', moreSub: 'Pace, check-ins and other time ranges on the Progress page' },
       levelNum: '{n} of 10', goalIn: { one: '{n} day to go', other: '{n} days to go' }, fitnessSub: 'log a time trial or new result',
       editHint: 'If your level, training volume or circumstances have changed, fill in the form again so the plan updates.',
       cycleLast: 'Last period started: {d}',
@@ -1013,8 +1013,6 @@
       intro: 'Every chart is built from your own data: the sessions you marked done, your daily check-ins, the RPE you logged after runs, and your race results and time trials.',
       rangeAria: 'Chart time range',
       r4w: 'Last 4 weeks', r3m: 'Last 3 months', rAll: 'From the start',
-      emptyAll: 'After a few weeks of training, your progress charts will appear here. Mark each run as done and fill in your daily check-in so the data builds up.',
-      emptyCta: 'Go to the plan',
       table: 'Show data table',
       date: 'Date', week: 'Week',
       weekOf: 'Week of {d}',
@@ -1024,7 +1022,7 @@
         title: 'Weekly volume', desc: 'Distance from completed sessions each week, with a 4-week moving average.',
         bars: 'Weekly {u}', ma: '4-week average', thisWeek: 'This week (so far)', avg4: '4-week average', trend: 'Trend',
         up: 'Rising', down: 'Falling', flat: 'Steady', unit: '{u}', val: '{n} {u}',
-        empty: 'After two weeks of logged training, your volume trend will appear here.'
+        empty: 'Fills in as you log runs'
       },
       pmc: {
         title: 'Fitness and fatigue', desc: 'The standard CTL / ATL / TSB model. Each session\'s load = duration (minutes) × perceived effort (RPE).',
@@ -1034,31 +1032,31 @@
         tsbDesc: 'Fitness minus fatigue; positive means you\'re fresh, negative means fatigue has built up.',
         fresh: 'Fresh and ready', neutral: 'Balanced', tired: 'Fatigue building', veryTired: 'Heavy fatigue; take recovery seriously',
         load: 'Session load', unit: 'load',
-        empty: 'After two weeks of logged training, your fitness and fatigue chart will appear here.'
+        empty: 'Fills in as you log runs'
       },
       pace: {
         title: 'Pace improvement', desc: 'Easy, tempo and interval paces from the VDOT of each race result or time trial. Higher on the chart = faster.',
         e: 'Easy', t: 'Tempo', i: 'Interval', vdot: 'VDOT', unit: '{pu}', faster: '↑ faster',
         diffFaster: '{n} s faster', diffSlower: '{n} s slower', diffSame: 'No change', newTest: 'New result or time trial',
-        empty: 'You need at least two race results or time trials to see a pace trend. Log a time trial on the Fitness page every 4–6 weeks.'
+        empty: 'Fills in with a race result or time trial'
       },
       checkins: {
         title: 'Check-in trends', desc: 'Fatigue and sleep quality (1–5) and the days you reported pain; useful for spotting recurring patterns.',
         fatigue: 'Fatigue', sleep: 'Sleep quality', pain: 'Pain', painYes: 'Pain reported',
         avgF: 'Average fatigue', avgS: 'Average sleep', painDays: 'Pain days', of5: '{n} of 5',
         weeklyAvg: 'weekly average', painN: { one: '{n} pain day', other: '{n} pain days' },
-        empty: 'After a few daily check-ins, your fatigue and sleep trends will appear here.'
+        empty: 'Fills in with daily check-ins'
       },
       pred: {
         title: '{race} prediction trend', desc: 'Each week\'s prediction from your latest result or time trial up to that week. Higher on the chart = faster.',
         riegel: 'Riegel formula', vdot: 'VDOT tables', now: 'Current prediction (Riegel)', delta: 'Change in this range',
         better: '{t} faster', worse: '{t} slower', same: 'No change',
-        empty: 'You need at least two race results or time trials to see the prediction trend.'
+        empty: 'Fills in with a race result or time trial'
       },
       vert: {
         title: 'Weekly climbing', desc: 'Metres of ascent from completed sessions each week, with a 4-week moving average.',
         bars: 'Weekly ascent', ma: '4-week average', unit: 'm', val: '{n} m', thisWeek: 'This week (so far)', avg4: '4-week average',
-        empty: 'After two weeks of logged training, your climbing trend will appear here.'
+        empty: 'Fills in as you log runs'
       },
       tod: {
         title: 'Morning or evening?',
@@ -1066,8 +1064,7 @@
         slot: { morning: 'Mornings', afternoon: 'Afternoons', evening: 'Evenings' },
         slotS: { morning: 'mornings', afternoon: 'afternoons', evening: 'evenings' },
         range: { morning: 'before 12:00', afternoon: '12:00 to 17:00', evening: 'from 17:00' },
-        empty: 'For this analysis, record the start time of at least {n} easy or long runs in two different parts of the day (in "Mark as done", with actual distance and time).',
-        sofar: { one: '{n} run with a start time so far.', other: '{n} runs with a start time so far.' },
+        empty: 'To compare, log the start time of at least {n} easy or long runs in two parts of the day (in "I did it").',
         better: 'You run better in the {best} than in the {next}.',
         same: 'No meaningful difference between {a} and {b}; run whenever suits you.',
         paceDiff: 'your easy pace is {n} s per {u} faster on average',
@@ -1081,7 +1078,7 @@
         title: 'Plan adherence', desc: 'Of the sessions planned in this range (up to today), how many you actually did.',
         rate: 'completed', of: '{n} of {total} sessions', count: { one: '{n} session ({p}%)', other: '{n} sessions ({p}%)' }, pct: '{n}%',
         completed: 'As planned', adapted: 'Adapted (fatigue, sleep or cycle)', pain: 'Cancelled for pain', missed: 'Not done',
-        empty: 'There are no past sessions in this range yet.'
+        empty: 'No past sessions yet'
       }
     },
 
