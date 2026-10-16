@@ -883,6 +883,7 @@
       photoPick: 'Choose a profile photo', photoRemove: 'Remove photo', photoSaved: 'Profile photo saved.',
       photoBad: 'This image can\'t be read; please choose another photo.', photoFull: 'Browser storage is full; the photo wasn\'t saved.',
       noName: 'Runner', noNameHint: 'Add your name in {link}.', noNameLink: 'Edit profile',
+      charts: { title: 'Training summary', sub: 'Last {n} weeks', empty: 'Your training charts will appear here after a few completed sessions.', more: 'All charts', moreSub: 'Pace, check-ins and other time ranges on the Progress page' },
       levelNum: '{n} of 10', goalIn: { one: '{n} day to go', other: '{n} days to go' }, fitnessSub: 'log a time trial or new result',
       editHint: 'If your level, training volume or circumstances have changed, fill in the form again so the plan updates.',
       cycleLast: 'Last period started: {d}',

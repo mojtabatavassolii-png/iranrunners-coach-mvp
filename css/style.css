@@ -1067,3 +1067,8 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .period-opts button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
 .period-opts button[aria-pressed="true"] small { color: #fff; }
 .period-opts button:hover:not([aria-pressed="true"]) { border-color: var(--brand); }
+
+/* ---------- خلاصه‌ی تمرین پایین پروفایل ---------- */
+.pf-sec-head { margin: var(--sp-6) 0 var(--sp-2); }
+.pf-sec-head h2 { margin: 0; font-size: var(--fs-xl); }
+.pf-sec-head p { margin: 2px 0 0; }

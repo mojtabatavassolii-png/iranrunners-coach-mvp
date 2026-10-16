@@ -1746,84 +1746,15 @@
       return;
     }
     var W = a.weeks, wkWithRuns = W.filter(function (w) { return w.runs > 0; }).length;
+    var pc = progCtx(a);
 
-    // ---- ۱. حجم هفتگی ----
-    (function () {
-      var body;
-      if (wkWithRuns < 2) body = emptyNote(T('progress.vol.empty'));
-      else {
-        var cur = W[W.length - 1], full = W.filter(function (w) { return !w.partial; });
-        var ma = full.length ? full[full.length - 1].maKm : null, maPrev = full.length > 4 ? full[full.length - 5].maKm : null;
-        var trend = ma != null && maPrev ? (ma > maPrev * 1.05 ? 'up' : ma < maPrev * 0.95 ? 'down' : 'flat') : null;
-        body = '<div class="pstats">' + statTile(T('progress.vol.thisWeek'), tt('progress.vol.val', { n: kmTxt(cur.km) })) +
-          (ma != null ? statTile(T('progress.vol.avg4'), tt('progress.vol.val', { n: kmTxt(ma) })) : '') +
-          (trend ? statTile(T('progress.vol.trend'), (trend === 'up' ? '↗ ' : trend === 'down' ? '↘ ' : '→ ') + esc(T('progress.vol.' + trend))) : '') + '</div>' +
-          '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.vol.bars'), 'bar') + legendItem(SERIES[1], T('progress.vol.ma')) + '</div>' +
-          chartBox('vol', {
-            rtl: rtl, n: W.length, aria: T('progress.vol.title'),
-            y: { min: 0, max: Math.max.apply(null, W.map(function (w) { return dKm(w.km); }).concat([isMi() ? 3 : 5])), fmt: fa, label: T('progress.vol.unit') },
-            bars: { values: W.map(function (w) { return dKm(w.km); }), color: SERIES[0], faded: W.map(function (w) { return w.partial; }) },
-            lines: [{ values: W.map(function (w) { return w.maKm == null ? null : dKm(w.maKm); }), color: SERIES[1], dots: 'last' }],
-            xLabels: function (i) { return weekLabel(W[i].start); }, xPx: 52,
-            tip: function (i) {
-              var w = W[i];
-              return { title: tt('progress.weekOf', { d: weekLabel(w.start) }) + (w.partial ? SEP + T('progress.partialTag') : ''), rows: [
-                { color: SERIES[0], kind: 'bar', label: T('progress.vol.bars'), value: T('progress.vol.val', { n: kmTxt(w.km) }) },
-                { color: SERIES[1], label: T('progress.vol.ma'), value: w.maKm != null ? T('progress.vol.val', { n: kmTxt(w.maKm) }) : '—' }] };
-            }
-          }) +
-          dataTable([T('progress.week'), T('progress.vol.bars'), T('progress.vol.ma')], W.map(function (w) {
-            return [esc(weekLabel(w.start)) + (w.partial ? ' <small class="muted">(' + esc(T('progress.partialTag')) + ')</small>' : ''), kmTxt(w.km), w.maKm != null ? kmTxt(w.maKm) : '—'];
-          }));
-      }
-      html += progCard('vol', T('progress.vol.title'), T('progress.vol.desc'), body, learnMore(['tenpct']));
-    })();
+    html += progVolCard(pc);
 
-    // ---- ۲. فیتنس و خستگی (CTL / ATL / TSB) ----
-    (function () {
-      var D = a.pmc, body;
-      if (D.length < 14 || a.runsDone < 3) body = emptyNote(T('progress.pmc.empty'));
-      else {
-        var last = D[D.length - 1], tsb = last.tsb;
-        var rel = last.ctl ? tsb / last.ctl : 0;
-        var st = rel > 0.05 ? 'fresh' : rel > -0.1 ? 'neutral' : rel > -0.3 ? 'tired' : 'veryTired';
-        var vals = [];
-        D.forEach(function (d) { vals.push(d.ctl, d.atl, d.tsb); });
-        var r1 = function (x) { return fa(Math.round(x)); };
-        body = '<div class="pstats">' + statTile(T('progress.pmc.ctl'), r1(last.ctl)) + statTile(T('progress.pmc.atl'), r1(last.atl)) +
-          statTile(T('progress.pmc.tsb'), signed(tsb), esc(T('progress.pmc.' + st))) + '</div>' +
-          '<ul class="pmc-keys">' +
-          [['ctl', 0], ['atl', 1], ['tsb', 2]].map(function (k) {
-            return '<li><i class="ch-key ch-key-line" style="background:' + SERIES[k[1]] + '"></i><b>' + esc(T('progress.pmc.' + k[0])) + ':</b> ' + esc(T('progress.pmc.' + k[0] + 'Desc')) + '</li>';
-          }).join('') + '</ul>' +
-          chartBox('pmc', {
-            rtl: rtl, n: D.length, aria: T('progress.pmc.title'), zero: true,
-            y: { min: Math.min(0, Math.min.apply(null, vals)), max: Math.max.apply(null, vals), fmt: function (v) { return v < 0 ? '−' + fa(-v) : fa(v); }, label: T('progress.pmc.unit') },
-            lines: [{ values: D.map(function (d) { return d.ctl; }), color: SERIES[0], dots: 'last' },
-              { values: D.map(function (d) { return d.atl; }), color: SERIES[1], dots: 'last' },
-              { values: D.map(function (d) { return d.tsb; }), color: SERIES[2], dots: 'last' }],
-            xLabels: function (i) { return faDate(D[i].date, true); }, xPx: 52,
-            tip: function (i) {
-              var d = D[i];
-              return { title: faDate(d.date) + (d.load ? SEP + T('progress.pmc.load') + ' ' + fa(d.load) : ''), rows: [
-                { color: SERIES[0], label: T('progress.pmc.ctl'), value: fa(Math.round(d.ctl)) },
-                { color: SERIES[1], label: T('progress.pmc.atl'), value: fa(Math.round(d.atl)) },
-                { color: SERIES[2], label: T('progress.pmc.tsb'), value: signed(d.tsb) }] };
-            }
-          }) +
-          dataTable([T('progress.date'), T('progress.pmc.load'), 'CTL', 'ATL', 'TSB'], D.filter(function (d, i) { return i % 7 === (D.length - 1) % 7; }).map(function (d) {
-            return [esc(faDate(d.date, true)), fa(d.load), fa(Math.round(d.ctl)), fa(Math.round(d.atl)), signed(d.tsb)];
-          }));
-      }
-      html += progCard('pmc', T('progress.pmc.title'), T('progress.pmc.desc'), body, learnMore(['rpe', 'eighty']));
-    })();
+    html += progPmcCard(pc);
 
     // ---- ۳. بهبود پیس ----
     // پیس‌ها به ثانیه در واحد کاربر (کیلومتر یا مایل)
-    var S = a.samples.filter(function (s) { return s.vdot; }).map(function (s) {
-      return Object.assign({}, s, { e: I.pace(s.e), t: I.pace(s.t), i: I.pace(s.i) });
-    });
-    var changed = S.length > 1 && S.some(function (s) { return s.entry !== S[0].entry; });
+    var S = pc.S, changed = pc.changed;
     (function () {
       var body;
       if (a.entriesCount < 2 || !changed) body = emptyNote(T('progress.pace.empty'));
@@ -1919,41 +1850,7 @@
       html += progCard('ck', T('progress.checkins.title'), T('progress.checkins.desc'), body);
     })();
 
-    // ---- ۵. پیش‌بینی زمان مسابقه (فقط هدف جاده‌ای با مسافت مشخص) ----
-    if (a.goal.km && !a.goal.ultra) (function () {
-      var race = C.RACE_LABELS[a.goal.type], body;
-      var P = S.filter(function (s) { return s.riegel; });
-      if (a.entriesCount < 2 || !changed || P.length < 2) body = emptyNote(T('progress.pred.empty'));
-      else {
-        var f = P[0], l = P[P.length - 1], dlt = l.riegel - f.riegel;
-        var vals = [];
-        P.forEach(function (s) { vals.push(s.riegel, s.vdotTime); });
-        var dTxt = Math.abs(dlt) < 1 ? T('progress.pred.same') : T(dlt < 0 ? 'progress.pred.better' : 'progress.pred.worse', { t: C.formatDuration(Math.round(Math.abs(dlt))) });
-        var marked = P.map(function (s, i) { return i === 0 || s.entry !== P[i - 1].entry; });
-        body = '<div class="pstats">' + statTile(T('progress.pred.now'), '<span dir="ltr">' + fa(C.formatDuration(Math.round(l.riegel))) + '</span>') +
-          statTile(T('progress.pred.delta'), fa(dTxt)) + '</div>' +
-          '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.pred.riegel')) + legendItem(SERIES[1], T('progress.pred.vdot')) +
-          '<span class="lg-item lg-note">' + esc(T('progress.pace.faster')) + '</span></div>' +
-          chartBox('pred', {
-            rtl: rtl, n: P.length, aria: T('progress.pred.title', { race: race }),
-            y: { min: Math.min.apply(null, vals) - 10, max: Math.max.apply(null, vals) + 10, invert: true, fmt: function (v) { return fa(C.formatDuration(Math.round(v))); } },
-            axisWidth: 58,
-            lines: [{ values: P.map(function (s) { return s.riegel; }), color: SERIES[0], step: true, dots: 'marked', marked: marked },
-              { values: P.map(function (s) { return s.vdotTime; }), color: SERIES[1], step: true, dots: 'marked', marked: marked }],
-            xLabels: function (i) { return faDate(P[i].date, true); }, xPx: 52,
-            tip: function (i) {
-              var s = P[i];
-              return { title: faDate(s.date), rows: [
-                { color: SERIES[0], label: T('progress.pred.riegel'), value: fa(C.formatDuration(Math.round(s.riegel))) },
-                { color: SERIES[1], label: T('progress.pred.vdot'), value: fa(C.formatDuration(Math.round(s.vdotTime))) }] };
-            }
-          }) +
-          dataTable([T('progress.date'), T('progress.pred.riegel'), T('progress.pred.vdot')], P.filter(function (s, i) { return marked[i]; }).map(function (s) {
-            return [esc(faDate(s.entry, true)), fa(C.formatDuration(Math.round(s.riegel))), fa(C.formatDuration(Math.round(s.vdotTime)))];
-          }));
-      }
-      html += progCard('pred', T('progress.pred.title', { race: race }), T('progress.pred.desc'), body, learnMore(['vdot']));
-    })();
+    html += progPredCard(pc);
 
     // ---- ۶. صعود هفتگی (هدف تریل/اولترا) ----
     if (a.goal.ultra) (function () {
@@ -1984,28 +1881,148 @@
       html += progCard('vert', T('progress.vert.title'), T('progress.vert.desc'), body, learnMore(['types']));
     })();
 
-    // ---- ۷. پایبندی به برنامه ----
-    (function () {
-      var A = a.adherence, body;
-      if (!A.planned) body = emptyNote(T('progress.adh.empty'));
-      else {
-        var keys = ['completed', 'adapted', 'pain', 'missed'];
-        var pct = function (n) { return Math.round(n / A.planned * 100); };
-        var doneN = A.completed + A.adapted;
-        body = '<div class="adh-hero"><b dir="ltr">' + tt('progress.adh.pct', { n: pct(doneN) }) + '</b><span>' + esc(T('progress.adh.rate')) + SEP + tt('progress.adh.of', { n: doneN, total: A.planned }) + '</span></div>' +
-          '<div class="adh-bar" role="img" aria-label="' + esc(keys.map(function (k) { return T('progress.adh.' + k) + ' ' + pct(A[k]) + '%'; }).join('، ')) + '">' +
-          keys.filter(function (k) { return A[k]; }).map(function (k) {
-            return '<i title="' + esc(T('progress.adh.' + k)) + '" style="flex:' + A[k] + ';background:' + STATUS[k] + '"></i>';
-          }).join('') + '</div>' +
-          '<ul class="adh-legend">' + keys.map(function (k) {
-            return '<li><i class="ch-key ch-key-bar" style="background:' + STATUS[k] + '"></i><span>' + esc(T('progress.adh.' + k)) + '</span><b>' + tt('progress.adh.count', { n: A[k], p: pct(A[k]) }) + '</b></li>';
-          }).join('') + '</ul>';
-      }
-      html += progCard('adh', T('progress.adh.title'), T('progress.adh.desc'), body);
-    })();
+    html += progAdhCard(pc);
 
     app.innerHTML = html;
     drawCharts();
+  }
+  // ---------- کارت‌های نمودار مشترک (صفحه‌ی پیشرفت و پایین پروفایل) ----------
+  function progCtx(a) {
+    var W = a.weeks;
+    // پیس‌ها به ثانیه در واحد کاربر (کیلومتر یا مایل)
+    var S = a.samples.filter(function (s) { return s.vdot; }).map(function (s) {
+      return Object.assign({}, s, { e: I.pace(s.e), t: I.pace(s.t), i: I.pace(s.i) });
+    });
+    return { a: a, W: W, wkWithRuns: W.filter(function (w) { return w.runs > 0; }).length, rtl: isRtl(), SEP: T('progress.sep'),
+      S: S, changed: S.length > 1 && S.some(function (s) { return s.entry !== S[0].entry; }) };
+  }
+  // ۱. حجم هفتگی
+  function progVolCard(c) {
+    var a = c.a, W = c.W, wkWithRuns = c.wkWithRuns, rtl = c.rtl, SEP = c.SEP, S = c.S, changed = c.changed;
+    var body;
+    if (wkWithRuns < 2) body = emptyNote(T('progress.vol.empty'));
+    else {
+      var cur = W[W.length - 1], full = W.filter(function (w) { return !w.partial; });
+      var ma = full.length ? full[full.length - 1].maKm : null, maPrev = full.length > 4 ? full[full.length - 5].maKm : null;
+      var trend = ma != null && maPrev ? (ma > maPrev * 1.05 ? 'up' : ma < maPrev * 0.95 ? 'down' : 'flat') : null;
+      body = '<div class="pstats">' + statTile(T('progress.vol.thisWeek'), tt('progress.vol.val', { n: kmTxt(cur.km) })) +
+        (ma != null ? statTile(T('progress.vol.avg4'), tt('progress.vol.val', { n: kmTxt(ma) })) : '') +
+        (trend ? statTile(T('progress.vol.trend'), (trend === 'up' ? '↗ ' : trend === 'down' ? '↘ ' : '→ ') + esc(T('progress.vol.' + trend))) : '') + '</div>' +
+        '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.vol.bars'), 'bar') + legendItem(SERIES[1], T('progress.vol.ma')) + '</div>' +
+        chartBox('vol', {
+          rtl: rtl, n: W.length, aria: T('progress.vol.title'),
+          y: { min: 0, max: Math.max.apply(null, W.map(function (w) { return dKm(w.km); }).concat([isMi() ? 3 : 5])), fmt: fa, label: T('progress.vol.unit') },
+          bars: { values: W.map(function (w) { return dKm(w.km); }), color: SERIES[0], faded: W.map(function (w) { return w.partial; }) },
+          lines: [{ values: W.map(function (w) { return w.maKm == null ? null : dKm(w.maKm); }), color: SERIES[1], dots: 'last' }],
+          xLabels: function (i) { return weekLabel(W[i].start); }, xPx: 52,
+          tip: function (i) {
+            var w = W[i];
+            return { title: tt('progress.weekOf', { d: weekLabel(w.start) }) + (w.partial ? SEP + T('progress.partialTag') : ''), rows: [
+              { color: SERIES[0], kind: 'bar', label: T('progress.vol.bars'), value: T('progress.vol.val', { n: kmTxt(w.km) }) },
+              { color: SERIES[1], label: T('progress.vol.ma'), value: w.maKm != null ? T('progress.vol.val', { n: kmTxt(w.maKm) }) : '—' }] };
+          }
+        }) +
+        dataTable([T('progress.week'), T('progress.vol.bars'), T('progress.vol.ma')], W.map(function (w) {
+          return [esc(weekLabel(w.start)) + (w.partial ? ' <small class="muted">(' + esc(T('progress.partialTag')) + ')</small>' : ''), kmTxt(w.km), w.maKm != null ? kmTxt(w.maKm) : '—'];
+        }));
+    }
+    return progCard('vol', T('progress.vol.title'), T('progress.vol.desc'), body, learnMore(['tenpct']));
+  }
+  // ۲. فیتنس و خستگی (CTL / ATL / TSB)
+  function progPmcCard(c) {
+    var a = c.a, W = c.W, wkWithRuns = c.wkWithRuns, rtl = c.rtl, SEP = c.SEP, S = c.S, changed = c.changed;
+    var D = a.pmc, body;
+    if (D.length < 14 || a.runsDone < 3) body = emptyNote(T('progress.pmc.empty'));
+    else {
+      var last = D[D.length - 1], tsb = last.tsb;
+      var rel = last.ctl ? tsb / last.ctl : 0;
+      var st = rel > 0.05 ? 'fresh' : rel > -0.1 ? 'neutral' : rel > -0.3 ? 'tired' : 'veryTired';
+      var vals = [];
+      D.forEach(function (d) { vals.push(d.ctl, d.atl, d.tsb); });
+      var r1 = function (x) { return fa(Math.round(x)); };
+      body = '<div class="pstats">' + statTile(T('progress.pmc.ctl'), r1(last.ctl)) + statTile(T('progress.pmc.atl'), r1(last.atl)) +
+        statTile(T('progress.pmc.tsb'), signed(tsb), esc(T('progress.pmc.' + st))) + '</div>' +
+        '<ul class="pmc-keys">' +
+        [['ctl', 0], ['atl', 1], ['tsb', 2]].map(function (k) {
+          return '<li><i class="ch-key ch-key-line" style="background:' + SERIES[k[1]] + '"></i><b>' + esc(T('progress.pmc.' + k[0])) + ':</b> ' + esc(T('progress.pmc.' + k[0] + 'Desc')) + '</li>';
+        }).join('') + '</ul>' +
+        chartBox('pmc', {
+          rtl: rtl, n: D.length, aria: T('progress.pmc.title'), zero: true,
+          y: { min: Math.min(0, Math.min.apply(null, vals)), max: Math.max.apply(null, vals), fmt: function (v) { return v < 0 ? '−' + fa(-v) : fa(v); }, label: T('progress.pmc.unit') },
+          lines: [{ values: D.map(function (d) { return d.ctl; }), color: SERIES[0], dots: 'last' },
+            { values: D.map(function (d) { return d.atl; }), color: SERIES[1], dots: 'last' },
+            { values: D.map(function (d) { return d.tsb; }), color: SERIES[2], dots: 'last' }],
+          xLabels: function (i) { return faDate(D[i].date, true); }, xPx: 52,
+          tip: function (i) {
+            var d = D[i];
+            return { title: faDate(d.date) + (d.load ? SEP + T('progress.pmc.load') + ' ' + fa(d.load) : ''), rows: [
+              { color: SERIES[0], label: T('progress.pmc.ctl'), value: fa(Math.round(d.ctl)) },
+              { color: SERIES[1], label: T('progress.pmc.atl'), value: fa(Math.round(d.atl)) },
+              { color: SERIES[2], label: T('progress.pmc.tsb'), value: signed(d.tsb) }] };
+          }
+        }) +
+        dataTable([T('progress.date'), T('progress.pmc.load'), 'CTL', 'ATL', 'TSB'], D.filter(function (d, i) { return i % 7 === (D.length - 1) % 7; }).map(function (d) {
+          return [esc(faDate(d.date, true)), fa(d.load), fa(Math.round(d.ctl)), fa(Math.round(d.atl)), signed(d.tsb)];
+        }));
+    }
+    return progCard('pmc', T('progress.pmc.title'), T('progress.pmc.desc'), body, learnMore(['rpe', 'eighty']));
+  }
+  // ۵. پیش‌بینی زمان مسابقه (فقط هدف جاده‌ای با مسافت مشخص)
+  function progPredCard(c) {
+    var a = c.a, W = c.W, wkWithRuns = c.wkWithRuns, rtl = c.rtl, SEP = c.SEP, S = c.S, changed = c.changed;
+    if (!(a.goal.km && !a.goal.ultra)) return '';
+    var race = C.RACE_LABELS[a.goal.type], body;
+    var P = S.filter(function (s) { return s.riegel; });
+    if (a.entriesCount < 2 || !changed || P.length < 2) body = emptyNote(T('progress.pred.empty'));
+    else {
+      var f = P[0], l = P[P.length - 1], dlt = l.riegel - f.riegel;
+      var vals = [];
+      P.forEach(function (s) { vals.push(s.riegel, s.vdotTime); });
+      var dTxt = Math.abs(dlt) < 1 ? T('progress.pred.same') : T(dlt < 0 ? 'progress.pred.better' : 'progress.pred.worse', { t: C.formatDuration(Math.round(Math.abs(dlt))) });
+      var marked = P.map(function (s, i) { return i === 0 || s.entry !== P[i - 1].entry; });
+      body = '<div class="pstats">' + statTile(T('progress.pred.now'), '<span dir="ltr">' + fa(C.formatDuration(Math.round(l.riegel))) + '</span>') +
+        statTile(T('progress.pred.delta'), fa(dTxt)) + '</div>' +
+        '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.pred.riegel')) + legendItem(SERIES[1], T('progress.pred.vdot')) +
+        '<span class="lg-item lg-note">' + esc(T('progress.pace.faster')) + '</span></div>' +
+        chartBox('pred', {
+          rtl: rtl, n: P.length, aria: T('progress.pred.title', { race: race }),
+          y: { min: Math.min.apply(null, vals) - 10, max: Math.max.apply(null, vals) + 10, invert: true, fmt: function (v) { return fa(C.formatDuration(Math.round(v))); } },
+          axisWidth: 58,
+          lines: [{ values: P.map(function (s) { return s.riegel; }), color: SERIES[0], step: true, dots: 'marked', marked: marked },
+            { values: P.map(function (s) { return s.vdotTime; }), color: SERIES[1], step: true, dots: 'marked', marked: marked }],
+          xLabels: function (i) { return faDate(P[i].date, true); }, xPx: 52,
+          tip: function (i) {
+            var s = P[i];
+            return { title: faDate(s.date), rows: [
+              { color: SERIES[0], label: T('progress.pred.riegel'), value: fa(C.formatDuration(Math.round(s.riegel))) },
+              { color: SERIES[1], label: T('progress.pred.vdot'), value: fa(C.formatDuration(Math.round(s.vdotTime))) }] };
+          }
+        }) +
+        dataTable([T('progress.date'), T('progress.pred.riegel'), T('progress.pred.vdot')], P.filter(function (s, i) { return marked[i]; }).map(function (s) {
+          return [esc(faDate(s.entry, true)), fa(C.formatDuration(Math.round(s.riegel))), fa(C.formatDuration(Math.round(s.vdotTime)))];
+        }));
+    }
+    return progCard('pred', T('progress.pred.title', { race: race }), T('progress.pred.desc'), body, learnMore(['vdot']));
+  }
+  // ۷. پایبندی به برنامه
+  function progAdhCard(c) {
+    var a = c.a, W = c.W, wkWithRuns = c.wkWithRuns, rtl = c.rtl, SEP = c.SEP, S = c.S, changed = c.changed;
+    var A = a.adherence, body;
+    if (!A.planned) body = emptyNote(T('progress.adh.empty'));
+    else {
+      var keys = ['completed', 'adapted', 'pain', 'missed'];
+      var pct = function (n) { return Math.round(n / A.planned * 100); };
+      var doneN = A.completed + A.adapted;
+      body = '<div class="adh-hero"><b dir="ltr">' + tt('progress.adh.pct', { n: pct(doneN) }) + '</b><span>' + esc(T('progress.adh.rate')) + SEP + tt('progress.adh.of', { n: doneN, total: A.planned }) + '</span></div>' +
+        '<div class="adh-bar" role="img" aria-label="' + esc(keys.map(function (k) { return T('progress.adh.' + k) + ' ' + pct(A[k]) + '%'; }).join('، ')) + '">' +
+        keys.filter(function (k) { return A[k]; }).map(function (k) {
+          return '<i title="' + esc(T('progress.adh.' + k)) + '" style="flex:' + A[k] + ';background:' + STATUS[k] + '"></i>';
+        }).join('') + '</div>' +
+        '<ul class="adh-legend">' + keys.map(function (k) {
+          return '<li><i class="ch-key ch-key-bar" style="background:' + STATUS[k] + '"></i><span>' + esc(T('progress.adh.' + k)) + '</span><b>' + tt('progress.adh.count', { n: A[k], p: pct(A[k]) }) + '</b></li>';
+        }).join('') + '</ul>';
+    }
+    return progCard('adh', T('progress.adh.title'), T('progress.adh.desc'), body);
   }
   // رسم بعد از قرار گرفتن در صفحه (عرض واقعی کادر) و دوباره با تغییر اندازه
   function drawCharts() {
@@ -2389,6 +2406,7 @@
 
   // ---------- پروفایل: فقط عکس، نام، سطح، هدف و ورود به تنظیمات ----------
   function renderProfile() {
+    chartSpecs = {};
     var p = state.profile, lv = C.assessLevel(p), g = C.goalInfo(p), race = C.raceInfo(p), now = today();
     // نام کامل (نام خانوادگی از مرحله‌ی ۱ فرم)
     var name = [p.name, p.lastName].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' '), hasPhoto = !!getAvatar();
@@ -2408,7 +2426,21 @@
       // تنظیمات اقدام اصلی نیست؛ مرجانی فقط برای اقدام اصلی
       '<a class="btn btn-outline btn-big btn-block pf-settings" href="#settings">' +
       '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>' +
-      esc(T('settingsPage.title')) + '</a></section>' + periodCard(p, now, race);
+      esc(T('settingsPage.title')) + '</a></section>' + periodCard(p, now, race) + profileCharts(now);
+    drawCharts();
+  }
+  // خلاصه‌ی تمرین پایین پروفایل (شبیه استراوا): ۱۲ هفته‌ی اخیر؛ همون کارت‌های صفحه‌ی پیشرفت
+  var PROFILE_WEEKS = 12;
+  function profileCharts(now) {
+    var a = C.analytics(state, now, PROFILE_WEEKS * 7);
+    var head = '<header class="pf-sec-head"><h2>' + esc(T('profile.charts.title')) + '</h2><p class="small muted">' + esc(T('profile.charts.sub', { n: PROFILE_WEEKS })) + '</p></header>';
+    if (!a || (!a.runsDone && !a.checkins.length)) {
+      return head + '<section class="card p-empty-all"><p>' + esc(T('profile.charts.empty')) + '</p><a class="btn btn-outline" href="#plan">' + esc(T('progress.emptyCta')) + '</a></section>';
+    }
+    // پیش‌بینی مسابقه از کل تاریخچه‌ی تست‌ها، نه فقط ۱۲ هفته
+    var all = C.analytics(state, now, null);
+    return head + progVolCard(progCtx(a)) + progPmcCard(progCtx(a)) + progAdhCard(progCtx(a)) + progPredCard(progCtx(all)) +
+      linkCard('#progress', T('profile.charts.more'), T('profile.charts.moreSub'));
   }
   // تمرین در روزهای پریود: پیش‌فرض + تغییر دستی فقط برای یک دوره‌ی مشخص (مثلاً نزدیک مسابقه)
   function periodCard(p, now, race) {
