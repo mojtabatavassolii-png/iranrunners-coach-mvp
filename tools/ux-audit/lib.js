@@ -42,6 +42,7 @@ const SCREENS = [
   ['learn', '#learn', async () => {}],
   ['learn-article', '#learn/vdot', async () => {}],
   ['guide', '#guide', async () => {}],
+  ['race', '#race', async () => {}],
   // فرم بعد از «انجامش دادم» (مسافت و زمان واقعی + سؤال‌های ایزی ران) روی یک ایزی ران انجام‌نشده‌ی هفته‌ی قبل
   ['plan-doneform', '#plan', async (p) => {
     await setPlanView(p, 'week');

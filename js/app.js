@@ -89,7 +89,7 @@
   function uShort() { return T('units.short.' + I.getUnits()); }
   function dKm(km) { return I.dist(km); }
   // بازه‌ی مجاز ورودی‌ها به واحد کاربر
-  var LIM = { vol: [[0, 400], [0, 250]], ultra: [[10, 400], [6, 250]], dist: [[1, 100], [0.6, 62]] };
+  var LIM = { vol: [[0, 400], [0, 250]], ultra: [[10, 400], [6, 250]], dist: [[1, 100], [0.6, 62]], race: [[1, 250], [0.6, 155]] };
   function lim(k) { return LIM[k][isMi() ? 1 : 0]; }
   function limAttrs(k, step) { var l = lim(k); return ' min="' + l[0] + '" max="' + l[1] + '" step="' + (isMi() ? '0.1' : step) + '"'; }
   // مقدار اولیه‌ی فیلد: عدد به واحد کاربر + کیلومتر اصلی (تا اگه کاربر دست نزد، عدد دقیق حفظ بشه)
@@ -325,11 +325,11 @@
   }, true);
   document.addEventListener('click', function (e) {
     var f = e.target.closest && e.target.closest('[data-onb-focus]');
-    if (f) pendingFocus = f.dataset.onbFocus === 'cycle' ? 'cycle-fieldset' : null;
+    if (f) pendingFocus = f.dataset.onbFocus === 'cycle' ? 'cycle-fieldset' : f.dataset.onbFocus === 'goal' ? 'gtype' : null;
     if (e.target.closest && e.target.closest('[data-focus-period]')) pendingFocus = 'period-card';
   }, true);
   // صفحه‌های فرعی: نوار برگشت بالای صفحه (برگشت واقعی تاریخچه، وگرنه تب مادر)
-  var SUB_PAGES = { checkin: '#home', race: '#home', fitness: '#progress', guide: '#learn', settings: '#profile' };
+  var SUB_PAGES = { checkin: '#home', race: '#profile', fitness: '#progress', guide: '#learn', settings: '#profile' };
   function backBar(v) {
     var s = navState(), from = s && s.depth > 0 ? s.from : null;
     return '<nav class="back-bar"><a class="learn-back" href="' + SUB_PAGES[v] + '"' + (from ? ' data-nav-back="1"' : '') + '>' +
@@ -337,7 +337,7 @@
   }
   // تب مادر هر صفحه
   var TABS = ['home', 'plan', 'progress', 'learn', 'profile'];
-  var TAB_OF = { home: 'home', checkin: 'home', race: 'home', plan: 'plan', progress: 'progress', fitness: 'progress',
+  var TAB_OF = { home: 'home', checkin: 'home', race: 'profile', plan: 'plan', progress: 'progress', fitness: 'progress',
     learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile' };
   // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
   var lastView = null, lastTab = null;
@@ -788,6 +788,8 @@
     document.getElementById('onb-back').addEventListener('click', function () { goStep(cur - 1); });
     // «ویرایش داده‌های چرخه» از تنظیمات: مستقیم به مرحله‌ی مشخصات بدنی
     if (pendingFocus === 'cycle-fieldset') goStep(2, true);
+    // «تغییر هدف اصلی» از صفحه‌ی مسابقه‌ها: مستقیم به مرحله‌ی هدف
+    if (pendingFocus === 'gtype') goStep(Number(document.getElementById('gtype').closest('.onb-step').dataset.step), true);
     paintNav();
 
     // همه‌ی ورودی‌ها رو بخون؛ هر خطا با شماره‌ی مرحله‌اش
@@ -863,7 +865,7 @@
         hrMax: hrIn.max, hrRest: hrIn.rest,
         sex: sex, cycle: cycleObj,
         // تاریخچه‌ی فیتنس و تنظیم دستی پیس ایزی با ویرایش پروفایل حفظ می‌شن
-        fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0,
+        fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0, races: p.races || [],
         createdAt: p.createdAt || new Date().toISOString()
       };
       return { errs: errs, next: next, pbObj: pbObj, curKm: curKm };
@@ -1590,18 +1592,17 @@
       (g.altitude ? '<li>' + tt('race.altitude', { n: g.altitude }) + '</li>' : '') + '</ul>';
   }
 
-  function renderRace() {
-    var p = state.profile, g = C.goalInfo(p);
+  // هدف اصلی: [کارت شمارش معکوس و تیپر، کارت‌های مسیر اولترا و پیش‌بینی زمان]
+  function mainRaceHtml(p, g) {
     if (g.type === 'none') {
-      app.innerHTML = '<section class="card"><h1>' + esc(T('race.title')) + '</h1><p>' + esc(T('race.none')) + '</p>' +
-        '<a class="btn btn-primary" href="#onboarding">' + esc(T('race.choose')) + '</a></section>';
-      return;
+      return ['<section class="card race-hero"><p class="eyebrow">' + esc(T('race.mainLabel')) + '</p><h2>' + esc(T('race.none')) + '</h2>' +
+        '<p class="small muted">' + esc(T('race.noneHint')) + '</p><a class="btn btn-primary" href="#onboarding" data-onb-focus="goal">' + esc(T('race.choose')) + '</a></section>', ''];
     }
     var race = C.raceInfo(p);
     var now = today();
     var fit = C.currentFitness(p);
     var pb = fit ? fit.entry : null;
-    var html = '<section class="card race-hero"><p class="eyebrow">' + esc(T('race.title')) + '</p><h1>' + t(C.goalLabel(g)) + '</h1>';
+    var html = '<section class="card race-hero"><p class="eyebrow">' + esc(T('race.mainLabel')) + '</p><h2 class="race-main-name">' + t(C.goalLabel(g)) + '</h2>';
     if (race) {
       var daysLeft = C.daysBetween(now, race.date);
       html += '<p class="race-date">' + esc(faDate(g.date)) + '</p><div class="countdown">' + (daysLeft > 0 ? '<b>' + fa(daysLeft) + '</b><span>' + esc(T('race.daysLeft', { n: daysLeft })) + '</span>'
@@ -1613,7 +1614,10 @@
       var taperStart = C.addDays(race.date, -C.taperWeeks(race.key) * 7);
       html += '<p class="race-date">' + esc(T('race.taperStart', { d: faDate(C.dateKey(taperStart)) })) + ' ' + helpLink('goals', T('race.taperHelp')) + '</p>';
     }
-    html += '</section>';
+    if (race && race.date <= now && g.category !== 'ultra') html += resultBlock('main', race.km, C.dateKey(race.date));
+    html += '<a class="linklike small race-change" href="#onboarding" data-onb-focus="goal">' + esc(T('race.changeMain')) + '</a></section>';
+    var hero = html;
+    html = '';
 
     if (g.category === 'ultra') html += '<section class="card"><h2>' + esc(T('race.route')) + ' ' + helpLink('goals', T('race.routeHelp')) + '</h2>' + ultraSummary(g) + '</section>';
 
@@ -1641,9 +1645,125 @@
       } else html += '<p>' + esc(T('race.predNeed')) + '</p>';
       html += '<a class="btn btn-outline" href="#fitness">' + esc(T('race.newTestOrPb')) + '</a></section>';
     }
-
-    app.innerHTML = html;
+    return [hero, html];
   }
+
+
+  // نتیجه‌ی ثبت‌شده‌ی یک مسابقه = رکورد «مسابقه» با همون تاریخ و مسافت در تاریخچه‌ی فیتنس
+  function raceResult(km, dateKey) {
+    return (state.profile.fitnessTests || []).filter(function (x) { return x.kind === 'race' && x.date === dateKey && Math.abs(x.distanceKm - km) < 0.15; })[0] || null;
+  }
+  // ثبت نتیجه (فقط بعد از روز مسابقه): رکورد تازه → VDOT و پیس‌ها خودکار به‌روز می‌شن
+  function resultBlock(id, km, dateKey) {
+    var r = raceResult(km, dateKey);
+    if (r) return '<p class="race-result"><b>' + esc(T('race.resultLabel')) + '</b> <span dir="ltr">' + fa(C.formatDuration(r.timeSec)) + '</span>' + T('progress.sep') +
+      'VDOT ' + fa(C.vdotFromRace(r.distanceKm, r.timeSec).toFixed(1)) + '</p>';
+    if (raceResultOpen !== id) return '<button type="button" class="btn btn-outline race-result-btn" data-race-result="' + esc(id) + '">' + esc(T('race.resultAdd')) + '</button>';
+    var f = C.currentFitness(state.profile), guess = f ? C.raceTimeFromVdot(f.vdot, km) : km * 360;
+    return '<form class="race-result-form" data-race-result-form="' + esc(id) + '" data-km="' + km + '" data-date="' + esc(dateKey) + '" novalidate>' +
+      '<div class="field field-tpick"><span class="field-label">' + esc(T('race.resultTime')) + '</span>' +
+      window.CoachTimePicker.html({ id: 'rr-' + id, name: 'rtime', sec: Math.round(guess / 5) * 5, touched: false, preview: 'rr-read-' + id,
+        aria: T('race.resultTime'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
+      '<small class="time-read" id="rr-read-' + esc(id) + '" aria-live="polite"></small></div>' +
+      '<p class="form-errors" hidden></p><div class="actions"><button type="submit" class="btn btn-primary">' + esc(T('race.resultSave')) + '</button>' +
+      '<button type="button" class="btn btn-ghost" data-race-result-cancel="1">' + esc(T('app.cancel')) + '</button></div></form>';
+  }
+  var raceResultOpen = null;
+  var RACE_KM = [['5', 5], ['10', 10], ['21', 21.1], ['42', 42.2]];
+  function renderRace() {
+    var p = state.profile, g = C.goalInfo(p), now = today(), nowKey = C.dateKey(now), main = C.raceInfo(p);
+    var mainParts = mainRaceHtml(p, g);
+    var html = '<header class="page-head"><h1>' + esc(T('race.pageTitle')) + '</h1></header>' + mainParts[0];
+    // مسابقه‌های دیگه
+    var list = C.otherRaces(p);
+    html += '<section class="card races-card" id="races-card"><h2>' + esc(T('race.others')) + '</h2><p class="small muted">' + esc(T('race.othersHint')) + '</p>';
+    if (!list.length) html += '<p class="muted races-empty">' + esc(T('race.othersEmpty')) + '</p>';
+    else html += '<ul class="race-list">' + list.map(function (r) {
+      var days = Math.round(C.daysBetween(now, r.date)), w = C.sideRaceWindow(r.km), past = r.key <= nowKey;
+      var near = main && main.date > r.date && C.daysBetween(r.date, main.date) <= C.taperWeeks(main.key) * 7 + 7;
+      var std = RACE_KM.filter(function (x) { return Math.abs(x[1] - r.km) < 0.15; })[0];
+      var src = (p.races || []).filter(function (x) { return x.id === r.id; })[0] || {};
+      var canMain = !past && (std || src.goal);
+      return '<li class="race-item' + (past ? ' is-past' : '') + '"><div class="race-item-head"><b>' + t(r.name || C.raceDistLabel(r.km)) + '</b>' +
+        (r.name ? '<span class="muted small">' + t(C.raceDistLabel(r.km)) + '</span>' : '') + '</div>' +
+        '<p class="small race-item-date">' + esc(faDate(r.key)) + T('progress.sep') + (past ? esc(T('race.past')) : days === 0 ? esc(T('race.todayBang')) : tt('race.inDays', { n: days })) + '</p>' +
+        (!past ? '<p class="small muted">' + tt('race.window', { pre: w.pre, post: w.post }) + '</p>' : '') +
+        (near && !past ? '<p class="small race-near">' + esc(T('race.nearMain')) + '</p>' : '') +
+        (past ? resultBlock(r.id, r.km, r.key) : '') +
+        '<div class="race-item-actions">' + (canMain ? '<button type="button" class="linklike small" data-race-main="' + esc(r.id) + '">' + esc(T('race.makeMain')) + '</button>' : '') +
+        '<button type="button" class="linklike small race-del" data-race-del="' + esc(r.id) + '">' + esc(T('race.remove')) + '</button></div></li>';
+    }).join('') + '</ul>';
+    // افزودن مسابقه
+    if ((p.races || []).length < C.MAX_RACES) {
+      html += '<details class="race-add"' + (raceAddOpen ? ' open' : '') + '><summary>' + esc(T('race.add')) + '</summary><form id="race-add-form" novalidate>' +
+        '<div class="field"><label for="ra-name">' + esc(T('race.name')) + '</label><input id="ra-name" name="name" type="text" maxlength="40" placeholder="' + esc(T('race.namePh')) + '"></div>' +
+        '<p class="sub-legend">' + esc(T('race.dist')) + '</p><div class="chips">' +
+        RACE_KM.map(function (x, i) { return '<label class="chip"><input type="radio" name="dist" value="' + x[1] + '"' + (i === 1 ? ' checked' : '') + '><span>' + t(C.RACE_LABELS[x[0]]) + '</span></label>'; }).join('') +
+        '<label class="chip"><input type="radio" name="dist" value="other"><span>' + esc(T('race.distOther')) + '</span></label></div>' +
+        '<div class="field" id="ra-km-field" hidden><label for="ra-km">' + esc(T('race.km', { u: T('units.' + I.getUnits()) })) + '</label><input id="ra-km" name="km" type="number" inputmode="decimal"' + limAttrs('race', '0.1') + '></div>' +
+        '<div class="field"><label for="ra-date">' + esc(T('race.date')) + '</label><input id="ra-date" name="date" type="date" min="' + nowKey + '"></div>' +
+        '<p class="form-errors" hidden></p><button type="submit" class="btn btn-primary">' + esc(T('race.addSave')) + '</button></form></details>';
+    }
+    html += '</section>' + mainParts[1];
+    app.innerHTML = html;
+    var rf = app.querySelector('.race-result-form');
+    if (rf) window.CoachTimePicker.init(rf);
+    var af = document.getElementById('race-add-form');
+    if (af) af.addEventListener('change', function () { document.getElementById('ra-km-field').hidden = af.querySelector('input[name=dist]:checked').value !== 'other'; });
+  }
+  var raceAddOpen = false;
+  function newRaceId() { return 'r' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36); }
+  app.addEventListener('submit', function (e) {
+    var af = e.target.closest('#race-add-form'), rf = e.target.closest('[data-race-result-form]');
+    if (!af && !rf) return;
+    e.preventDefault();
+    var p = state.profile, err = (af || rf).querySelector('.form-errors'), nowKey = C.dateKey(today());
+    var fail = function (m) { err.hidden = false; err.textContent = m; };
+    if (af) {
+      var dv = af.querySelector('input[name=dist]:checked').value, km = dv === 'other' ? kmIn(af.km) : Number(dv), date = af.date.value;
+      var main = C.raceInfo(p);
+      if (dv === 'other' && !inLim('race', rawIn(af.km))) return fail(fa(T('race.err.km', Object.assign(limParams('race'), { u: T('units.' + I.getUnits()) }))));
+      if (!date || date < nowKey) return fail(T('race.err.date'));
+      if (main && C.dateKey(main.date) === date) return fail(T('race.err.sameMain'));
+      if ((p.races || []).some(function (r) { return r.date === date; })) return fail(T('race.err.dup'));
+      p.races = (p.races || []).concat([{ id: newRaceId(), name: af.name.value.trim().slice(0, 40), km: km, date: date }]);
+      raceAddOpen = false;
+      save(); showToast(T('race.toastAdded')); renderRace();
+      return;
+    }
+    var tm = C.parseTime(rf.rtime.value), rkm = Number(rf.dataset.km), rdate = rf.dataset.date, v = tm ? rkm / (tm / 3600) : 0;
+    if (!tm) return fail(T('race.resultErr'));
+    if (v > 26 || v < 2) return fail(fa(T('fit.err.impossible', { km: rkm, d: C.describeDuration(tm) })));
+    p.fitnessTests = (p.fitnessTests || []).concat([{ date: rdate, distanceKm: rkm, timeSec: tm, kind: 'race' }]);
+    // رکورد تازه = پیس‌ها از نو (مثل ثبت تایم‌تست)
+    p.easyAdjustSec = 0;
+    raceResultOpen = null;
+    save(); showToast(fa(T('race.resultSaved', { v: C.currentFitness(p).vdot.toFixed(1) }))); renderRace();
+  });
+  app.addEventListener('click', function (e) {
+    var t0 = e.target.closest && e.target.closest('[data-race-result], [data-race-result-cancel], [data-race-main], [data-race-del], .race-add > summary');
+    if (!t0 || location.hash !== '#race') return;
+    var p = state.profile;
+    if (t0.matches('.race-add > summary')) { raceAddOpen = !t0.parentElement.open; return; }
+    if (t0.dataset.raceResult) { raceResultOpen = t0.dataset.raceResult; renderRace(); return; }
+    if (t0.dataset.raceResultCancel) { raceResultOpen = null; renderRace(); return; }
+    if (t0.dataset.raceDel) {
+      p.races = (p.races || []).filter(function (r) { return r.id !== t0.dataset.raceDel; });
+      save(); showToast(T('race.toastRemoved')); renderRace(); return;
+    }
+    if (t0.dataset.raceMain) {
+      var r = (p.races || []).filter(function (x) { return x.id === t0.dataset.raceMain; })[0];
+      if (!r) return;
+      var std = RACE_KM.filter(function (x) { return Math.abs(x[1] - r.km) < 0.15; })[0];
+      var rest = p.races.filter(function (x) { return x.id !== r.id; });
+      // هدف اصلی قبلی (اگه تاریخ آینده داره) مسابقه‌ی فرعی می‌شه؛ جزئیاتش (مثلاً مسیر اولترا) نگه داشته می‌شه
+      var old = p.goal, og = C.goalInfo(p);
+      if (og.type !== 'none' && og.date && og.date >= C.dateKey(today())) rest.push({ id: newRaceId(), name: '', km: og.km, date: og.date, goal: old });
+      p.goal = r.goal ? r.goal : { type: std[0], date: r.date };
+      p.races = rest;
+      save(); showToast(T('race.toastMain')); renderRace();
+    }
+  });
 
   // =====================================================================
   // خانه / امروز: کارت‌های جمع‌وجور به ترتیب اولویت
@@ -2641,6 +2761,7 @@
     // نام کامل (نام خانوادگی از مرحله‌ی ۱ فرم)
     var name = [p.name, p.lastName].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' '), hasPhoto = !!getAvatar();
     var days = race ? Math.round(C.daysBetween(now, race.date)) : null;
+    var nOther = C.otherRaces(p).filter(function (r) { return r.date >= now; }).length;
     app.innerHTML = '<section class="card pf-card">' +
       '<label class="pf-avatar-btn" for="avatar-file" title="' + esc(T('profile.photoPick')) + '">' + avatarHtml(112) +
       '<span class="pf-cam" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>' +
@@ -2651,8 +2772,10 @@
       (name ? '' : '<p class="small muted">' + esc(T('profile.noNameHint')).replace('{link}', '<a href="#onboarding">' + esc(T('profile.noNameLink')) + '</a>') + '</p>') +
       '<div class="pf-summary">' +
       '<div><span>' + esc(T('profile.rows.level')) + '</span><b>' + tt('profile.levelNum', { n: lv.level }) + '</b><small>' + esc(lv.info.name) + '</small></div>' +
-      '<div><span>' + esc(T('profile.rows.goal')) + '</span><b>' + (g.type !== 'none' ? t(C.goalLabel(g)) : esc(T('profile.noGoal'))) + '</b>' +
-      (race && days >= 0 ? '<small>' + tt('profile.goalIn', { n: days }) + '</small>' : '') + '</div></div>' +
+      '<a class="pf-goal" href="#race"><span>' + esc(T('profile.rows.goal')) + '</span><b>' + (g.type !== 'none' ? t(C.goalLabel(g)) : esc(T('profile.noGoal'))) + '</b>' +
+      (race && days >= 0 ? '<small>' + tt('profile.goalIn', { n: days }) + '</small>' : '') +
+      (nOther ? '<small>' + tt('profile.goalOthers', { n: nOther }) + '</small>' : '') +
+      '<small class="pf-goal-more">' + esc(T(g.type === 'none' ? 'profile.goalSet' : 'profile.goalManage')) + '</small></a></div>' +
       // تنظیمات اقدام اصلی نیست؛ مرجانی فقط برای اقدام اصلی
       '<a class="btn btn-outline btn-big btn-block pf-settings" href="#settings">' +
       '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>' +

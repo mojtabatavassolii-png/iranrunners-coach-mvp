@@ -364,6 +364,10 @@ textarea { resize: vertical; }
 .race-hero { background: var(--brand-deep); color: #fff; border: 0; position: relative; overflow: hidden; }
 .race-hero::after { content: ""; position: absolute; inset: auto auto -60px -40px; width: 220px; height: 220px; border-radius: 50%; background: var(--accent); opacity: 0.9; }
 .race-hero h1 { font-size: var(--fs-2xl); position: relative; z-index: 1; }
+.race-hero > * { position: relative; z-index: 1; }
+.race-hero h2, .race-hero .race-result { color: #fff; }
+.race-hero .race-change { color: #fff; }
+.race-hero .btn-outline { background: #fff; }
 .race-hero .eyebrow { color: var(--brand-light); position: relative; z-index: 1; }
 .race-hero .race-date { color: var(--brand-light); position: relative; z-index: 1; }
 .countdown { position: relative; z-index: 1; display: inline-flex; align-items: baseline; gap: 8px; }
@@ -885,7 +889,10 @@ html:has(body.has-tabbar) { scroll-padding-bottom: calc(90px + env(safe-area-ins
 .pf-name { margin: 6px 0 0; font-size: var(--fs-2xl); }
 .pf-card .small.muted { margin: 0; text-align: center; }
 .pf-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin: 10px 0 6px; }
-.pf-summary > div { background: var(--bg); border-radius: 14px; padding: 10px 12px; display: grid; gap: 2px; text-align: start; }
+.pf-summary > div, .pf-summary > a { background: var(--bg); border-radius: 14px; padding: 10px 12px; display: grid; gap: 2px; text-align: start; align-content: start; }
+.pf-summary > a { color: var(--text); text-decoration: none; border: 1.5px solid transparent; }
+.pf-summary > a:hover, .pf-summary > a:focus-visible { border-color: var(--brand); }
+.pf-summary .pf-goal-more { margin-top: 4px; }
 .pf-summary span { font-size: var(--fs-xs); color: var(--muted); }
 .pf-summary b { font-size: var(--fs-base); }
 .pf-summary small { color: var(--brand-deep); font-weight: 600; font-size: var(--fs-xs); }
@@ -1104,3 +1111,24 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .tod-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .tod-bar i { display: block; height: 100%; background: var(--brand); border-radius: 3px; }
 .tod-sofar { margin: 0 0 var(--sp-2); }
+
+/* مسابقه‌ها و هدف‌ها */
+.race-main-name { margin: 0 0 4px; font-size: 1.25rem; }
+.race-change { display: inline-block; margin-top: var(--sp-2); padding: 10px 0; }
+.race-result { margin: var(--sp-2) 0 0; }
+.race-result-btn { margin-top: var(--sp-2); }
+.race-result-form { margin-top: var(--sp-2); }
+.race-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: grid; gap: var(--sp-2); }
+.race-item { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
+.race-item.is-past { background: var(--bg); }
+.race-item-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.race-item p { margin: 0; }
+.race-item-date { color: var(--brand-deep); font-weight: 600; }
+.race-near { color: var(--accent-deep); }
+.race-item-actions { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.race-item-actions .linklike { min-height: 44px; }
+.race-del { color: var(--muted); }
+.races-empty { margin: var(--sp-2) 0 0; }
+.race-add { margin-top: var(--sp-3); border-top: 1px solid var(--line); padding-top: var(--sp-2); }
+.race-add > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--brand-deep); }
+.race-add form { display: grid; gap: var(--sp-2); margin-top: var(--sp-2); }

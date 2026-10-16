@@ -1225,6 +1225,58 @@
     return attachWarmup({ type: 'race', km: round05(d), hardKm: d, target: RACE_LABELS[g.type], steps: steps, how: h }, 'race', level, rk);
   }
 
+  // ---------- مسابقه‌های فرعی ----------
+  // کنار هدف اصلی، چند مسابقه‌ی دیگه (profile.races). فاز و حجم هفته‌ها فقط از هدف اصلی میاد؛
+  // مسابقه‌ی فرعی فقط چند روز قبل و بعدش رو تنظیم می‌کنه: روز مسابقه، چند روز سبک قبلش، ریکاوری بعدش.
+  var MAX_RACES = 10;
+  function otherRaces(profile) {
+    var main = raceInfo(profile), mk = main ? dateKey(main.date) : null;
+    return (profile.races || []).filter(function (r) { return r && r.date && Number(r.km) > 0 && r.date !== mk; })
+      .map(function (r) { return { id: r.id, name: r.name || '', km: Number(r.km), key: r.date, date: parseDate(r.date), result: r.result || null }; })
+      .sort(function (a, b) { return a.key < b.key ? -1 : a.key > b.key ? 1 : 0; });
+  }
+  // روزهای سبک قبل و روزهای ریکاوری بعد از مسابقه‌ی فرعی، بر اساس مسافت
+  function sideRaceWindow(km) {
+    return { pre: km <= 10 ? 2 : km <= 21.1 ? 3 : 5, post: km <= 5 ? 1 : km <= 10 ? 2 : km <= 21.1 ? 4 : km <= 42.2 ? 7 : Math.ceil(km / 6) };
+  }
+  function raceDistLabel(km) {
+    for (var k in RACE_DISTANCES) if (Math.abs(RACE_DISTANCES[k] - km) < 0.15) return RACE_LABELS[k];
+    return T('s.km', { n: km });
+  }
+  function sideRaceLabel(r) { return (r.name ? r.name + ' · ' : '') + raceDistLabel(r.km); }
+  function makeSideRace(profile, r, level) {
+    var fit = currentFitness(profile), h = T('s.race2.how');
+    if (fit) h += T('s.race.pred', { time: formatDuration(riegel(fit.entry.timeSec, fit.entry.distanceKm, r.km)) });
+    if (level <= 1) h += T('s.race.runwalk');
+    var rk = level <= 1 || r.km > 21.2 ? 'long' : r.km <= 10 ? 'short' : 'half';
+    return attachWarmup({ type: 'race', side: true, km: round05(r.km), hardKm: r.km, target: sideRaceLabel(r), steps: T('s.race.steps').slice(), how: h }, 'race', level, rk);
+  }
+  function applySideRaces(profile, s, date, races, ctx, rw, level) {
+    if (s.type === 'race' || s.type === 'none') return s; // روز مسابقه‌ی اصلی دست نمی‌خوره
+    var i, r, diff, w;
+    for (i = 0; i < races.length; i++) if (daysBetween(date, races[i].date) === 0) return makeSideRace(profile, races[i], level);
+    if (s.type === 'rest' || s.type === 'walkrun') return s;
+    for (i = 0; i < races.length; i++) {
+      r = races[i]; diff = daysBetween(date, r.date); w = sideRaceWindow(r.km);
+      if (diff > 0 && diff <= w.pre) {
+        var note = T('s.race2.pre', { race: sideRaceLabel(r) });
+        if (diff === 1 && r.km >= 21) return makeRest(T('s.taper.dayBefore'));
+        if (rw) return makeRunWalk(rw, diff === 1 ? 0.5 : 0.7, note);
+        if (diff === 1) { var e = makeEasy(Math.min(s.km || 4, 4), ctx.zones, note); e.steps.push(T('s.taper.raceStrides')); return e; }
+        if (isHard(s.type)) return makeEasy(Math.min((s.km || 5) * 0.7, r.km <= 10 ? 8 : 10), ctx.zones, note);
+        return s;
+      }
+      if (diff < 0 && -diff <= w.post) {
+        var pn = T('s.race2.post', { race: sideRaceLabel(r) });
+        if (diff === -1 && r.km >= 21) return makeRest(pn);
+        if (rw) return isHard(s.type) ? makeRunWalk(rw, 0.6, pn) : s;
+        if (isHard(s.type)) return makeEasy((s.km || 5) * 0.6, ctx.zones, pn);
+        return s;
+      }
+    }
+    return s;
+  }
+
   // ---------- ساخت هفته ----------
   // هفته‌ی اول برنامه = اولین هفته‌ی کامل (شنبه تا جمعه). اگه کاربر وسط هفته شروع کنه،
   // روزهای باقی‌مونده‌ی همون هفته «هفته‌ی شروع» (index = -1) هستن.
@@ -1366,6 +1418,7 @@
       });
     }
 
+    var side = otherRaces(profile);
     for (var i = 0; i < 7; i++) {
       var date = addDays(ws, i);
       var s;
@@ -1375,6 +1428,7 @@
       else if (template[i]) s = JSON.parse(JSON.stringify(template[i].session));
       else s = makeRest();
       if (race && s.type !== 'none') s = applyRace(profile, s, date, race, ctx, template._rw, level);
+      if (side.length) s = applySideRaces(profile, s, date, side, ctx, template._rw, level);
       s.date = dateKey(date);
       s.dayName = T('days')[(date.getDay() + 1) % 7];
       s.dayShort = T('daysShort')[(date.getDay() + 1) % 7];
@@ -2066,6 +2120,7 @@
     TYPE_INFO: TYPE_INFO, LOCATION_TIPS: LOCATION_TIPS, LOCATION_LABELS: LOCATION_LABELS,
     dateKey: dateKey, parseDate: parseDate, addDays: addDays, weekStart: weekStart, daysBetween: daysBetween,
     persianDayIndex: persianDayIndex, dayIndex: persianDayIndex, setWeekStart: setWeekStart, getWeekStart: getWeekStart, satToRel: satToRel, parseTime: parseTime, formatDuration: formatDuration, describeDuration: describeDuration,
+    otherRaces: otherRaces, sideRaceWindow: sideRaceWindow, raceDistLabel: raceDistLabel, MAX_RACES: MAX_RACES,
     riegel: riegel, vdotFromRace: vdotFromRace, raceTimeFromVdot: raceTimeFromVdot,
     levelFromKm: levelFromKm, levelFromVdot: levelFromVdot, assessLevel: assessLevel,
     paceZones: paceZones, bmi: bmi, progression: progression, weeklyVolumeKm: weeklyVolumeKm,

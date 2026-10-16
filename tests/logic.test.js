@@ -1076,4 +1076,61 @@ test('صبح یا عصر: داده‌ی ناکافی یا اختلاف ناچی�
   assert.strictEqual(C.timeOfDayStats(d).total, 0);
 });
 
+// ---------- مسابقه‌های فرعی ----------
+function sideSetup() {
+  var p = profileFor(6, { goal: goalOf('42', '2027-03-20') });
+  var base = JSON.parse(JSON.stringify(p));
+  // یک روز سخت در هفته‌ی ششم برای مسابقه‌ی فرعی
+  var wk = weekAt(p, 6), hardDay = wk.days.filter(function (d) { return d.hard && d.type !== 'long'; })[0];
+  return { p: p, base: base, day: hardDay.date };
+}
+test('مسابقه‌ی فرعی: روز مسابقه، روزهای سبک قبل و ریکاوری بعد', function () {
+  var x = sideSetup(), p = x.p;
+  p.races = [{ id: 'r1', name: 'تهران', km: 10, date: x.day }];
+  var d0 = C.parseDate(x.day), at = function (n) { return C.sessionFor(p, C.addDays(d0, n)); }, was = function (n) { return C.sessionFor(x.base, C.addDays(d0, n)); };
+  var r = at(0);
+  assert.strictEqual(r.type, 'race'); assert.strictEqual(r.side, true); assert.strictEqual(r.km, 10);
+  assert.ok(/تهران/.test(r.target));
+  [-2, -1, 1, 2].forEach(function (n) {
+    var s = at(n);
+    assert.ok(!s.hard, 'day ' + n + ' should not be hard: ' + s.type);
+    if (was(n).type !== 'rest') assert.ok(s.km <= (was(n).km || 99), 'day ' + n + ' should not grow');
+  });
+  assert.ok(at(-1).km <= 4);
+  // بیرون از پنجره‌ی مسابقه، جلسه‌ها همون برنامه‌ی اصلی‌ان
+  [-5, -4, 5, 6, 10].forEach(function (n) { assert.deepStrictEqual(JSON.parse(JSON.stringify(at(n))), JSON.parse(JSON.stringify(was(n)))); });
+});
+test('مسابقه‌ی فرعی: فاز و هدف حجم هفته‌ها عوض نمی‌شن', function () {
+  var x = sideSetup(), p = x.p;
+  p.races = [{ id: 'r1', km: 21.1, date: x.day }];
+  for (var w = 0; w < 14; w++) {
+    var a = weekAt(p, w), b = weekAt(x.base, w);
+    assert.strictEqual(a.phase.key, b.phase.key);
+    assert.strictEqual(a.volumeTarget, b.volumeTarget);
+  }
+  // نیمه‌ماراتن: روز قبل و روز بعد استراحت
+  var d0 = C.parseDate(x.day);
+  assert.strictEqual(C.sessionFor(p, C.addDays(d0, -1)).type, 'rest');
+  assert.strictEqual(C.sessionFor(p, C.addDays(d0, 1)).type, 'rest');
+});
+test('مسابقه‌ی فرعی: روز استراحت هم مسابقه می‌شه؛ هم‌تاریخ با هدف اصلی نادیده گرفته می‌شه', function () {
+  var x = sideSetup(), p = x.p, wk = weekAt(p, 6);
+  var rest = wk.days.filter(function (d) { return d.type === 'rest'; })[0];
+  p.days = [0, 2, 4];
+  var restDay = weekAt(p, 6).days.filter(function (d) { return d.type === 'rest'; })[0].date;
+  p.races = [{ id: 'a', km: 5, date: restDay }, { id: 'b', km: 10, date: '2027-03-20' }];
+  assert.strictEqual(C.sessionFor(p, C.parseDate(restDay)).type, 'race');
+  assert.strictEqual(C.otherRaces(p).length, 1);
+  var main = C.sessionFor(p, C.parseDate('2027-03-20'));
+  assert.strictEqual(main.type, 'race'); assert.ok(!main.side); assert.strictEqual(main.km, 42);
+  void rest;
+});
+test('مسابقه‌ی فرعی: پنجره‌ی سبک و ریکاوری بر اساس مسافت', function () {
+  assert.deepStrictEqual(C.sideRaceWindow(5), { pre: 2, post: 1 });
+  assert.deepStrictEqual(C.sideRaceWindow(10), { pre: 2, post: 2 });
+  assert.deepStrictEqual(C.sideRaceWindow(21.1), { pre: 3, post: 4 });
+  assert.deepStrictEqual(C.sideRaceWindow(42.2), { pre: 5, post: 7 });
+  assert.strictEqual(C.raceDistLabel(21.1), C.RACE_LABELS['21']);
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));
