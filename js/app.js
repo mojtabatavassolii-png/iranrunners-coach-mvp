@@ -954,6 +954,7 @@
     var log = (state.doneLog || {})[key], a = log && log.actual;
     if (!a) return '';
     var parts = [];
+    if (a.start) parts.push(tt('post.actStartVal', { t: a.start }));
     if (a.km > 0) parts.push(tt('post.actKmVal', { km: Math.round(a.km * 100) / 100 }) + (log.km && Math.abs(log.km - a.km) >= 0.05 ? ' <span class="muted">' + tt('post.actPlan', { km: log.km }) + '</span>' : ''));
     if (a.sec > 0) parts.push('<span dir="ltr">' + fa(C.formatDuration(a.sec)) + '</span>');
     var pace = C.actualPace(log);
@@ -987,7 +988,9 @@
       window.CoachTimePicker.html({ id: 'act-time-' + prefix, name: 'actTime', sec: a.sec || guessSec(s), touched: a.sec > 0, preview: 'act-time-read-' + prefix,
         aria: T('post.actTime'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
       '<small class="muted">' + esc(T('post.actTimeHint')) + '</small><small class="time-read" id="act-time-read-' + prefix + '" aria-live="polite">' +
-      (a.sec > 0 ? '= ' + fa(C.describeDuration(a.sec)) : '') + '</small></div></fieldset>';
+      (a.sec > 0 ? '= ' + fa(C.describeDuration(a.sec)) : '') + '</small></div>' +
+      '<div class="field"><label for="act-start-' + prefix + '">' + esc(T('post.actStart')) + '</label>' +
+      '<input id="act-start-' + prefix + '" name="actStart" type="time" value="' + esc(a.start || '') + '"></div></fieldset>';
     if (s.easyEffort) {
       h += '<p class="sub-legend">' + esc(T('post.q1')) + '</p><div class="scale scale10" role="radiogroup" aria-label="' + esc(T('post.rpeAria')) + '">';
       for (var i = 1; i <= 10; i++) h += '<label class="scale-opt"><input type="radio" name="rpe" id="' + n + '-' + i + '" value="' + i + '"' + (post && post.rpe === i ? ' checked' : '') + '><span>' + fa(i) + '</span></label>';
@@ -1353,6 +1356,13 @@
     // مسافت و زمان واقعی: هر دو اختیاری؛ خالی = ثبت نمی‌شه
     var kmRaw = rawIn(f.actKm), km = kmRaw === null ? null : (isMi() ? Math.round(I.toKm(kmRaw) * 100) / 100 : kmRaw);
     var sec = C.parseTime(f.actTime.value) || null;
+    var start = String(f.actStart.value || '').trim() || null;
+    if (start && !/^([01]\d|2[0-3]):[0-5]\d$/.test(start)) errs.push(T('post.errStart'));
+    // امروز: ساعت شروع نمی‌تونه بعد از الان باشه
+    else if (start && f.dataset.postrunForm === C.dateKey(new Date())) {
+      var now = new Date(), hm = start.split(':').map(Number);
+      if (hm[0] * 60 + hm[1] > now.getHours() * 60 + now.getMinutes()) errs.push(T('post.errStartFuture'));
+    }
     if (km !== null && !(km >= 0.5 && km <= 100)) errs.push(fa(T('post.errKm', { min: dKm(0.5), max: Math.round(dKm(100)) })));
     if (sec !== null && !(sec >= 60 && sec <= 86400)) errs.push(T('post.errTime'));
     if (km && sec && !errs.length && (sec / km < 120 || sec / km > 1200)) errs.push(fa(T('post.errPace', { p: paceFmt(sec / km) })));
@@ -1365,7 +1375,7 @@
     var key = f.dataset.postrunForm;
     if (!state.done[key]) markDone(key);
     var log = state.doneLog[key];
-    if (km || sec) { log.actual = {}; if (km) log.actual.km = km; if (sec) log.actual.sec = sec; } else delete log.actual;
+    if (km || sec || start) { log.actual = {}; if (km) log.actual.km = km; if (sec) log.actual.sec = sec; if (start) log.actual.start = start; } else delete log.actual;
     if (easy) state.postRuns[key] = { rpe: Number(rpe.value), pace: pace ? pace.value : null, easy: true, type: f.dataset.type, at: new Date().toISOString() };
     // سطح ۰: جلسه‌ی خیلی سخت → هفته «سخت» حساب می‌شه (مگه اینکه خود کاربر جواب داده باشه)
     if (easy && f.dataset.type === 'walkrun' && Number(rpe.value) >= 8) {

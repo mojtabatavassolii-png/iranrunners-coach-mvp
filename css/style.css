@@ -199,7 +199,7 @@ legend + * { clear: both; }
 .sub-legend { font-weight: 700; margin: 14px 0 6px; }
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
 .field label { font-weight: 500; font-size: var(--fs-md); }
-input[type=number], input[type=date], input[type=text], input:not([type]), select, textarea {
+input[type=number], input[type=date], input[type=time], input[type=text], input:not([type]), select, textarea {
   font: inherit; font-size: var(--fs-base);
   padding: 10px 12px; border: 1.5px solid var(--field-line); border-radius: 10px; background: #fff; color: var(--text);
   width: 100%; min-height: 44px;
@@ -1080,6 +1080,6 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 /* ---------- مسافت و زمان واقعی بعد از جلسه ---------- */
 .actual-fs { border: 0; border-top: 0; padding: 0; margin: 0 0 var(--sp-2); }
 .actual-fs legend { font-size: var(--fs-base); }
-.actual-fs input[name=actKm] { max-width: 200px; }
+.actual-fs input[name=actKm], .actual-fs input[name=actStart] { max-width: 200px; }
 .actual-line { margin: var(--sp-3) 0 var(--sp-1); }
 .actual-line b { color: var(--brand-deep); }
