@@ -36,7 +36,13 @@ const SCREENS = [
   ['plan-month', '#plan', async (p) => setPlanView(p, 'month')],
   ['profile', '#profile', async () => {}],
   ['progress', '#progress', async () => {}],
-  // فرم «انجام شد» باز (مسافت و زمان واقعی + سؤال‌های ایزی ران) روی یک ایزی ران انجام‌نشده‌ی هفته‌ی قبل
+  ['checkin', '#checkin', async () => {}],
+  ['settings', '#settings', async () => {}],
+  ['fitness', '#fitness', async () => {}],
+  ['learn', '#learn', async () => {}],
+  ['learn-article', '#learn/vdot', async () => {}],
+  ['guide', '#guide', async () => {}],
+  // فرم بعد از «انجامش دادم» (مسافت و زمان واقعی + سؤال‌های ایزی ران) روی یک ایزی ران انجام‌نشده‌ی هفته‌ی قبل
   ['plan-doneform', '#plan', async (p) => {
     await setPlanView(p, 'week');
     const k = await p.evaluate(([K, today]) => {
@@ -49,7 +55,7 @@ const SCREENS = [
     await p.reload(); await p.waitForTimeout(400); await setPlanView(p, 'week');
     for (let w = 0; w < 3 && !(await p.locator('button#tab-' + k).count()); w++) { await p.click('[data-week="-1"]'); await p.waitForTimeout(350); }
     await p.locator('button#tab-' + k).click(); await p.waitForTimeout(300);
-    await p.click('#day-panel [data-postrun="' + k + '"]'); await p.waitForTimeout(500);
+    await p.click('#day-panel [data-done="' + k + '"]'); await p.waitForTimeout(500);
     await p.locator('#day-panel form.postrun').scrollIntoViewIfNeeded();
   }],
   // پروفایل کاربر خانم با چرخه‌ی فعال (کارت «تمرین در روزهای پریود»)

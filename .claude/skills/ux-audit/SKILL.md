@@ -19,14 +19,14 @@ node audit.js        # all screens × widths 320/360/390/430 × fa/en, ~2 minute
 
 In the Claude Code cloud container Chromium lives at `/opt/pw-browsers/chromium` (picked up automatically); elsewhere set `CHROMIUM_PATH` or run `npx playwright install chromium`.
 
-Useful flags: `--widths 360`, `--langs fa`, `--screens home,plan-week`, `--no-shots`.
+Useful flags: `--widths 360`, `--langs fa`, `--screens home,plan-week`, `--no-shots`, `--css proposal.css --out out/try` (inject a proposal's CSS before measuring, to show its effect in numbers without touching the app).
 
 Outputs (git-ignored) in `tools/ux-audit/out/`:
 - `report.md` — findings grouped by rule + element, sorted high → low, with screens/widths where they occur, plus the font-size and spacing inventories.
 - `report.json` — the same data, machine-readable (compare with a previous run to show regressions/improvements).
 - `shots/<screen>-<lang>-<width>.jpg` — full-page screenshots with offending elements outlined (magenta = touch < 24px, orange = touch < 44px, purple = contrast, blue = small font, red = layout).
 
-Screens audited (defined in `lib.js`, edit there if new main pages appear): `onb-1`…`onb-5` (wizard, opened in edit mode so every step is reachable), `home`, `plan-week`, `plan-month`, `profile`. Data comes from the deterministic fixture in `fixture.js` and a fixed date, so runs are comparable over time.
+Screens audited (defined in `lib.js`, edit there if new main pages appear): `onb-1`…`onb-5` (wizard, opened in edit mode so every step is reachable), `home`, `plan-week`, `plan-month`, `plan-doneform` (the form that opens after «انجامش دادم»), `profile`, `profile-cycle`, `progress`, `checkin`, `settings`, `fitness`, `learn`, `learn-article`, `guide`. Data comes from the deterministic fixture in `fixture.js` and a fixed date, so runs are comparable over time.
 
 ## 2. What the rules mean (and their thresholds)
 
@@ -43,11 +43,13 @@ Screens audited (defined in `lib.js`, edit there if new main pages appear): `onb
 | `layout-overflow` | element sticking out of its container (the usual cause of hscroll) | high if > 8 px |
 | `layout-under-tabbar` | last content hidden under the bottom tab bar | high |
 | `layout-clipped` | text cut off by `overflow: hidden` | medium |
+| `justify-missing` | multi-line paragraph not justified. The owner wants all long text justified in both languages; deliberate exceptions (meta lines with badges, rows of links, centred text, very narrow columns) are listed in `css/style.css` and stay in the report as expected | medium |
+| `justify-gap` | a justified line with a gap between two words over 4× a normal space and over 16 px; "(پیش‌بینی)" marks the gap a not-yet-justified paragraph would get. Headless Chromium on Linux has no hyphenation, so English gaps are overstated | medium if justified now, else low |
 
 The automated pass cannot judge everything. **Always also look at the annotated screenshots yourself** (at least fa 320 and fa 390, plus en 360) for:
 - visual hierarchy (is the primary action obvious? is coral used only for the main action?),
 - awkward wrapping (an icon alone on a line, labels breaking mid-phrase),
-- justified Persian text creating large gaps in narrow boxes,
+- justified text creating large gaps in narrow boxes (the `justify-gap` rule finds candidates; confirm on the screenshot),
 - copy that no longer matches the UI (e.g. hints pointing to moved settings),
 - consistency between similar components on different pages.
 

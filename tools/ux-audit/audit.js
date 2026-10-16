@@ -7,11 +7,13 @@
  *   spacing  — فاصله‌ها (margin/padding/gap) خارج از شبکه‌ی ۴px و تعداد مقدارهای متفاوت
  *   type     — اندازه‌ی فونت‌های ریز، فاصله‌ی خطوط، سلسله‌مراتب عنوان‌ها و تعداد اندازه‌های متفاوت
  *   layout   — اسکرول افقی، المان‌های بیرون‌زده از صفحه، متن بریده‌شده، پوشیده شدن محتوا زیر نوار پایین
+ *   justify  — پاراگراف‌های چندخطی که تراز دوطرفه ندارن، و فاصله‌ی بین کلمه‌ها در تراز دوطرفه (یا اگه دوطرفه بشن)
  *
  * اجرا (از ریشه‌ی مخزن):
  *   cd tools/ux-audit && npm install && node audit.js
  * گزینه‌ها:
  *   --widths 320,360,390,430   --langs fa,en   --screens home,plan-week,...   --out out   --no-shots
+ *   --css proposal.css   (CSS پیشنهادی قبل از اندازه‌گیری تزریق می‌شه تا اثر یک پیشنهاد سنجیده بشه؛ اپ تغییر نمی‌کنه)
  * خروجی: out/report.json (همه‌ی یافته‌ها)، out/report.md (خلاصه‌ی اولویت‌بندی‌شده)، out/shots/*.jpg (با علامت‌گذاری)
  */
 'use strict';
@@ -27,6 +29,7 @@ const LANGS = opt('langs', 'fa,en').split(',');
 const OUT = path.resolve(__dirname, opt('out', 'out'));
 const SHOTS = !args.includes('--no-shots');
 const ONLY = opt('screens', null);
+const CSS = opt('css', null) ? fs.readFileSync(path.resolve(opt('css')), 'utf8') : null;
 const screens = ONLY ? SCREENS.filter((s) => ONLY.split(',').includes(s[0])) : SCREENS;
 
 // ---------- کاوشگر داخل صفحه ----------
@@ -34,10 +37,13 @@ const screens = ONLY ? SCREENS.filter((s) => ONLY.split(',').includes(s[0])) : S
 function probe(screenW) {
   // عرض واقعی صفحه‌ی گوشی؛ اگه محتوا پهن‌تر باشه، مرورگر موبایل innerWidth رو بزرگ می‌کنه و مشکل پنهان می‌مونه
   const vw = screenW || innerWidth, vh = innerHeight;
-  const out = { vw, touch: [], contrast: [], type: [], spacing: [], layout: [], headings: [], fontSizes: {}, spaceValues: {} };
+  const out = { vw, touch: [], contrast: [], type: [], spacing: [], layout: [], headings: [], justify: [], fontSizes: {}, spaceValues: {} };
   const cs = (el) => getComputedStyle(el);
   const visible = (el) => {
     if (!el.isConnected) return false;
+    // محتوای <details> بسته (به‌جز خود عنوانش) دیده نمی‌شه، هرچند getComputedStyle نمایشش رو none نشون نده
+    const dt = el.closest('details:not([open])');
+    if (dt && !el.closest('summary')) return false;
     for (let e = el; e; e = e.parentElement) {
       const s = cs(e);
       if (s.display === 'none' || s.visibility === 'hidden') return false;
@@ -235,6 +241,59 @@ function probe(screenW) {
     }
     scrollTo(0, 0);
   }
+  // ---- ۶. تراز دوطرفه ----
+  // هر پاراگراف چندخطی (نزدیک‌ترین والد بلوکی متن): ترازش، و بیشترین فاصله‌ی بین کلمه‌ها وقتی دوطرفه چیده بشه
+  // (اگه الان دوطرفه نیست، موقتاً دوطرفه می‌شه تا اثرش اندازه‌گیری بشه و بعد برمی‌گرده)
+  const SKIP = 'button, .btn, .chip, .chip-btn, .pill, .badge, summary, h1, h2, h3, h4, label, legend, nav, .tabbar, svg, table, input, select, textarea, .tpick, .scale, .mini-stats, .kv-list dt';
+  // صاحب متن = اولین والد غیر inline؛ اگه flex/grid باشه، متن جزو چیدمان اجزاست نه پاراگراف
+  const ownerOf = (n) => { let b = n.parentElement; while (b && b.id !== 'app' && cs(b).display === 'inline') b = b.parentElement; return b; };
+  const blocks = new Set();
+  const bw = document.createTreeWalker(document.querySelector('#app') || document.body, NodeFilter.SHOW_TEXT);
+  for (let n = bw.nextNode(); n; n = bw.nextNode()) {
+    if (n.textContent.trim().length < 2) continue;
+    const b = ownerOf(n);
+    if (b && b.id !== 'app' && /^(block|list-item|flow-root|table-cell)$/.test(cs(b).display) && !b.closest(SKIP) && visible(b)) blocks.add(b);
+  }
+  const canvas = document.createElement('canvas').getContext('2d');
+  const maxGap = (el) => {
+    const s = cs(el), lines = {};
+    const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) {
+      if (ownerOf(n) !== el) continue; // متن بلوک‌های تودرتو جدا سنجیده می‌شه
+      const re = /\S+/g; let m;
+      while ((m = re.exec(n.textContent))) {
+        const r = document.createRange(); r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length);
+        const rc = r.getClientRects(); if (!rc.length) continue;
+        const q = rc[0], k = Math.round(q.top / 4);
+        (lines[k] = lines[k] || []).push(q);
+      }
+    }
+    const keys = Object.keys(lines).map(Number).sort((a, b) => a - b);
+    let worst = 0;
+    keys.slice(0, -1).forEach((k) => { // خط آخر دوطرفه نمی‌شه
+      const ws = lines[k].sort((a, b) => a.left - b.left);
+      for (let i = 1; i < ws.length; i++) worst = Math.max(worst, ws[i].left - ws[i - 1].right);
+    });
+    canvas.font = s.fontWeight + ' ' + s.fontSize + ' ' + s.fontFamily;
+    return { gap: Math.round(worst), space: Math.max(2, canvas.measureText(' ').width), lines: keys.length };
+  };
+  blocks.forEach((el) => {
+    // فقط متن خود بلوک (نه بلوک‌های تودرتو)
+    let txt = '';
+    const tw0 = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = tw0.nextNode(); n; n = tw0.nextNode()) if (ownerOf(n) === el) txt += n.textContent;
+    txt = txt.replace(/\s+/g, ' ').trim();
+    if (txt.length < 40) return;
+    const s = cs(el), align = s.textAlign;
+    const lh = s.lineHeight === 'normal' ? parseFloat(s.fontSize) * 1.2 : parseFloat(s.lineHeight);
+    if (el.getBoundingClientRect().height / lh < 1.8) return; // تک‌خطی
+    const was = el.style.textAlign;
+    if (align !== 'justify') el.style.textAlign = 'justify';
+    const g = maxGap(el);
+    el.style.textAlign = was;
+    out.justify.push({ sel: sel(el), text: txt.slice(0, 40), align, justified: align === 'justify', gap: g.gap, space: Math.round(g.space * 10) / 10, ratio: Math.round(g.gap / g.space * 10) / 10, lines: g.lines, width: Math.round(el.getBoundingClientRect().width), rect: rect(el) });
+  });
+
   out.pageHeight = document.documentElement.scrollHeight;
   return out;
 }
@@ -274,6 +333,13 @@ function findingsOf(m, ctx) {
   const odd = {};
   m.spacing.forEach((s) => { if (s.v % 2 !== 0) (odd[s.v] = odd[s.v] || []).push(s.sel + ' ' + s.prop); });
   Object.entries(odd).forEach(([v, list]) => add('spacing-grid', 'low', v + 'px', `${list.length} مورد، مثلاً ${list[0]}`, { value: Number(v) }));
+  // تراز دوطرفه: خواسته‌ی صاحب اپ اینه که همه‌ی متن‌های بلند دوطرفه باشن (فارسی و انگلیسی)؛
+  // فاصله‌ی بیش از ۴ برابر فاصله‌ی عادی بین کلمه‌ها (و بیشتر از ۱۶px) سوراخ دیده می‌شه
+  (m.justify || []).forEach((j) => {
+    const holes = j.ratio >= 4 && j.gap >= 16;
+    if (!j.justified) add('justify-missing', 'medium', j.sel, `تراز ${j.align}، ${j.lines} خط، عرض ${j.width}px؛ اگه دوطرفه بشه بیشترین فاصله ${j.gap}px (${j.ratio}× فاصله‌ی عادی) «${j.text}»`, { value: j.ratio, rect: j.rect });
+    if (holes) add('justify-gap', j.justified ? 'medium' : 'low', j.sel, `${j.justified ? '' : '(پیش‌بینی) '}فاصله‌ی ${j.gap}px بین کلمه‌ها (${j.ratio}× عادی) در عرض ${j.width}px «${j.text}»`, { value: j.ratio, rect: j.rect });
+  });
   m.layout.forEach((l) => add('layout-' + l.kind, l.kind === 'hscroll' || l.kind === 'under-tabbar' || (l.kind === 'overflow' && l.v > 8) ? 'high' : 'medium', l.sel, `${l.kind} ${l.v}px${l.text ? ' «' + l.text + '»' : ''}`, { value: l.v, rect: l.rect }));
   return F;
 }
@@ -284,7 +350,7 @@ async function annotate(p, F) {
     const layer = document.createElement('div');
     layer.id = 'ux-audit-layer';
     layer.style.cssText = 'position:absolute;left:0;top:0;width:0;height:0;z-index:99999;pointer-events:none';
-    const COL = { 'touch-min': '#e5007e', 'touch-rec': '#ff9500', contrast: '#7b2ff7', 'font-small': '#0a84ff', layout: '#ff2d2d' };
+    const COL = { 'touch-min': '#e5007e', 'touch-rec': '#ff9500', contrast: '#7b2ff7', 'font-small': '#0a84ff', layout: '#ff2d2d', 'justify-missing': '#00a3a3', 'justify-gap': '#c9a400' };
     boxes.forEach((b) => {
       const d = document.createElement('div');
       const c = COL[b.rule] || COL[b.rule.split('-')[0]] || '#ff2d2d';
@@ -292,7 +358,7 @@ async function annotate(p, F) {
       layer.appendChild(d);
     });
     document.body.appendChild(layer);
-  }, F.filter((f) => f.rect && f.sev !== 'info' && f.rule !== 'spacing-grid'));
+  }, F.filter((f) => f.rect && f.sev !== 'info' && f.rule !== 'spacing-grid' && f.rule !== 'justify-missing'));
 }
 
 // ---------- اجرا ----------
@@ -307,6 +373,7 @@ async function annotate(p, F) {
     await seed(p, lang);
     for (const [key] of screens) {
       await openScreen(p, key);
+      if (CSS) { await p.addStyleTag({ content: CSS }); await p.waitForTimeout(150); }
       const m = await p.evaluate(probe, w);
       const ctxInfo = { screen: key, lang, width: w };
       const F = findingsOf(m, ctxInfo);

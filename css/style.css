@@ -70,9 +70,14 @@ body {
 body.modal-open { overflow: hidden; }
 /* تراز دوطرفه برای همه‌ی متن‌ها (فارسی و انگلیسی)؛ خط آخر هر پاراگراف طبق جهت زبان می‌مونه */
 body { text-align: justify; text-justify: inter-word; }
-/* روی گوشی کادرها باریکن و تراز دوطرفه بین کلمه‌ها فاصله‌ی زیاد می‌سازه؛ فقط متن بلند مقاله‌ها دوطرفه می‌مونه */
-@media (max-width: 599px) { body { text-align: start; } .learn-article p, .guide-body p { text-align: justify; } }
-:lang(en) p, :lang(en) li { hyphens: auto; -webkit-hyphens: auto; }
+/* استثناها: خط‌هایی با برچسب یا لینک‌های پشت‌سرهم، و ستون‌های خیلی باریک (تراز دوطرفه اون‌جا فاصله‌ی بزرگ بین کلمه‌ها می‌سازه) */
+.learn-more, .card.checkin > p.muted, .learn-item .learn-text, .level-note, .learn-body .learn-src { text-align: start; }
+:lang(en) p, :lang(en) li, :lang(en) dd, :lang(en) small { hyphens: auto; -webkit-hyphens: auto; }
+/* روی گوشی ستون متن فهرست‌های راهنما و مقاله‌ها پهن‌تر، تا فاصله‌های تراز دوطرفه کم بشن */
+@media (max-width: 599px) {
+  .guide-body ul, .guide-body ol, .learn-body ul { padding-inline-start: 18px; }
+  .glossary dd { padding-inline-start: 0; }
+}
 /* عنوان‌ها، دکمه‌ها، فیلدها، جدول‌ها و منو تراز دوطرفه نمی‌گیرن */
 h1, h2, h3, h4, button, .btn, input, select, textarea, th, td, .main-nav, .chips, .chip, .scale, .badge { text-align: start; }
 a { color: var(--brand-deep); }
@@ -473,9 +478,10 @@ textarea { resize: vertical; }
 .guide-toc ol { margin: 0; padding-inline-start: 26px; columns: 2 220px; list-style: persian; }
 [dir=ltr] .guide-toc ol { list-style: decimal; }
 [dir=rtl] .sess-steps, [dir=rtl] .guide-body ol { list-style: persian; }
-.guide-toc li { margin-bottom: 6px; break-inside: avoid; }
+.guide-toc li { margin-bottom: 0; break-inside: avoid; }
+.guide-toc li a { display: block; min-height: 44px; padding: 10px 0; }
 .guide-sec { padding-top: 14px; padding-bottom: 14px; scroll-margin-top: 150px; }
-.guide-sec summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.guide-sec summary { min-height: 44px; cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .guide-sec summary::-webkit-details-marker { display: none; }
 .guide-sec summary::after { content: '+'; color: var(--accent-strong); font-weight: 700; font-size: var(--fs-xl); }
 .guide-sec[open] summary::after { content: '−'; }
@@ -627,7 +633,7 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .learn-text { display: grid; gap: 4px; min-width: 0; }
 .learn-text b { font-size: var(--fs-base); color: var(--text); }
 .learn-time { font-size: var(--fs-xs); color: var(--brand-deep); font-weight: 600; }
-.learn-back { display: inline-flex; align-items: center; gap: 4px; color: var(--brand-deep); font-weight: 600; text-decoration: none; }
+.learn-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding-inline-end: 8px; color: var(--brand-deep); font-weight: 600; text-decoration: none; }
 .learn-back .chev { width: 18px; height: 18px; }
 .learn-article h1 { margin-bottom: 2px; }
 .learn-body { margin-top: 8px; line-height: 2; }
@@ -637,9 +643,10 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .learn-body li { margin-bottom: 6px; }
 .learn-body .learn-src { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--muted); line-height: 1.8; }
 .learn-others ul { margin: 6px 0 0; padding-inline-start: 22px; columns: 2 220px; }
-.learn-others li { margin-bottom: 6px; break-inside: avoid; }
+.learn-others li { margin-bottom: 0; break-inside: avoid; }
+.learn-others li a { display: block; min-height: 44px; padding: 10px 0; }
 .learn-others a { color: var(--brand-deep); }
-.learn-others h2 { font-size: var(--fs-base); }
+.learn-others h2 { font-size: 1.25rem; } /* بین عنوان مقاله (۲۲) و زیرعنوان‌هاش (۱۸) */
 
 /* ---------- پیشرفت من: نمودارها ---------- */
 .prange { display: inline-flex; flex-wrap: wrap; gap: 4px; background: var(--panel); border-radius: 999px; padding: 4px; margin-top: 10px; }
@@ -884,6 +891,8 @@ html:has(body.has-tabbar) { scroll-padding-bottom: calc(90px + env(safe-area-ins
 .pf-summary small { color: var(--brand-deep); font-weight: 600; font-size: var(--fs-xs); }
 .pf-settings { margin-top: 6px; gap: 10px; }
 .linklike.small { font-size: var(--fs-md); }
+/* «حذف» در جدول تایم‌تست‌ها: ناحیه‌ی لمس بزرگ‌تر بدون تغییر ظاهر */
+td .linklike { padding: 10px 8px; margin: -10px -8px; }
 
 /* ---------- تنظیمات: دسته‌های جمع‌وبازشونده با آیکون ---------- */
 .set-sec { padding: 0 !important; overflow: hidden; }
