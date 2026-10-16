@@ -1061,6 +1061,23 @@
         bars: 'Weekly ascent', ma: '4-week average', unit: 'm', val: '{n} m', thisWeek: 'This week (so far)', avg4: '4-week average',
         empty: 'After two weeks of logged training, your climbing trend will appear here.'
       },
+      tod: {
+        title: 'Morning or evening?',
+        desc: 'Easy and long runs with a start time recorded in "Mark as done", grouped by time of day (all time).',
+        slot: { morning: 'Mornings', afternoon: 'Afternoons', evening: 'Evenings' },
+        slotS: { morning: 'mornings', afternoon: 'afternoons', evening: 'evenings' },
+        range: { morning: 'before 12:00', afternoon: '12:00 to 17:00', evening: 'from 17:00' },
+        empty: 'For this analysis, record the start time of at least {n} easy or long runs in two different parts of the day (in "Mark as done", with actual distance and time).',
+        sofar: { one: '{n} run with a start time so far.', other: '{n} runs with a start time so far.' },
+        better: 'You run better in the {best} than in the {next}.',
+        same: 'No meaningful difference between {a} and {b}; run whenever suits you.',
+        paceDiff: 'your easy pace is {n} s per {u} faster on average',
+        rpeDiff: 'with lower perceived effort ({a} vs {b} out of 10)',
+        runs: { one: '{n} run', other: '{n} runs' },
+        pace: 'pace {p}',
+        rpe: 'effort {n}',
+        note: 'This is only a correlation: weather, sleep, food and weekly fatigue also affect pace. The more runs you record, the more reliable it gets.'
+      },
       adh: {
         title: 'Plan adherence', desc: 'Of the sessions planned in this range (up to today), how many you actually did.',
         rate: 'completed', of: '{n} of {total} sessions', count: { one: '{n} session ({p}%)', other: '{n} sessions ({p}%)' }, pct: '{n}%',

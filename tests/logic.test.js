@@ -1040,4 +1040,40 @@ test('انجام‌شده: مسافت و زمان واقعی جای عدد بر�
   assert.strictEqual(rec.actual.km, 3.3);
 });
 
+// ---------- صبح یا عصر؟ ----------
+function todData(spec) {
+  // spec: [[start, km, sec, rpe, type?], ...] روی روزهای پشت‌سرهم
+  var d = { done: {}, doneLog: {}, postRuns: {} };
+  spec.forEach(function (x, i) {
+    var k = C.dateKey(C.addDays(C.parseDate('2026-11-01'), i));
+    d.done[k] = true;
+    d.doneLog[k] = { type: x[4] || 'easy', km: x[1], actual: { start: x[0], km: x[1], sec: x[2] } };
+    if (x[3]) d.postRuns[k] = { rpe: x[3] };
+  });
+  return d;
+}
+test('صبح یا عصر: با داده‌ی کافی، بازه‌ی بهتر و اختلاف پیس و سختی', function () {
+  var spec = [];
+  for (var i = 0; i < 4; i++) spec.push(['06:30', 8, 8 * 360, 4]);   // صبح: ۶:۰۰ در کیلومتر، سختی ۴
+  for (var j = 0; j < 4; j++) spec.push(['18:15', 8, 8 * 380, 5]);   // عصر: ۶:۲۰، سختی ۵
+  spec.push(['13:00', 5, 5 * 370, 4]);                                // بعدازظهر: کمتر از حد لازم
+  var r = C.timeOfDayStats(todData(spec));
+  assert.strictEqual(r.enough, true);
+  assert.strictEqual(r.best, 'morning'); assert.strictEqual(r.next, 'evening');
+  assert.strictEqual(r.paceDiff, 20); assert.strictEqual(r.rpeDiff, 1);
+  assert.strictEqual(r.same, false);
+  assert.strictEqual(r.slots[1].runs, 1); assert.strictEqual(r.slots[1].enough, false);
+});
+test('صبح یا عصر: داده‌ی ناکافی یا اختلاف ناچیز', function () {
+  var few = C.timeOfDayStats(todData([['06:30', 8, 2880, 4], ['18:00', 8, 2900, 4]]));
+  assert.strictEqual(few.enough, false); assert.strictEqual(few.total, 2);
+  var spec = [];
+  for (var i = 0; i < 3; i++) spec.push(['07:00', 8, 8 * 360, 4]);
+  for (var j = 0; j < 3; j++) spec.push(['19:00', 8, 8 * 363, 4.1]);
+  assert.strictEqual(C.timeOfDayStats(todData(spec)).same, true);
+  // جلسه‌ی سخت یا بدون ساعت شروع حساب نمی‌شه
+  var d = todData([['06:00', 8, 2400, 7, 'tempo']]);
+  assert.strictEqual(C.timeOfDayStats(d).total, 0);
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

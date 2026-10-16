@@ -1862,6 +1862,7 @@
       }
       html += progCard('pace', T('progress.pace.title'), T('progress.pace.desc'), body, learnMore(['vdot']));
     })();
+    html += progTodCard();
 
     // ---- ۴. چک‌این‌ها (روزانه در کل بازه؛ روزهای بدون چک‌این خالی) ----
     (function () {
@@ -2092,6 +2093,34 @@
         }).join('') + '</ul>';
     }
     return progCard('adh', T('progress.adh.title'), T('progress.adh.desc'), body);
+  }
+  // صبح یا عصر؟ ایزی ران و لانگ‌ران‌هایی که ساعت شروعشون ثبت شده، بر اساس بازه‌ی روز (از کل تاریخچه)
+  function progTodCard() {
+    var r = C.timeOfDayStats(state), body;
+    var nm = function (k) { return T('progress.tod.slot.' + k); };
+    if (!r.enough) {
+      body = emptyNote(fa(T('progress.tod.empty', { n: r.minRuns }))) +
+        (r.total ? '<p class="small muted tod-sofar">' + tt('progress.tod.sofar', { n: r.total }) + '</p>' : '');
+    } else {
+      var best = r.slots.filter(function (b) { return b.key === r.best; })[0], next = r.slots.filter(function (b) { return b.key === r.next; })[0];
+      var ns = function (k) { return T('progress.tod.slotS.' + k); };
+      var verdict = r.same ? T('progress.tod.same', { a: ns(r.best), b: ns(r.next) }) : T('progress.tod.better', { best: ns(r.best), next: ns(r.next) });
+      var why = [];
+      if (!r.same && r.paceDiff != null && r.paceDiff > 0) why.push(T('progress.tod.paceDiff', { n: I.pace(r.paceDiff) }));
+      if (!r.same && r.rpeDiff != null && Math.abs(r.rpeDiff) >= 0.1) why.push(T('progress.tod.rpeDiff', { a: best.rpe.toFixed(1), b: next.rpe.toFixed(1) }));
+      var paces = r.slots.filter(function (b) { return b.pace; }).map(function (b) { return b.pace; }), fastest = Math.min.apply(null, paces.concat([Infinity]));
+      body = '<p class="tod-verdict"><b>' + t(verdict) + '</b>' + (why.length ? ' ' + t(why.join(T('progress.sep'))) : '') + '</p>' +
+        '<div class="tod-rows">' + r.slots.map(function (b) {
+          return '<div class="tod-row' + (!r.same && b.key === r.best ? ' is-best' : '') + (b.runs ? '' : ' is-empty') + '">' +
+            '<div class="tod-name"><b>' + esc(nm(b.key)) + '</b><small>' + esc(T('progress.tod.range.' + b.key)) + '</small></div>' +
+            '<div class="tod-vals"><span>' + tt('progress.tod.runs', { n: b.runs }) + '</span>' +
+            '<span>' + (b.pace ? tt('progress.tod.pace', { p: paceFmt(b.pace) }) : '—') + '</span>' +
+            '<span>' + (b.rpe ? tt('progress.tod.rpe', { n: b.rpe.toFixed(1) }) : '—') + '</span></div>' +
+            (b.pace ? '<div class="tod-bar" aria-hidden="true"><i style="width:' + Math.round(fastest / b.pace * 100) + '%"></i></div>' : '') + '</div>';
+        }).join('') + '</div>' +
+        '<p class="small muted">' + esc(T('progress.tod.note')) + '</p>';
+    }
+    return progCard('tod', T('progress.tod.title'), T('progress.tod.desc'), body);
   }
   // رسم بعد از قرار گرفتن در صفحه (عرض واقعی کادر) و دوباره با تغییر اندازه
   function drawCharts() {

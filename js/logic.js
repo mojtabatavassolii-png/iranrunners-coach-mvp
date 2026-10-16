@@ -1888,6 +1888,45 @@
     var a = log && log.actual;
     return a && a.km > 0 && a.sec > 0 ? a.sec / a.km : null;
   }
+  // ---------- صبح یا عصر؟ مقایسه‌ی دویدن‌ها بر اساس ساعت شروع ثبت‌شده ----------
+  // فقط ایزی ران و لانگ‌ران (شدت مشابه، مقایسه منصفانه‌ست)؛ پیس از مسافت و زمان واقعی، سختی از RPE بعد از جلسه
+  var TOD_SLOTS = [['morning', 0, 12], ['afternoon', 12, 17], ['evening', 17, 24]];
+  var TOD_MIN_RUNS = 3, TOD_SAME_PACE = 5, TOD_SAME_RPE = 0.3;
+  function timeOfDayStats(data) {
+    var logs = data.doneLog || {}, done = data.done || {}, posts = data.postRuns || {};
+    var B = TOD_SLOTS.map(function (x) { return { key: x[0], from: x[1], to: x[2], runs: 0, paceSum: 0, paceN: 0, rpeSum: 0, rpeN: 0 }; });
+    Object.keys(logs).forEach(function (k) {
+      var l = logs[k], a = l && l.actual;
+      if (!done[k] || !a || !a.start || (l.type !== 'easy' && l.type !== 'long')) return;
+      var h = Number(String(a.start).slice(0, 2));
+      var b = B.filter(function (x) { return h >= x.from && h < x.to; })[0];
+      if (!b) return;
+      b.runs++;
+      var pace = actualPace(l);
+      if (pace) { b.paceSum += pace; b.paceN++; }
+      var pr = posts[k];
+      if (pr && pr.rpe) { b.rpeSum += Number(pr.rpe); b.rpeN++; }
+    });
+    B.forEach(function (b) {
+      b.pace = b.paceN ? b.paceSum / b.paceN : null;
+      b.rpe = b.rpeN ? b.rpeSum / b.rpeN : null;
+      b.enough = b.paceN >= TOD_MIN_RUNS || b.rpeN >= TOD_MIN_RUNS;
+    });
+    var ok = B.filter(function (b) { return b.enough; });
+    var out = { slots: B, total: B.reduce(function (x, b) { return x + b.runs; }, 0), enough: ok.length >= 2, minRuns: TOD_MIN_RUNS };
+    if (!out.enough) return out;
+    // بهترین بازه: پیس تندتر (اگه همه پیس دارن)، وگرنه سختی کمتر؛ تفاوت با بهترینِ بعدی
+    var byPace = ok.filter(function (b) { return b.paceN >= TOD_MIN_RUNS; }).length === ok.length;
+    var sorted = ok.slice().sort(function (x, y) {
+      return byPace ? x.pace - y.pace || (x.rpe || 0) - (y.rpe || 0) : (x.rpe || 99) - (y.rpe || 99) || (x.pace || 9999) - (y.pace || 9999);
+    });
+    var best = sorted[0], next = sorted[1];
+    out.best = best.key; out.next = next.key;
+    out.paceDiff = best.pace != null && next.pace != null ? Math.round(next.pace - best.pace) : null;
+    out.rpeDiff = best.rpe != null && next.rpe != null ? Math.round((next.rpe - best.rpe) * 10) / 10 : null;
+    out.same = (out.paceDiff == null || Math.abs(out.paceDiff) < TOD_SAME_PACE) && (out.rpeDiff == null || Math.abs(out.rpeDiff) < TOD_SAME_RPE);
+    return out;
+  }
   // خلاصه‌ی فشرده‌ی یک جلسه برای ذخیره موقع «انجام شد» (تا تاریخچه با تغییر بعدی پروفایل عوض نشه)
   function sessionSnapshot(s) {
     if (!s) return null;
@@ -2040,7 +2079,7 @@
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks,
     goalInfo: goalInfo, goalLabel: goalLabel, GOAL_TYPES: GOAL_TYPES, TERRAIN_LABELS: TERRAIN_LABELS,
     cycleInfo: cycleInfo, nextPeriod: nextPeriod, cycleSuggestion: cycleSuggestion, CYCLE_PHASES: CYCLE_PHASES,
-    doneSession: doneSession, actualPace: actualPace,
+    doneSession: doneSession, actualPace: actualPace, timeOfDayStats: timeOfDayStats,
     periodPlan: periodPlan, periodSession: periodSession, periodsAhead: periodsAhead, PERIOD_MODES: PERIOD_MODES, dayRecords: dayRecords,
     ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,

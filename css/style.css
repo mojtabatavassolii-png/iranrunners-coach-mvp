@@ -1083,3 +1083,15 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .actual-fs input[name=actKm], .actual-fs input[name=actStart] { max-width: 200px; }
 .actual-line { margin: var(--sp-3) 0 var(--sp-1); }
 .actual-line b { color: var(--brand-deep); }
+/* ---------- صبح یا عصر؟ ---------- */
+.tod-verdict { margin-bottom: var(--sp-3); }
+.tod-rows { display: grid; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.tod-row { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; }
+.tod-row.is-best { border-color: var(--brand); background: var(--brand-soft); }
+.tod-row.is-empty { opacity: 0.6; }
+.tod-name { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.tod-name small { color: var(--muted); font-size: var(--fs-xs); }
+.tod-vals { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--fs-md); color: var(--text); }
+.tod-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.tod-bar i { display: block; height: 100%; background: var(--brand); border-radius: 3px; }
+.tod-sofar { margin: 0; }
