@@ -977,7 +977,6 @@
       cycleOn: 'Cycle adaptation is on', cycleOff: 'Cycle adaptation is off', cycleNA: 'For female users',
       cycleHint: 'Menstrual cycle settings become available when "female" is selected as sex in the setup form.',
       personSub: '{age} years old, level {n}',
-      name: 'Name (optional)', namePh: 'e.g. Sara',
       dangerTitle: 'Delete all data', dangerText: 'Your profile, check-ins, completed sessions, results and profile photo will be removed from this browser. This can\'t be undone.',
       wipeAck: 'I understand this can\'t be undone.'
     },

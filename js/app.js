@@ -1055,14 +1055,16 @@
   function markDone(k) {
     state.done[k] = true;
     state.doneLog = state.doneLog || {};
-    state.doneLog[k] = C.sessionSnapshot(effectiveSession(C.sessionFor(state.profile, C.parseDate(k))).session);
+    state.doneLog[k] = C.sessionSnapshot(loggable(effectiveSession(C.sessionFor(state.profile, C.parseDate(k))).session));
+  }
+  // جلسه‌ای که با چک‌این یا پریود به استراحت/لغو تبدیل شده هنوز قابل ثبته (مثلاً کاربر قبل از چک‌این دویده)؛ جلسه‌ی برنامه ثبت می‌شه
+  function loggable(ss) {
+    if (ss.type !== 'rest' && ss.type !== 'cancelled') return ss;
+    var b = C.sessionFor(state.profile, C.parseDate(ss.date));
+    return ['rest', 'none', 'cancelled'].indexOf(b.type) < 0 ? b : ss;
   }
   function doneButton(key, s) {
     var done = !!state.done[key];
-    // قبل از ثبت انجام: فرم مسافت و زمان واقعی (اختیاری)؛ برای جلسه‌ی ایزی سؤال RPE و پیس هم هست
-    if (!done && s) {
-      return '<button type="button" class="btn btn-outline" data-postrun="' + key + '" aria-expanded="' + (postRunOpen === key) + '">' + esc(T('today.done')) + '</button>';
-    }
     return '<button type="button" class="btn ' + (done ? 'btn-done' : 'btn-outline') + '" data-done="' + key + '" aria-pressed="' + done + '">' +
       esc(T(done ? 'today.doneDone' : 'today.done')) + '</button>';
   }
@@ -1153,16 +1155,17 @@
 
   // جزئیات کامل یک روز (مشترک بین نمای هفتگی و ماهانه)
   function dayPanel(rs, todayKey, labelledBy) {
-    var ss = rs.session, d = ss.date;
+    var ss = rs.session, d = ss.date, ls = loggable(ss), canLog = d < todayKey || (d === todayKey && state.checkins[todayKey]);
     return '<div class="day-panel" id="day-panel" role="tabpanel"' + (labelledBy ? ' aria-labelledby="' + labelledBy + '"' : '') + '>' +
       '<div class="day-panel-head"><div><p class="eyebrow">' + esc(ss.dayName) + ' ' + esc(faDate(d)) +
       (d === todayKey ? esc(T('week.todaySuffix')) : '') + '</p><h3>' + badge(ss.type, ss.label) + '</h3></div>' +
-      (d <= todayKey && ['rest', 'none', 'cancelled'].indexOf(ss.type) < 0 && (d < todayKey || state.checkins[todayKey]) ? doneButton(d, ss) : '') +
+      (d <= todayKey && ['rest', 'none', 'cancelled'].indexOf(ls.type) < 0 && (d < todayKey || state.checkins[todayKey]) ? doneButton(d, ls) : '') +
       '</div>' +
       (d === todayKey && !state.checkins[todayKey] && ['rest', 'none'].indexOf(ss.type) < 0 ?
         '<div class="checkin-cta"><p>' + esc(T('today.cta')) + '</p><a class="btn btn-primary" href="#checkin">' + esc(T('home.startCheckin')) + '</a></div>' : '') +
       (rs.adaptation ? adaptationBox(rs.adaptation, d) : '') + cycleBox(rs, d, todayKey) +
-      (ss.type !== 'cancelled' ? sessionBody(ss, d < todayKey || (d === todayKey && state.checkins[todayKey]) ? { key: d, prefix: 'panel' } : {}) : '') +
+      (ss.type !== 'cancelled' ? sessionBody(ss, canLog && ls === ss ? { key: d, prefix: 'panel' } : {}) : '') +
+      (canLog && ls !== ss ? postRunBlock(d, ls, 'panel') : '') +
       '</div>';
   }
 
@@ -1273,12 +1276,13 @@
     var dn = e.target.closest('[data-done]');
     if (dn) {
       var k = dn.dataset.done;
-      if (state.done[k]) { delete state.done[k]; delete state.postRuns[k]; if (state.doneLog) delete state.doneLog[k]; }
-      else {
-        markDone(k);
-      }
+      if (state.done[k]) { delete state.done[k]; delete state.postRuns[k]; if (state.doneLog) delete state.doneLog[k]; postRunOpen = null; }
+      // «انجامش دادم»: همون لحظه ثبت می‌شه، بعد فرم مسافت و زمان واقعی (و برای ایزی، سختی و پیس) باز می‌شه
+      else { markDone(k); postRunOpen = k; }
       save();
       route();
+      var pf = postRunOpen === k && app.querySelector('[data-postrun-form="' + k + '"]');
+      if (pf) pf.scrollIntoView({ block: 'start', behavior: 'smooth' });
       return;
     }
     var pr = e.target.closest('[data-postrun]');
@@ -2632,8 +2636,10 @@
           : '<p class="small muted">' + esc(T('settingsPage.cycleHint')) + '</p><a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.editOnb')) + '</a>')) +
       // ۴. اطلاعات شخصی
       setSection('person', 'person', T('settingsPage.person'), tt('settingsPage.personSub', { age: p.age, n: lv.level }),
-        '<div class="field"><label for="set-name">' + esc(T('settingsPage.name')) + '</label>' +
-        '<input id="set-name" type="text" maxlength="40" autocomplete="name" value="' + esc(p.name || '') + '" placeholder="' + esc(T('settingsPage.namePh')) + '"></div>' +
+        '<div class="field"><label for="set-name">' + esc(T('onb.firstName')) + '</label>' +
+        '<input id="set-name" type="text" maxlength="40" autocomplete="given-name" value="' + esc(p.name || '') + '" placeholder="' + esc(T('onb.firstNamePh')) + '"></div>' +
+        '<div class="field"><label for="set-lname">' + esc(T('onb.lastName')) + '</label>' +
+        '<input id="set-lname" type="text" maxlength="40" autocomplete="family-name" value="' + esc(p.lastName || '') + '" placeholder="' + esc(T('onb.lastNamePh')) + '"></div>' +
         '<a class="btn btn-primary" href="#onboarding">' + esc(T('profile.editOnb')) + '</a>' +
         '<p class="small muted">' + esc(T('profile.editHint')) + '</p>' +
         '<dl class="kv-list">' +
@@ -2712,10 +2718,11 @@
       }, true);
     });
   }
-  // نام (اختیاری)
+  // نام و نام خانوادگی (اختیاری)
   app.addEventListener('change', function (e) {
-    if (e.target.id !== 'set-name') return;
-    state.profile.name = e.target.value.trim().slice(0, 40);
+    var f = { 'set-name': 'name', 'set-lname': 'lastName' }[e.target.id];
+    if (!f) return;
+    state.profile[f] = e.target.value.trim().slice(0, 40);
     save(); showToast(T('settings.saved'));
   });
 
