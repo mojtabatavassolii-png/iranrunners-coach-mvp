@@ -220,4 +220,21 @@ test('ریسک آسیب: از الگوهای حرکتی، با عامل‌هاش
   assert.ok(!fore.risks.some(function (r) { return r.id === 'itbs'; }));
 });
 
+test('یک فیلم کافیه؛ زاویه خودکار تشخیص داده می‌شه', function () {
+  // فیلم از پشت در خونه‌ی «کنار»
+  var r = G.analyze({ side: backRunner({}).video, heightCm: 175 });
+  assert.ok(!r.side && r.back && r.back.ok && r.back.src === 'side', JSON.stringify({ side: !!r.side, back: r.back && r.back.src }));
+  assert.ok(r.findings.length >= 4 && r.failed.length === 0);
+  // فقط فیلم از کنار، در خونه‌ی «پشت»
+  var r2 = G.analyze({ back: sideRunner({}).video, heightCm: 175 });
+  assert.ok(r2.side && r2.side.ok && r2.side.src === 'back' && !r2.back);
+  // دو فیلم از کنار: دومی «هم‌زاویه» گزارش می‌شه
+  var r3 = G.analyze({ side: sideRunner({}).video, back: sideRunner({ cadence: 160 }).video, heightCm: 175 });
+  assert.ok(r3.side.src === 'side' && !r3.back);
+  assert.deepStrictEqual(r3.failed, [{ src: 'back', reason: 'sameView' }]);
+  // فیلم بدون آدم
+  var r4 = G.analyze({ side: sideRunner({}).video, back: { w: 100, h: 100, frames: [{ t: 0, lm: null }, { t: 0.03, lm: null }] }, heightCm: 175 });
+  assert.ok(r4.side.ok); assert.deepStrictEqual(r4.failed, [{ src: 'back', reason: 'noPerson' }]);
+});
+
 console.log(passed + ' تست تحلیل دویدن موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

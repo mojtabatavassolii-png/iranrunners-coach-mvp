@@ -353,12 +353,36 @@
     out.sort(function (a, b) { return L[a.level] - L[b.level] || b.weight - a.weight; });
     return out;
   }
+  // هر فیلم اول با زاویه‌ی خونه‌ای که کاربر انتخاب کرده سنجیده می‌شه؛ اگه زاویه‌ش اون نبود، با زاویه‌ی دیگه.
+  // پس یک فیلم تنها (از کنار یا از پشت، در هر خونه) کافیه و جابه‌جا گذاشتن فیلم‌ها هم مشکلی نیست.
+  function classify(v, h, pref) {
+    var a = pref === 'back' ? analyzeBack(v) : analyzeSide(v, h);
+    if (!a.ok && (a.reason === 'notSide' || a.reason === 'notBack')) {
+      var b = pref === 'back' ? analyzeSide(v, h) : analyzeBack(v);
+      if (b.ok) return b;
+    }
+    return a;
+  }
   function analyze(input) {
-    var side = input.side ? analyzeSide(input.side, input.heightCm) : null;
-    var back = input.back ? analyzeBack(input.back) : null;
+    var A = input.side ? classify(input.side, input.heightCm, 'side') : null;
+    var B = input.back ? classify(input.back, input.heightCm, 'back') : null;
+    if (A) A.src = 'side';
+    if (B) B.src = 'back';
+    var side = null, back = null;
+    // هر نتیجه‌ی موفق در جای زاویه‌ی واقعی خودش؛ دو فیلم با یک زاویه → اولی حساب می‌شه
+    [A, B].forEach(function (r) {
+      if (!r || !r.ok) return;
+      if (r.view === 'side' && !side) side = r;
+      else if (r.view === 'back' && !back) back = r;
+      else r.dup = true;
+    });
+    // فیلم‌هایی که تحلیل نشدن با دلیلشون (برای نمایش به کاربر)
+    var failed = [A, B].filter(function (r) { return r && (!r.ok || r.dup); }).map(function (r) {
+      return { src: r.src, reason: r.dup ? 'sameView' : r.reason };
+    });
     var F = findings(side, back);
     var R = risks(F, side);
-    return { side: side, back: back, findings: F, risks: R,
+    return { side: side, back: back, failed: failed, findings: F, risks: R,
       axes: { performance: axisScore(F, AXIS.performance), form: axisScore(F, AXIS.form),
         risk: R.length ? R[0].level : null },
       score: F.length ? Math.round(F.reduce(function (s, f) { return s + (f.status === 'good' ? 1 : f.status === 'warn' ? 0.5 : 0); }, 0) / F.length * 100) : null };

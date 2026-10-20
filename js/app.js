@@ -299,6 +299,8 @@
     });
     // هشدار پزشکی فقط در صفحه‌ی چک‌این
     document.getElementById('medical-banner').hidden = v !== 'checkin';
+    // ترک صفحه‌ی تحلیل دویدن: پخش‌کننده‌ها و ویدیوهاش کامل آزاد می‌شن
+    if (v !== 'gait') destroyGaitPlayers();
     VIEWS[v](sub);
     window.CoachTimePicker.init(app);
     if (SUB_PAGES[v]) {
@@ -1888,14 +1890,19 @@
       return '<li><b>' + esc(T('gait.items.' + f.id + '.t')) + '</b> <span class="muted small">' + esc(T('gait.status.' + f.status)) + '</span></li>';
     }).join('') + '</ol>';
     else if (F.length) html += '<p>' + esc(T('gait.noIssues')) + '</p>';
-    if (r.sideReason) html += '<p class="alert alert-adapt">' + esc(T('gait.sideTitle')) + ': ' + esc(T('gait.reason.' + r.sideReason)) + '</p>';
-    if (r.backReason) html += '<p class="alert alert-adapt">' + esc(T('gait.backTitle')) + ': ' + esc(T('gait.reason.' + r.backReason)) + '</p>';
+    // فیلم‌هایی که تحلیل نشدن (گزارش‌های قدیمی: sideReason / backReason)
+    var fails = (r.failed || []).slice();
+    if (r.sideReason) fails.push({ src: 'side', reason: r.sideReason });
+    if (r.backReason) fails.push({ src: 'back', reason: r.backReason });
+    fails.forEach(function (x) { html += '<p class="alert alert-adapt">' + esc(T('gait.' + x.src)) + ': ' + esc(T('gait.reason.' + x.reason)) + '</p>'; });
     html += '</section>';
     // ویدیوی تحلیل (فقط در همین نشست) یا تصویرهای کلیدی
-    if (live && (live.side || live.back)) {
+    if (live && live.inputs && Object.keys(live.inputs).length) {
       html += '<section class="card gait-anim"><h2>' + esc(T('gait.anim.title')) + '</h2><p class="small muted">' + esc(T('gait.anim.hint')) + '</p>' +
-        ['side', 'back'].filter(function (k) { return live[k]; }).map(function (k) {
-          return '<figure class="gait-player"><figcaption>' + esc(T(k === 'side' ? 'gait.sideTitle' : 'gait.backTitle')) + '</figcaption><canvas id="gp-' + k + '"></canvas>' +
+        ['side', 'back'].filter(function (k) { return live.inputs[k]; }).map(function (k) {
+          var L = live.inputs[k], view = L.res ? L.res.view : null;
+          var cap = T(view === 'back' ? 'gait.backTitle' : view === 'side' ? 'gait.sideTitle' : 'gait.' + k) + (L.reason ? ' · ' + T('gait.reason.' + L.reason) : '');
+          return '<figure class="gait-player"><figcaption>' + esc(cap) + '</figcaption><canvas id="gp-' + k + '"></canvas>' +
             '<div class="gp-ctrl"><button type="button" class="btn btn-primary" data-gp="' + k + '" data-act="toggle">' + esc(T('gait.anim.play')) + '</button>' +
             '<button type="button" class="btn btn-outline" data-gp="' + k + '" data-act="rate">' + esc(fa(T('gait.anim.speed', { r: 1 }))) + '</button>' +
             '<button type="button" class="btn btn-ghost gp-step" data-gp="' + k + '" data-act="prev" aria-label="' + esc(T('gait.anim.prev')) + '">' + chevron(isRtl() ? 'right' : 'left') + '</button>' +
@@ -1919,6 +1926,7 @@
       '<label class="btn btn-outline gait-pick">' + esc(T(f ? 'gait.change' : 'gait.pick')) + '<input type="file" accept="video/*" class="sr-only" data-gait-file="' + kind + '"></label></div>';
   }
   function renderGait() {
+    destroyGaitPlayers();
     var reports = state.gaitReports || [];
     var html = '<header class="page-head"><h1>' + esc(T('gait.title')) + '</h1></header><p class="page-intro">' + esc(T('gait.intro')) + '</p>';
     if (gaitBusy) {
@@ -1929,10 +1937,10 @@
     }
     html += '<section class="card"><details class="gait-how"' + (reports.length ? '' : ' open') + '><summary>' + esc(T('gait.howTitle')) + '</summary><ul>' +
       T('gait.how').map(function (x) { return '<li>' + esc(fa(x)) + '</li>'; }).join('') + '</ul></details>' +
-      gaitSlot('side') + gaitSlot('back') +
+      '<p class="small gait-one">' + esc(T('gait.oneEnough')) + '</p>' + gaitSlot('side') + gaitSlot('back') +
       (gaitError ? '<p class="form-errors">' + esc(gaitError) + '</p>' : '') +
-      '<button type="button" class="btn btn-primary btn-block" data-gait-run="1"' + (gaitFiles.side ? '' : ' disabled') + '>' + esc(T('gait.analyze')) + '</button>' +
-      '<p class="small muted">' + esc(gaitFiles.side ? T('gait.firstLoad') : T('gait.needSide')) + '</p></section>';
+      '<button type="button" class="btn btn-primary btn-block" data-gait-run="1"' + (gaitFiles.side || gaitFiles.back ? '' : ' disabled') + '>' + esc(T('gait.analyze')) + '</button>' +
+      '<p class="small muted">' + esc(gaitFiles.side || gaitFiles.back ? T('gait.firstLoad') : T('gait.needSide')) + '</p></section>';
     if (reports.length) {
       html += gaitReportHtml(reports[0], gaitLive && gaitLive.id === reports[0].id ? gaitLive : null);
       if (reports.length > 1) html += '<section class="card"><h2>' + esc(T('gait.history')) + '</h2><ul class="gait-hist">' + reports.slice(1).map(function (r) {
@@ -1943,50 +1951,63 @@
     app.innerHTML = html;
     initGaitPlayers();
   }
-  // پخش‌کننده‌ها روی ویدیوهای همین نشست؛ مفاصل مشکل‌دار قرمز، زاویه‌های زنده‌ی زانو و آرنج (یا لگن از پشت)
-  var gaitLive = null, gaitPlayers = {};
-  function initGaitPlayers() {
+  // پخش‌کننده‌ها: فقط وقتی صفحه‌ی تحلیل بازه، از روی فایل‌های همین نشست ساخته می‌شن و با ترک صفحه کامل از بین می‌رن
+  // (ویدیو، حلقه‌ی رسم و بوم)، تا حافظه‌ی گوشی برای بقیه‌ی صفحه‌ها آزاد بمونه.
+  var gaitLive = null, gaitPlayers = {}, gaitGen = 0;
+  function destroyGaitPlayers() {
+    gaitGen++;
+    Object.keys(gaitPlayers).forEach(function (k) {
+      var x = gaitPlayers[k];
+      if (x.pl) x.pl.destroy();
+      if (x.video) window.CoachPose.release(x.video);
+    });
     gaitPlayers = {};
+  }
+  function initGaitPlayers() {
+    destroyGaitPlayers();
     if (!gaitLive) return;
     var rep = (state.gaitReports || [])[0];
     if (!rep || rep.id !== gaitLive.id) return;
-    var st = {};
+    var gen = gaitGen, st = {};
     (rep.findings || []).forEach(function (f) { st[f.id] = f.status; });
     var bad = function (id) { return st[id] && st[id] !== 'good'; };
     var labels = { strike: T('gait.anim.strike'), pelvis: T('gait.anim.pelvis') };
-    ['side', 'back'].forEach(function (k) {
-      var L = gaitLive[k], cv = document.getElementById('gp-' + k);
+    Object.keys(gaitLive.inputs).forEach(function (k) {
+      var L = gaitLive.inputs[k], cv = document.getElementById('gp-' + k);
       if (!L || !cv) return;
-      var o = { duration: L.data.duration, labels: labels, digits: fa, bad: [] };
-      if (k === 'side') {
-        var n = L.res.near === 'l' ? 0 : 1, hip = 23 + n, knee = 25 + n, ank = 27 + n, sh = 11 + n, el = 13 + n, wr = 15 + n;
+      var res = L.res, o = { duration: L.data.duration, labels: labels, digits: fa, bad: [] };
+      if (res && res.view === 'side') {
+        var n = res.near === 'l' ? 0 : 1, hip = 23 + n, knee = 25 + n, ank = 27 + n, sh = 11 + n, el = 13 + n, wr = 15 + n;
         if (bad('kneeIc') || bad('overstride')) o.bad.push(knee, ank);
         if (bad('elbow')) o.bad.push(el);
         if (bad('head')) o.bad.push(7 + n);
         if (bad('trunk')) o.bad.push(sh);
         o.angles = [{ k: [hip, knee, ank], label: T('gait.anim.knee'), flex: true, bad: bad('kneeIc') }, { k: [sh, el, wr], label: T('gait.anim.elbow'), bad: bad('elbow') }];
-        o.strikes = (L.res.ic || []).map(function (i) { return L.data.frames[i] && L.data.frames[i].t; }).filter(function (t) { return t != null; });
-        o.startAt = L.res.keyT;
-      } else {
+        o.strikes = (res.ic || []).map(function (i) { return L.data.frames[i] && L.data.frames[i].t; }).filter(function (t) { return t != null; });
+        o.startAt = res.keyT;
+      } else if (res && res.view === 'back') {
         o.back = true; o.pelvisBad = bad('pelvic');
         if (bad('pelvic')) o.bad.push(23, 24);
         if (bad('valgus')) o.bad.push(25, 26);
         if (bad('pronation')) o.bad.push(29, 30);
-        o.startAt = L.res.keyT;
+        o.startAt = res.keyT;
       }
-      gaitPlayers[k] = window.CoachPose.player(cv, L.data.video, L.data, o);
+      gaitPlayers[k] = { pl: null, video: null };
+      window.CoachPose.openVideo(L.file).then(function (video) {
+        // صفحه در این فاصله عوض شده؟ همین‌جا آزاد کن
+        if (gen !== gaitGen || !document.body.contains(cv)) { window.CoachPose.release(video); return; }
+        gaitPlayers[k] = { video: video, pl: window.CoachPose.player(cv, video, L.data, o) };
+      }).catch(function () { /* پخش‌کننده نشد؛ گزارش و تصویرها سر جاشون‌ان */ });
     });
   }
   function releaseGaitLive() {
-    if (!gaitLive) return;
-    Object.keys(gaitPlayers).forEach(function (k) { gaitPlayers[k].pause(); });
-    ['side', 'back'].forEach(function (k) { if (gaitLive[k]) window.CoachPose.release(gaitLive[k].data.video); });
-    gaitLive = null; gaitPlayers = {};
+    destroyGaitPlayers();
+    gaitLive = null;
   }
   app.addEventListener('click', function (e) {
     var b = e.target.closest('[data-gp]');
     if (!b) return;
-    var pl = gaitPlayers[b.dataset.gp], act = b.dataset.act;
+    var pl = gaitPlayers[b.dataset.gp] && gaitPlayers[b.dataset.gp].pl, act = b.dataset.act;
     if (!pl) return;
     if (act === 'toggle') b.textContent = T(pl.toggle() ? 'gait.anim.pause' : 'gait.anim.play');
     else if (act === 'rate') { var r = pl.rate() === 1 ? 0.5 : pl.rate() === 0.5 ? 0.25 : 1; pl.setRate(r); b.textContent = fa(T('gait.anim.speed', { r: r })); }
@@ -2009,35 +2030,38 @@
     if (st && bar) { st.textContent = fa(text); bar.style.width = Math.round(p * 100) + '%'; } else if (location.hash === '#gait') renderGait();
   }
   function runGait() {
-    if (gaitBusy || !gaitFiles.side) return;
+    var slots = ['side', 'back'].filter(function (k) { return gaitFiles[k]; });
+    if (gaitBusy || !slots.length) return;
     gaitError = null;
     releaseGaitLive();
-    var side = null, back = null, failed = false, result = null;
+    var files = { side: gaitFiles.side, back: gaitFiles.back }, data = {}, failed = false, result = null;
     var pct = function (x) { return Math.round(x * 100); };
     gaitProgress(T('gait.stage.load'), 0.02);
-    window.CoachPose.load().catch(function () { failed = true; throw new Error('load'); }).then(function () {
-      return window.CoachPose.processVideo(gaitFiles.side, function (x) { gaitProgress(T('gait.stage.side', { p: pct(x) }), 0.05 + x * (gaitFiles.back ? 0.45 : 0.85)); });
-    }).then(function (d) {
-      side = d;
-      if (!gaitFiles.back) return null;
-      return window.CoachPose.processVideo(gaitFiles.back, function (x) { gaitProgress(T('gait.stage.back', { p: pct(x) }), 0.5 + x * 0.4); });
-    }).then(function (d) {
-      back = d;
+    // فیلم‌ها یکی‌یکی؛ هر کدوم که هست (یکی کافیه)
+    var chain = window.CoachPose.load().catch(function () { failed = true; throw new Error('load'); });
+    slots.forEach(function (k, i) {
+      chain = chain.then(function () {
+        var span = 0.88 / slots.length, base = 0.05 + i * span;
+        return window.CoachPose.processVideo(files[k], function (x) { gaitProgress(T('gait.stage.' + k, { p: pct(x) }), base + x * span); });
+      }).then(function (d) { data[k] = d; });
+    });
+    chain.then(function () {
       gaitProgress(T('gait.stage.report'), 0.95);
-      var r = window.CoachGait.analyze({ side: side, back: back, heightCm: state.profile.heightCm });
+      var r = window.CoachGait.analyze({ side: data.side, back: data.back, heightCm: state.profile.heightCm });
       result = r;
       var rep = { id: 'g' + Date.now().toString(36), date: C.dateKey(today()), at: new Date().toISOString(), score: r.score,
-        findings: r.findings, risks: r.risks, axes: r.axes, side: r.side && r.side.ok ? r.side.metrics : null, back: r.back && r.back.ok ? r.back.metrics : null,
-        sideReason: r.side && !r.side.ok ? r.side.reason : null, backReason: r.back && !r.back.ok ? r.back.reason : null };
+        findings: r.findings, risks: r.risks, axes: r.axes, side: r.side ? r.side.metrics : null, back: r.back ? r.back.metrics : null,
+        failed: r.failed };
+      // تصویر فریم کلیدی از ویدیوی خود هر زاویه (هر خونه‌ای که کاربر گذاشته)
       var shots = [];
-      if (r.side && r.side.ok) {
-        var nk = r.side.near === 'l' ? 25 : 26, fr = side.frames[r.side.keyFrame];
-        shots.push(window.CoachPose.keyImage(side.video, side.frames[r.side.keyFrame].t, fr && fr.lm, { focus: [nk - 2, nk, nk + 2], label: fa(T('gait.kneeLabel', { n: Math.round(r.side.metrics.kneeIc) })), labelAt: nk })
+      if (r.side) {
+        var ds = data[r.side.src], nk = r.side.near === 'l' ? 25 : 26, fr = ds.frames[r.side.keyFrame];
+        shots.push(window.CoachPose.keyImage(ds.video, fr ? fr.t : r.side.keyT, fr && fr.lm, { focus: [nk - 2, nk, nk + 2], label: fa(T('gait.kneeLabel', { n: Math.round(r.side.metrics.kneeIc) })), labelAt: nk })
           .then(function (u) { rep.imgSide = u; }));
       }
-      if (r.back && r.back.ok) {
-        var fb = back.frames[r.back.keyFrame];
-        shots.push(window.CoachPose.keyImage(back.video, fb.t, fb.lm, { focus: [23, 24, 25, 26] }).then(function (u) { rep.imgBack = u; }));
+      if (r.back) {
+        var db = data[r.back.src], fb = db.frames[r.back.keyFrame];
+        shots.push(window.CoachPose.keyImage(db.video, fb ? fb.t : r.back.keyT, fb && fb.lm, { focus: [23, 24, 25, 26] }).then(function (u) { rep.imgBack = u; }));
       }
       return Promise.all(shots).catch(function () { /* بدون تصویر هم گزارش کامله */ }).then(function () { return rep; });
     }).then(function (rep) {
@@ -2045,20 +2069,24 @@
       state.gaitReports = [rep].concat((state.gaitReports || []).map(function (x) { var y = Object.assign({}, x); delete y.imgSide; delete y.imgBack; return y; })).slice(0, GAIT_KEEP);
       save();
       gaitFiles = { side: null, back: null };
-      // ویدیوها برای پخش انیمیشنی در همین نشست نگه داشته می‌شن
-      gaitLive = { id: rep.id,
-        side: result.side && result.side.ok ? { data: side, res: result.side } : null,
-        back: result.back && result.back.ok ? { data: back, res: result.back } : null };
+      // برای پخش انیمیشنی فقط فایل‌ها و نقاط نگه داشته می‌شن (نه ویدیوی باز)؛ پخش‌کننده فقط وقتی این صفحه بازه ساخته می‌شه
+      var live = { id: rep.id, inputs: {} };
+      slots.forEach(function (k) {
+        if (!data[k]) return;
+        var res = [result.side, result.back].filter(function (x) { return x && x.src === k; })[0] || null;
+        var fail = (result.failed || []).filter(function (x) { return x.src === k; })[0];
+        live.inputs[k] = { file: files[k], data: { frames: data[k].frames, duration: data[k].duration, w: data[k].w, h: data[k].h }, res: res, reason: fail ? fail.reason : null };
+      });
+      gaitLive = live;
       showToast(T('gait.saved'));
     }).catch(function (e) {
       // کد کوتاه مرحله‌ی خطا (open / meta / seek / detect / short) برای پیدا کردن علت روی گوشی‌های مختلف
       gaitError = T(failed ? 'gait.err.load' : 'gait.err.video') + (e && e.code ? ' [' + e.code + ']' : '');
       if (window.console) console.warn('gait', e);
     }).then(function () {
-      // ویدیوهایی که در پخش انیمیشنی استفاده نمی‌شن آزاد می‌شن
-      [['side', side], ['back', back]].forEach(function (x) {
-        if (x[1] && x[1].video && !(gaitLive && gaitLive[x[0]] && gaitLive[x[0]].data === x[1])) window.CoachPose.release(x[1].video);
-      });
+      // همه‌چیز آزاد: ویدیوهای پردازش و خود تحلیلگر (گرافیک و حافظه)
+      Object.keys(data).forEach(function (k) { if (data[k] && data[k].video) { window.CoachPose.release(data[k].video); data[k].video = null; } });
+      window.CoachPose.unload();
       gaitBusy = null;
       if (location.hash === '#gait') renderGait();
     });

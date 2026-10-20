@@ -27,6 +27,13 @@
     return loading;
   }
 
+  // آزاد کردن کامل تحلیلگر (گرافیک WebGL و حافظه‌ی WebAssembly)؛ بار بعد از کش دوباره ساخته می‌شه.
+  // روی آیفون نگه داشتنش بعد از تحلیل، حافظه‌ی صفحه رو پر می‌کرد و بقیه‌ی صفحه‌ها کشیده نمی‌شدن.
+  function unload() {
+    var l = landmarker;
+    landmarker = null; loading = null;
+    if (l) { try { l.close(); } catch (e) { /* */ } }
+  }
   function once(el, ev, ms) {
     return new Promise(function (res, rej) {
       var to = setTimeout(function () { done(); rej(new Error('timeout: ' + ev)); }, ms || 8000);
@@ -233,9 +240,10 @@
     var S = smoothFrames(data.frames), g = canvas.getContext('2d');
     var W = Math.min(720, video.videoWidth), H = Math.round(video.videoHeight * W / video.videoWidth);
     canvas.width = W; canvas.height = H;
-    var dur = Math.min(o.duration || data.duration, video.duration || 99), playing = false, raf = 0, rate = 1, rec = null, onEnd = null;
+    var dur = Math.min(o.duration || data.duration, video.duration || 99), playing = false, raf = 0, rate = 1, rec = null, dead = false;
     o.digits = o.digits || String;
     function draw() {
+      if (dead) return;
       if (video.readyState >= 2) g.drawImage(video, 0, 0, W, H);
       var t = video.currentTime, lm = lmAt(S, t);
       if (lm) drawOverlay(g, lm, W, H, o);
@@ -245,6 +253,7 @@
       g.fillStyle = '#00c8a0'; g.fillRect(0, H - 4, W * Math.min(1, t / dur), 4);
     }
     function loop() {
+      if (dead) return;
       draw();
       if (video.currentTime >= dur - 0.03 || video.ended) {
         if (rec) { finish(); return; }
@@ -253,7 +262,7 @@
       }
       if (playing) raf = requestAnimationFrame(loop);
     }
-    function play() { if (playing) return; playing = true; video.playbackRate = rate; video.play().catch(function () {}); raf = requestAnimationFrame(loop); }
+    function play() { if (playing || dead) return; playing = true; video.playbackRate = rate; video.play().catch(function () {}); raf = requestAnimationFrame(loop); }
     function pause() { playing = false; cancelAnimationFrame(raf); video.pause(); draw(); }
     function step(n) {
       pause();
@@ -279,9 +288,16 @@
     }
     var first = o.startAt != null ? o.startAt : 0.001;
     seek(video, first).then(draw).catch(function () {});
+    // توقف کامل: حلقه‌ی رسم، پخش و ضبط؛ بوم خالی می‌شه تا حافظه‌ش آزاد بشه
+    function destroy() {
+      if (dead) return;
+      if (rec && rec.state !== 'inactive') { try { rec.stop(); } catch (e) { /* */ } }
+      rec = null; playing = false; cancelAnimationFrame(raf); video.pause();
+      dead = true; canvas.width = canvas.height = 1;
+    }
     return { play: play, pause: pause, toggle: function () { if (playing) pause(); else play(); return playing; }, step: step,
-      setRate: setRate, rate: function () { return rate; }, isPlaying: function () { return playing; }, record: record, draw: draw };
+      setRate: setRate, rate: function () { return rate; }, isPlaying: function () { return playing; }, record: record, draw: draw, destroy: destroy };
   }
 
-  root.CoachPose = { load: load, processVideo: processVideo, keyImage: keyImage, release: release, player: player, MAX_SEC: MAX_SEC };
+  root.CoachPose = { load: load, unload: unload, processVideo: processVideo, openVideo: openVideo, keyImage: keyImage, release: release, player: player, MAX_SEC: MAX_SEC };
 })(this);

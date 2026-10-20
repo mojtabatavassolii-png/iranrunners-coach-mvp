@@ -1192,3 +1192,4 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .gp-ctrl .btn { min-height: 44px; }
 .gp-step { min-width: 44px; padding-inline: 10px; }
 .gp-step svg { width: 20px; height: 20px; }
+.gait-one { margin: var(--sp-2) 0 0; color: var(--brand-deep); }
