@@ -1133,4 +1133,20 @@ test('مسابقه‌ی فرعی: پنجره‌ی سبک و ریکاوری بر 
   assert.strictEqual(C.raceDistLabel(21.1), C.RACE_LABELS['21']);
 });
 
+// ---------- تاریخ شروع انتخابی ----------
+test('تاریخ شروع: قبلش جلسه‌ای نیست، از همون روز جلسه‌ی آشنایی، هفته‌ی اول از شنبه‌ی بعد', function () {
+  var p = profileFor(5, { startDate: '2026-10-28' }); // چهارشنبه
+  assert.strictEqual(C.sessionFor(p, C.parseDate('2026-10-27')).type, 'none');
+  var wk = C.buildWeek(p, C.parseDate('2026-10-28'));
+  assert.strictEqual(wk.weekIndex, -1);
+  wk.days.forEach(function (d) { assert.strictEqual(d.type === 'none', d.date < '2026-10-28', d.date + ' ' + d.type); });
+  assert.ok(wk.days.some(function (d) { return d.date >= '2026-10-28' && d.type !== 'none' && d.type !== 'rest'; }));
+  var w0 = C.buildWeek(p, C.parseDate('2026-10-31')); // شنبه
+  assert.strictEqual(w0.weekIndex, 0); assert.strictEqual(w0.start, '2026-10-31');
+  // شروع روز شنبه: همون هفته، هفته‌ی اوله
+  var q = profileFor(5, { startDate: '2026-10-31' });
+  assert.strictEqual(C.buildWeek(q, C.parseDate('2026-10-31')).weekIndex, 0);
+  assert.strictEqual(C.sessionFor(q, C.parseDate('2026-10-30')).type, 'none');
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

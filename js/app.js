@@ -284,11 +284,13 @@
     var v = (location.hash || '#home').slice(1), sub = null;
     // مقاله‌ی آموزش: #learn/<شناسه>
     if (v.indexOf('learn/') === 0) { sub = v.slice(6); v = 'learn'; }
-    if (!state.profile || needsMigration()) v = 'onboarding';
+    // بدون پروفایل فقط فرم اولیه؛ به‌جز راهنما و مقاله‌ها که از لینک‌های «؟» و «بیشتر بدان» داخل خود فرم باز می‌شن
+    var noProfile = !state.profile || needsMigration();
+    if (noProfile && v !== 'guide' && v !== 'learn') v = 'onboarding';
     if (!VIEWS[v]) v = 'home';
     // نوار پایین: همه‌جا به‌جز ورود و فرم اولیه؛ صفحه‌های فرعی زیر تب مادرشون فعال می‌شن
     var tab = TAB_OF[v] || null;
-    tabbar.hidden = v === 'onboarding';
+    tabbar.hidden = v === 'onboarding' || noProfile;
     document.body.classList.toggle('has-tabbar', !tabbar.hidden);
     tabbar.querySelectorAll('a').forEach(function (a) {
       var on = a.dataset.tab === tab;
@@ -362,9 +364,49 @@
   var navDepth = 0;
   function navState() { var s = history.state; return s && typeof s === 'object' && s.depth != null ? s : null; }
   function setNav(s) { try { history.replaceState(s, ''); } catch (e) { /* */ } }
+  // پیش‌نویس فرم اولیه (مرحله، مقدار فیلدها و چرخ‌های زمان)، تا برگشت از راهنما یا مقاله چیزی رو پاک نکنه
+  var onbApi = null;
+  function onbDraft() {
+    var f = document.getElementById('onb');
+    if (!f || !onbApi) return null;
+    var fields = Array.prototype.map.call(f.elements, function (el) {
+      if (!el.name && !el.id) return null;
+      return { id: el.id || null, name: el.name || null, val: el.value, type: el.type, on: el.checked };
+    }).filter(Boolean);
+    var picks = Array.prototype.map.call(f.querySelectorAll('.tpick'), function (pk) {
+      var inp = pk.querySelector('input[type=hidden]');
+      return { id: pk.id.replace(/-picker$/, ''), val: inp ? inp.value : '', set: pk.classList.contains('is-set') };
+    });
+    return { step: onbApi.cur(), max: onbApi.max(), fields: fields, picks: picks };
+  }
+  function applyOnbDraft(d) {
+    var f = document.getElementById('onb');
+    if (!f || !d || !onbApi) return;
+    d.fields.forEach(function (x) {
+      var el = x.id ? document.getElementById(x.id) : null;
+      if (!el && x.name && (x.type === 'radio' || x.type === 'checkbox')) el = f.querySelector('input[name="' + x.name + '"][value="' + String(x.val).replace(/"/g, '\\"') + '"]');
+      if (!el && x.name) el = f.elements[x.name];
+      if (!el || el.type === 'hidden' || el.type === 'file' || el.length) return;
+      if (x.type === 'radio' || x.type === 'checkbox') el.checked = x.on; else el.value = x.val;
+    });
+    // فیلدهای وابسته (بخش‌های پنهان/نمایان، پیش‌نمایش سطح) با همون رویدادهای فرم همگام می‌شن
+    f.dispatchEvent(new Event('input', { bubbles: true }));
+    f.dispatchEvent(new Event('change', { bubbles: true }));
+    (d.picks || []).forEach(function (pk) {
+      var sec = C.parseTime(pk.val);
+      if (!sec) return;
+      window.CoachTimePicker.preset(pk.id, sec);
+      var el = document.getElementById(pk.id + '-picker');
+      if (pk.set && el) { el.classList.add('is-set'); var inp = el.querySelector('input[type=hidden]'); if (inp) inp.value = pk.val; }
+    });
+    onbApi.setMax(d.max || 1);
+    onbApi.go(d.step || 1, true);
+  }
   function snapshot() {
     var s = navState();
     if (!s) return;
+    var dr = onbDraft();
+    if (dr) s.onb = dr; else delete s.onb;
     s.y = Math.round(window.scrollY || 0);
     s.ui = { day: selectedDay, wk: viewWeekOffset, mo: monthOffset,
       open: Array.prototype.map.call(app.querySelectorAll('details[open][id]'), function (d) { return d.id; }) };
@@ -373,6 +415,7 @@
   function restore(s) {
     if (s.ui) { selectedDay = s.ui.day; viewWeekOffset = s.ui.wk || 0; monthOffset = s.ui.mo || 0; }
     route();
+    if (s.onb && location.hash === '#onboarding') applyOnbDraft(s.onb);
     if (s.ui && s.ui.open) s.ui.open.forEach(function (id) { var d = document.getElementById(id); if (d) d.open = true; });
     var y = s.y || 0;
     window.scrollTo(0, y);
@@ -479,6 +522,7 @@
       '</div></div>';
   }
 
+  var START_MAX_DAYS = 90;
   function renderOnboarding() {
     var p = state.profile || {};
     var editing = !!state.profile;
@@ -601,6 +645,9 @@
 
       // ۵. هدف و بقیه‌ی اطلاعات تخصصی
       step(5,
+        // تاریخ شروع برنامه: پیش‌فرض امروز (یا همون تاریخ قبلی در ویرایش)
+        '<div class="field"><label for="sdate">' + esc(T('onb.startDate')) + '</label><input id="sdate" name="startDate" type="date" min="' + (editing && p.startDate && p.startDate < todayKey ? p.startDate : todayKey) + '" max="' + C.dateKey(C.addDays(today(), START_MAX_DAYS)) + '" value="' + esc(p.startDate || todayKey) + '">' +
+        '<small class="muted" id="sdate-fa"></small><small class="muted">' + esc(T('onb.startDateHint')) + '</small></div>' +
         '<div class="field"><label for="gtype">' + esc(T('onb.goalType')) + '</label><select id="gtype" name="goalType">' +
         // ترتیب صریح (کلیدهای عددی در Object.keys جلو می‌افتن)
         ['none', '5', '10', '21', '42', 'ultra'].map(function (k) { return '<option value="' + k + '"' + (goal.type === k ? ' selected' : '') + '>' + esc(C.GOAL_TYPES[k]) + '</option>'; }).join('') +
@@ -717,6 +764,8 @@
     }
     form.addEventListener('input', syncRace);
     function syncDate() {
+      var sv = document.getElementById('sdate').value;
+      document.getElementById('sdate-fa').textContent = sv && I.getCalendar() === 'jalali' ? T('onb.raceDateEq', { d: faDate(sv) }) : '';
       var v = document.getElementById('rdate').value;
       // تاریخ ورودی مرورگر میلادیه؛ در تقویم شمسی معادلش نشون داده می‌شه
       document.getElementById('rdate-fa').textContent = v && I.getCalendar() === 'jalali' ? T('onb.raceDateEq', { d: faDate(v) }) : '';
@@ -782,6 +831,8 @@
       from.classList.add(fwd ? 'onb-out-fwd' : 'onb-out-back');
       setTimeout(show, 160);
     }
+    onbApi = { go: goStep, cur: function () { return cur; }, max: function () { return maxSeen; },
+      setMax: function (v) { maxSeen = Math.max(maxSeen, v); paintNav(); } };
     app.querySelectorAll('.onb-dot').forEach(function (d) {
       d.addEventListener('click', function () { goStep(Number(d.dataset.gotoStep)); });
     });
@@ -833,11 +884,16 @@
       // ۴. رکورد
       var pbObj = never ? null : readPb();
       if (pbObj === false) E(4, T('onb.err.pb'));
-      // ۵. هدف، روزها، محل، ضربان
+      // ۵. تاریخ شروع، هدف، روزها، محل، ضربان
+      var sd = String(fd.get('startDate') || '').trim(), maxStart = C.dateKey(C.addDays(today(), START_MAX_DAYS));
+      if (!sd) E(5, T('onb.err.startDate'));
+      else if (sd < todayKey && !(editing && sd === p.startDate)) E(5, T('onb.err.startPast'));
+      else if (sd > maxStart) E(5, fa(T('onb.err.startFar', { n: START_MAX_DAYS })));
       var gType = fd.get('goalType') || 'none', goalObj = { type: gType, date: null };
       if (gType !== 'none') {
         var rd = fd.get('raceDate');
         if (rd && C.daysBetween(today(), C.parseDate(rd)) < 1) E(5, T('onb.err.raceDate'));
+        else if (rd && sd && rd <= sd) E(5, T('onb.err.raceBeforeStart'));
         goalObj.date = rd || null;
         if (gType === 'ultra') {
           var num = function (n) { var v = String(fd.get(n) || '').trim(); return v === '' ? null : Number(v); };
@@ -868,7 +924,7 @@
         fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0, races: p.races || [],
         createdAt: p.createdAt || new Date().toISOString()
       };
-      return { errs: errs, next: next, pbObj: pbObj, curKm: curKm };
+      return { errs: errs, next: next, pbObj: pbObj, curKm: curKm, startDate: sd };
     }
 
     form.addEventListener('submit', function (e) {
@@ -900,7 +956,9 @@
       // تغییر سطح یا حجم فعلی = نقطه‌ی شروع جدید؛ بقیه‌ی تغییرات پیشرفت برنامه رو حفظ می‌کنن
       var keep = editing && !migrating && p.startDate && p.currentWeeklyKm === curKm && p.monthAvgKm === next.monthAvgKm && p.lastWeekKm === next.lastWeekKm &&
         C.assessLevel(p).level === C.assessLevel(next).level;
-      next.startDate = keep ? p.startDate : C.dateKey(today());
+      // تاریخ شروعی که کاربر انتخاب کرده؛ اگه دست نزده: همون قبلی (یا امروز، وقتی سطح/حجم عوض شده و تاریخ قبلی گذشته)
+      var chosen = r.startDate, todayK = C.dateKey(today());
+      next.startDate = !editing || chosen !== p.startDate ? chosen : (keep || p.startDate > todayK ? p.startDate : todayK);
       state.profile = next;
       save();
       showToast(T(editing ? 'onb.toastEdit' : 'onb.toastNew'));
@@ -1804,6 +1862,7 @@
       (done ? '<span class="pill pill-done">✓ ' + esc(T('home.done')) + '</span>' : (s.original ? '<span class="pill pill-adapt">' + esc(T('home.adjusted')) + '</span>' : '')) + '</div>' +
       '<div class="today-main">' + badge(s.type, s.label) + (s.km ? '<b class="today-target">' + t(s.target) + '</b>' : (s.minutes ? '<b class="today-target">' + tt('home.minutes', { n: s.minutes }) + '</b>' : '')) + '</div>' +
       (main ? '<p class="today-sum">' + t(main) + (wu ? ' <span class="muted">' + t(wu) + '</span>' : '') + '</p>' : '') +
+      (base.type === 'none' && state.profile.startDate > key ? '<p class="today-sum">' + esc(T('home.startsOn', { d: faDate(state.profile.startDate) })) + '</p>' : '') +
       (!ci && runDay && prevCheckin(key) && prevCheckin(key).pain ? painYesterdayBox() : '') +
       cta + '</section>';
   }

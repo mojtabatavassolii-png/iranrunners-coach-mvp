@@ -296,7 +296,7 @@
         vMp: 'marathon-pace finish', vTempo: 'with tempo sections'
       },
       rest: 'Full rest, or a light walk / stretching',
-      notStarted: 'The plan starts on your sign-up day.',
+      notStarted: 'Your plan starts on the start date you chose.',
       race: {
         ultraHow: 'Race day! Don\'t try anything new (shoes, food, clothing). Pace by effort (RPE), not by pace; the first half should feel easy.',
         ultraEst: ' Very rough estimated time: about {time} (equivalent to {km:d} {u} of flat running).',
@@ -496,6 +496,8 @@
       injuryPh: 'e.g. right knee pain last year, asthma',
       s6: '6. Race goal',
       goalType: 'Target race type',
+      startDate: 'When should your plan start?',
+      startDateHint: 'Your plan is laid out from this exact day. If it is mid-week, you get a few intro sessions until the next week starts.',
       raceDate: 'Race date (if you have a specific race)',
       raceDateEq: 'Solar Hijri date: {d}',
       ultraKm: 'Race distance ({u})',
@@ -544,6 +546,10 @@
         height: 'Height must be between 120 and 230 cm.',
         days: 'Choose at least one free day.',
         locs: 'Choose at least one training location.',
+        startDate: 'Choose the date your plan starts.',
+        startPast: 'The start date can\'t be before today.',
+        startFar: 'The start date can be at most {n} days from today.',
+        raceBeforeStart: 'The race date must be after your plan start date.',
         raceDate: 'The race date must be after today (or leave it empty).',
         ultraKm: 'Enter the trail race distance ({min} to {max} {u}).',
         ultraGain: 'Enter the race\'s total climb (metres of ascent); for a flat course enter 0 or a small number.',
@@ -1026,6 +1032,7 @@
     tabs: { aria: 'Main sections', home: 'Today', plan: 'Plan', progress: 'Progress', learn: 'Learn', profile: 'Profile' },
     home: {
       date: '{day} {date}',
+      startsOn: 'Your plan starts on {d}.',
       greet: { morning: 'Good morning', day: 'Good afternoon', evening: 'Good evening' },
       todayTitle: 'Today\'s session', done: 'Done', adjusted: 'Adjusted',
       cancelled: 'Don\'t train today because of pain.',
