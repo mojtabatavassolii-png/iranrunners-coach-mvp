@@ -1948,7 +1948,8 @@
       gaitFiles = { side: null, back: null };
       showToast(T('gait.saved'));
     }).catch(function (e) {
-      gaitError = T(failed ? 'gait.err.load' : 'gait.err.video');
+      // کد کوتاه مرحله‌ی خطا (open / meta / seek / detect / short) برای پیدا کردن علت روی گوشی‌های مختلف
+      gaitError = T(failed ? 'gait.err.load' : 'gait.err.video') + (e && e.code ? ' [' + e.code + ']' : '');
       if (window.console) console.warn('gait', e);
     }).then(function () {
       [side, back].forEach(function (d) { if (d && d.video) window.CoachPose.release(d.video); });
