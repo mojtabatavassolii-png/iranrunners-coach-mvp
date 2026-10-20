@@ -1103,7 +1103,7 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .tod-rows { display: grid; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .tod-row { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; }
 .tod-row.is-best { border-color: var(--brand); background: var(--brand-soft); }
-.tod-row.is-empty { opacity: 0.6; }
+.tod-row.is-empty { background: var(--bg); }
 .tod-name { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .tod-name small { color: var(--muted); font-size: var(--fs-xs); }
 .tod-vals { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--fs-md); color: var(--text); }
@@ -1131,3 +1131,40 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .race-add { margin-top: var(--sp-3); border-top: 1px solid var(--line); padding-top: var(--sp-2); }
 .race-add > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--brand-deep); }
 .race-add form { display: grid; gap: var(--sp-2); margin-top: var(--sp-2); }
+
+/* تحلیل فرم دویدن */
+.gait-how > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--brand-deep); }
+.gait-how ul { margin: 0 0 var(--sp-2); padding-inline-start: 18px; }
+.gait-slot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); border: 1.5px dashed var(--line); border-radius: 12px; padding: 10px 12px; margin: var(--sp-2) 0; }
+.gait-slot.has-file { border-style: solid; border-color: var(--brand); background: var(--brand-soft); }
+.gait-slot > div { display: grid; gap: 2px; min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+.gait-file { color: var(--brand-deep); font-weight: 600; overflow-wrap: anywhere; }
+.gait-pick { flex: 0 0 auto; }
+.gait-busy { text-align: center; }
+.gait-bar { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; margin: var(--sp-2) 0; }
+.gait-bar i { display: block; height: 100%; background: var(--brand); border-radius: 5px; transition: width .3s; }
+.gait-score { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin: var(--sp-2) 0; }
+.gait-score b { font-size: var(--fs-xl); color: var(--brand-deep); }
+.gait-score span { color: var(--muted); font-size: var(--fs-md); }
+.gait-report h3 { font-size: var(--fs-base); margin: var(--sp-3) 0 4px; }
+.gait-pri { margin: 0; padding-inline-start: 22px; }
+.gait-key { margin: 0 0 var(--sp-3); }
+.gait-key img { width: 100%; height: auto; border-radius: 12px; display: block; }
+.gait-key figcaption { font-size: var(--fs-sm); color: var(--muted); margin-top: 4px; }
+.gait-items { display: grid; gap: var(--sp-2); }
+.gait-item { border: 1.5px solid var(--line); border-inline-start-width: 5px; border-radius: 12px; padding: 10px 12px; }
+.gait-item p { margin: 4px 0 0; }
+.gait-item.gi-good { border-inline-start-color: #0ca30c; }
+.gait-item.gi-warn { border-inline-start-color: #e0a100; }
+.gait-item.gi-bad { border-inline-start-color: var(--accent); }
+.gi-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.gi-chip { font-size: var(--fs-xs); font-weight: 700; border-radius: 999px; padding: 1px 10px; white-space: nowrap; background: var(--bg); }
+.gi-good .gi-chip { color: #0a7a0a; }
+.gi-warn .gi-chip { color: #8a5a00; }
+.gi-bad .gi-chip { color: var(--accent-deep); }
+.gi-val { font-weight: 700; }
+.gait-methods > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--brand-deep); font-weight: 600; }
+.gait-hist { list-style: none; margin: 0; padding: 0; }
+.gait-hist li { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); min-height: 44px; }
+.gait-hist li:first-child { border-top: 0; }
+.gait-hist button { margin-inline-start: auto; min-height: 44px; }

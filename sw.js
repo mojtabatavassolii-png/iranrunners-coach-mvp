@@ -5,8 +5,12 @@
  * - بقیه (آیکون‌ها، فونت): کش و به‌روزرسانی در پس‌زمینه.
  * با هر انتشار، VERSION و نسخه‌ی فایل‌ها در index.html با هم بالا می‌رن (تست این هماهنگی رو بررسی می‌کنه).
  */
-var VERSION = '45';
+var VERSION = '46';
 var CACHE = 'coach-v' + VERSION;
+// فایل‌های بزرگ تحلیل دویدن (MediaPipe و مدل، حدود ۳۵ مگابایت): کش جدا و ماندگار، فقط بعد از اولین استفاده؛
+// با انتشار نسخه‌ی تازه‌ی اپ پاک نمی‌شن. با عوض شدن نسخه‌ی MediaPipe، این اسم عوض می‌شه.
+var BIG_CACHE = 'coach-mp-1.1.1';
+function isBig(url) { return url.pathname.indexOf('/js/vendor/mediapipe/') >= 0 || url.pathname.indexOf('/models/') >= 0; }
 var SHELL = [
   './',
   'index.html',
@@ -21,6 +25,8 @@ var SHELL = [
   'js/logic.js?v=' + VERSION,
   'js/charts.js?v=' + VERSION,
   'js/timepicker.js?v=' + VERSION,
+  'js/gait.js?v=' + VERSION,
+  'js/pose.js?v=' + VERSION,
   'js/app.js?v=' + VERSION,
   'img/logo.png?v=' + VERSION,
   'img/favicon.png',
@@ -35,7 +41,7 @@ self.addEventListener('install', function (e) {
 
 self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (keys) {
-    return Promise.all(keys.filter(function (k) { return k.indexOf('coach-') === 0 && k !== CACHE; }).map(function (k) { return caches.delete(k); }));
+    return Promise.all(keys.filter(function (k) { return k.indexOf('coach-') === 0 && k !== CACHE && k !== BIG_CACHE; }).map(function (k) { return caches.delete(k); }));
   }).then(function () { return self.clients.claim(); }));
 });
 
@@ -62,6 +68,15 @@ self.addEventListener('fetch', function (e) {
       return res;
     }).catch(function () {
       return caches.match(req, { ignoreSearch: true }).then(function (r) { return r || caches.match('./'); });
+    }));
+    return;
+  }
+  // MediaPipe و مدل: اول کش ماندگار
+  if (sameOrigin && isBig(url)) {
+    e.respondWith(caches.open(BIG_CACHE).then(function (c) {
+      return c.match(req).then(function (r) {
+        return r || fetch(req).then(function (res) { if (res.ok) c.put(req, res.clone()); return res; });
+      });
     }));
     return;
   }

@@ -268,7 +268,7 @@
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, settings: renderSettings, progress: renderProgress, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
+  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, gait: renderGait, settings: renderSettings, progress: renderProgress, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
   function route() {
     var loginMode = !isEntered();
     document.body.classList.toggle('login-mode', loginMode);
@@ -331,7 +331,7 @@
     if (e.target.closest && e.target.closest('[data-focus-period]')) pendingFocus = 'period-card';
   }, true);
   // صفحه‌های فرعی: نوار برگشت بالای صفحه (برگشت واقعی تاریخچه، وگرنه تب مادر)
-  var SUB_PAGES = { checkin: '#home', race: '#profile', fitness: '#progress', guide: '#learn', settings: '#profile' };
+  var SUB_PAGES = { checkin: '#home', race: '#profile', gait: '#progress', fitness: '#progress', guide: '#learn', settings: '#profile' };
   function backBar(v) {
     var s = navState(), from = s && s.depth > 0 ? s.from : null;
     return '<nav class="back-bar"><a class="learn-back" href="' + SUB_PAGES[v] + '"' + (from ? ' data-nav-back="1"' : '') + '>' +
@@ -339,7 +339,7 @@
   }
   // تب مادر هر صفحه
   var TABS = ['home', 'plan', 'progress', 'learn', 'profile'];
-  var TAB_OF = { home: 'home', checkin: 'home', race: 'profile', plan: 'plan', progress: 'progress', fitness: 'progress',
+  var TAB_OF = { home: 'home', checkin: 'home', race: 'profile', gait: 'progress', plan: 'plan', progress: 'progress', fitness: 'progress',
     learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile' };
   // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
   var lastView = null, lastTab = null;
@@ -1824,6 +1824,152 @@
   });
 
   // =====================================================================
+  // تحلیل فرم دویدن: MediaPipe Pose داخل گوشی (js/pose.js) → قواعد اختصاصی (js/gait.js) → گزارش
+  // ویدیو فقط در حافظه‌ی همین صفحه می‌مونه؛ فقط عددها و دو تصویر کوچک ذخیره می‌شن.
+  // =====================================================================
+  var gaitFiles = { side: null, back: null }, gaitBusy = null, gaitError = null, GAIT_KEEP = 5;
+  var GAIT_SIDE = ['head', 'trunk', 'elbow', 'kneeIc', 'overstride', 'strike', 'cadence', 'vo', 'timing'];
+  function gaitValue(f) {
+    var I0 = 'gait.items.' + f.id + '.v', n = f.value;
+    switch (f.id) {
+      case 'head': return T(I0, { n: n, g: f.gaze, look: T('gait.look.' + f.look) });
+      case 'overstride': return T(I0, { n: n, s: f.shank });
+      case 'strike': return T(I0, { s: T('gait.strikeName.' + f.strike), n: n });
+      case 'pelvic': case 'valgus': return T(I0, { l: f.left, r: f.right });
+      case 'armCross': return T(I0, { n: Math.round(n * 100) });
+      default: return T(I0, { n: n });
+    }
+  }
+  function gaitText(f) {
+    var k = 'gait.items.' + f.id + '.';
+    if (f.status === 'good') return T(k + 'good');
+    if (f.id === 'head') return T(k + (f.look === 'down' ? 'down' : f.look === 'up' ? 'up' : 'fwd'));
+    if (f.id === 'trunk') return T(k + (f.lean === 'back' ? 'back' : 'forward'));
+    if (f.id === 'elbow') return T(k + (f.bend === 'tight' ? 'tight' : 'straight'));
+    if (f.id === 'kneeIc') return T(k + (f.form === 'bent' ? 'bent' : 'straight'));
+    if (f.id === 'cadence') return T(k + 'fix', { n: f.value, t: Math.round(f.value * 1.05) });
+    return T(k + 'fix');
+  }
+  function gaitItem(f) {
+    return '<article class="gait-item gi-' + f.status + '"><div class="gi-head"><b>' + esc(T('gait.items.' + f.id + '.t')) + '</b>' +
+      '<span class="gi-chip">' + esc(T('gait.status.' + f.status)) + '</span></div>' +
+      '<p class="gi-val">' + esc(fa(gaitValue(f))) + '</p>' +
+      '<p class="small muted">' + esc(T('gait.ref') + fa(T('gait.items.' + f.id + '.ref'))) + '</p>' +
+      '<p class="gi-text">' + esc(fa(gaitText(f))) + '</p></article>';
+  }
+  function gaitReportHtml(r) {
+    var F = r.findings || [], cnt = { good: 0, warn: 0, bad: 0 };
+    F.forEach(function (f) { cnt[f.status]++; });
+    var pri = F.filter(function (f) { return f.status !== 'good'; }).slice(0, 3);
+    var sideF = F.filter(function (f) { return GAIT_SIDE.indexOf(f.id) >= 0; }), backF = F.filter(function (f) { return GAIT_SIDE.indexOf(f.id) < 0; });
+    var img = function (src, cap) { return src ? '<figure class="gait-key"><img src="' + src + '" alt="' + esc(cap) + '"><figcaption>' + esc(cap) + '</figcaption></figure>' : ''; };
+    var html = '<section class="card gait-report" id="gait-report"><h2>' + esc(T('gait.report')) + '</h2><p class="small muted">' + esc(faDate(r.date)) + '</p>';
+    if (r.score != null) html += '<div class="gait-score"><b>' + esc(fa(T('gait.scoreOf', { n: r.score }))) + '</b><span>' + esc(fa(T('gait.counts', cnt))) + '</span></div>';
+    html += '<h3>' + esc(T('gait.priorities')) + '</h3>' + (pri.length ? '<ol class="gait-pri">' + pri.map(function (f) {
+      return '<li><b>' + esc(T('gait.items.' + f.id + '.t')) + '</b> <span class="muted small">' + esc(T('gait.status.' + f.status)) + '</span></li>';
+    }).join('') + '</ol>' : '<p>' + esc(T('gait.noIssues')) + '</p>');
+    if (r.sideReason) html += '<p class="alert alert-adapt">' + esc(T('gait.sideTitle')) + ': ' + esc(T('gait.reason.' + r.sideReason)) + '</p>';
+    if (r.backReason) html += '<p class="alert alert-adapt">' + esc(T('gait.backTitle')) + ': ' + esc(T('gait.reason.' + r.backReason)) + '</p>';
+    html += '</section>';
+    if (sideF.length) html += '<section class="card"><h2>' + esc(T('gait.sideTitle')) + '</h2>' + img(r.imgSide, T('gait.keySide')) + '<div class="gait-items">' + sideF.map(gaitItem).join('') + '</div></section>';
+    if (backF.length) html += '<section class="card"><h2>' + esc(T('gait.backTitle')) + '</h2>' + img(r.imgBack, T('gait.keyBack')) + '<div class="gait-items">' + backF.map(gaitItem).join('') + '</div></section>';
+    html += '<section class="card"><p class="small">' + esc(T('gait.disclaimer')) + '</p><details class="gait-methods"><summary>' + esc(T('gait.methodsTitle')) + '</summary><p class="small muted">' + esc(fa(T('gait.methods'))) + '</p></details></section>';
+    return html;
+  }
+  function gaitSlot(kind) {
+    var f = gaitFiles[kind];
+    return '<div class="gait-slot' + (f ? ' has-file' : '') + '"><div><b>' + esc(T('gait.' + kind)) + '</b><span class="small muted">' + esc(T('gait.' + kind + 'Hint')) + '</span>' +
+      (f ? '<span class="small gait-file">' + esc(f.name) + '</span>' : '') + '</div>' +
+      '<label class="btn btn-outline gait-pick">' + esc(T(f ? 'gait.change' : 'gait.pick')) + '<input type="file" accept="video/*" class="sr-only" data-gait-file="' + kind + '"></label></div>';
+  }
+  function renderGait() {
+    var reports = state.gaitReports || [];
+    var html = '<header class="page-head"><h1>' + esc(T('gait.title')) + '</h1></header><p class="page-intro">' + esc(T('gait.intro')) + '</p>';
+    if (gaitBusy) {
+      html += '<section class="card gait-busy" aria-live="polite"><p id="gait-stage">' + esc(fa(gaitBusy.text)) + '</p>' +
+        '<div class="gait-bar"><i id="gait-bar" style="width:' + Math.round(gaitBusy.p * 100) + '%"></i></div><p class="small muted">' + esc(T('gait.busyHint')) + '</p></section>';
+      app.innerHTML = html;
+      return;
+    }
+    html += '<section class="card"><details class="gait-how"' + (reports.length ? '' : ' open') + '><summary>' + esc(T('gait.howTitle')) + '</summary><ul>' +
+      T('gait.how').map(function (x) { return '<li>' + esc(fa(x)) + '</li>'; }).join('') + '</ul></details>' +
+      gaitSlot('side') + gaitSlot('back') +
+      (gaitError ? '<p class="form-errors">' + esc(gaitError) + '</p>' : '') +
+      '<button type="button" class="btn btn-primary btn-block" data-gait-run="1"' + (gaitFiles.side ? '' : ' disabled') + '>' + esc(T('gait.analyze')) + '</button>' +
+      '<p class="small muted">' + esc(gaitFiles.side ? T('gait.firstLoad') : T('gait.needSide')) + '</p></section>';
+    if (reports.length) {
+      html += gaitReportHtml(reports[0]);
+      if (reports.length > 1) html += '<section class="card"><h2>' + esc(T('gait.history')) + '</h2><ul class="gait-hist">' + reports.slice(1).map(function (r) {
+        return '<li><span>' + esc(faDate(r.date)) + '</span><b>' + esc(fa(T('gait.histRow', { s: r.score == null ? '—' : r.score }))) + '</b>' +
+          '<button type="button" class="linklike small" data-gait-del="' + esc(r.id) + '">' + esc(T('gait.remove')) + '</button></li>';
+      }).join('') + '</ul></section>';
+    }
+    app.innerHTML = html;
+  }
+  function gaitProgress(text, p) {
+    gaitBusy = { text: text, p: p };
+    var st = document.getElementById('gait-stage'), bar = document.getElementById('gait-bar');
+    if (st && bar) { st.textContent = fa(text); bar.style.width = Math.round(p * 100) + '%'; } else if (location.hash === '#gait') renderGait();
+  }
+  function runGait() {
+    if (gaitBusy || !gaitFiles.side) return;
+    gaitError = null;
+    var side = null, back = null, failed = false;
+    var pct = function (x) { return Math.round(x * 100); };
+    gaitProgress(T('gait.stage.load'), 0.02);
+    window.CoachPose.load().catch(function () { failed = true; throw new Error('load'); }).then(function () {
+      return window.CoachPose.processVideo(gaitFiles.side, function (x) { gaitProgress(T('gait.stage.side', { p: pct(x) }), 0.05 + x * (gaitFiles.back ? 0.45 : 0.85)); });
+    }).then(function (d) {
+      side = d;
+      if (!gaitFiles.back) return null;
+      return window.CoachPose.processVideo(gaitFiles.back, function (x) { gaitProgress(T('gait.stage.back', { p: pct(x) }), 0.5 + x * 0.4); });
+    }).then(function (d) {
+      back = d;
+      gaitProgress(T('gait.stage.report'), 0.95);
+      var r = window.CoachGait.analyze({ side: side, back: back, heightCm: state.profile.heightCm });
+      var rep = { id: 'g' + Date.now().toString(36), date: C.dateKey(today()), at: new Date().toISOString(), score: r.score,
+        findings: r.findings, side: r.side && r.side.ok ? r.side.metrics : null, back: r.back && r.back.ok ? r.back.metrics : null,
+        sideReason: r.side && !r.side.ok ? r.side.reason : null, backReason: r.back && !r.back.ok ? r.back.reason : null };
+      var shots = [];
+      if (r.side && r.side.ok) {
+        var nk = r.side.near === 'l' ? 25 : 26, fr = side.frames[r.side.keyFrame];
+        shots.push(window.CoachPose.keyImage(side.video, side.frames[r.side.keyFrame].t, fr && fr.lm, { focus: [nk - 2, nk, nk + 2], label: fa(T('gait.kneeLabel', { n: Math.round(r.side.metrics.kneeIc) })), labelAt: nk })
+          .then(function (u) { rep.imgSide = u; }));
+      }
+      if (r.back && r.back.ok) {
+        var fb = back.frames[r.back.keyFrame];
+        shots.push(window.CoachPose.keyImage(back.video, fb.t, fb.lm, { focus: [23, 24, 25, 26] }).then(function (u) { rep.imgBack = u; }));
+      }
+      return Promise.all(shots).catch(function () { /* بدون تصویر هم گزارش کامله */ }).then(function () { return rep; });
+    }).then(function (rep) {
+      // فقط آخرین گزارش‌ها؛ تصویرها فقط برای آخرین گزارش نگه داشته می‌شن (حجم حافظه)
+      state.gaitReports = [rep].concat((state.gaitReports || []).map(function (x) { var y = Object.assign({}, x); delete y.imgSide; delete y.imgBack; return y; })).slice(0, GAIT_KEEP);
+      save();
+      gaitFiles = { side: null, back: null };
+      showToast(T('gait.saved'));
+    }).catch(function (e) {
+      gaitError = T(failed ? 'gait.err.load' : 'gait.err.video');
+      if (window.console) console.warn('gait', e);
+    }).then(function () {
+      [side, back].forEach(function (d) { if (d && d.video) window.CoachPose.release(d.video); });
+      gaitBusy = null;
+      if (location.hash === '#gait') renderGait();
+    });
+  }
+  app.addEventListener('change', function (e) {
+    var k = e.target.dataset && e.target.dataset.gaitFile;
+    if (!k) return;
+    gaitFiles[k] = e.target.files && e.target.files[0] || null;
+    gaitError = null;
+    renderGait();
+  });
+  app.addEventListener('click', function (e) {
+    if (e.target.closest('[data-gait-run]')) { runGait(); return; }
+    var d = e.target.closest('[data-gait-del]');
+    if (d) { state.gaitReports = (state.gaitReports || []).filter(function (r) { return r.id !== d.dataset.gaitDel; }); save(); renderGait(); }
+  });
+
+  // =====================================================================
   // خانه / امروز: کارت‌های جمع‌وجور به ترتیب اولویت
   // =====================================================================
   function greetKey() {
@@ -2003,7 +2149,8 @@
       ['4w', '3m', 'all'].map(function (k) {
         return '<button type="button" data-prange="' + k + '" aria-pressed="' + (k === rk) + '">' + esc(T('progress.r' + (k === '4w' ? '4w' : k === '3m' ? '3m' : 'All'))) + '</button>';
       }).join('') + '</div></header><p class="page-intro">' + esc(T('progress.intro')) + '</p>' +
-      (function () { var f = C.currentFitness(state.profile); return linkCard('#fitness', T('profile.linkFitness'), f ? 'VDOT ' + fa(f.vdot.toFixed(1)) + T('progress.sep') + T('profile.fitnessSub') : T('profile.registerTest')); })();
+      (function () { var f = C.currentFitness(state.profile); return linkCard('#fitness', T('profile.linkFitness'), f ? 'VDOT ' + fa(f.vdot.toFixed(1)) + T('progress.sep') + T('profile.fitnessSub') : T('profile.registerTest')); })() +
+      linkCard('#gait', T('gait.title'), T('gait.linkSub'));
 
     var W = a.weeks, wkWithRuns = W.filter(function (w) { return w.runs > 0; }).length;
     var pc = progCtx(a, rk === '4w' ? 4 : 13);
