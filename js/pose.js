@@ -139,6 +139,7 @@
         });
         if (opts.label && opts.labelAt != null) {
           var q = pt(opts.labelAt);
+          g.direction = /[\u0600-\u06FF]/.test(opts.label) ? 'rtl' : 'ltr'; g.textAlign = 'left';
           g.font = '600 15px Vazirmatn, sans-serif';
           var w = g.measureText(opts.label).width + 12;
           var x = Math.min(W - w - 4, q[0] + 10), y = Math.max(4, q[1] - 30);
@@ -155,5 +156,132 @@
     if (video.parentNode) video.parentNode.removeChild(video);
   }
 
-  root.CoachPose = { load: load, processVideo: processVideo, keyImage: keyImage, release: release, MAX_SEC: MAX_SEC };
+  // ---------- پخش انیمیشنی: اسکلت روی فریم‌های خود ویدیو، هم‌زمان با دویدن ----------
+  var LEFT = { 11: 1, 13: 1, 15: 1, 23: 1, 25: 1, 27: 1, 29: 1, 31: 1, 7: 1 }, RIGHT = { 12: 1, 14: 1, 16: 1, 24: 1, 26: 1, 28: 1, 30: 1, 32: 1, 8: 1 };
+  var COL = { l: '#4aa3ff', r: '#ff8a5c', c: '#ffffff', bad: '#ff3b30' };
+  // صاف کردن ملایم برای نمایش (لرزش نقاط کمتر)، فقط بین فریم‌های پشت‌سرهم
+  function smoothFrames(F) {
+    return F.map(function (f, i) {
+      if (!f || !f.lm) return null;
+      return f.lm.map(function (p, k) {
+        var sx = 0, sy = 0, c = 0;
+        for (var j = i - 1; j <= i + 1; j++) { var q = F[j] && F[j].lm; if (q) { sx += q[k][0]; sy += q[k][1]; c++; } }
+        return [sx / c, sy / c, p[2]];
+      });
+    });
+  }
+  function lmAt(S, t) {
+    var x = Math.max(0, (t - 0.001) / STEP), i = Math.floor(x), f = x - i, a = S[i], b = S[i + 1];
+    if (a && b) return a.map(function (p, k) { return [p[0] + (b[k][0] - p[0]) * f, p[1] + (b[k][1] - p[1]) * f, p[2]]; });
+    return a || b || S[i - 1] || null;
+  }
+  function angleAt(lm, a, b, c, W, H) {
+    var v1x = (lm[a][0] - lm[b][0]) * W, v1y = (lm[a][1] - lm[b][1]) * H, v2x = (lm[c][0] - lm[b][0]) * W, v2y = (lm[c][1] - lm[b][1]) * H;
+    var d = Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y);
+    return d ? Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / d))) * 180 / Math.PI : null;
+  }
+  function tag(g, text, x, y, W, color) {
+    // جهت متن بوم از صفحه (راست‌به‌چپ) ارث می‌بره و متن از جعبه‌ش جدا می‌افته؛ همیشه چپ‌به‌راست با تراز چپ
+    // جهت متن بر اساس خود برچسب (فارسی راست‌به‌چپ تا علامت درجه درست بیفته)؛ تراز «left» مطلقه
+    g.direction = /[\u0600-\u06FF]/.test(text) ? 'rtl' : 'ltr'; g.textAlign = 'left';
+    g.font = '700 ' + Math.round(Math.max(13, W / 34)) + 'px Vazirmatn, sans-serif';
+    var w = g.measureText(text).width + 12, h = Math.round(Math.max(20, W / 22));
+    x = Math.max(4, Math.min(W - w - 4, x)); y = Math.max(4, y);
+    g.fillStyle = 'rgba(10, 30, 28, 0.82)'; g.fillRect(x, y, w, h);
+    g.fillStyle = color || '#fff'; g.fillText(text, x + 6, y + h * 0.72);
+  }
+  function drawOverlay(g, lm, W, H, o) {
+    var pt = function (k) { return [lm[k][0] * W, lm[k][1] * H]; }, lw = Math.max(2.5, W / 160), r = Math.max(4, W / 110);
+    g.lineCap = 'round';
+    LINKS.forEach(function (l) {
+      var a = pt(l[0]), b = pt(l[1]), side = LEFT[l[0]] && LEFT[l[1]] ? 'l' : RIGHT[l[0]] && RIGHT[l[1]] ? 'r' : 'c';
+      g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = lw + 2; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+      g.strokeStyle = COL[side]; g.lineWidth = lw; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+    });
+    for (var k = 11; k <= 32; k++) {
+      if (k > 16 && k < 23) continue; // انگشت‌های دست
+      var p = pt(k), bad = o.bad && o.bad.indexOf(k) >= 0;
+      g.beginPath(); g.arc(p[0], p[1], bad ? r * 1.6 : r, 0, Math.PI * 2);
+      g.fillStyle = bad ? COL.bad : '#fff'; g.fill();
+      g.lineWidth = 2; g.strokeStyle = bad ? '#fff' : (LEFT[k] ? COL.l : COL.r); g.stroke();
+    }
+    // زاویه‌های زنده (مثلاً خم زانو و آرنج سمت نزدیک)
+    (o.angles || []).forEach(function (a) {
+      var v = angleAt(lm, a.k[0], a.k[1], a.k[2], W, H);
+      if (v == null) return;
+      var val = a.flex ? 180 - v : v, q = pt(a.k[1]);
+      tag(g, a.label + ' ' + o.digits(Math.round(val)) + '°', q[0] + r * 2, q[1] - r * 4, W, a.bad ? '#ffb4ab' : '#fff');
+    });
+    // از پشت: خط لگن و خط افق برای دیدن افت لگن
+    if (o.back) {
+      var l = pt(23), rr = pt(24), cx = (l[0] + rr[0]) / 2, cy = (l[1] + rr[1]) / 2, hw = Math.abs(rr[0] - l[0]) * 0.9;
+      g.setLineDash([6, 5]); g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(cx - hw, cy); g.lineTo(cx + hw, cy); g.stroke(); g.setLineDash([]);
+      var tilt = Math.atan2(rr[1] - l[1], Math.abs(rr[0] - l[0]) || 1) * 180 / Math.PI;
+      tag(g, o.labels.pelvis + ' ' + o.digits(Math.abs(Math.round(tilt))) + '°', cx + hw + 6, cy - 12, W, o.pelvisBad ? '#ffb4ab' : '#fff');
+    }
+  }
+  function pickMime() {
+    if (!window.MediaRecorder) return null;
+    var c = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    for (var i = 0; i < c.length; i++) if (!MediaRecorder.isTypeSupported || MediaRecorder.isTypeSupported(c[i])) return c[i];
+    return null;
+  }
+  // canvas: بوم صفحه؛ video: ویدیوی تحلیل‌شده (همون که پردازش شد)؛ data.frames: نقاط هر فریم
+  // o: { duration, angles, bad, back, pelvisBad, strikes (زمان‌های فرود)، labels، digits }
+  function player(canvas, video, data, o) {
+    var S = smoothFrames(data.frames), g = canvas.getContext('2d');
+    var W = Math.min(720, video.videoWidth), H = Math.round(video.videoHeight * W / video.videoWidth);
+    canvas.width = W; canvas.height = H;
+    var dur = Math.min(o.duration || data.duration, video.duration || 99), playing = false, raf = 0, rate = 1, rec = null, onEnd = null;
+    o.digits = o.digits || String;
+    function draw() {
+      if (video.readyState >= 2) g.drawImage(video, 0, 0, W, H);
+      var t = video.currentTime, lm = lmAt(S, t);
+      if (lm) drawOverlay(g, lm, W, H, o);
+      if (o.strikes && o.strikes.some(function (s) { return Math.abs(s - t) < 0.05; })) tag(g, o.labels.strike, 8, 8, W, '#ffd60a');
+      // نوار زمان
+      g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(0, H - 4, W, 4);
+      g.fillStyle = '#00c8a0'; g.fillRect(0, H - 4, W * Math.min(1, t / dur), 4);
+    }
+    function loop() {
+      draw();
+      if (video.currentTime >= dur - 0.03 || video.ended) {
+        if (rec) { finish(); return; }
+        video.currentTime = 0.001;
+        if (playing) video.play().catch(function () {});
+      }
+      if (playing) raf = requestAnimationFrame(loop);
+    }
+    function play() { if (playing) return; playing = true; video.playbackRate = rate; video.play().catch(function () {}); raf = requestAnimationFrame(loop); }
+    function pause() { playing = false; cancelAnimationFrame(raf); video.pause(); draw(); }
+    function step(n) {
+      pause();
+      return seek(video, Math.max(0.001, Math.min(dur - STEP, video.currentTime + n * STEP))).then(draw);
+    }
+    function setRate(r) { rate = r; video.playbackRate = r; }
+    function finish() {
+      var r = rec; rec = null; pause();
+      if (r && r.state !== 'inactive') r.stop();
+    }
+    // ساخت فایل ویدیو از همین پخش (با همون سرعت انتخاب‌شده)
+    function record() {
+      var mime = pickMime();
+      if (!mime || !canvas.captureStream) return Promise.reject(new Error('noRecorder'));
+      return new Promise(function (resolve, reject) {
+        pause();
+        var chunks = [], stream = canvas.captureStream(30), mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4e6 });
+        mr.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+        mr.onstop = function () { stream.getTracks().forEach(function (tr) { tr.stop(); }); resolve(new Blob(chunks, { type: mime.split(';')[0] })); };
+        mr.onerror = function (e) { reject(e.error || new Error('record')); };
+        seek(video, 0.001).then(function () { draw(); rec = mr; mr.start(250); play(); }, reject);
+      });
+    }
+    var first = o.startAt != null ? o.startAt : 0.001;
+    seek(video, first).then(draw).catch(function () {});
+    return { play: play, pause: pause, toggle: function () { if (playing) pause(); else play(); return playing; }, step: step,
+      setRate: setRate, rate: function () { return rate; }, isPlaying: function () { return playing; }, record: record, draw: draw };
+  }
+
+  root.CoachPose = { load: load, processVideo: processVideo, keyImage: keyImage, release: release, player: player, MAX_SEC: MAX_SEC };
 })(this);

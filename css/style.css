@@ -1168,3 +1168,27 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .gait-hist li { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); min-height: 44px; }
 .gait-hist li:first-child { border-top: 0; }
 .gait-hist button { margin-inline-start: auto; min-height: 44px; }
+.gait-axes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: var(--sp-2) 0; }
+.gait-axis { background: var(--bg); border-radius: 12px; padding: 10px; display: grid; gap: 2px; text-align: start; align-content: start; }
+.gait-axis span { font-size: var(--fs-xs); color: var(--muted); font-weight: 700; }
+.gait-axis b { font-size: var(--fs-lg); color: var(--brand-deep); }
+.gait-axis small { font-size: var(--fs-xs); color: var(--muted); line-height: 1.5; }
+.gait-axis.risk-high b { color: var(--accent-deep); }
+.gait-axis.risk-moderate b { color: #8a5a00; }
+@media (max-width: 380px) { .gait-axes { grid-template-columns: 1fr; } }
+.gi-fix { background: var(--brand-soft); border-radius: 8px; padding: 6px 10px; }
+.gait-risk { border: 1.5px solid var(--line); border-inline-start-width: 5px; border-radius: 12px; padding: 10px 12px; }
+.gait-risk p { margin: 4px 0 0; }
+.gait-risk.gr-low { border-inline-start-color: #0ca30c; }
+.gait-risk.gr-moderate { border-inline-start-color: #e0a100; }
+.gait-risk.gr-high { border-inline-start-color: var(--accent); }
+.gr-low .gi-chip { color: #0a7a0a; }
+.gr-moderate .gi-chip { color: #8a5a00; }
+.gr-high .gi-chip { color: var(--accent-deep); }
+.gait-player { margin: var(--sp-2) 0 var(--sp-3); }
+.gait-player figcaption { font-weight: 700; margin-bottom: 6px; }
+.gait-player canvas { width: 100%; height: auto; border-radius: 12px; background: #000; display: block; }
+.gp-ctrl { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+.gp-ctrl .btn { min-height: 44px; }
+.gp-step { min-width: 44px; padding-inline: 10px; }
+.gp-step svg { width: 20px; height: 20px; }

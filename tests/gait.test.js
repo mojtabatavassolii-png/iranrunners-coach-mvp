@@ -75,7 +75,7 @@ function sideRunner(o) {
 
 // ---------- دونده‌ی مصنوعی از پشت ----------
 function backRunner(o) {
-  o = Object.assign({ cadence: 175, dropL: 3, dropR: 3, valgL: 4, valgR: 4, cross: 0, armCross: false, fps: 30, dur: 10 }, o);
+  o = Object.assign({ cadence: 175, dropL: 3, dropR: 3, valgL: 4, valgR: 4, cross: 0, armCross: false, pron: 4, fps: 30, dur: 10 }, o);
   var L = 200, l = L / 2, W = 1000, H = 800, ground = 700, cx = 500, hw = 0.18 * L;
   var T = 120 / o.cadence, st = 0.36, frames = [];
   for (var k = 0; k * (1 / o.fps) < o.dur; k++) {
@@ -97,7 +97,10 @@ function backRunner(o) {
       var half = Math.hypot(ank.x - hip.x, ank.y - hip.y) / 2, offs = half * Math.tan(v / 2 * R);
       var knee = { x: mid.x - sgn * offs, y: mid.y };
       var S = side === 'l' ? { hip: P.lHip, knee: P.lKnee, ank: P.lAnk, heel: P.lHeel, toe: P.lToe } : { hip: P.rHip, knee: P.rKnee, ank: P.rAnk, heel: P.rHeel, toe: P.rToe };
-      put(S.hip, hip); put(S.knee, knee); put(S.ank, ank); put(S.heel, { x: footX, y: footY }); put(S.toe, { x: footX, y: footY - 4 });
+      // پاشنه به سمت بیرون (پرونیشن) به اندازه‌ی pron نسبت به ادامه‌ی خط ساق، فقط در فاز تماس
+      var expX = ank.x + (ank.x - knee.x) * (0.08 * L) / ((ank.y - knee.y) || 1);
+      var heelX = expX + (ph < st ? sgn * Math.tan(o.pron * R) * 0.08 * L : 0);
+      put(S.hip, hip); put(S.knee, knee); put(S.ank, ank); put(S.heel, { x: heelX, y: footY }); put(S.toe, { x: footX, y: footY - 4 });
     });
     var shY = hipY - 0.75 * L, shL = { x: cx - 0.24 * L, y: shY }, shR = { x: cx + 0.24 * L, y: shY };
     put(P.lSh, shL); put(P.rSh, shR);
@@ -192,6 +195,29 @@ test('نویز: لرزش نقاط و فریم‌های گم‌شده (مثل خ�
   near(r.side.metrics.cadence, 168, 10, 'cadence');
   assert.strictEqual(r.side.metrics.strike, 'heel');
   assert.ok(find(r, 'overstride').status !== 'good');
+});
+
+test('پشت: پرونیشن (تقریبی) از زاویه‌ی پاشنه با ساق', function () {
+  var ok = G.analyze({ back: backRunner({ pron: 5 }).video });
+  near(ok.back.metrics.pronL, 5, 2, 'pron L'); assert.strictEqual(find(ok, 'pronation').status, 'good');
+  var hi = G.analyze({ back: backRunner({ pron: 18 }).video });
+  near(hi.back.metrics.pronR, 18, 3, 'pron R'); assert.strictEqual(find(hi, 'pronation').status, 'bad');
+});
+test('ریسک آسیب: از الگوهای حرکتی، با عامل‌هاش', function () {
+  var good = G.analyze({ side: sideRunner({}).video, back: backRunner({}).video, heightCm: 175 });
+  good.risks.forEach(function (r) { assert.strictEqual(r.level, 'low', r.id + ' ' + JSON.stringify(r.factors)); });
+  assert.ok(good.axes.performance >= 80 && good.axes.form >= 80, JSON.stringify(good.axes));
+  var bad = G.analyze({ side: sideRunner({ cadence: 150, ic: 0.36, fsa: 16 }).video, back: backRunner({ dropL: 11, valgR: 16, cross: 1.1 }).video, heightCm: 175 });
+  var rk = bad.risks.filter(function (r) { return r.id === 'runnersKnee'; })[0], sh = bad.risks.filter(function (r) { return r.id === 'shin'; })[0];
+  assert.strictEqual(rk.level, 'high'); assert.ok(rk.factors.indexOf('overstride') >= 0 && rk.factors.indexOf('valgus') >= 0, JSON.stringify(rk));
+  assert.strictEqual(sh.level, 'high');
+  assert.strictEqual(bad.axes.risk, 'high');
+  assert.ok(bad.axes.performance < 75 && bad.axes.form < 75, JSON.stringify(bad.axes));
+  var fore = G.analyze({ side: sideRunner({ fsa: -8 }).video, heightCm: 175 });
+  var ach = fore.risks.filter(function (r) { return r.id === 'achilles'; })[0];
+  assert.ok(ach && ach.level === 'moderate' && ach.factors.indexOf('strikeFore') >= 0, JSON.stringify(ach));
+  // بدون فیلم از پشت، آسیب‌هایی که فقط از پشت سنجیده می‌شن (مثل ITBS) گزارش نمی‌شن
+  assert.ok(!fore.risks.some(function (r) { return r.id === 'itbs'; }));
 });
 
 console.log(passed + ' تست تحلیل دویدن موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));
