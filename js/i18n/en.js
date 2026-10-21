@@ -1097,6 +1097,8 @@
       editOnb: 'Edit your details (setup form)',
       photoPick: 'Choose a profile photo', photoRemove: 'Remove photo', photoSaved: 'Profile photo saved.',
       photoBad: 'This image can\'t be read; please choose another photo.', photoFull: 'Browser storage is full; the photo wasn\'t saved.',
+      joined: 'Joined {d}', edit: 'Edit profile', levelLink: 'Suggested plans for your level', goalSetShort: 'No goal set yet',
+      groups: { mine: 'My stuff', prefs: 'My preferences' },
       noName: 'Runner', noNameHint: 'Add your name in {link}.', noNameLink: 'Edit profile',
       tabs: { aria: 'Profile sections', progress: 'Progress', gait: 'Biomechanics' },
       goalOthers: { one: '+{n} more race', other: '+{n} more races' }, goalSet: 'Set a goal →', goalManage: 'Races and results →', levelNum: '{n} of 10', goalIn: { one: '{n} day to go', other: '{n} days to go' }, fitnessSub: 'log a time trial or new result',
@@ -1165,6 +1167,7 @@
 
     // ---------- Settings page ----------
     settingsPage: {
+      account: 'My account',
       title: 'Settings',
       lang: 'Language and units', cal: 'Calendar', health: 'Health and cycle', person: 'Personal details', data: 'Data',
       cycleOn: 'Cycle adaptation is on', cycleOff: 'Cycle adaptation is off', cycleNA: 'For female users',

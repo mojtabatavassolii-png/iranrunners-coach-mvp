@@ -19,16 +19,17 @@
   --info: #2d6cdf;
   --info-soft: #e6eefc;
   --info-line: #b9cef5;
-  --ink: #0f2a2a;
-  --bg: #f2faf8;
-  --card: #ffffff;
-  --panel: #e4f4f0;
-  --panel-raised: #d3ebe5;
-  --text: #0f2a2a;
-  --muted: #4f6b68;
-  --faint: #5f7673;
-  --field-line: #c3d9d3;
-  --line: rgba(15, 42, 42, 0.1);
+  /* سبک Runna: زمینه‌ی خاکستری‌آبی روشن، کارت تخت با حاشیه‌ی نازک، متن جوهری؛ نعنایی و مرجانی فقط برای معنا */
+  --ink: #121a24;
+  --bg: #f1f4f8;
+  --card: #f9fbfd;
+  --panel: #e8edf3;
+  --panel-raised: #dde4ec;
+  --text: #121a24;
+  --muted: #556170;
+  --faint: #5f6b79;
+  --field-line: #cfd8e3;
+  --line: #e0e6ee;
 
   /* مقیاس تایپوگرافی: همه‌ی اندازه‌ها از این پله‌ها (حداقل ۱۲ پیکسل) */
   --fs-xs: 0.75rem;     /* 12 برچسب */
@@ -42,8 +43,8 @@
   --fs-display: 2.75rem; /* 44 عدد خیلی درشت */
   /* مقیاس فاصله: ۴، ۸، ۱۲، ۱۶، ۲۰، ۲۴، ۳۲ (و ۲ و ۶ برای جاهای فشرده) */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
-  --radius: 18px;
-  --shadow: 0 20px 50px -30px rgba(15, 42, 42, 0.2);
+  --radius: 22px;
+  --shadow: none;
 
   /* رنگ جلسه‌ها به ترتیب شدت؛ -ink برای متن روی زمینه‌ی کم‌رنگ */
   --c-easy: #00a884;      --c-easy-ink: #00705a;     --c-easy-bg: #dcf5ee;
@@ -1277,3 +1278,84 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .race-hero .race-target > summary { color: #fff; text-decoration: underline; text-underline-offset: 4px; }
 .race-hero .race-target form { background: #fff; color: var(--text); border-radius: 14px; padding: 12px 14px; }
 .race-hero .race-target .linklike { color: var(--brand-deep); }
+
+/* ===========================================================
+   سبک Runna برای همه‌ی صفحه‌ها
+   =========================================================== */
+/* هدر روشن با خط نازک */
+.site-header { background: var(--bg); color: var(--text); border-bottom: 1px solid var(--line) !important; }
+.brand, .brand-text b { color: var(--text); }
+.brand-text small { color: var(--muted); }
+.brand-mark { width: 40px; height: 40px; box-shadow: 0 0 0 1px var(--line); }
+.lang-toggle { background: var(--card); color: var(--text); border-color: var(--line); }
+.lang-toggle:hover { background: var(--ink); color: #fff; }
+/* کارت تخت */
+.card { border: 1.5px solid var(--line); }
+/* دکمه‌ها: خنثی = قرص تیره، اقدام اصلی = مرجانی */
+.btn-outline, .btn-ink { background: var(--ink); color: #fff; border-color: var(--ink); }
+.btn-outline:hover, .btn-ink:hover { background: #000; border-color: #000; color: #fff; }
+.btn-ghost:hover { background: var(--panel); }
+.race-hero .btn-outline { background: #fff; color: var(--ink); border-color: #fff; }
+input, select, textarea { background: #fff; }
+/* برچسب گروه بالای فهرست‌ها (مثل MY STUFF) */
+.group-label { font-size: var(--fs-sm); font-weight: 700; color: var(--muted); margin: var(--sp-6) 6px var(--sp-2); letter-spacing: .02em; }
+[dir="ltr"] .group-label { text-transform: uppercase; letter-spacing: .06em; }
+.hcard-label, .eyebrow { color: var(--muted); letter-spacing: .02em; }
+/* فهرست ردیفی با آیکون و فلش */
+.list-group { padding: 0 !important; overflow: hidden; }
+.list-row { display: flex; align-items: center; gap: 14px; padding: 14px 18px; min-height: 64px; color: var(--text); text-decoration: none; }
+.list-row + .list-row { border-top: 1.5px solid var(--line); }
+.list-row:hover { background: var(--panel); }
+.list-row:focus-visible { outline: 3px solid var(--brand); outline-offset: -3px; }
+.lr-ico { flex: none; display: grid; place-items: center; color: var(--ink); }
+.lr-text { flex: 1; display: grid; gap: 1px; text-align: start; min-width: 0; }
+.lr-text b { font-weight: 600; font-size: var(--fs-base); }
+.lr-text small { color: var(--muted); font-size: var(--fs-sm); }
+.list-row .chev, .link-card .chev { flex: none; color: var(--faint); }
+/* تنظیمات: بخش‌های هر گروه در یک کارت، با خط جداکننده */
+.set-list { border: 1.5px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--card); margin-bottom: 18px; }
+.set-list > .set-sec { margin: 0 !important; border: 0 !important; border-radius: 0 !important; }
+.set-list > .set-sec + .set-sec { border-top: 1.5px solid var(--line) !important; }
+.set-ico { background: transparent !important; color: var(--ink) !important; }
+/* پروفایل */
+.pf-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 8px 0 6px; }
+.pf-head .pf-avatar-btn { box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--accent); }
+.pf-head .pf-avatar-btn:hover { box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--accent-strong); }
+.pf-head .pf-cam { box-shadow: 0 0 0 3px var(--bg); }
+.pf-head .pf-name { margin: 12px 0 0; font-size: var(--fs-xl); }
+.pf-head .small.muted { margin: 0; text-align: center; }
+.pf-joined { margin: 0; color: var(--muted); font-size: var(--fs-md); }
+.pf-edit { margin-top: 12px; padding-inline: 30px; min-height: 48px; }
+.pf-goalcard {
+  display: grid; gap: 4px; margin-top: var(--sp-5); color: #fff; text-decoration: none; border: 0;
+  background: linear-gradient(120deg, #00604b 0%, #2f6e60 45%, #b2533f 100%);
+}
+.pf-goalcard .eyebrow { color: #d9efe9; margin: 0; }
+.pf-goal-name { font-size: var(--fs-xl); }
+.pf-goal-count { color: #f2f7f6; font-size: var(--fs-md); }
+.pf-goal-count b { font-size: var(--fs-lg); }
+.pf-goal-meta { color: #e6efed; font-size: var(--fs-sm); }
+.pf-goal-cta { margin-top: 8px; font-weight: 800; font-size: var(--fs-sm); letter-spacing: .03em; }
+.pf-goalcard:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+.pf-level { display: flex; align-items: center; gap: 14px; color: var(--text); text-decoration: none; }
+.pf-level-badge {
+  flex: none; width: 60px; height: 66px; display: grid; place-content: center; text-align: center; line-height: 1.1;
+  background: linear-gradient(160deg, var(--brand) 0%, var(--brand-deep) 100%); color: #fff;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+.pf-level-badge b { font-size: var(--fs-xl); }
+.pf-level-badge small { font-size: var(--fs-xs); opacity: .9; }
+.pf-level-text { flex: 1; display: grid; gap: 2px; text-align: start; }
+.pf-level-text b { font-size: var(--fs-lg); }
+.pf-level-text small { color: var(--muted); font-size: var(--fs-sm); }
+.pf-level:hover .pf-level-text b { color: var(--brand-deep); }
+/* کارت‌های گرادیانی هدف (همسان با پروفایل) */
+.race-hero, .hcard-race { background: linear-gradient(120deg, #00604b 0%, #2f6e60 45%, #b2533f 100%); border: 0; }
+.race-hero::after { display: none; }
+/* نوار پایین روشن؛ تب فعال جوهری */
+.tabbar { background: rgba(249, 251, 253, .97); border-top: 1px solid var(--line); box-shadow: none; }
+.tabbar a.is-active { color: var(--ink); }
+.tabbar a.is-active .tab-ico { background: var(--panel); color: var(--ink); }
+.pf-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+/* کاشی‌های داخل کارت */
+.plan-rows > div, .mini-stats > div, .pf-summary > div { background: var(--panel); }

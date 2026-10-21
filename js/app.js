@@ -3287,30 +3287,74 @@
     var p = state.profile, lv = C.assessLevel(p), g = C.goalInfo(p), race = C.raceInfo(p), now = today();
     // نام کامل (نام خانوادگی از مرحله‌ی ۱ فرم)
     var name = [p.name, p.lastName].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' '), hasPhoto = !!getAvatar();
-    var days = race ? Math.round(C.daysBetween(now, race.date)) : null;
-    var nOther = C.otherRaces(p).filter(function (r) { return r.date >= now; }).length;
-    app.innerHTML = '<section class="card pf-card">' +
+    var joined = p.createdAt && !isNaN(new Date(p.createdAt)) ? I.monthTitle(new Date(p.createdAt)) : null;
+    var fit = C.currentFitness(p);
+    app.innerHTML = '<section class="pf-head">' +
       '<label class="pf-avatar-btn" for="avatar-file" title="' + esc(T('profile.photoPick')) + '">' + avatarHtml(96) +
       '<span class="pf-cam" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>' +
       '<span class="sr-only">' + esc(T('profile.photoPick')) + '</span></label>' +
       '<input type="file" id="avatar-file" accept="image/*" class="sr-only">' +
       (hasPhoto ? '<button type="button" class="linklike small" data-avatar-remove="1">' + esc(T('profile.photoRemove')) + '</button>' : '') +
       '<h1 class="pf-name">' + esc(name || T('profile.noName')) + '</h1>' +
+      (joined ? '<p class="pf-joined">' + esc(T('profile.joined', { d: joined })) + '</p>' : '') +
       (name ? '' : '<p class="small muted">' + esc(T('profile.noNameHint')).replace('{link}', '<a href="#onboarding">' + esc(T('profile.noNameLink')) + '</a>') + '</p>') +
-      '<div class="pf-summary">' +
-      '<div><span>' + esc(T('profile.rows.level')) + '</span><b>' + tt('profile.levelNum', { n: lv.level }) + '</b><small>' + esc(lv.info.name) + '</small></div>' +
-      '<a class="pf-goal" href="#race"><span>' + esc(T('profile.rows.goal')) + '</span><b>' + (g.type !== 'none' ? t(C.goalLabel(g)) : esc(T('profile.noGoal'))) + '</b>' +
-      (race && days >= 0 ? '<small>' + tt('profile.goalIn', { n: days }) + '</small>' : '') +
-      (nOther ? '<small>' + tt('profile.goalOthers', { n: nOther }) + '</small>' : '') +
-      '<small class="pf-goal-more">' + esc(T(g.type === 'none' ? 'profile.goalSet' : 'profile.goalManage')) + '</small></a></div>' +
-      // تنظیمات اقدام اصلی نیست؛ مرجانی فقط برای اقدام اصلی
-      '<a class="btn btn-outline btn-block pf-settings" href="#settings">' +
-      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>' +
-      esc(T('settingsPage.title')) + '</a></section>' + periodCard(p, now, race) + pfTabsHtml() +
+      '<a class="btn btn-ink pf-edit" href="#onboarding">' + esc(T('profile.edit')) + '</a></section>' +
+      profileGoalCard(p, g, race, now) +
+      '<a class="card pf-level" href="#plans"><span class="pf-level-badge" aria-hidden="true"><b>' + fa(lv.level) + '</b><small>' + esc(T('level.of10')) + '</small></span>' +
+      '<span class="pf-level-text"><b>' + tt('level.title', { n: lv.level, name: lv.info.name }) + '</b><small>' + esc(T('profile.levelLink')) + '</small></span>' + chevron(isRtl() ? 'left' : 'right') + '</a>' +
+      periodCard(p, now, race) +
+      listGroup(T('profile.groups.mine'), [
+        ['#race', 'flag', T('race.pageTitle'), g.type !== 'none' ? C.goalLabel(g) + (race && race.date >= now ? T('progress.sep') + T('profile.goalIn', { n: Math.round(C.daysBetween(now, race.date)) }) : '') : T('profile.goalSetShort')],
+        ['#plans', 'plans', T('plans.title'), T('plans.linkSub')],
+        ['#fitness', 'watch', T('profile.linkFitness'), fit ? 'VDOT ' + fit.vdot.toFixed(1) : T('profile.registerTest')]
+      ]) +
+      listGroup(T('profile.groups.prefs'), [
+        ['#settings', 'lang', T('settingsPage.lang'), (I.getLang() === 'fa' ? 'فارسی' : 'English') + T('progress.sep') + T('units.' + I.getUnits()), 'lang'],
+        ['#settings', 'cal', T('settingsPage.cal'), T('settings.' + I.getCalendar()), 'cal'],
+        ['#settings', 'health', T('settingsPage.health'), T(p.sex === 'female' ? ((p.cycle || {}).enabled ? 'settingsPage.cycleOn' : 'settingsPage.cycleOff') : 'settingsPage.cycleNA'), 'health'],
+        ['#settings', 'person', T('settingsPage.person'), T('settingsPage.personSub', { age: p.age, n: lv.level }), 'person'],
+        ['#settings', 'install', T('install.title'), T('install.short.' + installMode()), 'install'],
+        ['#settings', 'data', T('settingsPage.data'), T('profile.statsVal', { c: Object.keys(state.checkins).length, d: Object.keys(state.done).length }), 'data']
+      ]) +
+      pfTabsHtml() +
       '<div class="pf-panel" id="pf-panel" role="tabpanel" tabindex="0" data-tab="' + pfTab + '" aria-labelledby="pf-tab-' + pfTab + '"></div>';
     setHeaderH();
     renderPfPanel();
   }
+  // کارت هدف اصلی (گرادیان نعنایی به مرجانی): شمارش معکوس، زمان هدف، بقیه‌ی مسابقه‌ها
+  function profileGoalCard(p, g, race, now) {
+    var head = '<span class="eyebrow">' + esc(T('race.mainLabel')) + '</span>';
+    if (g.type === 'none') {
+      return '<a class="card pf-goalcard" href="#race">' + head + '<b class="pf-goal-name">' + esc(T('profile.noGoal')) + '</b>' +
+        '<span class="pf-goal-cta">' + esc(T('profile.goalSet')) + '</span></a>';
+    }
+    var days = race ? Math.round(C.daysBetween(now, race.date)) : null;
+    var nOther = C.otherRaces(p).filter(function (r) { return r.date >= now; }).length;
+    var bits = [];
+    if (g.targetSec) bits.push(T('race.targetLine', { t: C.formatDuration(g.targetSec) }));
+    if (nOther) bits.push(T('profile.goalOthers', { n: nOther }));
+    return '<a class="card pf-goalcard" href="#race">' + head + '<b class="pf-goal-name">' + t(C.goalLabel(g)) + '</b>' +
+      (race && days >= 0 ? '<span class="pf-goal-count"><b>' + fa(days) + '</b> ' + esc(T('race.daysLeft', { n: days })) + T('progress.sep') + esc(faDate(g.date)) + '</span>'
+        : '<span class="pf-goal-count">' + esc(T(g.date ? 'race.done' : 'race.noDate')) + '</span>') +
+      (bits.length ? '<span class="pf-goal-meta">' + t(bits.join(T('progress.sep'))) + '</span>' : '') +
+      '<span class="pf-goal-cta">' + esc(T('profile.goalManage')) + '</span></a>';
+  }
+  // فهرست ردیفی (سبک Runna): عنوان گروه، ردیف‌ها با آیکون و فلش، در یک کارت
+  function listGroup(label, rows) {
+    return '<p class="group-label" role="heading" aria-level="2">' + esc(label) + '</p><nav class="card list-group" aria-label="' + esc(label) + '">' + rows.map(function (r) {
+      return '<a class="list-row" href="' + r[0] + '"' + (r[4] ? ' data-set-open="' + r[4] + '"' : '') + '>' +
+        '<span class="lr-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + SET_ICONS[r[1]] + '</svg></span>' +
+        '<span class="lr-text"><b>' + esc(r[2]) + '</b>' + (r[3] ? '<small>' + t(r[3]) + '</small>' : '') + '</span>' + chevron(isRtl() ? 'left' : 'right') + '</a>';
+    }).join('') + '</nav>';
+  }
+  // ردیف تنظیمات در پروفایل: همون بخش در صفحه‌ی تنظیمات باز و دیده می‌شه
+  document.addEventListener('click', function (e) {
+    var r = e.target.closest && e.target.closest('[data-set-open]');
+    if (!r) return;
+    openSettings = {};
+    openSettings[r.dataset.setOpen] = true;
+    pendingFocus = 'set-' + r.dataset.setOpen;
+  }, true);
   // ---------- تب‌های پایین پروفایل (شبیه استراوا): پیشرفت و بیومکانیک ----------
   // پیش‌فرض «پیشرفت» (پرکاربردتر و سبک‌تر)؛ تب انتخاب‌شده تا بسته شدن برنامه یادش می‌مونه
   var PF_TABS = ['progress', 'gait'], pfTab = 'progress';
@@ -3412,7 +3456,10 @@
     health: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
     person: '<circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/>',
     install: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v8M8.8 11.8 12 15l3.2-3.2"/>',
-    data: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>'
+    data: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
+    flag: '<path d="M5.5 21V4"/><path d="M5.5 4.5h12l-2.5 4 2.5 4h-12"/>',
+    plans: '<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8 8.5h8M8 12h8M8 15.5h5"/>',
+    watch: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M9.5 2.5h5M18.5 6.5 20 5"/>'
   };
   var openSettings = {};
   function setSection(id, icon, title, sub, body) {
@@ -3438,6 +3485,7 @@
     }
     var lang = I.getLang(), D = C.DAY_NAMES;
     var html = '<header class="page-head"><h1>' + esc(T('settingsPage.title')) + '</h1></header>' +
+      '<p class="group-label" role="heading" aria-level="2">' + esc(T('profile.groups.prefs')) + '</p><div class="set-list">' +
       // ۱. زبان و نمایش
       setSection('lang', 'lang', T('settingsPage.lang'), esc((lang === 'fa' ? 'فارسی' : 'English') + T('progress.sep') + T('units.' + I.getUnits())),
         '<div class="field"><span class="field-label">' + esc(T('settings.language')) + '</span><div class="seg lang-seg" role="group" aria-label="' + esc(T('settings.language')) + '">' +
@@ -3462,6 +3510,7 @@
           (c.lastStart ? '<p class="small muted">' + tt('cycle.profileOn', { len: c.cycleLen, p: c.periodLen }) + T('progress.sep') + esc(T('profile.cycleLast', { d: faDate(c.lastStart) })) + '</p>' : '') +
           '<a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.cycleEdit')) + '</a>'
           : '<p class="small muted">' + esc(T('settingsPage.cycleHint')) + '</p><a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.editOnb')) + '</a>')) +
+      '</div><p class="group-label" role="heading" aria-level="2">' + esc(T('settingsPage.account')) + '</p><div class="set-list">' +
       // ۴. اطلاعات شخصی
       setSection('person', 'person', T('settingsPage.person'), tt('settingsPage.personSub', { age: p.age, n: lv.level }),
         '<div class="field"><label for="set-name">' + esc(T('onb.firstName')) + '</label>' +
@@ -3501,7 +3550,7 @@
         '<p id="confirm-text"></p>' +
         '<label class="check-row" id="confirm-ack-row" hidden><input type="checkbox" id="confirm-ack"> <span>' + esc(T('settingsPage.wipeAck')) + '</span></label>' +
         '<div class="actions"><button type="button" class="btn btn-primary" id="confirm-yes">' + esc(T('profile.confirmYes')) + '</button>' +
-        '<button type="button" class="btn btn-ghost" id="confirm-no">' + esc(T('app.cancel')) + '</button></div></div>');
+        '<button type="button" class="btn btn-ghost" id="confirm-no">' + esc(T('app.cancel')) + '</button></div></div>') + '</div>';
     app.innerHTML = html;
 
     // تایید داخل صفحه؛ برای پاک کردن داده‌ها تیک «غیرقابل بازگشت» هم لازمه

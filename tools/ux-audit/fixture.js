@@ -8,7 +8,7 @@ function build(kind, todayKey) {
         goal: { type: 'ultra', date: '2027-04-10', ultra: { km: 60, gain: 3000, terrain: 'technical' } }, pb: { distanceKm: 21.1, timeSec: 6300, date: '2026-09-01' }, startDate: '2026-09-26', sex: 'male' }
     : { age: 33, weightKg: 68, heightCm: 175, days: [0,1,2,3,4,5,6], locations: ['park'], injury: '', currentWeeklyKm: 42, lastWeekKm: 42, monthAvgKm: 40, experience: 'gt3y', structured: true, schemaVersion: 3,
         goal: { type: '10', date: '2027-03-12' }, pb: { distanceKm: 10, timeSec: 2700, date: '2026-09-10' }, startDate: '2026-09-26', sex: 'male',
-        fitnessTests: [{ date: '2026-10-24', distanceKm: 5, timeSec: 1290, kind: 't5' }, { date: '2026-11-21', distanceKm: 5, timeSec: 1262, kind: 't5' }, { date: '2026-12-12', distanceKm: 3, timeSec: 735, kind: 't3' }] };
+        fitnessTests: [{ date: '2026-10-24', distanceKm: 5, timeSec: 1290, kind: 'test' }, { date: '2026-11-21', distanceKm: 5, timeSec: 1262, kind: 'test' }, { date: '2026-12-12', distanceKm: 3, timeSec: 735, kind: 'test' }] };
   const st = { profile, checkins: {}, done: {}, ackPain: {}, postRuns: {}, cycleChoices: {}, doneLog: {} };
   const today = C.parseDate(todayKey);
   for (let d = C.parseDate(profile.startDate); d <= today; d = C.addDays(d, 1)) {
