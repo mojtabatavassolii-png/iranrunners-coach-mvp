@@ -824,14 +824,14 @@ test('بخش آموزش: هشت مقاله‌ی دوزبانه با ساختار
       assert(a.title && a.summary && a.body, id);
       var n = words(a.body);
       assert(n >= 300 && n <= 500, id + ': ' + n + ' کلمه');
-      assert(/<h3>/.test(a.body) && /class="learn-src"/.test(a.body), id);
+      assert(/<h2>/.test(a.body) && !/<h3>/.test(a.body) && /class="learn-src"/.test(a.body), id);
       // HTML متوازن (بدون تگ باز مونده)
-      ['p', 'ul', 'li', 'h3', 'b', 'i'].forEach(function (tag) {
+      ['p', 'ul', 'li', 'h2', 'b', 'i'].forEach(function (tag) {
         var open = (a.body.match(new RegExp('<' + tag + '[ >]', 'g')) || []).length, close = (a.body.match(new RegExp('</' + tag + '>', 'g')) || []).length;
         assert.strictEqual(open, close, id + ' <' + tag + '>');
       });
     });
-    assert.strictEqual(lf.articles[id].body.split('<h3>').length, le.articles[id].body.split('<h3>').length, id + ': تعداد زیرعنوان‌ها');
+    assert.strictEqual(lf.articles[id].body.split('<h2>').length, le.articles[id].body.split('<h2>').length, id + ': تعداد زیرعنوان‌ها');
     assert(!/[؀-ۿ]/.test(JSON.stringify(le.articles[id])), id + ': متن فارسی در نسخه‌ی انگلیسی');
   });
   // در دسترس از طریق t()

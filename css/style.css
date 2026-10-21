@@ -643,7 +643,7 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .learn-article h1 { margin-bottom: 2px; }
 .learn-body { margin-top: 8px; line-height: 2; }
 [dir=ltr] .learn-body { line-height: 1.75; }
-.learn-body h3 { margin: 22px 0 6px; font-size: var(--fs-lg); color: var(--brand-deep); }
+.learn-body h2, .learn-body h3 { margin: 22px 0 6px; font-size: var(--fs-lg); color: var(--brand-deep); }
 .learn-body ul { padding-inline-start: 22px; margin: 6px 0 10px; }
 .learn-body li { margin-bottom: 6px; }
 .learn-body .learn-src { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--muted); line-height: 1.8; }
@@ -1359,3 +1359,37 @@ input, select, textarea { background: #fff; }
 .pf-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
 /* کاشی‌های داخل کارت */
 .plan-rows > div, .mini-stats > div, .pf-summary > div { background: var(--panel); }
+
+/* ===== بازبینی UX پنجم ===== */
+/* UX5-01: تاریخچه‌ی فیتنس روی گوشی: هر رکورد یک بلوک دوستونه (همه‌چیز از جمله «حذف» داخل کادر) */
+@media (max-width: 599px) {
+  .fit-hist thead { display: none; }
+  .fit-hist tr { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 2px; padding: 10px 8px; border-bottom: 1px solid var(--line); }
+  .fit-hist td { border: 0; padding: 0; background: none !important; }
+  .fit-hist tr.hl { background: var(--brand-soft); border-radius: 12px; }
+  .fit-hist td:nth-child(1) { grid-area: 1 / 1; font-weight: 700; }
+  .fit-hist td:nth-child(2) { grid-area: 2 / 1; color: var(--muted); font-size: var(--fs-sm); font-weight: 500; }
+  .fit-hist td:nth-child(3) { grid-area: 3 / 1; font-size: var(--fs-sm); font-weight: 500; }
+  .fit-hist td:nth-child(4) { grid-area: 1 / 2; text-align: end; font-weight: 700; }
+  .fit-hist td:nth-child(5) { grid-area: 2 / 2; text-align: end; font-size: var(--fs-sm); font-weight: 500; }
+  .fit-hist td:nth-child(5)::before { content: "VDOT "; color: var(--muted); }
+  .fit-hist td:nth-child(6) { grid-area: 3 / 2; text-align: end; }
+}
+/* UX5-02: جزئیات روز بدون زمینه‌ی خاکستری؛ فقط یک خط جداکننده داخل کارت هفته */
+.day-panel { background: transparent; border-top: 1.5px solid var(--line); border-radius: 0 !important; padding: 16px 0 0; }
+@media (max-width: 399px) { .week-card .day-panel { margin-inline: 0; padding: 14px 0 0; } }
+/* UX5-03: هشدار پزشکی آرام‌تر: کارت روشن با نوار مرجانی؛ جمله‌ی اصلی همچنان قرمز تیره */
+.medical-banner { background: var(--card); border: 1.5px solid var(--line); border-inline-start: 4px solid var(--accent-strong); padding: 12px 14px; font-size: var(--fs-md); gap: 12px; align-items: flex-start; }
+.medical-banner p { text-align: start; line-height: 1.75; }
+.medical-icon { width: 30px; height: 30px; }
+.medical-icon svg { width: 18px; height: 18px; }
+@media (max-width: 519px) { .medical-banner { padding: 12px 14px; } .medical-icon { width: 30px; height: 30px; } .medical-icon svg { width: 18px; height: 18px; } }
+/* UX5-04: شماره‌ی فهرست‌ها با رقم فارسی در حالت راست‌به‌چپ */
+[dir="rtl"] ol { list-style-type: persian; }
+/* UX5-05: کادرهای باریک گزارش تحلیل و راهنمای زیر فیلدها با تراز شروع */
+@media (max-width: 599px) { .gi-text, .gi-fix { text-align: start; } }
+.field small, .field .muted { text-align: start; }
+/* UX5-06: نقطه‌های مرحله‌ی فرم اولیه با ناحیه‌ی لمس ۴۴ پیکسل */
+.onb-dot { width: 44px; height: 44px; }
+.onb-dots { gap: 0; }
+@media (max-width: 359px) { .onb-dots li:not(:last-child)::after { width: 6px; } }
