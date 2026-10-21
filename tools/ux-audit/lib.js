@@ -35,7 +35,7 @@ const SCREENS = [
   ['plan-week', '#plan', async (p) => setPlanView(p, 'week')],
   ['plan-month', '#plan', async (p) => setPlanView(p, 'month')],
   ['profile', '#profile', async () => {}],
-  ['progress', '#progress', async () => {}],
+  ['progress', '#profile/progress', async () => {}],
   ['checkin', '#checkin', async () => {}],
   ['settings', '#settings', async () => {}],
   ['fitness', '#fitness', async () => {}],
@@ -43,7 +43,14 @@ const SCREENS = [
   ['learn-article', '#learn/vdot', async () => {}],
   ['guide', '#guide', async () => {}],
   ['race', '#race', async () => {}],
-  ['gait', '#gait', async () => {}],
+  ['gait', '#profile/gait', async () => {}],
+  // گزارش تحلیل دویدن نمونه (از دونده‌ی مصنوعی با چند مشکل؛ gait-report.json)
+  ['gait-report', '#profile/gait', async (p) => {
+    await p.evaluate(([K, reps]) => {
+      const s = JSON.parse(localStorage.getItem(K)); s.gaitReports = reps; localStorage.setItem(K, JSON.stringify(s));
+    }, [KEY, JSON.parse(fs.readFileSync(path.join(__dirname, 'gait-report.json'), 'utf8'))]);
+    await p.reload(); await p.waitForTimeout(500);
+  }],
   // فرم بعد از «انجامش دادم» (مسافت و زمان واقعی + سؤال‌های ایزی ران) روی یک ایزی ران انجام‌نشده‌ی هفته‌ی قبل
   ['plan-doneform', '#plan', async (p) => {
     await setPlanView(p, 'week');
