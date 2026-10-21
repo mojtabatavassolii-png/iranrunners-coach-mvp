@@ -1233,3 +1233,47 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 @media (prefers-reduced-motion: reduce) { .pf-panel.pf-in { animation: none; } }
 .pf-tool { margin: 0 2px 10px; }
 .pf-tool .prange { margin: 0; }
+
+/* خانه: کارت «امروز» با دو بخش (تمرین و چک‌این) */
+.hcard-today .ht-checkin { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.hcard-today .ht-sec > .btn { margin-top: 12px; }
+.ht-note { margin: 0 0 4px; text-align: start; }
+.ht-link { display: inline-flex; align-items: center; min-height: 44px; }
+.ht-checkin .ready-row { margin: 2px 0; }
+.ht-checkin .ready-line { font-size: var(--fs-base); }
+
+/* برنامه‌های پیشنهادی */
+.plan-me p { margin: 0 0 6px; text-align: start; }
+.plan-me p:last-child { margin-bottom: 0; }
+.plan-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.plan-head h2 { margin: 0; }
+.plan-weeks { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 10px 0 12px; }
+.plan-weeks b { font-size: var(--fs-xl); color: var(--brand-deep); }
+.plan-weeks span { color: var(--muted); font-size: var(--fs-sm); }
+.plan-rows { display: grid; gap: 6px; margin: 0 0 12px; }
+.plan-rows > div { display: flex; justify-content: space-between; gap: 10px; background: var(--bg); border-radius: 10px; padding: 8px 12px; }
+.plan-rows dt { color: var(--muted); font-size: var(--fs-sm); }
+.plan-rows dd { margin: 0; font-weight: 700; text-align: end; }
+.plan-pace { border-top: 1px dashed var(--line); padding-top: 12px; margin-bottom: 12px; }
+.plan-now { margin: 0 0 10px; text-align: start; }
+.plan-target input { max-width: 160px; }
+.plan-presets { margin: 4px 0 10px; }
+.plan-presets .chip-btn { display: grid; gap: 0; text-align: center; line-height: 1.4; }
+.plan-presets .chip-btn small { font-weight: 500; font-size: var(--fs-xs); }
+.plan-pace .alert { margin: 8px 0; }
+.plan-pace .alert p { margin: 0 0 4px; }
+.plan-card .btn-block + .small.center { margin: 8px 0 0; }
+.plan-foot { margin: 4px 2px 8px; text-align: start; }
+
+/* زمان هدف مسابقه */
+.race-target { margin: 10px 0 4px; text-align: start; }
+.race-target > summary { cursor: pointer; color: var(--brand-deep); font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.race-target form { margin-top: 6px; }
+.race-target input, #ra-target { max-width: 160px; }
+.race-target .actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.race-target-line { margin: 2px 0; color: var(--brand-deep); font-weight: 600; }
+.race-draft { background: var(--brand-soft); color: var(--brand-deep); border-radius: 10px; padding: 8px 12px; text-align: start; }
+/* زمان هدف داخل کارت تیره‌ی هدف اصلی: عنوان سفید، فرم روی پنل روشن */
+.race-hero .race-target > summary { color: #fff; text-decoration: underline; text-underline-offset: 4px; }
+.race-hero .race-target form { background: #fff; color: var(--text); border-radius: 14px; padding: 12px 14px; }
+.race-hero .race-target .linklike { color: var(--brand-deep); }

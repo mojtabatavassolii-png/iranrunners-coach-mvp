@@ -268,7 +268,7 @@
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, settings: renderSettings, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
+  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, settings: renderSettings, plans: renderPlans, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
   function route() {
     var loginMode = !isEntered();
     document.body.classList.toggle('login-mode', loginMode);
@@ -302,6 +302,8 @@
     });
     // هشدار پزشکی فقط در صفحه‌ی چک‌این
     document.getElementById('medical-banner').hidden = v !== 'checkin';
+    // پیش‌نویس «استفاده به‌عنوان الگو» فقط تا وقتی صفحه‌ی مسابقه‌ها بازه
+    if (v !== 'race') raceDraft = null;
     // پخش‌کننده‌ها و ویدیوهای تحلیل دویدن کامل آزاد می‌شن؛ تب بیومکانیک دوباره می‌سازدشون
     destroyGaitPlayers();
     VIEWS[v](sub);
@@ -336,7 +338,7 @@
     if (e.target.closest && e.target.closest('[data-focus-period]')) pendingFocus = 'period-card';
   }, true);
   // صفحه‌های فرعی: نوار برگشت بالای صفحه (برگشت واقعی تاریخچه، وگرنه تب مادر)
-  var SUB_PAGES = { checkin: '#home', race: '#profile', fitness: '#profile/progress', guide: '#learn', settings: '#profile' };
+  var SUB_PAGES = { checkin: '#home', race: '#profile', plans: '#race', fitness: '#profile/progress', guide: '#learn', settings: '#profile' };
   function backBar(v) {
     var s = navState(), from = s && s.depth > 0 ? s.from : null;
     return '<nav class="back-bar"><a class="learn-back" href="' + SUB_PAGES[v] + '"' + (from ? ' data-nav-back="1"' : '') + '>' +
@@ -344,7 +346,7 @@
   }
   // تب مادر هر صفحه
   var TABS = ['home', 'plan', 'learn', 'profile'];
-  var TAB_OF = { home: 'home', checkin: 'home', race: 'profile', plan: 'plan', fitness: 'profile',
+  var TAB_OF = { home: 'home', checkin: 'home', race: 'profile', plans: 'profile', plan: 'plan', fitness: 'profile',
     learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile' };
   // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
   var lastView = null, lastTab = null;
@@ -922,7 +924,7 @@
         currentWeeklyKm: curKm, lastWeekKm: volP.lastWeekKm, monthAvgKm: volP.monthAvgKm, volumeReason: volP.volumeReason,
         experience: fd.get('experience'), structured: !never && fd.get('structured') === 'yes',
         schemaVersion: SCHEMA_VERSION,
-        goal: goalObj, pb: pbObj,
+        goal: p.goal && p.goal.type === goalObj.type && p.goal.targetSec ? Object.assign(goalObj, { targetSec: p.goal.targetSec }) : goalObj, pb: pbObj,
         hrMax: hrIn.max, hrRest: hrIn.rest,
         sex: sex, cycle: cycleObj,
         // تاریخچه‌ی فیتنس و تنظیم دستی پیس ایزی با ویرایش پروفایل حفظ می‌شن
@@ -1486,6 +1488,10 @@
     var trend = C.easyRpeTrend(state.postRuns, now);
     if (trend >= 2) items.push('<li><strong>' + esc(T('fitNotes.trendStrong')) + '</strong> ' + tt('fitNotes.trend', { n: trend }) + ' ' +
       t(C.EASY_RPE_WARNING) + easyActions() + '</li>');
+    var vs = C.vdotStepSuggestion(p, state.postRuns, now);
+    if (vs) items.push('<li>' + tt('fitNotes.step', { n: vs.weeks, a: vs.from.toFixed(1), b: vs.to.toFixed(1) }) +
+      '<div class="actions"><button type="button" class="btn btn-outline" data-vdot-step="1">' + esc(T('fitNotes.stepApply')) + '</button>' +
+      ' <a href="#fitness">' + esc(T('fitNotes.stepTest')) + '</a></div></li>');
     var sg = C.fitnessLevelSuggestion(p);
     if (sg) items.push('<li>' + esc(T('fitNotes.suggestA')) + ' <strong>' + tt('fitNotes.suggestLevel', { n: sg.to }) + '</strong> ' + tt('fitNotes.suggestB', { from: sg.from }) + ' ' +
       esc(T(sg.up ? 'fitNotes.up' : 'fitNotes.down')) +
@@ -1494,6 +1500,13 @@
     return '<section class="card fitness-notes"><h3>' + esc(T('fitNotes.title')) + '</h3><ul>' + items.join('') + '</ul></section>';
   }
 
+  document.addEventListener('click', function (e) {
+    if (!(e.target.closest && e.target.closest('[data-vdot-step]'))) return;
+    var p = state.profile, vs = C.vdotStepSuggestion(p, state.postRuns, today());
+    if (!vs) return;
+    p.fitnessTests = (p.fitnessTests || []).concat([vs.entry]);
+    save(); showToast(fa(T('fitNotes.stepDone', { v: vs.to.toFixed(1) }))); route();
+  });
   // تغییر سطح بر اساس آخرین تایم‌تست؛ حجم از حجم فعلی برنامه ادامه پیدا می‌کنه (نه از عدد قدیمی)
   function applyFitnessLevel() {
     var p = state.profile, now = today();
@@ -1678,7 +1691,7 @@
       html += '<p class="race-date">' + esc(T('race.taperStart', { d: faDate(C.dateKey(taperStart)) })) + ' ' + helpLink('goals', T('race.taperHelp')) + '</p>';
     }
     if (race && race.date <= now && g.category !== 'ultra') html += resultBlock('main', race.km, C.dateKey(race.date));
-    html += '<a class="linklike small race-change" href="#onboarding" data-onb-focus="goal">' + esc(T('race.changeMain')) + '</a></section>';
+    html += mainTargetHtml(p, g) + '<a class="linklike small race-change" href="#onboarding" data-onb-focus="goal">' + esc(T('race.changeMain')) + '</a></section>';
     var hero = html;
     html = '';
 
@@ -1736,7 +1749,7 @@
   function renderRace() {
     var p = state.profile, g = C.goalInfo(p), now = today(), nowKey = C.dateKey(now), main = C.raceInfo(p);
     var mainParts = mainRaceHtml(p, g);
-    var html = '<header class="page-head"><h1>' + esc(T('race.pageTitle')) + '</h1></header>' + mainParts[0];
+    var html = '<header class="page-head"><h1>' + esc(T('race.pageTitle')) + '</h1></header>' + mainParts[0] + linkCard('#plans', T('plans.title'), T('plans.linkSub'));
     // مسابقه‌های دیگه
     var list = C.otherRaces(p);
     html += '<section class="card races-card" id="races-card"><h2>' + esc(T('race.others')) + '</h2><p class="small muted">' + esc(T('race.othersHint')) + '</p>';
@@ -1749,6 +1762,7 @@
       var canMain = !past && (std || src.goal);
       return '<li class="race-item' + (past ? ' is-past' : '') + '"><div class="race-item-head"><b>' + t(r.name || C.raceDistLabel(r.km)) + '</b>' +
         (r.name ? '<span class="muted small">' + t(C.raceDistLabel(r.km)) + '</span>' : '') + '</div>' +
+        ((src.targetSec || (src.goal && src.goal.targetSec)) && !past ? '<p class="small race-target-line">' + tt('race.targetLine', { t: C.formatDuration(src.targetSec || src.goal.targetSec) }) + '</p>' : '') +
         '<p class="small race-item-date">' + esc(faDate(r.key)) + T('progress.sep') + (past ? esc(T('race.past')) : days === 0 ? esc(T('race.todayBang')) : tt('race.inDays', { n: days })) + '</p>' +
         (!past ? '<p class="small muted">' + tt('race.window', { pre: w.pre, post: w.post }) + '</p>' : '') +
         (near && !past ? '<p class="small race-near">' + esc(T('race.nearMain')) + '</p>' : '') +
@@ -1758,13 +1772,18 @@
     }).join('') + '</ul>';
     // افزودن مسابقه
     if ((p.races || []).length < C.MAX_RACES) {
-      html += '<details class="race-add"' + (raceAddOpen ? ' open' : '') + '><summary>' + esc(T('race.add')) + '</summary><form id="race-add-form" novalidate>' +
+      var dr = raceDraft || {}, paceOk = C.assessLevel(p).level >= C.PACE_LEVEL;
+      html += '<details class="race-add" id="race-add"' + (raceAddOpen ? ' open' : '') + '><summary>' + esc(T('race.add')) + '</summary><form id="race-add-form" novalidate>' +
+        (raceDraft ? '<p class="small race-draft">' + esc(T('race.fromPlan')) + '</p>' : '') +
         '<div class="field"><label for="ra-name">' + esc(T('race.name')) + '</label><input id="ra-name" name="name" type="text" maxlength="40" placeholder="' + esc(T('race.namePh')) + '"></div>' +
         '<p class="sub-legend">' + esc(T('race.dist')) + '</p><div class="chips">' +
-        RACE_KM.map(function (x, i) { return '<label class="chip"><input type="radio" name="dist" value="' + x[1] + '"' + (i === 1 ? ' checked' : '') + '><span>' + t(C.RACE_LABELS[x[0]]) + '</span></label>'; }).join('') +
+        RACE_KM.map(function (x, i) { return '<label class="chip"><input type="radio" name="dist" value="' + x[1] + '"' + ((dr.key ? dr.key === x[0] : i === 1) ? ' checked' : '') + '><span>' + t(C.RACE_LABELS[x[0]]) + '</span></label>'; }).join('') +
         '<label class="chip"><input type="radio" name="dist" value="other"><span>' + esc(T('race.distOther')) + '</span></label></div>' +
         '<div class="field" id="ra-km-field" hidden><label for="ra-km">' + esc(T('race.km', { u: T('units.' + I.getUnits()) })) + '</label><input id="ra-km" name="km" type="number" inputmode="decimal"' + limAttrs('race', '0.1') + '></div>' +
-        '<div class="field"><label for="ra-date">' + esc(T('race.date')) + '</label><input id="ra-date" name="date" type="date" min="' + nowKey + '"></div>' +
+        '<div class="field"><label for="ra-date">' + esc(T('race.date')) + '</label><input id="ra-date" name="date" type="date" min="' + nowKey + '"' + (dr.date ? ' value="' + dr.date + '"' : '') + '></div>' +
+        (paceOk ? '<div class="field" id="ra-target-field"><label for="ra-target">' + esc(T('race.target')) + '</label>' +
+          '<input id="ra-target" name="target" type="text" inputmode="numeric" dir="ltr" autocomplete="off" placeholder="' + esc(T('race.targetPh')) + '"' + (dr.targetSec ? ' value="' + C.formatDuration(dr.targetSec) + '"' : '') + '>' +
+          '<small class="muted">' + esc(T('race.targetHint')) + '</small></div>' : '') +
         '<p class="form-errors" hidden></p><button type="submit" class="btn btn-primary">' + esc(T('race.addSave')) + '</button></form></details>';
     }
     html += '</section>' + mainParts[1];
@@ -1772,9 +1791,144 @@
     var rf = app.querySelector('.race-result-form');
     if (rf) window.CoachTimePicker.init(rf);
     var af = document.getElementById('race-add-form');
-    if (af) af.addEventListener('change', function () { document.getElementById('ra-km-field').hidden = af.querySelector('input[name=dist]:checked').value !== 'other'; });
+    if (af) af.addEventListener('change', function () {
+      var other = af.querySelector('input[name=dist]:checked').value === 'other', tf = document.getElementById('ra-target-field');
+      document.getElementById('ra-km-field').hidden = !other;
+      // زمان هدف فقط برای مسافت‌های استاندارد (پیس مسابقه‌ی همون مسافت)
+      if (tf) tf.hidden = other;
+    });
   }
-  var raceAddOpen = false;
+  var raceAddOpen = false, raceDraft = null;
+  // زمان هدف: ورودی «۲۵:۰۰» یا «۱:۴۵:۰۰»؛ سرعت باید ممکن باشه
+  function targetIn(str, km) {
+    var sec = C.parseTime(str), v = sec ? km / (sec / 3600) : 0;
+    if (!sec) return { error: T('race.targetErr') };
+    if (v > 26 || v < 4) return { error: fa(T('fit.err.impossible', { km: km, d: C.describeDuration(sec) })) };
+    return { sec: sec };
+  }
+  // زمان هدف مسابقه‌ی اصلی (سطح ۳ به بالا، مسافت‌های استاندارد)
+  function mainTargetHtml(p, g) {
+    if (g.category === 'ultra' || C.assessLevel(p).level < C.PACE_LEVEL) return '';
+    var race = C.raceInfo(p);
+    if (race && race.date <= today()) return '';
+    var cur = g.targetSec;
+    return '<details class="race-target"' + (targetOpen ? ' open' : '') + '><summary>' + (cur
+      ? tt('race.targetLine', { t: C.formatDuration(cur) }) + ' · ' + tt('race.targetPace', { p: C.formatDuration(Math.round(I.pace(cur / g.km))) })
+      : esc(T('race.targetSet'))) + '</summary>' +
+      '<form data-race-target-form="1" novalidate><p class="small muted">' + esc(T('race.targetHow')) + '</p>' +
+      '<div class="field"><label for="rt-time">' + esc(T('race.target')) + '</label><input id="rt-time" name="target" type="text" inputmode="numeric" dir="ltr" autocomplete="off" placeholder="' +
+      esc(T('race.targetPh')) + '"' + (cur ? ' value="' + C.formatDuration(cur) + '"' : '') + '></div>' +
+      '<p class="form-errors" hidden></p><div class="actions"><button type="submit" class="btn btn-primary">' + esc(T('race.targetSave')) + '</button>' +
+      (cur ? '<button type="button" class="linklike small" data-race-target-clear="1">' + esc(T('race.targetClear')) + '</button>' : '') + '</div></form></details>';
+  }
+  var targetOpen = false;
+  app.addEventListener('submit', function (e) {
+    var f = e.target.closest('[data-race-target-form]');
+    if (!f) return;
+    e.preventDefault();
+    var p = state.profile, g = C.goalInfo(p), r = targetIn(f.target.value, g.km), err = f.querySelector('.form-errors');
+    if (r.error) { err.hidden = false; err.textContent = r.error; return; }
+    p.goal = Object.assign({}, p.goal, { targetSec: r.sec });
+    targetOpen = false;
+    save(); showToast(T('race.targetSaved')); renderRace();
+  });
+  app.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-race-target-clear]')) return;
+    var p = state.profile;
+    p.goal = Object.assign({}, p.goal); delete p.goal.targetSec;
+    targetOpen = false;
+    save(); showToast(T('race.targetCleared')); renderRace();
+  });
+  app.addEventListener('toggle', function (e) { if (e.target.classList && e.target.classList.contains('race-target')) targetOpen = e.target.open; }, true);
+
+  // =====================================================================
+  // برنامه‌های پیشنهادی: الگوی ۵ و ۱۰ کیلومتر، نیمه‌ماراتن و ماراتن برای سطح و حجم فعلی (C.planSuggestion)
+  // فقط پیشنهاده؛ «استفاده به‌عنوان الگو» فقط فرم افزودن مسابقه رو پیش‌پر می‌کنه
+  // =====================================================================
+  var PLAN_KEYS = ['5', '10', '21', '42'], planTargets = {};
+  function weeksText(w, hi) {
+    if (hi <= 52) return T('plans.weeks', { a: w, b: hi });
+    return T('plans.months', { a: Math.round(w / 4.35), b: Math.round(hi / 4.35) });
+  }
+  function paceU(sec) { return fa(C.formatDuration(Math.round(I.pace(sec)))); }
+  function renderPlans() {
+    var p = state.profile, a = C.assessLevel(p), pace = a.level >= C.PACE_LEVEL;
+    var html = '<header class="page-head"><h1>' + esc(T('plans.title')) + '</h1></header><p class="page-intro">' + esc(T('plans.intro')) + '</p>' +
+      '<section class="card plan-me"><p><b>' + tt('profile.levelNum', { n: a.level }) + '</b> · ' + esc(a.info.name) + ' · ' + tt('plans.volNow', { n: C.planSuggestion(p, '5').startKm }) + '</p>' +
+      '<p class="small muted">' + esc(T(pace ? 'plans.modePace' : 'plans.modeVolume')) + '</p>' +
+      (C.ageFactor(p.age) > 1 ? '<p class="small muted">' + esc(T('plans.ageNote')) + '</p>' : '') + '</section>';
+    html += PLAN_KEYS.map(function (k) { return planCard(p, k); }).join('');
+    html += '<p class="small muted plan-foot">' + esc(T('plans.foot')) + '</p>' + learnMore(['tenpct', 'vdot']);
+    app.innerHTML = html;
+  }
+  function planCard(p, k) {
+    var s = C.planSuggestion(p, k, planTargets[k] || 0);
+    var row = function (label, val) { return '<div><dt>' + esc(label) + '</dt><dd>' + val + '</dd></div>'; };
+    var html = '<section class="card plan-card" id="plan-' + k + '"><div class="plan-head"><h2>' + t(C.RACE_LABELS[k]) + '</h2>' +
+      '<span class="pill pill-level">' + esc(T(s.pace ? 'plans.goalPace' : 'plans.goalFinish')) + '</span></div>' +
+      '<div class="plan-weeks"><b>' + t(weeksText(s.weeks, s.weeksHi)) + '</b><span>' + esc(T(s.pace ? 'plans.cycle' : 'plans.untilReady')) + '</span></div><dl class="plan-rows">' +
+      (s.zeroWeeks ? row(T('plans.zero'), tt('plans.zeroVal', { n: s.zeroWeeks })) : '') +
+      row(T('plans.volume'), s.peakKm > s.startKm ? tt('plans.volVal', { a: s.startKm, b: s.peakKm }) : tt('plans.volKeep', { n: s.peakKm })) +
+      row(T('plans.long'), tt('plans.longVal', { n: s.longKm })) +
+      row(T('plans.sessions'), tt('plans.sesVal', { n: s.sessions })) + '</dl>';
+    if (s.pace) html += planPaceHtml(s, k);
+    var useWeeks = s.weeks, date = C.dateKey(C.addDays(today(), useWeeks * 7));
+    html += '<button type="button" class="btn btn-outline btn-block" data-plan-use="' + k + '" data-plan-date="' + date + '">' + esc(T('plans.use')) + '</button>' +
+      '<p class="small muted center">' + tt('plans.useHint', { d: faDate(date) }) + '</p></section>';
+    return html;
+  }
+  function planPaceHtml(s, k) {
+    var html = '<div class="plan-pace"><p class="plan-now">' + esc(T('plans.now')) + ' <b dir="ltr">' + fa(C.formatDuration(Math.round(s.predSec))) + '</b>' +
+      (s.vdotKnown ? '' : ' <span class="small muted">' + esc(T('plans.nowEst')) + '</span>') + '</p>' +
+      '<div class="field plan-target"><label for="pt-' + k + '">' + esc(T('plans.target')) + '</label><input id="pt-' + k + '" type="text" inputmode="numeric" dir="ltr" autocomplete="off" data-plan-target="' + k + '"' +
+      ' placeholder="' + fa(C.formatDuration(s.presets[1].sec)) + '"' + (s.targetSec ? ' value="' + C.formatDuration(s.targetSec) + '"' : '') + '></div>' +
+      '<div class="chips plan-presets" role="group" aria-label="' + esc(T('plans.presetsAria')) + '">' + s.presets.map(function (x) {
+        return '<button type="button" class="chip-btn" data-plan-preset="' + k + '" data-sec="' + x.sec + '" aria-pressed="' + (s.targetSec === x.sec) + '"><b dir="ltr">' + fa(C.formatDuration(x.sec)) + '</b><small>' + tt('plans.presetWeeks', { n: x.weeks }) + '</small></button>';
+      }).join('') + '</div>';
+    if (planErr[k]) html += '<p class="form-errors">' + esc(planErr[k]) + '</p>';
+    if (s.targetSec) {
+      if (s.already) html += '<p class="alert alert-good small">' + esc(T('plans.already')) + '</p>';
+      else {
+        html += '<dl class="plan-rows">' +
+          '<div><dt>' + esc(T('plans.targetPace')) + '</dt><dd dir="ltr">' + paceU(s.targetPace) + ' ' + esc(T('units.pace.' + I.getUnits())) + '</dd></div>' +
+          '<div><dt>VDOT</dt><dd><span dir="ltr">' + fa(s.vdot.toFixed(1)) + ' → ' + fa(s.targetVdot.toFixed(1)) + '</span> · ' + tt('plans.steps', { n: s.steps, w: s.stepWeeks }) + '</dd></div></dl>' +
+          '<p class="small muted">' + tt('plans.howPace', { e: paceU(s.paces.E), t: paceU(s.paces.T), w: s.stepWeeks }) + '</p>';
+        if (s.ambitious) html += '<div class="alert alert-adapt small"><p>' + tt('plans.ambitious', { n: s.paceWeeks }) + '</p>' +
+          '<button type="button" class="linklike small" data-plan-preset="' + k + '" data-sec="' + s.mid.sec + '">' + tt('plans.midUse', { t: C.formatDuration(s.mid.sec), n: s.mid.weeks }) + '</button></div>';
+      }
+    }
+    return html + '</div>';
+  }
+  var planErr = {}, planBusy = false;
+  function setPlanTarget(k, sec, err) {
+    planErr[k] = err || null;
+    if (!err) { if (sec) planTargets[k] = sec; else delete planTargets[k]; }
+    var y = window.scrollY, card = document.getElementById('plan-' + k);
+    // جایگزینی کارت فیلد فعال رو برمی‌داره و «change» دوباره صدا زده می‌شه؛ یک بار کافیه
+    if (!card || planBusy) return;
+    planBusy = true;
+    try { card.outerHTML = planCard(state.profile, k); } finally { planBusy = false; }
+    window.scrollTo(0, y);
+  }
+  app.addEventListener('change', function (e) {
+    var k = e.target.dataset && e.target.dataset.planTarget;
+    if (!k) return;
+    var v = e.target.value.trim();
+    if (!v) return setPlanTarget(k, 0);
+    var r = targetIn(v, C.RACE_DISTANCES[k]);
+    setPlanTarget(k, r.sec, r.error);
+  });
+  app.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-plan-preset]');
+    if (b) { setPlanTarget(b.dataset.planPreset, Number(b.dataset.sec)); var inp = document.getElementById('pt-' + b.dataset.planPreset); if (inp) inp.focus(); return; }
+    var u = e.target.closest('[data-plan-use]');
+    if (!u) return;
+    var k = u.dataset.planUse;
+    raceDraft = { key: k, date: u.dataset.planDate, targetSec: planTargets[k] || null };
+    raceAddOpen = true;
+    location.hash = '#race';
+    setTimeout(function () { var d = document.getElementById('race-add'); if (d) d.scrollIntoView({ block: 'start' }); }, 50);
+  });
   function newRaceId() { return 'r' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36); }
   app.addEventListener('submit', function (e) {
     var af = e.target.closest('#race-add-form'), rf = e.target.closest('[data-race-result-form]');
@@ -1789,8 +1943,12 @@
       if (!date || date < nowKey) return fail(T('race.err.date'));
       if (main && C.dateKey(main.date) === date) return fail(T('race.err.sameMain'));
       if ((p.races || []).some(function (r) { return r.date === date; })) return fail(T('race.err.dup'));
-      p.races = (p.races || []).concat([{ id: newRaceId(), name: af.name.value.trim().slice(0, 40), km: km, date: date }]);
-      raceAddOpen = false;
+      var tgt = af.target && af.target.value.trim() ? targetIn(af.target.value, km) : null;
+      if (tgt && tgt.error) return fail(tgt.error);
+      var nr = { id: newRaceId(), name: af.name.value.trim().slice(0, 40), km: km, date: date };
+      if (tgt && dv !== 'other') nr.targetSec = tgt.sec;
+      p.races = (p.races || []).concat([nr]);
+      raceAddOpen = false; raceDraft = null;
       save(); showToast(T('race.toastAdded')); renderRace();
       return;
     }
@@ -1823,6 +1981,7 @@
       var old = p.goal, og = C.goalInfo(p);
       if (og.type !== 'none' && og.date && og.date >= C.dateKey(today())) rest.push({ id: newRaceId(), name: '', km: og.km, date: og.date, goal: old });
       p.goal = r.goal ? r.goal : { type: std[0], date: r.date };
+      if (r.targetSec && !r.goal) p.goal.targetSec = r.targetSec;
       p.races = rest;
       save(); showToast(T('race.toastMain')); renderRace();
     }
@@ -2131,27 +2290,46 @@
       '<h1>' + esc(T(greetKey())) + '</h1></header>' +
       '<div data-install-slot="home">' + installBanner() + '</div>' +
       homeToday(base, r.session, ci, key) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
-      homeCycle(r, key, now) + homeProgress(now) + homeRace(now);
+      homeCycle(r, key, now) + homeProgress(now) + homeRace(now) + linkCard('#plans', T('plans.title'), T('plans.linkSub'));
     app.innerHTML = '<div class="home">' + html + '</div>';
   }
+  // کارت اصلی بالای خانه: «تمرین امروز» و زیرش «چک‌این امروز»
   function homeToday(base, s, ci, key) {
     var runDay = ['rest', 'none'].indexOf(base.type) < 0, done = !!state.done[key], cancelled = s.type === 'cancelled';
     var main = cancelled ? T('home.cancelled') : (s.steps && s.steps[0]) || '';
     var wu = !cancelled && s.warmup && s.warmup.min ? T('home.withWarmup', { n: s.warmup.min }) : '';
-    var cta;
-    if (cancelled) cta = '<a class="btn btn-outline btn-block" href="#plan" data-goto-today="1">' + esc(T('home.details')) + '</a>';
-    else if (runDay && !ci && !done) cta = '<a class="btn btn-primary btn-big btn-block" href="#checkin">' + esc(T('home.startCheckin')) + '</a>' +
-      '<p class="small muted center">' + esc(T('home.checkinHint')) + ' <a href="#plan" data-goto-today="1">' + esc(T('home.preview')) + '</a></p>';
-    else if (runDay) cta = '<a class="btn btn-primary btn-big btn-block" href="#plan" data-goto-today="1">' + esc(T('home.details')) + '</a>';
-    else cta = '<a class="btn btn-outline btn-block" href="#plan" data-goto-today="1">' + esc(T('home.weekPlan')) + '</a>';
-    return '<section class="card hcard hcard-today hc-' + s.type + '">' +
+    var btn = runDay || cancelled
+      ? '<a class="btn btn-outline btn-block" href="#plan" data-goto-today="1">' + esc(T(runDay && !cancelled ? 'home.sessionDetails' : 'home.details')) + '</a>'
+      : '<a class="btn btn-outline btn-block" href="#plan" data-goto-today="1">' + esc(T('home.weekPlan')) + '</a>';
+    var session = '<div class="ht-sec">' +
       '<div class="hcard-top"><span class="hcard-label">' + esc(T('home.todayTitle')) + '</span>' +
       (done ? '<span class="pill pill-done">✓ ' + esc(T('home.done')) + '</span>' : (s.original ? '<span class="pill pill-adapt">' + esc(T('home.adjusted')) + '</span>' : '')) + '</div>' +
       '<div class="today-main">' + badge(s.type, s.label) + (s.km ? '<b class="today-target">' + t(s.target) + '</b>' : (s.minutes ? '<b class="today-target">' + tt('home.minutes', { n: s.minutes }) + '</b>' : '')) + '</div>' +
       (main ? '<p class="today-sum">' + t(main) + (wu ? ' <span class="muted">' + t(wu) + '</span>' : '') + '</p>' : '') +
       (base.type === 'none' && state.profile.startDate > key ? '<p class="today-sum">' + esc(T('home.startsOn', { d: faDate(state.profile.startDate) })) + '</p>' : '') +
-      (!ci && runDay && prevCheckin(key) && prevCheckin(key).pain ? painYesterdayBox() : '') +
-      cta + '</section>';
+      btn + '</div>';
+    return '<section class="card hcard hcard-today hc-' + s.type + '">' + session + homeCheckinSec(base, ci, key, runDay, done) + '</section>';
+  }
+  function homeCheckinSec(base, ci, key, runDay, done) {
+    var head = function (pill) {
+      return '<div class="hcard-top"><span class="hcard-label">' + esc(T('home.ci.title')) + '</span>' + (pill || '') + '</div>';
+    };
+    var body;
+    if (ci) {
+      var rd = ci.pain ? null : C.readiness(ci, recentCheckins(key));
+      var st = ci.pain ? 'pain' : !rd.tier ? 'fresh' : rd.tier === 'mild' ? 'ok' : rd.tier === 'moderate' ? 'tired' : 'recover';
+      body = head('<span class="pill pill-done">✓ ' + esc(T('home.ci.done')) + '</span>') +
+        '<div class="ready-row ready-' + st + '"><span class="ready-dot" aria-hidden="true"></span><b class="ready-line">' + esc(T('home.ready.' + st)) + '</b></div>' +
+        (ci.pain ? '' : '<a class="linklike small ht-link" href="#checkin">' + esc(T('home.ci.edit')) + '</a>');
+    } else if (runDay && !done) {
+      body = head() + '<p class="small muted ht-note">' + esc(T('home.ci.todo')) + '</p>' +
+        (prevCheckin(key) && prevCheckin(key).pain ? painYesterdayBox() : '') +
+        '<a class="btn btn-primary btn-big btn-block" href="#checkin">' + esc(T('home.startCheckin')) + '</a>';
+    } else {
+      body = head() + '<p class="small muted ht-note">' + esc(T(done ? 'home.ci.afterRun' : 'home.ci.rest')) + '</p>' +
+        '<a class="linklike small ht-link" href="#checkin">' + esc(T('home.ci.optional')) + '</a>';
+    }
+    return '<div class="ht-sec ht-checkin">' + body + '</div>';
   }
   // وضعیت آمادگی: بدترِ دو نشانه (TSB از بار تمرینی، و چک‌این امروز با تاریخچه)
   var READY = { fresh: 0, ok: 1, tired: 2, recover: 3, pain: 4 };

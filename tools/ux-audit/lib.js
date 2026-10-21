@@ -43,6 +43,7 @@ const SCREENS = [
   ['learn-article', '#learn/vdot', async () => {}],
   ['guide', '#guide', async () => {}],
   ['race', '#race', async () => {}],
+  ['plans', '#plans', async () => {}],
   ['gait', '#profile/gait', async () => {}],
   // گزارش تحلیل دویدن نمونه (از دونده‌ی مصنوعی با چند مشکل؛ gait-report.json)
   ['gait-report', '#profile/gait', async (p) => {

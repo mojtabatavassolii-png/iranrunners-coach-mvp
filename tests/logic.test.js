@@ -1149,4 +1149,77 @@ test('تاریخ شروع: قبلش جلسه‌ای نیست، از همون ر�
   assert.strictEqual(C.sessionFor(q, C.parseDate('2026-10-30')).type, 'none');
 });
 
+
+// ---------- برنامه‌های پیشنهادی ----------
+test('پیشنهاد: سطح ۰ تا ۲ فقط حجم و مسافت؛ از سطح ۳ پیس هم داره', function () {
+  [0, 1, 2].forEach(function (n) {
+    var p = n === 0 ? profileFor(1, { experience: 'never', currentWeeklyKm: 0 }) : profileFor(n);
+    ['5', '10', '21', '42'].forEach(function (k) {
+      var s = C.planSuggestion(p, k, 1200);
+      assert.strictEqual(s.pace, false, n + ' ' + k);
+      assert.strictEqual(s.predSec, undefined); assert.strictEqual(s.targetSec, undefined);
+    });
+  });
+  [3, 6, 10].forEach(function (n) {
+    var s = C.planSuggestion(profileFor(n), '10', 0);
+    assert.ok(s.pace && s.predSec > 0 && s.presets.length === 3, String(n));
+  });
+});
+test('پیشنهاد: مسافت بلندتر و سطح پایین‌تر = زمان آماده‌سازی بیشتر، هیچ‌وقت کمتر از حداقل موتور', function () {
+  [1, 2, 3, 5, 8].forEach(function (n) {
+    var p = profileFor(n), prev = 0;
+    ['5', '10', '21', '42'].forEach(function (k) {
+      var s = C.planSuggestion(p, k, 0);
+      assert.ok(s.weeks >= prev, n + ' ' + k);
+      assert.ok(s.weeks >= C.minPrepWeeks({ type: k }, n), n + ' ' + k);
+      assert.ok(s.weeksHi >= s.weeks && s.peakKm >= s.startKm && s.peakKm >= C.PLAN_NEEDS[k].km);
+      prev = s.weeks;
+    });
+  });
+  var zero = C.planSuggestion(profileFor(1, { experience: 'never', currentWeeklyKm: 0 }), '42', 0);
+  assert.ok(zero.zeroWeeks > 0 && zero.weeks > C.planSuggestion(profileFor(4), '42', 0).weeks);
+});
+test('پیشنهاد: رشد حجم با همون قانون ۱۰٪ و هفته‌ی سبک موتور اصلی', function () {
+  assert.strictEqual(C.weeksToVolume(30, 30, 1.1), 0);
+  // ۲۰ → ۳۰: ۵ پله‌ی رشد + یک هفته‌ی سبک
+  assert.strictEqual(C.weeksToVolume(20, 30, 1.1), 6);
+  assert.ok(C.weeksToVolume(20, 30, 1.05) > C.weeksToVolume(20, 30, 1.1));
+});
+test('پیشنهاد: سن بالای ۵۰ زمان بیشتری لازم داره', function () {
+  var a = C.planSuggestion(profileFor(4, { age: 30 }), '21', 0), b = C.planSuggestion(profileFor(4, { age: 62 }), '21', 0);
+  assert.ok(b.weeks > a.weeks && b.ageAdjusted && !a.ageAdjusted);
+});
+test('پیشنهاد: زمان هدف → پله‌های VDOT (۴ تا ۶ هفته)، هدف خیلی دور = هدف میانی', function () {
+  var p = profileFor(6, { pb: { distanceKm: 5, timeSec: 960, date: '2026-09-01' } });
+  var s = C.planSuggestion(p, '5', 900); // ۱۶:۰۰ → ۱۵:۰۰
+  assert.ok(s.targetVdot > s.vdot && s.steps >= 4);
+  assert.strictEqual(s.paceWeeks, s.steps * C.vdotStepWeeks(s.level));
+  assert.ok(s.ambitious && s.mid.sec < 960 && s.mid.sec > 900);
+  assert.ok(Math.abs(s.targetPace - 180) < 0.01);
+  var easy = C.planSuggestion(p, '5', s.presets[0].sec);
+  assert.strictEqual(easy.steps, 1); assert.ok(!easy.ambitious);
+  assert.ok(C.planSuggestion(p, '5', 1000).already);
+});
+test('زمان هدف مسابقه‌ی اصلی: فقط پیس همون مسافت، حداکثر ۲ واحد VDOT جلوتر؛ زیر سطح ۳ بی‌اثر', function () {
+  var pb = { distanceKm: 10, timeSec: hms(0, 45), date: '2026-09-01' };
+  var p = profileFor(5, { pb: pb, goal: { type: '10', date: '2027-03-01', targetSec: hms(0, 40) } });
+  var lv = C.assessLevel(p).level, P0 = C.paceSet(profileFor(5, { pb: pb, goal: { type: '10', date: '2027-03-01' } }), lv), P = C.paceSet(p, lv);
+  assert.ok(P.p10 < P0.p10 && P.goal && P.goal.capped);
+  assert.strictEqual(P.p5, P0.p5); assert.strictEqual(P.pT, P0.pT); assert.strictEqual(P.pE, P0.pE);
+  assert.ok(Math.abs(P.goal.vdot - (P0.vdot + 2)) < 1e-9);
+  var low = profileFor(2, { goal: { type: '10', targetSec: hms(0, 40) } });
+  assert.ok(!C.paceSet(low, C.assessLevel(low).level).goal);
+});
+test('پله‌ی VDOT: بعد از ۴ تا ۶ هفته، فقط وقتی ایزی‌ها سخت نبودن، حداکثر تا هدف', function () {
+  var p = profileFor(5, { pb: { distanceKm: 10, timeSec: hms(0, 45), date: '2026-09-01' }, goal: { type: '10', targetSec: hms(0, 44) } });
+  assert.strictEqual(C.vdotStepSuggestion(p, {}, C.parseDate('2026-09-15')), null);
+  var sg = C.vdotStepSuggestion(p, {}, C.parseDate('2026-10-20'));
+  assert.ok(sg && sg.to > sg.from && sg.to <= C.vdotFromRace(10, hms(0, 44)) + 1e-9 && sg.entry.kind === 'step');
+  var hard = { '2026-10-15': { easy: true, rpe: 8, pace: 'ok' }, '2026-10-18': { easy: true, rpe: 7, pace: 'ok' } };
+  assert.strictEqual(C.vdotStepSuggestion(p, hard, C.parseDate('2026-10-20')), null);
+  // پله‌ی ثبت‌شده پیشنهاد تغییر سطح نمی‌سازه
+  p.fitnessTests = [sg.entry];
+  assert.strictEqual(C.fitnessLevelSuggestion(p), null);
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

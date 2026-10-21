@@ -296,7 +296,11 @@
       out.cls = ultraClass(out.ratio);
       // مسیر با سرازیری خیلی بیشتر از صعود (نقطه به نقطه)
       out.netDownhill = out.loss !== null && out.loss > out.gain * 1.2;
-    } else out.km = RACE_DISTANCES[g.type];
+    } else {
+      out.km = RACE_DISTANCES[g.type];
+      // زمان هدف (اختیاری، از سطح ۳ به بالا): بخش‌های «پیس مسابقه» با این هدف تمرین می‌شن
+      out.targetSec = Number(g.targetSec) > 0 ? Number(g.targetSec) : null;
+    }
     return out;
   }
   function goalLabel(g) {
@@ -484,7 +488,7 @@
   // آیا فیتنس فعلی به سطح دیگه‌ای رسیده؟ (برنامه خودکار سطح عوض نمی‌کنه تا حجم پرش نکنه؛ به کاربر پیشنهاد می‌ده)
   function fitnessLevelSuggestion(profile) {
     var fit = currentFitness(profile);
-    if (!fit || fit.entry.kind === 'baseline' || profile.experience === 'never') return null;
+    if (!fit || fit.entry.kind === 'baseline' || fit.entry.kind === 'step' || profile.experience === 'never') return null;
     var planLevel = assessLevel(profile).level;
     var fitLevel = levelFromVdot(fit.vdot);
     if (fitLevel === planLevel) return null;
@@ -949,11 +953,27 @@
     var v = refVdot(profile, level);
     var race = function (d) { return raceTimeFromVdot(v, d) / d; };
     var adj = clamp(Number(profile.easyAdjustSec) || 0, 0, EASY_ADJUST_MAX);
-    return { vdot: v, known: !!currentFitness(profile), p5: race(5), p10: race(10), pHM: race(21.0975), pM: race(42.195),
+    var P = { vdot: v, known: !!currentFitness(profile), p5: race(5), p10: race(10), pHM: race(21.0975), pM: race(42.195),
       pT: paceAtPct(v, 0.88), pE: paceAtPct(v, 0.70) + adj,
       // همون بازه‌ای که صفحه‌ی فیتنس برای آستانه نشون می‌ده
       tRange: [paceAtPct(v, 0.90), paceAtPct(v, 0.86)] };
+    // زمان هدف مسابقه‌ی اصلی (دنیلز): پیس‌های تمرینی از آمادگی فعلی می‌مونن؛ فقط پیس مسابقه‌ی همون مسافت
+    // به سمت هدف می‌ره و حداکثر ۲ واحد VDOT جلوتر از آمادگی فعلی (هدف خیلی دور تمرین رو بیش از حد سخت نکنه)
+    var tg = goalTarget(profile, level);
+    if (tg && tg.vdot > v) {
+      var gv = Math.min(tg.vdot, v + 2), k = RACE_PACE_KEY[tg.key];
+      P[k] = raceTimeFromVdot(gv, tg.km) / tg.km;
+      P.goal = { key: tg.key, vdot: gv, capped: gv < tg.vdot };
+    }
+    return P;
   }
+  var RACE_PACE_KEY = { '5': 'p5', '10': 'p10', '21': 'pHM', '42': 'pM' };
+  function goalTarget(profile, level) {
+    var g = goalInfo(profile);
+    if (!g.targetSec || !RACE_PACE_KEY[g.type] || level < PACE_LEVEL) return null;
+    return { key: g.type, km: g.km, sec: g.targetSec, vdot: vdotFromRace(g.km, g.targetSec) };
+  }
+
   function r1(x) { return Math.round(x * 10) / 10; }
   function round10(x) { return Math.round(x / 10) * 10; }
   function hoursText(min) {
@@ -2114,6 +2134,95 @@
     };
   }
 
+  // =====================================================================
+  // برنامه‌های پیشنهادی (اختیاری): برای هر مسافت، از سطح و حجم فعلی کاربر
+  // با همون قواعد موتور اصلی: رشد ۱۰٪ (احتیاط ۵٪) با هفته‌ی سبک هر ۴ هفته، حداقل آماده‌سازی هر سطح،
+  // برنامه‌ی سطح ۰، و برای سطح ۳ به بالا رسیدن به زمان هدف با پله‌های ۱ واحدی VDOT (دنیلز: هر ۴ تا ۶ هفته).
+  // =====================================================================
+  var PACE_LEVEL = 3;
+  // حداقل حجم هفتگی اوج و لانگ‌ران لازم برای تموم کردن راحت هر مسافت (برنامه‌های مبتدی دنیلز و هیگدن)
+  var PLAN_NEEDS = { '5': { km: 12, long: 6, ses: 3 }, '10': { km: 30, long: 12, ses: 4 }, '21': { km: 40, long: 18, ses: 4 }, '42': { km: 55, long: 30, ses: 5 } };
+  // آماده‌سازی اختصاصی بعد از رسیدن به حجم لازم (فاز کیفی و تیپر)؛ برای تموم کردن مسافت کوتاه‌تر، چون خود افزایش حجم آماده‌سازیه
+  var SPECIFIC_WEEKS = { '5': 6, '10': 8, '21': 10, '42': 12 }, FINISH_WEEKS = { '5': 3, '10': 4, '21': 6, '42': 8 };
+  var ZERO_WEEKS = ZERO_FINAL + 1, ZERO_EXIT_KM = 6;
+  // هفته‌های هر پله‌ی VDOT: دونده‌ی پیشرفته‌تر کندتر پیشرفت می‌کنه
+  function vdotStepWeeks(level) { return level <= 5 ? 4 : level <= 7 ? 5 : 6; }
+  // ریکاوری کندتر در سنین بالاتر
+  function ageFactor(age) { age = Number(age) || 0; return age >= 60 ? 1.15 : age >= 50 ? 1.1 : 1; }
+  // هفته‌ها تا رسیدن به یک حجم هفتگی، با همون الگوی رشد و هفته‌ی سبک موتور اصلی
+  function weeksToVolume(start, target, rate) {
+    if (start >= target) return 0;
+    var v = start;
+    for (var w = 1; w <= 156; w++) {
+      var pr = progression(w);
+      if (pr.deload) continue;
+      v = start;
+      for (var i = 0; i < pr.steps; i++) v = Math.max(v + 0.5, floor05(v * rate));
+      if (v >= target) return w;
+    }
+    return 156;
+  }
+  function planSuggestion(profile, key, targetSec) {
+    var a = assessLevel(profile), level = a.level, need = PLAN_NEEDS[key], km = RACE_DISTANCES[key];
+    var pace = level >= PACE_LEVEL;
+    var zero = level === 0 ? ZERO_WEEKS : 0;
+    var start = level === 0 ? ZERO_EXIT_KM : startKm(profile);
+    // سطح ۳ به بالا (بهتر کردن زمان): حدود ۲۰٪ بیشتر از حجم فعلی، در سقف سطح؛ هیچ‌وقت کمتر از حجم فعلی نیست
+    var peak = Math.max(need.km, pace ? Math.min(floor05(start * 1.2), Math.max(start, LEVELS[level].maxKm)) : 0, start);
+    var volW = weeksToVolume(start, peak, growthRate(a)), specW = (pace ? SPECIFIC_WEEKS : FINISH_WEEKS)[key];
+    var out = { key: key, km: km, level: level, pace: pace, zeroWeeks: zero, startKm: start, peakKm: peak,
+      longKm: Math.min(Math.round(need.long + (pace ? Math.min(level - 2, 4) * (key === '42' ? 0.5 : 1) : 0)), RACE_LONG_CAP[key]),
+      sessions: pace ? Math.max(need.ses, LEVELS[level].sessions - 1) : need.ses,
+      volWeeks: volW, minWeeks: minPrepWeeks({ type: key }, level), paceWeeks: 0 };
+    if (pace) {
+      var fit = currentFitness(profile), v = refVdot(profile, level);
+      out.vdot = v; out.vdotKnown = !!fit;
+      out.predSec = raceTimeFromVdot(v, km);
+      out.stepWeeks = vdotStepWeeks(level);
+      // پیشنهاد هدف: یک، دو و سه پله‌ی VDOT
+      out.presets = [1, 2, 3].map(function (d) { return { steps: d, sec: Math.round(raceTimeFromVdot(v + d, km)), weeks: d * out.stepWeeks }; });
+      out.paces = paceTable(v, key);
+      if (targetSec > 0) {
+        var tv = vdotFromRace(km, targetSec), delta = tv - v;
+        out.targetSec = targetSec; out.targetVdot = tv; out.delta = delta;
+        out.targetPace = targetSec / km;
+        out.targetPaces = paceTable(tv, key);
+        if (delta <= 0.05) out.already = true;
+        else {
+          out.steps = Math.ceil(delta - 0.05);
+          out.paceWeeks = out.steps * out.stepWeeks;
+          // بیشتر از یک فصل تمرین (حدود ۲۴ هفته): هدف میانی پیشنهاد می‌شه
+          var cycle = Math.floor(24 / out.stepWeeks);
+          if (out.steps > cycle) {
+            out.ambitious = true;
+            var mid = Math.floor(16 / out.stepWeeks);
+            out.mid = { sec: Math.round(raceTimeFromVdot(v + mid, km)), steps: mid, weeks: mid * out.stepWeeks };
+          }
+        }
+      }
+    }
+    var base = Math.max(out.minWeeks, zero + Math.max(volW + specW, out.paceWeeks));
+    var f = ageFactor(profile.age);
+    out.ageAdjusted = f > 1;
+    out.weeks = Math.ceil(base * f);
+    out.weeksHi = Math.ceil(out.weeks * 1.25);
+    return out;
+  }
+  // پیس‌های اصلی دنیلز برای یک VDOT (ثانیه بر کیلومتر)؛ race = پیس همون مسافت
+  function paceTable(v, key) {
+    var km = RACE_DISTANCES[key];
+    return { race: raceTimeFromVdot(v, km) / km, E: paceAtPct(v, 0.70), T: paceAtPct(v, 0.88), I: paceAtPct(v, 0.98) };
+  }
+  // پله‌ی بعدی VDOT به سمت زمان هدف مسابقه‌ی اصلی: بعد از ۴ تا ۶ هفته از آخرین رکورد، اگه ایزی‌ها سخت نبودن
+  function vdotStepSuggestion(profile, postRuns, today) {
+    var level = assessLevel(profile).level, tg = goalTarget(profile, level), fit = currentFitness(profile);
+    if (!tg || !fit || fit.vdot >= tg.vdot - 0.05) return null;
+    var weeks = Math.floor(daysBetween(parseDate(fit.entry.date), today) / 7), need = vdotStepWeeks(level);
+    if (weeks < need || easyRpeTrend(postRuns, today) >= 2) return null;
+    var to = Math.min(tg.vdot, fit.vdot + 1);
+    return { from: fit.vdot, to: to, weeks: weeks, entry: { date: dateKey(today), distanceKm: 5, timeSec: Math.round(raceTimeFromVdot(to, 5)), kind: 'step' } };
+  }
+
   var api = {
     LEVELS: LEVELS, EXPERIENCE: EXPERIENCE, TIER_INFO: TIER_INFO, PERIOD_LABELS: PERIOD_LABELS,
     RACE_DISTANCES: RACE_DISTANCES, RACE_LABELS: RACE_LABELS,
@@ -2138,6 +2247,8 @@
     periodPlan: periodPlan, periodSession: periodSession, periodsAhead: periodsAhead, PERIOD_MODES: PERIOD_MODES, dayRecords: dayRecords,
     ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,
+    planSuggestion: planSuggestion, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
+    PACE_LEVEL: PACE_LEVEL, PLAN_NEEDS: PLAN_NEEDS, vdotStepWeeks: vdotStepWeeks,
     analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS
   };
   // متن‌هایی که به زبان فعلی بستگی دارن، موقع خوندن ترجمه می‌شن
