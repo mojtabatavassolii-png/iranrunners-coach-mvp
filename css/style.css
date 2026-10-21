@@ -1393,3 +1393,60 @@ input, select, textarea { background: #fff; }
 .onb-dot { width: 44px; height: 44px; }
 .onb-dots { gap: 0; }
 @media (max-width: 359px) { .onb-dots li:not(:last-child)::after { width: 6px; } }
+
+/* ===========================================================
+   پروفایل: تب‌های «پیشرفت» و «بیومکانیک» هم‌زبان با بقیه‌ی پروفایل (سبک Runna)
+   کارت تخت، کاشی‌های خاکستری روشن، ردیف‌ها با خط جداکننده، انتخاب فعال جوهری
+   =========================================================== */
+.pf-panel .page-intro { font-size: var(--fs-md); margin: 0 4px 14px; }
+.pf-panel .prange { background: var(--panel); }
+.pf-panel .prange button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+.pf-panel .card > h2 { font-size: var(--fs-lg); margin-bottom: 2px; }
+.pf-panel .card > h2 + .small.muted { font-size: var(--fs-sm); margin: 0 0 14px; }
+/* کاشی‌های آمار: دو ستون؛ سه کاشی از ۴۲۰ پیکسل در یک ردیف؛ کاشی تنها تمام‌عرض */
+.pf-panel .pstats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.pf-panel .pstats > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+@media (min-width: 420px) {
+  .pf-panel .pstats:has(> :nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pf-panel .pstats:has(> :nth-child(3):last-child) > :last-child { grid-column: auto; }
+}
+.pf-panel .pstat { background: var(--panel); border: 0; border-radius: 14px; padding: 10px 12px; }
+.pf-panel .pstat b { font-size: var(--fs-base); }
+.pf-panel .pmc-keys li { text-align: start; }
+.pf-panel .adh-bar { background: var(--panel); }
+.pf-panel .tod-row { border-color: transparent; background: var(--panel); }
+.pf-panel .tod-row.is-best { border-color: var(--brand); background: var(--brand-soft); }
+/* «نمایش جدول داده‌ها» و «بیشتر بدان»: ردیف انتهای کارت با خط جداکننده */
+.pf-panel .ch-table { margin-top: 10px; border-top: 1.5px solid var(--line); }
+.pf-panel .ch-table > summary, .pf-panel .gait-how > summary, .pf-panel .gait-methods > summary { list-style: none; justify-content: space-between; color: var(--ink); font-weight: 600; }
+.pf-panel .ch-table > summary::-webkit-details-marker, .pf-panel .gait-how > summary::-webkit-details-marker, .pf-panel .gait-methods > summary::-webkit-details-marker { display: none; }
+.pf-panel .ch-table > summary::after, .pf-panel .gait-how > summary::after, .pf-panel .gait-methods > summary::after {
+  content: ""; flex: none; width: 8px; height: 8px; margin-inline: 8px 4px; border-right: 2px solid var(--faint); border-bottom: 2px solid var(--faint);
+  transform: translateY(-2px) rotate(45deg); transition: transform .2s;
+}
+.pf-panel details[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
+.pf-panel .pcard .learn-more { font-size: var(--fs-sm); margin: 6px 0 0; }
+/* بیومکانیک: جای فیلم‌ها ردیف‌های یک کارت؛ دکمه‌ی انتخاب فیلم ملایم تا «شروع تحلیل» اقدام اصلی بمونه */
+.pf-panel .gait-how { border-bottom: 1.5px solid var(--line); margin-bottom: 4px; }
+.pf-panel .gait-one { color: var(--muted); margin: 10px 0 4px; }
+.pf-panel .gait-slot { border: 0; border-top: 1.5px solid var(--line); border-radius: 0; padding: 14px 0; margin: 0; background: none; }
+.pf-panel .gait-slot.has-file { background: none; }
+.pf-panel .gait-one + .gait-slot { border-top: 0; }
+.pf-panel .gait-pick { background: var(--panel); color: var(--ink); border-color: var(--panel); }
+.pf-panel .gait-pick:hover { background: var(--panel-raised); border-color: var(--panel-raised); color: var(--ink); }
+.pf-panel [data-gait-run] { margin-top: 6px; }
+.pf-panel .gait-axis { background: var(--panel); }
+/* مورد‌های گزارش و ریسک‌ها: ردیف با خط جداکننده؛ وضعیت با برچسب رنگی */
+.pf-panel .gait-items { gap: 0; }
+.pf-panel .gait-item, .pf-panel .gait-risk { border: 0; border-top: 1.5px solid var(--line); border-radius: 0; padding: 14px 0; }
+.pf-panel .gait-items > :first-child { border-top: 0; padding-top: 2px; }
+.pf-panel .gait-items > :last-child { padding-bottom: 0; }
+.pf-panel .gi-chip { padding: 2px 10px; }
+.pf-panel .gi-good .gi-chip, .pf-panel .gr-low .gi-chip { background: #e3f4e3; }
+.pf-panel .gi-warn .gi-chip, .pf-panel .gr-moderate .gi-chip { background: var(--c-tempo-bg); }
+.pf-panel .gi-bad .gi-chip, .pf-panel .gr-high .gi-chip { background: var(--accent-soft); }
+.pf-panel .gi-fix { background: var(--panel); border-radius: 12px; padding: 8px 12px; margin-top: 8px; }
+.pf-panel .gait-hist li { min-height: 52px; }
+/* بازه‌ی زمانی: کنترل سه‌بخشی تمام‌عرض (در انگلیسی هم یک ردیف) */
+.pf-panel .prange { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.pf-panel .prange button { padding: 8px 6px; font-size: var(--fs-sm); text-align: center; }

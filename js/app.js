@@ -2467,7 +2467,10 @@
       ['4w', '3m', 'all'].map(function (k) {
         return '<button type="button" data-prange="' + k + '" aria-pressed="' + (k === rk) + '">' + esc(T('progress.r' + (k === '4w' ? '4w' : k === '3m' ? '3m' : 'All'))) + '</button>';
       }).join('') + '</div></div><p class="page-intro">' + esc(T('progress.intro')) + '</p>' +
-      (function () { var f = C.currentFitness(state.profile); return linkCard('#fitness', T('profile.linkFitness'), f ? 'VDOT ' + fa(f.vdot.toFixed(1)) + T('progress.sep') + T('profile.fitnessSub') : T('profile.registerTest')); })();
+      (function () {
+        var f = C.currentFitness(state.profile);
+        return '<nav class="card list-group">' + listRows([['#fitness', 'watch', T('profile.linkFitness'), f ? 'VDOT ' + f.vdot.toFixed(1) + T('progress.sep') + T('profile.fitnessSub') : T('profile.registerTest')]]) + '</nav>';
+      })();
 
     var W = a.weeks, wkWithRuns = W.filter(function (w) { return w.runs > 0; }).length;
     var pc = progCtx(a, rk === '4w' ? 4 : 13);
@@ -3341,11 +3344,14 @@
   }
   // فهرست ردیفی (سبک Runna): عنوان گروه، ردیف‌ها با آیکون و فلش، در یک کارت
   function listGroup(label, rows) {
-    return '<p class="group-label" role="heading" aria-level="2">' + esc(label) + '</p><nav class="card list-group" aria-label="' + esc(label) + '">' + rows.map(function (r) {
+    return '<p class="group-label" role="heading" aria-level="2">' + esc(label) + '</p><nav class="card list-group" aria-label="' + esc(label) + '">' + listRows(rows) + '</nav>';
+  }
+  function listRows(rows) {
+    return rows.map(function (r) {
       return '<a class="list-row" href="' + r[0] + '"' + (r[4] ? ' data-set-open="' + r[4] + '"' : '') + '>' +
         '<span class="lr-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + SET_ICONS[r[1]] + '</svg></span>' +
         '<span class="lr-text"><b>' + esc(r[2]) + '</b>' + (r[3] ? '<small>' + t(r[3]) + '</small>' : '') + '</span>' + chevron(isRtl() ? 'left' : 'right') + '</a>';
-    }).join('') + '</nav>';
+    }).join('');
   }
   // ردیف تنظیمات در پروفایل: همون بخش در صفحه‌ی تنظیمات باز و دیده می‌شه
   document.addEventListener('click', function (e) {
