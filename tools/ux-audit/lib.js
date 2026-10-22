@@ -32,6 +32,15 @@ const SCREENS = [
   ['onb-4', '#onboarding', async (p) => gotoStep(p, 4)],
   ['onb-5', '#onboarding', async (p) => gotoStep(p, 5)],
   ['home', '#home', async () => {}],
+  // کاربر تازه: چک‌لیست شروع (۲ از ۵) و کارت «مسیر تو»
+  ['home-new', '#home', async (p) => {
+    await p.evaluate(([K, today]) => {
+      const s = JSON.parse(localStorage.getItem(K));
+      s.checklist = { since: today }; s.checkins = {}; s.done = {}; s.postRuns = {}; s.profile.name = '';
+      localStorage.setItem(K, JSON.stringify(s));
+    }, [KEY, TODAY]);
+    await p.reload(); await p.waitForTimeout(500);
+  }],
   ['plan-week', '#plan', async (p) => setPlanView(p, 'week')],
   ['plan-month', '#plan', async (p) => setPlanView(p, 'month')],
   ['profile', '#profile', async () => {}],

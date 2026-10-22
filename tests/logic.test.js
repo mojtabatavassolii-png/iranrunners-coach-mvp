@@ -1222,4 +1222,21 @@ test('پله‌ی VDOT: بعد از ۴ تا ۶ هفته، فقط وقتی ایز
   assert.strictEqual(C.fitnessLevelSuggestion(p), null);
 });
 
+
+test('مسیر تا هدف: باقی‌مونده با گذشت هفته‌ها کم می‌شه، وضعیت نسبت به تاریخ مسابقه', function () {
+  var p = profileFor(4, { startDate: '2026-09-26', goal: { type: '21', date: '2027-06-01' } });
+  var a = C.goalPath(p, C.parseDate('2026-09-26')), b = C.goalPath(p, C.parseDate('2026-11-21'));
+  assert.strictEqual(a.elapsed, 0); assert.strictEqual(b.elapsed, 8);
+  assert.ok(a.weeks > 0 && b.weeks < a.weeks, a.weeks + ' → ' + b.weeks);
+  assert.ok(b.frac > a.frac && b.frac < 1);
+  assert.strictEqual(a.status, 'ok');
+  var tight = C.goalPath(profileFor(2, { startDate: '2026-09-26', goal: { type: '42', date: '2026-11-01' } }), C.parseDate('2026-09-26'));
+  assert.strictEqual(tight.status, 'tight');
+  assert.ok(C.goalPath(profileFor(4, { goal: { type: 'none' } }), C.parseDate('2026-09-26')).none);
+  var past = C.goalPath(profileFor(4, { goal: { type: '10', date: '2026-09-01' } }), C.parseDate('2026-09-26'));
+  assert.ok(past.past);
+  var ultra = C.goalPath(profileFor(6, { goal: goalOf('ultra', '2027-09-01') }), C.parseDate('2026-09-26'));
+  assert.ok(ultra.weeks >= C.minPrepWeeks(C.goalInfo(profileFor(6, { goal: goalOf('ultra') })), 6));
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

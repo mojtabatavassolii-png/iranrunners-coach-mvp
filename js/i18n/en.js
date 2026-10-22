@@ -922,6 +922,29 @@
       remove: 'Remove',
       saved: 'Report saved; the videos are not stored.'
     },
+    path: {
+      title: 'Your path', now: 'Now', goal: 'Goal', level: 'Level {n}', aria: 'Progress toward your goal',
+      week: 'Week {a} of about {b} weeks of preparation', notStarted: 'Your plan starts on {d}',
+      race: 'Race in {n} days ({d})', eta: 'Estimated readiness: {a} to {b} weeks', etaMonth: 'Estimated arrival: around {m}', ready: 'In mileage and preparation, you are ready',
+      st: { ok: 'You have enough time', tight: 'Tight; check an intermediate goal', ready: 'Ready' },
+      more: 'Details →', seePlans: 'Suggested plans →',
+      none: 'Your path: no goal yet', noneSub: 'See the suggested plans for your level and pick one'
+    },
+    start: {
+      title: 'Getting started', count: '{a} of {b}', close: 'Close the getting-started list',
+      plan: 'Your plan is ready',
+      goal: 'Pick your first goal', goalSub: 'From the suggested plans for your level', goalDone: 'First goal: {g}',
+      checkin: 'Your first check-in', checkinSub: 'Under a minute; tunes today\'s session to how you feel',
+      run: 'Mark your first run as done', runSub: 'After your run, from today\'s plan',
+      name: 'Add your name', nameSub: 'Makes the plan more personal; you can add a photo too',
+      srDone: '(done)', srTodo: '(not done)',
+      allDone: 'All steps done!', allDoneSub: 'Now just keep going; this card disappears from tomorrow.'
+    },
+    cele: {
+      title: 'Well done, you took the first step!',
+      text: 'Your first run is logged: {s}. From now on the plan adapts to your own data.',
+      next: 'Next session', cont: 'Continue'
+    },
     plans: {
       title: 'Suggested plans',
       linkSub: '5K, 10K, half and full marathon for your level',

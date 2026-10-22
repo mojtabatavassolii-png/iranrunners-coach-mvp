@@ -2162,11 +2162,12 @@
     }
     return 156;
   }
-  function planSuggestion(profile, key, targetSec) {
+  // opts.km: حجم هفتگی فعلی برنامه (به‌جای حجم فرم اولیه)، برای تخمین باقی‌مونده وسط برنامه
+  function planSuggestion(profile, key, targetSec, opts) {
     var a = assessLevel(profile), level = a.level, need = PLAN_NEEDS[key], km = RACE_DISTANCES[key];
     var pace = level >= PACE_LEVEL;
     var zero = level === 0 ? ZERO_WEEKS : 0;
-    var start = level === 0 ? ZERO_EXIT_KM : startKm(profile);
+    var start = level === 0 ? ZERO_EXIT_KM : opts && opts.km > 0 ? Math.max(5, floor05(opts.km)) : startKm(profile);
     // سطح ۳ به بالا (بهتر کردن زمان): حدود ۲۰٪ بیشتر از حجم فعلی، در سقف سطح؛ هیچ‌وقت کمتر از حجم فعلی نیست
     var peak = Math.max(need.km, pace ? Math.min(floor05(start * 1.2), Math.max(start, LEVELS[level].maxKm)) : 0, start);
     var volW = weeksToVolume(start, peak, growthRate(a)), specW = (pace ? SPECIFIC_WEEKS : FINISH_WEEKS)[key];
@@ -2208,6 +2209,31 @@
     out.weeksHi = Math.ceil(out.weeks * 1.25);
     return out;
   }
+  // مسیر تا هدف اصلی: سطح فعلی، هفته‌های گذشته و تخمین باقی‌مونده (همون محاسبه‌ی برنامه‌های پیشنهادی).
+  // بخش‌های ثابت (حداقل آماده‌سازی، فاز اختصاصی) با گذشت هفته‌ها کم می‌شن؛ حجم از حجم فعلی برنامه
+  // و پیس از آخرین VDOT ثبت‌شده دوباره حساب می‌شن، پس تخمین با پیشرفت واقعی کوتاه می‌شه.
+  function goalPath(profile, today) {
+    var g = goalInfo(profile), a = assessLevel(profile), level = a.level;
+    var out = { level: level, goal: g };
+    if (g.type === 'none') { out.none = true; return out; }
+    var start = parseDate(profile.startDate), elapsed = start <= today ? Math.floor(daysBetween(start, today) / 7) : 0, rem;
+    if (PLAN_NEEDS[g.type]) {
+      var wi = weekIndexFor(profile, today), km = level > 0 && wi >= 0 ? weeklyVolume(profile, wi, true, a).km : 0;
+      var s = planSuggestion(profile, g.type, g.targetSec || 0, { km: km });
+      rem = Math.max(Math.max(0, s.zeroWeeks - elapsed) + s.volWeeks, s.paceWeeks || 0, s.weeks - elapsed, 0);
+    } else rem = Math.max(0, Math.ceil(minPrepWeeks(g, level) * ageFactor(profile.age)) - elapsed);
+    out.notStarted = start > today;
+    out.elapsed = elapsed; out.weeks = rem; out.weeksHi = Math.ceil(rem * 1.25); out.total = elapsed + rem;
+    out.frac = out.total ? elapsed / out.total : 1;
+    out.readyDate = dateKey(addDays(today, rem * 7));
+    var race = raceInfo(profile);
+    if (race) {
+      out.daysLeft = Math.round(daysBetween(today, race.date));
+      if (out.daysLeft < 0) out.past = true;
+      else out.status = rem === 0 ? 'ready' : out.daysLeft / 7 >= rem ? 'ok' : 'tight';
+    } else if (rem === 0) out.status = 'ready';
+    return out;
+  }
   // پیس‌های اصلی دنیلز برای یک VDOT (ثانیه بر کیلومتر)؛ race = پیس همون مسافت
   function paceTable(v, key) {
     var km = RACE_DISTANCES[key];
@@ -2247,7 +2273,7 @@
     periodPlan: periodPlan, periodSession: periodSession, periodsAhead: periodsAhead, PERIOD_MODES: PERIOD_MODES, dayRecords: dayRecords,
     ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,
-    planSuggestion: planSuggestion, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
+    planSuggestion: planSuggestion, goalPath: goalPath, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
     PACE_LEVEL: PACE_LEVEL, PLAN_NEEDS: PLAN_NEEDS, vdotStepWeeks: vdotStepWeeks,
     analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS
   };

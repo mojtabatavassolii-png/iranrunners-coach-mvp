@@ -967,6 +967,7 @@
       var chosen = r.startDate, todayK = C.dateKey(today());
       next.startDate = !editing || chosen !== p.startDate ? chosen : (keep || p.startDate > todayK ? p.startDate : todayK);
       state.profile = next;
+      if (!editing) state.checklist = { since: todayK };
       save();
       showToast(T(editing ? 'onb.toastEdit' : 'onb.toastNew'));
       viewWeekOffset = 0;
@@ -1345,9 +1346,14 @@
       var k = dn.dataset.done;
       if (state.done[k]) { delete state.done[k]; delete state.postRuns[k]; if (state.doneLog) delete state.doneLog[k]; postRunOpen = null; }
       // «انجامش دادم»: همون لحظه ثبت می‌شه، بعد فرم مسافت و زمان واقعی (و برای ایزی، سختی و پیس) باز می‌شه
-      else { markDone(k); postRunOpen = k; }
+      else {
+        var firstRun = !state.firstRunCelebrated && !Object.keys(state.done).length;
+        markDone(k); postRunOpen = k;
+        if (firstRun) state.firstRunCelebrated = true;
+      }
       save();
       route();
+      if (firstRun) openCelebration(k);
       var pf = postRunOpen === k && app.querySelector('[data-postrun-form="' + k + '"]');
       if (pf) pf.scrollIntoView({ block: 'start', behavior: 'smooth' });
       return;
@@ -2289,8 +2295,8 @@
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
       '<h1>' + esc(T(greetKey())) + '</h1></header>' +
       '<div data-install-slot="home">' + installBanner() + '</div>' +
-      homeToday(base, r.session, ci, key) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
-      homeCycle(r, key, now) + homeProgress(now) + homeRace(now) + linkCard('#plans', T('plans.title'), T('plans.linkSub'));
+      homeToday(base, r.session, ci, key) + homeChecklist(now) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
+      homeCycle(r, key, now) + homeProgress(now) + homePath(now) + linkCard('#plans', T('plans.title'), T('plans.linkSub'));
     app.innerHTML = '<div class="home">' + html + '</div>';
   }
   // کارت اصلی بالای خانه: «تمرین امروز» و زیرش «چک‌این امروز»
@@ -2402,15 +2408,107 @@
     return '<section class="card hcard"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.prog.title')) + '</span>' +
       '<a class="hcard-link" href="#profile/progress">' + esc(T('home.more')) + '</a></div>' + body + '</section>';
   }
-  function homeRace(now) {
-    var race = C.raceInfo(state.profile);
-    if (!race) return '';
-    var days = Math.round(C.daysBetween(now, race.date));
-    if (days < 0) return '';
-    var taper = C.addDays(race.date, -C.taperWeeks(race.key) * 7), tDays = Math.round(C.daysBetween(now, taper));
-    return '<a class="card hcard hcard-race" href="#race"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.race.title')) + '</span></div>' +
-      '<div class="race-count"><b>' + fa(days) + '</b><span>' + esc(T(days === 0 ? 'home.race.today' : 'home.race.days', { race: C.goalLabel(C.goalInfo(state.profile)) })) + '</span></div>' +
-      '<p class="small muted">' + esc(faDate(C.dateKey(race.date))) + (tDays > 0 ? T('progress.sep') + tt('home.race.taper', { n: tDays }) : '') + '</p></a>';
+  // ---------- مسیر تو: سطح فعلی → هدف اصلی، با تخمین زمان باقی‌مونده (C.goalPath) ----------
+  function pathBar(gp) {
+    var pct = Math.round(Math.max(0.03, Math.min(1, gp.frac)) * 100);
+    return '<div class="path-line" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '" aria-label="' + esc(T('path.aria')) + '">' +
+      '<i style="width:' + pct + '%"></i><b style="inset-inline-start:' + pct + '%"></b></div>';
+  }
+  function pathEta(gp) {
+    if (gp.status === 'ready') return T('path.ready');
+    return gp.goal.date ? T('path.eta', { a: gp.weeks, b: gp.weeksHi }) : T('path.etaMonth', { m: I.monthTitle(C.parseDate(gp.readyDate)) });
+  }
+  function homePath(now) {
+    var p = state.profile, gp = C.goalPath(p, now);
+    if (gp.none) return linkCard('#plans', T('path.none'), T('path.noneSub'));
+    if (gp.past) return '';
+    var lines = [gp.notStarted ? T('path.notStarted', { d: faDate(p.startDate) }) : T('path.week', { a: gp.elapsed + 1, b: gp.total })];
+    if (gp.daysLeft != null) lines.push(gp.daysLeft === 0 ? T('home.race.today') : T('path.race', { n: gp.daysLeft, d: faDate(gp.goal.date) }));
+    lines.push(pathEta(gp));
+    var tight = gp.status === 'tight';
+    return '<a class="card hcard path-card" href="' + (tight ? '#plans' : '#race') + '"><div class="hcard-top"><span class="hcard-label">' + esc(T('path.title')) + '</span>' +
+      '<span class="hcard-link">' + esc(T(tight ? 'path.seePlans' : 'path.more')) + '</span></div>' +
+      '<div class="path-ends"><span class="path-now"><span class="path-hex" aria-hidden="true">' + fa(gp.level) + '</span><span><small>' + esc(T('path.now')) + '</small><b>' + tt('path.level', { n: gp.level }) + '</b></span></span>' +
+      '<span class="path-goal"><small>' + esc(T('path.goal')) + '</small><b>' + t(C.goalLabel(gp.goal)) + '</b>' +
+      (gp.goal.targetSec ? '<small dir="ltr">' + fa(C.formatDuration(gp.goal.targetSec)) + '</small>' : '') + '</span></div>' +
+      pathBar(gp) + '<div class="path-meta">' + lines.map(function (l) { return '<span>' + t(l) + '</span>'; }).join('') + '</div>' +
+      (gp.status ? '<span class="path-pill">' + esc(T('path.st.' + gp.status)) + '</span>' : '') + '</a>';
+  }
+
+  // ---------- چک‌لیست شروع (فقط کاربرهای تازه؛ بعد از کامل شدن، همون روز یک پیام و بعد محو) ----------
+  function checklistSteps(p) {
+    var g = C.goalInfo(p);
+    return [
+      { done: true, title: T('start.plan') },
+      { done: g.type !== 'none', title: g.type !== 'none' ? T('start.goalDone', { g: C.goalLabel(g) }) : T('start.goal'), sub: g.type !== 'none' ? (g.date ? faDate(g.date) : '') : T('start.goalSub'), href: '#plans' },
+      { done: Object.keys(state.checkins).length > 0, title: T('start.checkin'), sub: T('start.checkinSub'), href: '#checkin' },
+      { done: Object.keys(state.done).length > 0, title: T('start.run'), sub: T('start.runSub'), href: '#plan', attr: ' data-goto-today="1"' },
+      { done: !!(p.name || '').trim(), title: T('start.name'), sub: T('start.nameSub'), href: '#settings', attr: ' data-set-open="person"' }
+    ];
+  }
+  function homeChecklist(now) {
+    var c = state.checklist;
+    if (!c || c.dismissed) return '';
+    var steps = checklistSteps(state.profile), n = steps.filter(function (x) { return x.done; }).length, key = C.dateKey(now);
+    var close = '<button type="button" class="ob-close" data-ob-close="1" aria-label="' + esc(T('start.close')) + '"><span aria-hidden="true">×</span></button>';
+    var head = '<div class="hcard-top"><span class="hcard-label">' + esc(T('start.title')) + '</span><span class="ob-count">' + tt('start.count', { a: n, b: steps.length }) + '</span>' + close + '</div>' +
+      '<div class="ob-bar" aria-hidden="true"><i style="width:' + Math.round(n / steps.length * 100) + '%"></i></div>';
+    if (n === steps.length) {
+      if (!c.completedAt) { c.completedAt = key; save(); }
+      if (c.completedAt !== key) return '';
+      return '<section class="card hcard ob-check ob-complete" aria-live="polite">' + head +
+        '<div class="ob-done"><span class="ob-tick" aria-hidden="true">✓</span><span><b>' + esc(T('start.allDone')) + '</b><small>' + esc(T('start.allDoneSub')) + '</small></span></div></section>';
+    }
+    var next = steps.filter(function (x) { return !x.done; })[0];
+    return '<section class="card hcard ob-check" aria-label="' + esc(T('start.title')) + '">' + head + '<ul class="ob-list">' + steps.map(function (x) {
+      var cls = (x.done ? 'is-done' : '') + (x === next ? ' ob-next' : ''), inner = '<span class="ob-tick" aria-hidden="true">' + (x.done ? '✓' : '') + '</span>' +
+        '<span class="ob-txt"><b>' + t(x.title) + '</b>' + (x.sub ? '<small>' + t(x.sub) + '</small>' : '') + '</span>';
+      var sr = '<span class="sr-only">' + esc(T(x.done ? 'start.srDone' : 'start.srTodo')) + '</span>';
+      return '<li class="' + cls.trim() + '">' + (x.done || !x.href ? '<div class="ob-row">' + inner + sr + '</div>'
+        : '<a class="ob-row" href="' + x.href + '"' + (x.attr || '') + '>' + inner + sr + chevron(isRtl() ? 'left' : 'right') + '</a>') + '</li>';
+    }).join('') + '</ul></section>';
+  }
+  app.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-ob-close]');
+    if (!b || !state.checklist) return;
+    state.checklist.dismissed = true;
+    save();
+    var card = b.closest('.ob-check');
+    card.classList.add('ob-leaving');
+    var gone = function () { if (card.parentNode) card.remove(); };
+    card.addEventListener('animationend', gone);
+    setTimeout(gone, 400);
+  });
+
+  // ---------- پیام تشویقی اولین تمرین ثبت‌شده (فقط یک بار) ----------
+  function openCelebration(k) {
+    var p = state.profile, s = C.sessionFor(p, C.parseDate(k)), next = null;
+    for (var i = 1; i <= 14 && !next; i++) {
+      var d = C.addDays(C.parseDate(k), i), ns = C.sessionFor(p, d);
+      if (['rest', 'none'].indexOf(ns.type) < 0) next = { d: d, s: ns };
+    }
+    var dots = '';
+    for (var j = 0; j < 22; j++) dots += '<i style="inset-inline-start:' + (4 + (j * 37) % 92) + '%;animation-delay:' + (j % 7) * 0.08 + 's;background:' + ['#00866b', '#ff6b57', '#e89a0c', '#2d6cdf', '#9b5de5'][j % 5] + '"></i>';
+    modalRoot.innerHTML = '<div class="modal-backdrop" id="cele-modal"><div class="modal cele" role="dialog" aria-modal="true" aria-labelledby="cele-title" aria-describedby="cele-text">' +
+      '<div class="cele-dots" aria-hidden="true">' + dots + '</div><div class="cele-ico" aria-hidden="true">✓</div>' +
+      '<h2 id="cele-title">' + esc(T('cele.title')) + '</h2>' +
+      '<p id="cele-text">' + tt('cele.text', { s: s.label + (s.km ? ' ' + T('s.km', { n: s.km }) : '') }) + '</p>' +
+      (next ? '<div class="cele-next"><small>' + esc(T('cele.next')) + '</small><b>' + t(next.s.dayName + T('progress.sep') + next.s.label + (next.s.km ? ' ' + T('s.km', { n: next.s.km }) : '')) + '</b></div>' : '') +
+      '<button type="button" class="btn btn-primary btn-block" data-cele-close="1">' + esc(T('cele.cont')) + '</button></div></div>';
+    document.body.classList.add('modal-open');
+    var btn = modalRoot.querySelector('[data-cele-close]');
+    btn.focus();
+    var close = function () {
+      modalRoot.innerHTML = '';
+      document.body.classList.remove('modal-open');
+      document.removeEventListener('keydown', onKey);
+      var f = app.querySelector('[data-postrun-form] input, [data-postrun-form] button');
+      if (f) f.focus();
+    };
+    var onKey = function (e) { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    btn.addEventListener('click', close);
+    modalRoot.querySelector('#cele-modal').addEventListener('click', function (e) { if (e.target.id === 'cele-modal') close(); });
   }
 
   // =====================================================================
@@ -3331,7 +3429,7 @@
       return '<a class="card pf-goalcard" href="#race">' + head + '<b class="pf-goal-name">' + esc(T('profile.noGoal')) + '</b>' +
         '<span class="pf-goal-cta">' + esc(T('profile.goalSet')) + '</span></a>';
     }
-    var days = race ? Math.round(C.daysBetween(now, race.date)) : null;
+    var days = race ? Math.round(C.daysBetween(now, race.date)) : null, gp = C.goalPath(p, now);
     var nOther = C.otherRaces(p).filter(function (r) { return r.date >= now; }).length;
     var bits = [];
     if (g.targetSec) bits.push(T('race.targetLine', { t: C.formatDuration(g.targetSec) }));
@@ -3340,6 +3438,7 @@
       (race && days >= 0 ? '<span class="pf-goal-count"><b>' + fa(days) + '</b> ' + esc(T('race.daysLeft', { n: days })) + T('progress.sep') + esc(faDate(g.date)) + '</span>'
         : '<span class="pf-goal-count">' + esc(T(g.date ? 'race.done' : 'race.noDate')) + '</span>') +
       (bits.length ? '<span class="pf-goal-meta">' + t(bits.join(T('progress.sep'))) + '</span>' : '') +
+      (gp && !gp.past ? pathBar(gp) + '<span class="pf-goal-meta">' + t(pathEta(gp)) + '</span>' : '') +
       '<span class="pf-goal-cta">' + esc(T('profile.goalManage')) + '</span></a>';
   }
   // فهرست ردیفی (سبک Runna): عنوان گروه، ردیف‌ها با آیکون و فلش، در یک کارت
