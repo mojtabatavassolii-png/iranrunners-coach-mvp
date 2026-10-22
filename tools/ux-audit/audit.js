@@ -370,8 +370,9 @@ async function annotate(p, F) {
     const ctx = await newContext(browser, w);
     const p = await ctx.newPage();
     p.on('pageerror', (e) => pageErrors.push(`${lang}/${w}: ${e.message}`));
-    await seed(p, lang);
     for (const [key] of screens) {
+      // هر صفحه از داده‌ی تازه (صفحه‌هایی مثل home-new داده رو تغییر می‌دن)
+      await seed(p, lang);
       await openScreen(p, key);
       if (CSS) { await p.addStyleTag({ content: CSS }); await p.waitForTimeout(150); }
       const m = await p.evaluate(probe, w);

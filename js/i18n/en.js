@@ -922,7 +922,7 @@
       remove: 'Remove',
       saved: 'Report saved; the videos are not stored.'
     },
-    goalTiles: { title: 'Pick a goal', main: 'Main goal', eta: 'Ready in: {w}', names: { 5: 'Five K', 10: 'Ten K', 21: 'Half marathon', 42: 'Marathon' } },
+    goalTiles: { title: 'Pick a goal', titleNext: 'What\'s your next goal?', main: 'Main goal', eta: 'Ready in: {w}', names: { 5: 'Five K', 10: 'Ten K', 21: 'Half marathon', 42: 'Marathon' } },
     path: {
       title: 'Your path', now: 'Now', goal: 'Goal', level: 'Level {n}', aria: 'Progress toward your goal',
       week: 'Week {a} of about {b} weeks of preparation', notStarted: 'Your plan starts on {d}',

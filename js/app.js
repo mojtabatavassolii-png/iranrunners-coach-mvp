@@ -2530,11 +2530,11 @@
   // ---------- کاشی‌های تیره‌ی هدف: هر مسافت → برنامه‌ی پیشنهادی همون مسافت ----------
   function homeGoalTiles() {
     var p = state.profile, g = C.goalInfo(p);
-    return '<p class="group-label" role="heading" aria-level="2">' + esc(T('goalTiles.title')) + '</p><div class="goal-tiles">' + PLAN_KEYS.map(function (k) {
+    return '<p class="group-label" role="heading" aria-level="2">' + esc(T(g.type === 'none' ? 'goalTiles.title' : 'goalTiles.titleNext')) + '</p><div class="goal-tiles">' + PLAN_KEYS.map(function (k) {
       var s = C.planSuggestion(p, k), km = C.RACE_DISTANCES[k], main = g.type === k;
       return '<a class="goal-tile' + (main ? ' is-main' : '') + '" href="#plans" data-plan-focus="' + k + '">' +
         (main ? '<span class="gt-badge">' + esc(T('goalTiles.main')) + '</span>' : '') +
-        '<span class="gt-km">' + fa(dKm(Math.round(km * 10) / 10)) + '<small>' + esc(uShort()) + '</small></span>' +
+        '<span class="gt-km">' + fa(dKm(Math.round(km * 10) / 10)) + '</span>' +
         '<span class="gt-name">' + esc(T('goalTiles.names.' + k)) + '</span>' +
         '<span class="gt-eta">' + t(T('goalTiles.eta', { w: weeksText(s.weeks, s.weeksHi) })) + '</span></a>';
     }).join('') + '</div>';

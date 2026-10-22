@@ -52,6 +52,15 @@ const SCREENS = [
   ['learn-article', '#learn/vdot', async () => {}],
   ['guide', '#guide', async () => {}],
   ['race', '#race', async () => {}],
+  // اهداف فرعی (تاریخ‌دار و بی‌تاریخ) با دستگیره‌ی کشیدن
+  ['race-goals', '#race', async (p) => {
+    await p.evaluate(([K]) => {
+      const s = JSON.parse(localStorage.getItem(K));
+      s.profile.races = [{ id: 'r1', name: 'نیمه‌ماراتن تهران', km: 21.1, date: '2027-05-05' }, { id: 'r2', name: '', km: 5, date: '2027-01-30', targetSec: 1320 }, { id: 'r3', name: '', km: 42.2, date: null }];
+      localStorage.setItem(K, JSON.stringify(s));
+    }, [KEY]);
+    await p.reload(); await p.waitForTimeout(500);
+  }],
   ['plans', '#plans', async () => {}],
   ['gait', '#gait', async () => {}],
   // گزارش تحلیل دویدن نمونه (از دونده‌ی مصنوعی با چند مشکل؛ gait-report.json)
