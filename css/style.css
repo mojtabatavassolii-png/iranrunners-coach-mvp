@@ -1500,3 +1500,50 @@ a.ob-row:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; b
   .is-done .ob-tick, .ob-complete, .ob-leaving, .cele .cele-ico { animation: none; }
   .cele-dots { display: none; }
 }
+
+/* ===========================================================
+   کاشی‌های هدف در خانه و جابه‌جایی هدف اصلی/فرعی
+   =========================================================== */
+.goal-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+.goal-tile {
+  position: relative; overflow: hidden; display: grid; gap: 2px; align-content: end; min-height: 120px; padding: 14px;
+  border-radius: 20px; text-decoration: none; color: #fff; text-align: start;
+  background: radial-gradient(120% 90% at 100% 0%, #222d3a 0%, #121a24 62%); border: 1px solid rgba(255, 255, 255, .06);
+}
+.goal-tile::before { content: ""; position: absolute; inset-block-start: 14px; inset-inline-start: 14px; width: 26px; height: 4px; border-radius: 2px; background: var(--accent); }
+.goal-tile:hover { background: radial-gradient(120% 90% at 100% 0%, #2a3747 0%, #17212d 62%); }
+.goal-tile:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
+.gt-km { font-size: var(--fs-3xl); font-weight: 800; line-height: 1.1; }
+.gt-km small { font-size: var(--fs-sm); font-weight: 700; color: #b9c3cf; margin-inline-start: 4px; }
+.gt-name { font-weight: 700; font-size: var(--fs-md); }
+.gt-eta { font-size: var(--fs-xs); color: #b9c3cf; }
+.gt-badge { position: absolute; inset-block-start: 10px; inset-inline-end: 10px; font-size: var(--fs-xs); font-weight: 700; padding: 0 8px; border-radius: 999px; background: var(--brand); color: #fff; }
+.plan-card.is-focus { animation: obGlow 1.6s ease-out; border-color: var(--brand); }
+
+.race-item.has-grip { grid-template-columns: auto 1fr; align-items: start; column-gap: 6px; }
+.race-item-body { display: grid; gap: 2px; min-width: 0; }
+.race-grip {
+  width: 44px; height: 44px; margin-inline-start: -8px; display: grid; place-items: center; border: 0; background: none; border-radius: 12px;
+  color: var(--faint); cursor: grab; touch-action: none;
+}
+.race-grip:hover { background: var(--panel); color: var(--ink); }
+.race-grip:focus-visible { outline: 3px solid var(--brand); outline-offset: -3px; }
+.race-item { background: var(--card); position: relative; }
+.race-item.is-lifted { z-index: 5; box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .45); cursor: grabbing; }
+.race-item.is-lifted .race-grip { cursor: grabbing; }
+.race-item.snap { transition: transform .22s ease; }
+body.goal-dragging { user-select: none; -webkit-user-select: none; }
+.race-hero .drop-hint {
+  position: absolute; inset: 0; z-index: 3; border-radius: inherit; display: grid; place-items: center; font-weight: 800; font-size: var(--fs-lg); color: #fff;
+  background: rgba(0, 0, 0, .55); border: 3px dashed #fff; opacity: 0; transition: opacity .15s; pointer-events: none;
+}
+body.goal-dragging .race-hero { box-shadow: 0 0 0 4px var(--brand-soft); }
+.race-hero { transition: transform .18s ease, box-shadow .18s ease; }
+.race-hero.is-over { transform: scale(1.02); }
+.race-hero.is-over .drop-hint { opacity: 1; }
+.race-hero.swapped { animation: heroPop .45s ease-out; }
+@keyframes heroPop { from { transform: scale(.96); } 60% { transform: scale(1.03); } to { transform: scale(1); } }
+.toast-undo { display: flex; align-items: center; gap: 14px; border-radius: 16px; text-align: start; padding: 10px 12px 10px 18px; }
+[dir="rtl"] .toast-undo { padding: 10px 18px 10px 12px; }
+.toast-undo button { font: inherit; font-weight: 800; color: var(--accent); background: none; border: 0; min-height: 40px; padding: 0 6px; cursor: pointer; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .race-hero, .race-item.snap { transition: none; } .race-hero.swapped, .plan-card.is-focus { animation: none; } }

@@ -1684,7 +1684,7 @@
     var now = today();
     var fit = C.currentFitness(p);
     var pb = fit ? fit.entry : null;
-    var html = '<section class="card race-hero"><p class="eyebrow">' + esc(T('race.mainLabel')) + '</p><h2 class="race-main-name">' + t(C.goalLabel(g)) + '</h2>';
+    var html = '<section class="card race-hero"><span class="drop-hint" aria-hidden="true">' + esc(T('race.dropHint')) + '</span><p class="eyebrow">' + esc(T('race.mainLabel')) + '</p><h2 class="race-main-name">' + t(C.goalLabel(g)) + '</h2>';
     if (race) {
       var daysLeft = C.daysBetween(now, race.date);
       html += '<p class="race-date">' + esc(faDate(g.date)) + '</p><div class="countdown">' + (daysLeft > 0 ? '<b>' + fa(daysLeft) + '</b><span>' + esc(T('race.daysLeft', { n: daysLeft })) + '</span>'
@@ -1757,24 +1757,28 @@
     var mainParts = mainRaceHtml(p, g);
     var html = '<header class="page-head"><h1>' + esc(T('race.pageTitle')) + '</h1></header>' + mainParts[0] + linkCard('#plans', T('plans.title'), T('plans.linkSub'));
     // مسابقه‌های دیگه
-    var list = C.otherRaces(p);
+    var list = goalList(p);
     html += '<section class="card races-card" id="races-card"><h2>' + esc(T('race.others')) + '</h2><p class="small muted">' + esc(T('race.othersHint')) + '</p>';
     if (!list.length) html += '<p class="muted races-empty">' + esc(T('race.othersEmpty')) + '</p>';
     else html += '<ul class="race-list">' + list.map(function (r) {
-      var days = Math.round(C.daysBetween(now, r.date)), w = C.sideRaceWindow(r.km), past = r.key <= nowKey;
-      var near = main && main.date > r.date && C.daysBetween(r.date, main.date) <= C.taperWeeks(main.key) * 7 + 7;
+      var dated = !!r.key, days = dated ? Math.round(C.daysBetween(now, r.date)) : null, w = C.sideRaceWindow(r.km), past = dated && r.key <= nowKey;
+      var near = dated && main && main.date > r.date && C.daysBetween(r.date, main.date) <= C.taperWeeks(main.key) * 7 + 7;
       var std = RACE_KM.filter(function (x) { return Math.abs(x[1] - r.km) < 0.15; })[0];
       var src = (p.races || []).filter(function (x) { return x.id === r.id; })[0] || {};
       var canMain = !past && (std || src.goal);
-      return '<li class="race-item' + (past ? ' is-past' : '') + '"><div class="race-item-head"><b>' + t(r.name || C.raceDistLabel(r.km)) + '</b>' +
+      var label = r.name || C.raceDistLabel(r.km);
+      return '<li class="race-item' + (past ? ' is-past' : '') + (canMain ? ' has-grip' : '') + '" data-race-id="' + esc(r.id) + '">' +
+        (canMain ? '<button type="button" class="race-grip" data-race-grip="' + esc(r.id) + '" aria-label="' + esc(T('race.dragAria', { g: label })) + '">' + GRIP_SVG + '</button>' : '') +
+        '<div class="race-item-body"><div class="race-item-head"><b>' + t(r.name || C.raceDistLabel(r.km)) + '</b>' +
         (r.name ? '<span class="muted small">' + t(C.raceDistLabel(r.km)) + '</span>' : '') + '</div>' +
         ((src.targetSec || (src.goal && src.goal.targetSec)) && !past ? '<p class="small race-target-line">' + tt('race.targetLine', { t: C.formatDuration(src.targetSec || src.goal.targetSec) }) + '</p>' : '') +
-        '<p class="small race-item-date">' + esc(faDate(r.key)) + T('progress.sep') + (past ? esc(T('race.past')) : days === 0 ? esc(T('race.todayBang')) : tt('race.inDays', { n: days })) + '</p>' +
-        (!past ? '<p class="small muted">' + tt('race.window', { pre: w.pre, post: w.post }) + '</p>' : '') +
+        (dated ? '<p class="small race-item-date">' + esc(faDate(r.key)) + T('progress.sep') + (past ? esc(T('race.past')) : days === 0 ? esc(T('race.todayBang')) : tt('race.inDays', { n: days })) + '</p>' +
+          (!past ? '<p class="small muted">' + tt('race.window', { pre: w.pre, post: w.post }) + '</p>' : '')
+          : '<p class="small muted">' + esc(T('race.noDateSec')) + '</p>') +
         (near && !past ? '<p class="small race-near">' + esc(T('race.nearMain')) + '</p>' : '') +
         (past ? resultBlock(r.id, r.km, r.key) : '') +
         '<div class="race-item-actions">' + (canMain ? '<button type="button" class="linklike small" data-race-main="' + esc(r.id) + '">' + esc(T('race.makeMain')) + '</button>' : '') +
-        '<button type="button" class="linklike small race-del" data-race-del="' + esc(r.id) + '">' + esc(T('race.remove')) + '</button></div></li>';
+        '<button type="button" class="linklike small race-del" data-race-del="' + esc(r.id) + '">' + esc(T('race.remove')) + '</button></div></div></li>';
     }).join('') + '</ul>';
     // افزودن مسابقه
     if ((p.races || []).length < C.MAX_RACES) {
@@ -1805,6 +1809,12 @@
     });
   }
   var raceAddOpen = false, raceDraft = null;
+  function goalList(p) {
+    var main = C.raceInfo(p), mk = main ? C.dateKey(main.date) : null;
+    return (p.races || []).filter(function (r) { return r && Number(r.km) > 0 && (!r.date || r.date !== mk); })
+      .map(function (r) { return { id: r.id, name: r.name || '', km: Number(r.km), key: r.date || null, date: r.date ? C.parseDate(r.date) : null, result: r.result || null }; })
+      .sort(function (a, b) { return a.key === b.key ? 0 : !a.key ? 1 : !b.key ? -1 : a.key < b.key ? -1 : 1; });
+  }
   // زمان هدف: ورودی «۲۵:۰۰» یا «۱:۴۵:۰۰»؛ سرعت باید ممکن باشه
   function targetIn(str, km) {
     var sec = C.parseTime(str), v = sec ? km / (sec / 3600) : 0;
@@ -1868,9 +1878,10 @@
     app.innerHTML = html;
   }
   function planCard(p, k) {
-    var s = C.planSuggestion(p, k, planTargets[k] || 0);
+    var s = C.planSuggestion(p, k, planTargets[k] || 0), focus = planFocus === k;
+    if (focus) planFocus = null;
     var row = function (label, val) { return '<div><dt>' + esc(label) + '</dt><dd>' + val + '</dd></div>'; };
-    var html = '<section class="card plan-card" id="plan-' + k + '"><div class="plan-head"><h2>' + t(C.RACE_LABELS[k]) + '</h2>' +
+    var html = '<section class="card plan-card' + (focus ? ' is-focus' : '') + '" id="plan-' + k + '"><div class="plan-head"><h2>' + t(C.RACE_LABELS[k]) + '</h2>' +
       '<span class="pill pill-level">' + esc(T(s.pace ? 'plans.goalPace' : 'plans.goalFinish')) + '</span></div>' +
       '<div class="plan-weeks"><b>' + t(weeksText(s.weeks, s.weeksHi)) + '</b><span>' + esc(T(s.pace ? 'plans.cycle' : 'plans.untilReady')) + '</span></div><dl class="plan-rows">' +
       (s.zeroWeeks ? row(T('plans.zero'), tt('plans.zeroVal', { n: s.zeroWeeks })) : '') +
@@ -1946,16 +1957,24 @@
       var dv = af.querySelector('input[name=dist]:checked').value, km = dv === 'other' ? kmIn(af.km) : Number(dv), date = af.date.value;
       var main = C.raceInfo(p);
       if (dv === 'other' && !inLim('race', rawIn(af.km))) return fail(fa(T('race.err.km', Object.assign(limParams('race'), { u: T('units.' + I.getUnits()) }))));
-      if (!date || date < nowKey) return fail(T('race.err.date'));
-      if (main && C.dateKey(main.date) === date) return fail(T('race.err.sameMain'));
-      if ((p.races || []).some(function (r) { return r.date === date; })) return fail(T('race.err.dup'));
+      if (date && date < nowKey) return fail(T('race.err.date'));
+      if (date && main && C.dateKey(main.date) === date) return fail(T('race.err.sameMain'));
+      if (date && (p.races || []).some(function (r) { return r.date === date; })) return fail(T('race.err.dup'));
       var tgt = af.target && af.target.value.trim() ? targetIn(af.target.value, km) : null;
       if (tgt && tgt.error) return fail(tgt.error);
-      var nr = { id: newRaceId(), name: af.name.value.trim().slice(0, 40), km: km, date: date };
+      var stdK = RACE_KM.filter(function (x) { return x[1] === km; })[0];
+      raceAddOpen = false; raceDraft = null;
+      // بدون هدف اصلی: هدف تازه (مسافت استاندارد) هدف اصلی می‌شه و برنامه بر اساسش چیده می‌شه
+      if (C.goalInfo(p).type === 'none' && stdK) {
+        p.goal = { type: stdK[0], date: date || null };
+        if (tgt) p.goal.targetSec = tgt.sec;
+        save(); showToast(T('race.toastAddedMain')); renderRace();
+        return;
+      }
+      var nr = { id: newRaceId(), name: af.name.value.trim().slice(0, 40), km: km, date: date || null };
       if (tgt && dv !== 'other') nr.targetSec = tgt.sec;
       p.races = (p.races || []).concat([nr]);
-      raceAddOpen = false; raceDraft = null;
-      save(); showToast(T('race.toastAdded')); renderRace();
+      save(); showToast(T(date ? 'race.toastAdded' : 'race.toastAddedSec')); renderRace();
       return;
     }
     var tm = C.parseTime(rf.rtime.value), rkm = Number(rf.dataset.km), rdate = rf.dataset.date, v = tm ? rkm / (tm / 3600) : 0;
@@ -1978,20 +1997,93 @@
       p.races = (p.races || []).filter(function (r) { return r.id !== t0.dataset.raceDel; });
       save(); showToast(T('race.toastRemoved')); renderRace(); return;
     }
-    if (t0.dataset.raceMain) {
-      var r = (p.races || []).filter(function (x) { return x.id === t0.dataset.raceMain; })[0];
-      if (!r) return;
-      var std = RACE_KM.filter(function (x) { return Math.abs(x[1] - r.km) < 0.15; })[0];
-      var rest = p.races.filter(function (x) { return x.id !== r.id; });
-      // هدف اصلی قبلی (اگه تاریخ آینده داره) مسابقه‌ی فرعی می‌شه؛ جزئیاتش (مثلاً مسیر اولترا) نگه داشته می‌شه
-      var old = p.goal, og = C.goalInfo(p);
-      if (og.type !== 'none' && og.date && og.date >= C.dateKey(today())) rest.push({ id: newRaceId(), name: '', km: og.km, date: og.date, goal: old });
-      p.goal = r.goal ? r.goal : { type: std[0], date: r.date };
-      if (r.targetSec && !r.goal) p.goal.targetSec = r.targetSec;
-      p.races = rest;
-      save(); showToast(T('race.toastMain')); renderRace();
-    }
+    if (t0.dataset.raceMain) makeMainGoal(t0.dataset.raceMain);
   });
+  // هدف فرعی ← هدف اصلی؛ هدف اصلی قبلی (آینده یا بدون تاریخ) فرعی می‌شه و جزئیاتش (مسیر اولترا، زمان هدف) می‌مونه
+  function makeMainGoal(id) {
+    var p = state.profile, r = (p.races || []).filter(function (x) { return x.id === id; })[0];
+    if (!r) return;
+    var std = RACE_KM.filter(function (x) { return Math.abs(x[1] - r.km) < 0.15; })[0];
+    if (!r.goal && !std) return;
+    var before = { goal: JSON.parse(JSON.stringify(p.goal || null)), races: JSON.parse(JSON.stringify(p.races || [])) };
+    var rest = p.races.filter(function (x) { return x.id !== r.id; });
+    var old = p.goal, og = C.goalInfo(p);
+    if (og.type !== 'none' && (!og.date || og.date >= C.dateKey(today()))) rest.push({ id: newRaceId(), name: '', km: og.km, date: og.date || null, goal: old });
+    p.goal = r.goal ? r.goal : { type: std[0], date: r.date || null };
+    if (r.targetSec && !r.goal) p.goal.targetSec = r.targetSec;
+    p.races = rest;
+    save(); renderRace();
+    var hero = app.querySelector('.race-hero');
+    if (hero) { hero.classList.remove('swapped'); void hero.offsetWidth; hero.classList.add('swapped'); }
+    undoToast(T('race.swapped', { g: C.goalLabel(C.goalInfo(p)) }), function () {
+      p.goal = before.goal; p.races = before.races;
+      save(); if (location.hash === '#race') renderRace(); showToast(T('race.undone'));
+    });
+  }
+  // پیام با دکمه‌ی «برگردان» (۶ ثانیه)
+  function undoToast(msg, onUndo) {
+    var old = document.querySelector('.toast-undo');
+    if (old) old.remove();
+    var el = document.createElement('div');
+    el.className = 'toast toast-undo';
+    el.setAttribute('role', 'status');
+    el.innerHTML = '<span></span><button type="button">' + esc(T('race.undo')) + '</button>';
+    el.firstChild.textContent = msg;
+    document.body.appendChild(el);
+    var done = false, close = function () { if (done) return; done = true; el.classList.add('out'); setTimeout(function () { el.remove(); }, 400); };
+    el.querySelector('button').addEventListener('click', function () { if (done) return; onUndo(); close(); });
+    setTimeout(close, 6000);
+  }
+  var GRIP_SVG = '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><g fill="currentColor"><circle cx="6" cy="4" r="1.6"/><circle cx="12" cy="4" r="1.6"/><circle cx="6" cy="9" r="1.6"/><circle cx="12" cy="9" r="1.6"/><circle cx="6" cy="14" r="1.6"/><circle cx="12" cy="14" r="1.6"/></g></svg>';
+  // کشیدن هدف فرعی روی کارت هدف اصلی (Pointer Events: انگشت، ماوس و قلم یکسان)؛ فقط از دستگیره، تا اسکرول صفحه دست نخوره
+  var goalDrag = null;
+  app.addEventListener('pointerdown', function (e) {
+    var g = e.target.closest('[data-race-grip]');
+    if (!g || e.button > 0) return;
+    e.preventDefault();
+    var li = g.closest('.race-item');
+    try { g.setPointerCapture(e.pointerId); } catch (er) { /* */ }
+    goalDrag = { id: g.dataset.raceGrip, li: li, x0: e.clientX, y0: e.clientY, sy0: window.scrollY, x: e.clientX, y: e.clientY, over: false };
+    li.classList.add('is-lifted');
+    document.body.classList.add('goal-dragging');
+    requestAnimationFrame(goalDragFrame);
+  });
+  // جای کارت = جابه‌جایی انگشت + اسکرول صفحه از شروع کشیدن (تا با اسکرول خودکار زیر انگشت بمونه)
+  function goalDragUpdate() {
+    var d = goalDrag, dy = d.y - d.y0 + (window.scrollY - d.sy0), dx = (d.x - d.x0) * 0.2;
+    d.li.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    var hero = app.querySelector('.race-hero');
+    if (!hero) return;
+    var m = hero.getBoundingClientRect();
+    d.over = d.y >= m.top - 10 && d.y <= m.bottom + 10;
+    hero.classList.toggle('is-over', d.over);
+  }
+  // نزدیک لبه‌ی بالا یا پایین، صفحه خودش اسکرول می‌شه (کارت هدف اصلی بلنده و روی گوشی با فهرست هم‌زمان دیده نمی‌شه)
+  function goalDragFrame() {
+    if (!goalDrag) return;
+    var edge = 110, y = goalDrag.y;
+    if (y < edge) window.scrollBy(0, -Math.ceil((edge - y) / 6));
+    else if (y > window.innerHeight - edge) window.scrollBy(0, Math.ceil((y - window.innerHeight + edge) / 6));
+    goalDragUpdate();
+    requestAnimationFrame(goalDragFrame);
+  }
+  app.addEventListener('pointermove', function (e) {
+    if (!goalDrag) return;
+    goalDrag.x = e.clientX; goalDrag.y = e.clientY;
+    goalDragUpdate();
+  });
+  function endGoalDrag() {
+    if (!goalDrag) return;
+    var d = goalDrag, hero = app.querySelector('.race-hero');
+    goalDrag = null;
+    document.body.classList.remove('goal-dragging');
+    if (hero) hero.classList.remove('is-over');
+    if (d.over) { d.li.style.transform = ''; makeMainGoal(d.id); return; }
+    d.li.classList.add('snap'); d.li.style.transform = '';
+    setTimeout(function () { d.li.classList.remove('snap', 'is-lifted'); }, 230);
+  }
+  app.addEventListener('pointerup', endGoalDrag);
+  app.addEventListener('pointercancel', endGoalDrag);
 
   // =====================================================================
   // تحلیل فرم دویدن: MediaPipe Pose داخل گوشی (js/pose.js) → قواعد اختصاصی (js/gait.js) → گزارش
@@ -2295,7 +2387,7 @@
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
       '<h1>' + esc(T(greetKey())) + '</h1></header>' +
       '<div data-install-slot="home">' + installBanner() + '</div>' +
-      homeToday(base, r.session, ci, key) + homeChecklist(now) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
+      homeToday(base, r.session, ci, key) + homeChecklist(now) + homeGoalTiles() + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
       homeCycle(r, key, now) + homeProgress(now) + homePath(now) + linkCard('#plans', T('plans.title'), T('plans.linkSub'));
     app.innerHTML = '<div class="home">' + html + '</div>';
   }
@@ -2434,6 +2526,24 @@
       pathBar(gp) + '<div class="path-meta">' + lines.map(function (l) { return '<span>' + t(l) + '</span>'; }).join('') + '</div>' +
       (gp.status ? '<span class="path-pill">' + esc(T('path.st.' + gp.status)) + '</span>' : '') + '</a>';
   }
+
+  // ---------- کاشی‌های تیره‌ی هدف: هر مسافت → برنامه‌ی پیشنهادی همون مسافت ----------
+  function homeGoalTiles() {
+    var p = state.profile, g = C.goalInfo(p);
+    return '<p class="group-label" role="heading" aria-level="2">' + esc(T('goalTiles.title')) + '</p><div class="goal-tiles">' + PLAN_KEYS.map(function (k) {
+      var s = C.planSuggestion(p, k), km = C.RACE_DISTANCES[k], main = g.type === k;
+      return '<a class="goal-tile' + (main ? ' is-main' : '') + '" href="#plans" data-plan-focus="' + k + '">' +
+        (main ? '<span class="gt-badge">' + esc(T('goalTiles.main')) + '</span>' : '') +
+        '<span class="gt-km">' + fa(dKm(Math.round(km * 10) / 10)) + '<small>' + esc(uShort()) + '</small></span>' +
+        '<span class="gt-name">' + esc(T('goalTiles.names.' + k)) + '</span>' +
+        '<span class="gt-eta">' + t(T('goalTiles.eta', { w: weeksText(s.weeks, s.weeksHi) })) + '</span></a>';
+    }).join('') + '</div>';
+  }
+  var planFocus = null;
+  document.addEventListener('click', function (e) {
+    var f = e.target.closest && e.target.closest('[data-plan-focus]');
+    if (f) { planFocus = f.dataset.planFocus; pendingFocus = 'plan-' + planFocus; }
+  }, true);
 
   // ---------- چک‌لیست شروع (فقط کاربرهای تازه؛ بعد از کامل شدن، همون روز یک پیام و بعد محو) ----------
   function checklistSteps(p) {
@@ -3427,7 +3537,7 @@
         '<span class="pf-goal-cta">' + esc(T('profile.goalSet')) + '</span></a>';
     }
     var days = race ? Math.round(C.daysBetween(now, race.date)) : null, gp = C.goalPath(p, now);
-    var nOther = C.otherRaces(p).filter(function (r) { return r.date >= now; }).length;
+    var nOther = goalList(p).filter(function (r) { return !r.date || r.date >= now; }).length;
     var bits = [];
     if (g.targetSec) bits.push(T('race.targetLine', { t: C.formatDuration(g.targetSec) }));
     if (nOther) bits.push(T('profile.goalOthers', { n: nOther }));
