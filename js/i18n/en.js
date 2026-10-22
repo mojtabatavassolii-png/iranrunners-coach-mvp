@@ -1120,6 +1120,7 @@
       editOnb: 'Edit your details (setup form)',
       photoPick: 'Choose a profile photo', photoRemove: 'Remove photo', photoSaved: 'Profile photo saved.',
       photoBad: 'This image can\'t be read; please choose another photo.', photoFull: 'Browser storage is full; the photo wasn\'t saved.',
+      rowProgress: 'Charts for mileage, training load, pace and check-ins', rowGait: 'Running form analysis from a short video', rowGaitLast: 'Latest analysis: {d} · score {s}',
       joined: 'Joined {d}', edit: 'Edit profile', levelLink: 'Suggested plans for your level', goalSetShort: 'No goal set yet',
       groups: { mine: 'My stuff', prefs: 'My preferences' },
       noName: 'Runner', noNameHint: 'Add your name in {link}.', noNameLink: 'Edit profile',

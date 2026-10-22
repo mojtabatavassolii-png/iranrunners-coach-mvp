@@ -1215,23 +1215,8 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .gi-head b, .gait-risk > p.small, .gait-pri li { text-align: start; }
 .gait-hist button { padding-inline: 8px; }
 
-/* پروفایل: تب‌های پیشرفت و بیومکانیک (شبیه استراوا)؛ نوار تب زیر هدر می‌چسبه */
-.pf-tabs {
-  position: sticky; top: var(--hdr-h, 0px); z-index: 15; display: grid; grid-template-columns: 1fr 1fr;
-  margin: var(--sp-6) 0 var(--sp-4); background: var(--bg); border-bottom: 1px solid var(--line);
-}
-.pf-tabs button {
-  font: inherit; font-weight: 700; font-size: var(--fs-base); color: var(--muted); background: none; cursor: pointer;
-  border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; min-height: 50px; padding: 8px 6px;
-  -webkit-tap-highlight-color: transparent; text-align: center;
-}
-.pf-tabs button:hover { color: var(--brand-deep); }
-.pf-tabs button[aria-selected="true"] { color: var(--brand-deep); font-weight: 800; border-bottom-color: var(--brand); }
-.pf-tabs button:focus-visible { outline: 3px solid var(--brand); outline-offset: -3px; border-radius: 8px; }
 .pf-panel:focus { outline: none; }
 .pf-panel:focus-visible { outline: 3px solid var(--brand); outline-offset: 4px; border-radius: 12px; }
-.pf-panel.pf-in { animation: viewIn .2s ease-out; }
-@media (prefers-reduced-motion: reduce) { .pf-panel.pf-in { animation: none; } }
 .pf-tool { margin: 0 2px 10px; }
 .pf-tool .prange { margin: 0; }
 
@@ -1356,7 +1341,6 @@ input, select, textarea { background: #fff; }
 .tabbar { background: rgba(249, 251, 253, .97); border-top: 1px solid var(--line); box-shadow: none; }
 .tabbar a.is-active { color: var(--ink); }
 .tabbar a.is-active .tab-ico { background: var(--panel); color: var(--ink); }
-.pf-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
 /* کاشی‌های داخل کارت */
 .plan-rows > div, .mini-stats > div, .pf-summary > div { background: var(--panel); }
 

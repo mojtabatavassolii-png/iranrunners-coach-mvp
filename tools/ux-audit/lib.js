@@ -44,7 +44,7 @@ const SCREENS = [
   ['plan-week', '#plan', async (p) => setPlanView(p, 'week')],
   ['plan-month', '#plan', async (p) => setPlanView(p, 'month')],
   ['profile', '#profile', async () => {}],
-  ['progress', '#profile/progress', async () => {}],
+  ['progress', '#progress', async () => {}],
   ['checkin', '#checkin', async () => {}],
   ['settings', '#settings', async () => {}],
   ['fitness', '#fitness', async () => {}],
@@ -53,9 +53,9 @@ const SCREENS = [
   ['guide', '#guide', async () => {}],
   ['race', '#race', async () => {}],
   ['plans', '#plans', async () => {}],
-  ['gait', '#profile/gait', async () => {}],
+  ['gait', '#gait', async () => {}],
   // گزارش تحلیل دویدن نمونه (از دونده‌ی مصنوعی با چند مشکل؛ gait-report.json)
-  ['gait-report', '#profile/gait', async (p) => {
+  ['gait-report', '#gait', async (p) => {
     await p.evaluate(([K, reps]) => {
       const s = JSON.parse(localStorage.getItem(K)); s.gaitReports = reps; localStorage.setItem(K, JSON.stringify(s));
     }, [KEY, JSON.parse(fs.readFileSync(path.join(__dirname, 'gait-report.json'), 'utf8'))]);

@@ -268,7 +268,7 @@
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, settings: renderSettings, plans: renderPlans, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
+  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, settings: renderSettings, plans: renderPlans, progress: renderProgressPage, gait: renderGaitPage, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
   function route() {
     var loginMode = !isEntered();
     document.body.classList.toggle('login-mode', loginMode);
@@ -284,9 +284,9 @@
     var v = (location.hash || '#home').slice(1), sub = null;
     // مقاله‌ی آموزش: #learn/<شناسه>
     if (v.indexOf('learn/') === 0) { sub = v.slice(6); v = 'learn'; }
-    // تب‌های پروفایل: #profile/progress و #profile/gait؛ آدرس‌های قدیمی (#progress و #gait) هم همون تب رو باز می‌کنن
-    else if (v.indexOf('profile/') === 0) { sub = v.slice(8); v = 'profile'; }
-    else if (v === 'progress' || v === 'gait') { sub = v; v = 'profile'; try { history.replaceState(history.state, '', '#profile/' + sub); } catch (e) { /* */ } }
+    // آدرس‌های قدیمی تب‌های پروفایل (#profile/progress و #profile/gait) حالا صفحه‌های جدای «پیشرفت» و «بیومکانیک»‌ان
+    else if (v === 'profile/progress' || v === 'profile/gait') { v = v.slice(8); try { history.replaceState(history.state, '', '#' + v); } catch (e) { /* */ } }
+    else if (v.indexOf('profile/') === 0) v = 'profile';
     // بدون پروفایل فقط فرم اولیه؛ به‌جز راهنما و مقاله‌ها که از لینک‌های «؟» و «بیشتر بدان» داخل خود فرم باز می‌شن
     var noProfile = !state.profile || needsMigration();
     if (noProfile && v !== 'guide' && v !== 'learn') v = 'onboarding';
@@ -338,7 +338,7 @@
     if (e.target.closest && e.target.closest('[data-focus-period]')) pendingFocus = 'period-card';
   }, true);
   // صفحه‌های فرعی: نوار برگشت بالای صفحه (برگشت واقعی تاریخچه، وگرنه تب مادر)
-  var SUB_PAGES = { checkin: '#home', race: '#profile', plans: '#race', fitness: '#profile/progress', guide: '#learn', settings: '#profile' };
+  var SUB_PAGES = { checkin: '#home', race: '#profile', plans: '#race', progress: '#profile', gait: '#profile', fitness: '#progress', guide: '#learn', settings: '#profile' };
   function backBar(v) {
     var s = navState(), from = s && s.depth > 0 ? s.from : null;
     return '<nav class="back-bar"><a class="learn-back" href="' + SUB_PAGES[v] + '"' + (from ? ' data-nav-back="1"' : '') + '>' +
@@ -346,7 +346,7 @@
   }
   // تب مادر هر صفحه
   var TABS = ['home', 'plan', 'learn', 'profile'];
-  var TAB_OF = { home: 'home', checkin: 'home', race: 'profile', plans: 'profile', plan: 'plan', fitness: 'profile',
+  var TAB_OF = { home: 'home', checkin: 'home', race: 'profile', plans: 'profile', progress: 'profile', gait: 'profile', plan: 'plan', fitness: 'profile',
     learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile' };
   // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
   var lastView = null, lastTab = null;
@@ -2358,7 +2358,7 @@
     }
     var sign = function (n) { n = Math.round(n); return '‎' + (n > 0 ? '+' : n < 0 ? '−' : '') + fa(Math.abs(n)); };
     return '<section class="card hcard hcard-ready ready-' + st + '"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.ready.title')) + '</span>' +
-      '<a class="hcard-link" href="#profile/progress">' + esc(T('home.more')) + '</a></div>' +
+      '<a class="hcard-link" href="#progress">' + esc(T('home.more')) + '</a></div>' +
       '<div class="ready-row"><span class="ready-dot" aria-hidden="true"></span><div><b class="ready-line">' + esc(T('home.ready.' + st)) + '</b>' +
       (why.length ? '<span class="small muted">' + esc(why.join(' ')) + '</span>' : '') + '</div></div>' +
       (pm ? '<div class="mini-stats">' +
@@ -2406,7 +2406,7 @@
         (hl ? '<p class="prog-hl">' + hl + '</p>' : '');
     }
     return '<section class="card hcard"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.prog.title')) + '</span>' +
-      '<a class="hcard-link" href="#profile/progress">' + esc(T('home.more')) + '</a></div>' + body + '</section>';
+      '<a class="hcard-link" href="#progress">' + esc(T('home.more')) + '</a></div>' + body + '</section>';
   }
   // ---------- مسیر تو: سطح فعلی → هدف اصلی، با تخمین زمان باقی‌مونده (C.goalPath) ----------
   function pathBar(gp) {
@@ -3048,8 +3048,7 @@
     return Math.max(1, Math.ceil(words / 200));
   }
   // دکمه‌ی برگشت مقاله: اگه از جای دیگه‌ای از برنامه اومده، همون‌جا (history.back با اسکرول و روز قبلی)؛ وگرنه فهرست مقاله‌ها
-  // تب پیشرفت پروفایل همون «برگشت به پیشرفت»؛ تب بیومکانیک «برگشت به پروفایل»
-  function fromKey(h) { return h === '#profile/progress' ? 'progress' : h.slice(1).split('/')[0]; }
+  function fromKey(h) { return h.slice(1).split('/')[0]; }
   function learnBack() {
     var s = navState(), from = s && s.depth > 0 ? s.from : null;
     var key = !from ? 'list' : from.indexOf('#learn/') === 0 ? 'article' : from === '#learn' ? 'list'
@@ -3383,13 +3382,12 @@
   }
 
   // ---------- پروفایل: فقط عکس، نام، سطح، هدف و ورود به تنظیمات ----------
-  function renderProfile(sub) {
-    if (PF_TABS.indexOf(sub) >= 0) pfTab = sub;
+  function renderProfile() {
     var p = state.profile, lv = C.assessLevel(p), g = C.goalInfo(p), race = C.raceInfo(p), now = today();
     // نام کامل (نام خانوادگی از مرحله‌ی ۱ فرم)
     var name = [p.name, p.lastName].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' '), hasPhoto = !!getAvatar();
     var joined = p.createdAt && !isNaN(new Date(p.createdAt)) ? I.monthTitle(new Date(p.createdAt)) : null;
-    var fit = C.currentFitness(p);
+    var fit = C.currentFitness(p), lastGait = (state.gaitReports || [])[0];
     app.innerHTML = '<section class="pf-head">' +
       '<label class="pf-avatar-btn" for="avatar-file" title="' + esc(T('profile.photoPick')) + '">' + avatarHtml(96) +
       '<span class="pf-cam" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>' +
@@ -3405,9 +3403,11 @@
       '<span class="pf-level-text"><b>' + tt('level.title', { n: lv.level, name: lv.info.name }) + '</b><small>' + esc(T('profile.levelLink')) + '</small></span>' + chevron(isRtl() ? 'left' : 'right') + '</a>' +
       periodCard(p, now, race) +
       listGroup(T('profile.groups.mine'), [
+        ['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgress')],
         ['#race', 'flag', T('race.pageTitle'), g.type !== 'none' ? C.goalLabel(g) + (race && race.date >= now ? T('progress.sep') + T('profile.goalIn', { n: Math.round(C.daysBetween(now, race.date)) }) : '') : T('profile.goalSetShort')],
         ['#plans', 'plans', T('plans.title'), T('plans.linkSub')],
-        ['#fitness', 'watch', T('profile.linkFitness'), fit ? 'VDOT ' + fit.vdot.toFixed(1) : T('profile.registerTest')]
+        ['#fitness', 'watch', T('profile.linkFitness'), fit ? 'VDOT ' + fit.vdot.toFixed(1) : T('profile.registerTest')],
+        ['#gait', 'gait', T('profile.tabs.gait'), lastGait ? T('profile.rowGaitLast', { d: faDate(lastGait.date), s: lastGait.score == null ? '—' : lastGait.score }) : T('profile.rowGait')]
       ]) +
       listGroup(T('profile.groups.prefs'), [
         ['#settings', 'lang', T('settingsPage.lang'), (I.getLang() === 'fa' ? 'فارسی' : 'English') + T('progress.sep') + T('units.' + I.getUnits()), 'lang'],
@@ -3417,10 +3417,7 @@
         ['#settings', 'install', T('install.title'), T('install.short.' + installMode()), 'install'],
         ['#settings', 'data', T('settingsPage.data'), T('profile.statsVal', { c: Object.keys(state.checkins).length, d: Object.keys(state.done).length }), 'data']
       ]) +
-      pfTabsHtml() +
-      '<div class="pf-panel" id="pf-panel" role="tabpanel" tabindex="0" data-tab="' + pfTab + '" aria-labelledby="pf-tab-' + pfTab + '"></div>';
-    setHeaderH();
-    renderPfPanel();
+      '';
   }
   // کارت هدف اصلی (گرادیان نعنایی به مرجانی): شمارش معکوس، زمان هدف، بقیه‌ی مسابقه‌ها
   function profileGoalCard(p, g, race, now) {
@@ -3460,67 +3457,15 @@
     openSettings[r.dataset.setOpen] = true;
     pendingFocus = 'set-' + r.dataset.setOpen;
   }, true);
-  // ---------- تب‌های پایین پروفایل (شبیه استراوا): پیشرفت و بیومکانیک ----------
-  // پیش‌فرض «پیشرفت» (پرکاربردتر و سبک‌تر)؛ تب انتخاب‌شده تا بسته شدن برنامه یادش می‌مونه
-  var PF_TABS = ['progress', 'gait'], pfTab = 'progress';
+  // ---------- «پیشرفت» و «بیومکانیک»: صفحه‌های جدا زیر پروفایل (ردیف‌های «بخش‌های من») ----------
+  // محتوا داخل #pf-panel ساخته می‌شه (renderProgress و renderGait)، با همون استایل پروفایل
   function pfPanel() { return document.getElementById('pf-panel'); }
-  function pfTabsHtml() {
-    return '<div class="pf-tabs" role="tablist" aria-label="' + esc(T('profile.tabs.aria')) + '">' + PF_TABS.map(function (k) {
-      var on = k === pfTab;
-      return '<button type="button" role="tab" id="pf-tab-' + k + '" aria-controls="pf-panel" aria-selected="' + on + '" tabindex="' + (on ? 0 : -1) + '" data-pf-tab="' + k + '">' +
-        esc(T('profile.tabs.' + k)) + '</button>';
-    }).join('') + '</div>';
-  }
-  function renderPfPanel() {
-    destroyGaitPlayers();
+  function subPage(kind, title) {
     chartSpecs = {};
-    if (pfTab === 'gait') renderGait(); else renderProgress();
+    app.innerHTML = '<header class="page-head"><h1>' + esc(title) + '</h1></header><div class="pf-panel" id="pf-panel" data-tab="' + kind + '"></div>';
   }
-  // نوار تب زیر هدر چسبنده می‌چسبه؛ ارتفاع هدر با عرض صفحه عوض می‌شه
-  function setHeaderH() {
-    var h = document.querySelector('.site-header');
-    if (h) document.documentElement.style.setProperty('--hdr-h', h.offsetHeight + 'px');
-  }
-  window.addEventListener('resize', setHeaderH);
-  function setPfTab(k, focus) {
-    var el = pfPanel(), tabs = app.querySelector('.pf-tabs');
-    if (!el || PF_TABS.indexOf(k) < 0) return;
-    if (focus) { var fb = document.getElementById('pf-tab-' + k); if (fb) fb.focus(); }
-    if (k === pfTab) return;
-    pfTab = k;
-    // بدون ورودی تازه در تاریخچه: برگشت از پروفایل بیرون می‌ره، نه بین تب‌ها
-    try { history.replaceState(history.state, '', '#profile/' + k); } catch (e) { /* */ }
-    app.querySelectorAll('[data-pf-tab]').forEach(function (b) {
-      var on = b.dataset.pfTab === k;
-      b.setAttribute('aria-selected', on);
-      b.tabIndex = on ? 0 : -1;
-    });
-    // اگه نوار تب چسبیده بود، محتوای تازه از اولش دیده بشه
-    var top = el.getBoundingClientRect().top + window.scrollY - tabs.offsetHeight - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hdr-h')) || 0);
-    el.dataset.tab = k;
-    el.setAttribute('aria-labelledby', 'pf-tab-' + k);
-    renderPfPanel();
-    if (window.scrollY > top) window.scrollTo(0, top);
-    el.classList.remove('pf-in');
-    void el.offsetWidth;
-    el.classList.add('pf-in');
-  }
-  app.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-pf-tab]');
-    if (b) setPfTab(b.dataset.pfTab);
-  });
-  // صفحه‌کلید: جهت‌نماها بین تب‌ها (در RTL برعکس)
-  app.addEventListener('keydown', function (e) {
-    var b = e.target.closest && e.target.closest('[data-pf-tab]');
-    if (!b || ['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) < 0) return;
-    e.preventDefault();
-    var i = PF_TABS.indexOf(b.dataset.pfTab), n = PF_TABS.length;
-    if (e.key === 'Home') i = 0;
-    else if (e.key === 'End') i = n - 1;
-    else i = (i + ((e.key === 'ArrowLeft') === isRtl() ? 1 : -1) + n) % n;
-    setPfTab(PF_TABS[i], true);
-  });
-  app.addEventListener('animationend', function (e) { if (e.target.id === 'pf-panel') e.target.classList.remove('pf-in'); });
+  function renderProgressPage() { subPage('progress', T('profile.tabs.progress')); renderProgress(); }
+  function renderGaitPage() { subPage('gait', T('profile.tabs.gait')); renderGait(); }
   // تمرین در روزهای پریود: پیش‌فرض + تغییر دستی فقط برای یک دوره‌ی مشخص (مثلاً نزدیک مسابقه)
   function periodCard(p, now, race) {
     if (!C.cycleInfo(p, now)) return '';
@@ -3564,6 +3509,8 @@
     data: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
     flag: '<path d="M5.5 21V4"/><path d="M5.5 4.5h12l-2.5 4 2.5 4h-12"/>',
     plans: '<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8 8.5h8M8 12h8M8 15.5h5"/>',
+    chart: '<path d="M4 20h16"/><path d="M7 16v-4M12 16V8M17 16v-7"/><path d="m5 10 5-4 4 3 5-5"/>',
+    gait: '<circle cx="14.5" cy="4.5" r="2"/><path d="M8 21l3-6 3 2v5"/><path d="M6.5 12.5 9 9l4-.5 2.5 3.5 3 1"/><path d="M11 15l2-6.5"/>',
     watch: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M9.5 2.5h5M18.5 6.5 20 5"/>'
   };
   var openSettings = {};
