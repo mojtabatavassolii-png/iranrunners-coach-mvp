@@ -1583,7 +1583,6 @@ body.goal-dragging .race-hero { box-shadow: 0 0 0 4px var(--primary-soft); }
    برند «گام»: لایه‌ی نهایی رنگ‌ها روی زمینه‌ی تیره
    (رنگ‌های ثابت روشنِ قبلی این‌جا به پالت زغالی، گرافیتی و شنی برمی‌گردن)
    =========================================================== */
-html { color-scheme: dark; }
 body { background: var(--bg); color: var(--text); }
 a { color: var(--primary); }
 /* هدر: لوگوی متنی گام */
@@ -1601,7 +1600,6 @@ a { color: var(--primary); }
 input, select, textarea { background: var(--surface-elevated); color: var(--text); border-color: var(--border); }
 input::placeholder, textarea::placeholder { color: var(--text-secondary); opacity: 1; }
 input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--focus-ring); }
-input[type="date"], input[type="time"] { color-scheme: dark; }
 .chip span, .chip-btn, .act-opt span, .scale-opt span { background: var(--surface-elevated); color: var(--text); }
 .adh-bar { background: var(--surface-elevated); }
 .ch-dot { stroke: var(--surface); }
@@ -1773,3 +1771,10 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 .onb-photo-acts .btn { min-height: 44px; padding: 6px 16px; cursor: pointer; }
 .onb-photo-acts .linklike { min-height: 44px; }
 .onb-photo-acts:has(#avatar-file:focus-visible) label { outline: 3px solid var(--primary); outline-offset: 2px; }
+
+/* لوگو: نسخه‌ی مناسب زمینه‌ی تیره یا روشن (از توکن‌های theme.css) */
+.logo-on-dark { display: var(--logo-on-dark); }
+.logo-on-light { display: var(--logo-on-light); }
+/* انتخاب ظاهر: سه گزینه با آیکون */
+.theme-seg button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.theme-seg svg { flex: none; }

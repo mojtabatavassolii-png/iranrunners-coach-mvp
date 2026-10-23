@@ -1010,6 +1010,11 @@
       saved: 'Goal saved: {g}', errDate: 'The event date must be at least a week away.',
       manage: 'Change goal →', stepsLine: 'Target: {n} steps a day', eventLine: '{km} km event'
     },
+    theme: {
+      title: 'Appearance', auto: 'Automatic', light: 'Light', dark: 'Dark',
+      nowLight: 'light now', nowDark: 'dark now',
+      hint: 'Automatic follows your phone setting, for example light by day and dark at night.'
+    },
     inbox: {
       title: 'Messages', aria: 'Messages', ariaN: 'Messages, {n} unread', unread: '(unread)',
       today: 'Today', earlier: 'Earlier', readAll: 'Mark all read', clear: 'Clear read',

@@ -127,12 +127,14 @@ async function newContext(browser, w) {
 }
 async function seed(p, lang) {
   await p.goto(BASE);
-  await p.evaluate(([s, l, K]) => {
+  await p.evaluate(([s, l, K, th]) => {
     localStorage.clear();
     localStorage.setItem(K, JSON.stringify(s));
     localStorage.setItem('iranrunners-coach-lang', l);
     sessionStorage.setItem('iranrunners-coach-session', '1');
-  }, [build('road', TODAY), lang, KEY]);
+    // ظاهر: AUDIT_THEME=light|dark (پیش‌فرض: تیره)
+    if (th) localStorage.setItem('iranrunners-coach-settings', JSON.stringify({ theme: th }));
+  }, [build('road', TODAY), lang, KEY, process.env.AUDIT_THEME || '']);
 }
 async function openScreen(p, key) {
   const sc = SCREENS.find((s) => s[0] === key);

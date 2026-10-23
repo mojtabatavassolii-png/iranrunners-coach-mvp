@@ -42,11 +42,22 @@
   var SETTINGS_KEY = 'iranrunners-coach-settings';
   var WS_MAP = { sat: 6, sun: 0, mon: 1 };
   function loadSettings() {
-    var d = { calendar: 'auto', weekStart: 'auto', planView: 'week', cycleMarkers: true, progressRange: '3m', units: 'km' };
+    var d = { calendar: 'auto', weekStart: 'auto', planView: 'week', cycleMarkers: true, progressRange: '3m', units: 'km', theme: 'auto' };
     try { return Object.assign(d, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { return d; }
   }
   var settings = loadSettings();
   function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* */ } }
+  // ظاهر: auto = مثل گوشی، light یا dark = انتخاب کاربر (رنگ‌ها همه از css/theme.css)
+  var darkQuery = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+  function isLightTheme() { return settings.theme === 'light' || (settings.theme !== 'dark' && !!darkQuery && !darkQuery.matches); }
+  function applyTheme() {
+    var root = document.documentElement;
+    if (settings.theme === 'light' || settings.theme === 'dark') root.setAttribute('data-theme', settings.theme); else root.removeAttribute('data-theme');
+    var m = document.querySelector('meta[name=theme-color]');
+    if (m) m.setAttribute('content', getComputedStyle(root).getPropertyValue('--bg').trim() || '#121214');
+  }
+  applyTheme();
+  if (darkQuery && darkQuery.addEventListener) darkQuery.addEventListener('change', function () { applyTheme(); if (settings.theme === 'auto' && typeof route === 'function' && document.querySelector('.chart')) route(); });
   function applyCalendarSettings() {
     var isFa = I.getLang() === 'fa';
     I.setCalendar(settings.calendar === 'auto' ? (isFa ? 'jalali' : 'gregorian') : settings.calendar);
@@ -670,7 +681,8 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="public/assets/gaam-logo-transparent.svg?v=68" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=69" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=69" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -4083,6 +4095,11 @@
       settings.units = ub.dataset.setunits; saveSettings(); I.setUnits(settings.units);
       showToast(T('settings.saved')); route();
     }
+    var tb = e.target.closest && e.target.closest('[data-settheme]');
+    if (tb && tb.dataset.settheme !== settings.theme) {
+      settings.theme = tb.dataset.settheme; saveSettings(); applyTheme();
+      openSettings.theme = true; route();
+    }
   });
   // ---------- عکس پروفایل: فقط در همین مرورگر (localStorage)، کوچک‌شده به ۳۰۰×۳۰۰ ----------
   var AVATAR_KEY = 'iranrunners-coach-avatar', AVATAR_PX = 300, AVATAR_MAX_BYTES = 120 * 1024;
@@ -4274,7 +4291,13 @@
     plans: '<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8 8.5h8M8 12h8M8 15.5h5"/>',
     chart: '<path d="M4 20h16"/><path d="M7 16v-4M12 16V8M17 16v-7"/><path d="m5 10 5-4 4 3 5-5"/>',
     gait: '<circle cx="14.5" cy="4.5" r="2"/><path d="M8 21l3-6 3 2v5"/><path d="M6.5 12.5 9 9l4-.5 2.5 3.5 3 1"/><path d="M11 15l2-6.5"/>',
-    watch: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M9.5 2.5h5M18.5 6.5 20 5"/>'
+    watch: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M9.5 2.5h5M18.5 6.5 20 5"/>',
+    theme: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/>'
+  };
+  var THEME_ICON = {
+    auto: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 6.5a5.5 5.5 0 0 0 0 11z" fill="currentColor"/></svg>',
+    light: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>',
+    dark: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>'
   };
   var openSettings = {};
   function setSection(id, icon, title, sub, body) {
@@ -4301,6 +4324,11 @@
     var lang = I.getLang(), D = C.DAY_NAMES;
     var html = '<header class="page-head"><h1>' + esc(T('settingsPage.title')) + '</h1></header>' +
       '<p class="group-label" role="heading" aria-level="2">' + esc(T('profile.groups.prefs')) + '</p><div class="set-list">' +
+      // ظاهر: خودکار (مثل گوشی)، روشن، تیره
+      setSection('theme', 'theme', T('theme.title'), esc(T('theme.' + settings.theme) + (settings.theme === 'auto' ? T('progress.sep') + T(isLightTheme() ? 'theme.nowLight' : 'theme.nowDark') : '')),
+        '<div class="seg theme-seg" role="group" aria-label="' + esc(T('theme.title')) + '">' + ['auto', 'light', 'dark'].map(function (k) {
+          return '<button type="button" data-settheme="' + k + '" aria-pressed="' + (settings.theme === k) + '">' + THEME_ICON[k] + esc(T('theme.' + k)) + '</button>';
+        }).join('') + '</div><small class="muted">' + esc(T('theme.hint')) + '</small>') +
       // ۱. زبان و نمایش
       setSection('lang', 'lang', T('settingsPage.lang'), esc((lang === 'fa' ? 'فارسی' : 'English') + T('progress.sep') + T('units.' + I.getUnits())),
         '<div class="field"><span class="field-label">' + esc(T('settings.language')) + '</span><div class="seg lang-seg" role="group" aria-label="' + esc(T('settings.language')) + '">' +

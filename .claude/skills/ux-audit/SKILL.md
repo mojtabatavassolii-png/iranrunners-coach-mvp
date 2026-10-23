@@ -67,7 +67,7 @@ node compare.js proposals.json      # → out/compare/<id>-before.png and <id>-a
 
 The CSS is only injected into the test browser; nothing in the app changes. Look at every pair — if the "after" does not clearly show the improvement, adjust the CSS or the crop.
 
-When proposing colours, use only the tokens in `css/theme.css` (Gaam, dark-only): `--bg` background, `--surface` cards, `--surface-elevated` inputs/modals/sheets, `--border` dividers and secondary-button borders, `--primary` (sand) for the primary action, active and selected states with `--on-primary` text, `--success/--warning/--error/--info` for status, `--zone-1`…`--zone-5` for training zones. Never add a literal colour outside `css/theme.css`. Check ratios numerically before proposing them.
+When proposing colours, use only the tokens in `css/theme.css` (Gaam; dark and light modes, both defined there): `--bg` background, `--surface` cards, `--surface-elevated` inputs/modals/sheets, `--border` dividers and secondary-button borders, `--primary` (sand) for the primary action, active and selected states with `--on-primary` text, `--success/--warning/--error/--info` for status, `--zone-1`…`--zone-5` for training zones. Never add a literal colour outside `css/theme.css`. Check ratios numerically before proposing them.
 
 ## 5. Report
 

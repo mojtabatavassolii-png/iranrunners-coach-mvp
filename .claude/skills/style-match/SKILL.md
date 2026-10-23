@@ -9,7 +9,7 @@ The owner sends one or more screenshots of another product and wants to know how
 
 ## Non-negotiables (brand identity)
 
-- The Gaam colour system stays (`css/theme.css`, dark-only): all colours come from its tokens (`--bg`, `--surface`, `--surface-elevated`, `--border`, `--text*`, `--primary*`, status and `--zone-1`…`--zone-5`). You may tune token values or add a derived token there, but never put a literal colour elsewhere, replace sand as the primary colour, or switch the app back to a light background.
+- The Gaam colour system stays (`css/theme.css`, dark and light modes): all colours come from its tokens (`--bg`, `--surface`, `--surface-elevated`, `--border`, `--text*`, `--primary*`, status and `--zone-1`…`--zone-5`). You may tune token values or add a derived token there, but never put a literal colour elsewhere, replace sand as the primary colour, or add colours that exist in only one of the two modes.
 - The logo, the app name «گام» (Gaam), the bilingual RTL/LTR support and Persian digits stay.
 - Do not copy another brand's logo, icons, illustrations, wording or proprietary fonts. Borrow *principles* (density, rhythm, contrast, shape language), not assets.
 - Every proposed colour combination must still pass WCAG AA contrast (4.5:1 body text, 3:1 large text / UI parts). Check numerically.

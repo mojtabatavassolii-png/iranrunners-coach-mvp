@@ -1,6 +1,8 @@
 /* ===========================================================
-   گام (Gaam): فایل رنگ‌ها، تنها منبع رنگ در کل اپ (فقط تم تیره)
+   گام (Gaam): فایل رنگ‌ها، تنها منبع رنگ در کل اپ
    همه‌ی رنگ‌های style.css و اسکریپت‌ها از همین متغیرها خونده می‌شن.
+   دو حالت: تیره (پیش‌فرض، روی :root) و روشن. انتخاب کاربر در تنظیمات روی <html data-theme="light|dark">
+   می‌شینه؛ بدون انتخاب («خودکار») حالت گوشی (prefers-color-scheme) تصمیم می‌گیره.
    =========================================================== */
 :root {
   color-scheme: dark;
@@ -44,5 +46,67 @@
   --zone-5-soft: color-mix(in srgb, var(--zone-5) 16%, var(--surface));
   /* لایه‌ی تیره‌ی پشت پنجره‌ها و برگه‌ها، و حلقه‌ی فوکوس */
   --scrim: color-mix(in srgb, var(--bg) 78%, transparent);
+  /* کدوم نسخه‌ی لوگو دیده بشه */
+  --logo-on-dark: inline-block;
+  --logo-on-light: none;
   --focus-ring: color-mix(in srgb, var(--primary) 45%, transparent);
 }
+
+/* ---- حالت روشن: همون پالت با زمینه‌ی سفید استخوانی (#F5F2EC) و متن زغالی ---- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #F5F2EC;
+    --surface: #FFFDF9;
+    --surface-elevated: #ECE7DE;
+    --border: #DAD3C7;
+    --text: #121214;
+    --text-secondary: #5C5C64;
+    --text-disabled: #9A9AA2;
+    /* شنیِ روشن روی زمینه‌ی روشن خونا نیست؛ همون رنگ با تُن تیره‌تر (برنزی) برای متن و دکمه */
+    --primary: #7A5E2C;
+    --primary-pressed: #634B21;
+    --primary-soft: #EFE5D3;
+    --on-primary: #FFFFFF;
+    --success: #356C34;
+    --warning: #8A5E0E;
+    --error: #A63D30;
+    --info: #345A8A;
+    --zone-1: #56616E;
+    --zone-2: #2F6F5C;
+    --zone-3: #7A5E2C;
+    --zone-4: #8F5212;
+    --zone-5: #A33A2C;
+    --scrim: color-mix(in srgb, #121214 42%, transparent);
+    --logo-on-dark: none;
+    --logo-on-light: inline-block;
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #F5F2EC;
+  --surface: #FFFDF9;
+  --surface-elevated: #ECE7DE;
+  --border: #DAD3C7;
+  --text: #121214;
+  --text-secondary: #5C5C64;
+  --text-disabled: #9A9AA2;
+  /* شنیِ روشن روی زمینه‌ی روشن خونا نیست؛ همون رنگ با تُن تیره‌تر (برنزی) برای متن و دکمه */
+  --primary: #7A5E2C;
+  --primary-pressed: #634B21;
+  --primary-soft: #EFE5D3;
+  --on-primary: #FFFFFF;
+  --success: #356C34;
+  --warning: #8A5E0E;
+  --error: #A63D30;
+  --info: #345A8A;
+  --zone-1: #56616E;
+  --zone-2: #2F6F5C;
+  --zone-3: #7A5E2C;
+  --zone-4: #8F5212;
+  --zone-5: #A33A2C;
+  --scrim: color-mix(in srgb, #121214 42%, transparent);
+  --logo-on-dark: none;
+  --logo-on-light: inline-block;
+}
+:root[data-theme="dark"] { color-scheme: dark; }
