@@ -67,7 +67,7 @@ node compare.js proposals.json      # → out/compare/<id>-before.png and <id>-a
 
 The CSS is only injected into the test browser; nothing in the app changes. Look at every pair — if the "after" does not clearly show the improvement, adjust the CSS or the crop.
 
-When proposing colours, keep the Gaam brand (`css/brand.css`): charcoal `#121214` background, graphite `#2A2A30` surfaces, sand `#D8C4A0` for the primary action and active states (text on sand `#121214`), off-white `#F5F2EC` text, `#A0A0A8` secondary text. Darken or lighten within the same hue to meet contrast rather than switching hues. Check ratios numerically before proposing them.
+When proposing colours, use only the tokens in `css/theme.css` (Gaam, dark-only): `--bg` background, `--surface` cards, `--surface-elevated` inputs/modals/sheets, `--border` dividers and secondary-button borders, `--primary` (sand) for the primary action, active and selected states with `--on-primary` text, `--success/--warning/--error/--info` for status, `--zone-1`…`--zone-5` for training zones. Never add a literal colour outside `css/theme.css`. Check ratios numerically before proposing them.
 
 ## 5. Report
 

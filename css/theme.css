@@ -1,0 +1,48 @@
+/* ===========================================================
+   گام (Gaam): فایل رنگ‌ها، تنها منبع رنگ در کل اپ (فقط تم تیره)
+   همه‌ی رنگ‌های style.css و اسکریپت‌ها از همین متغیرها خونده می‌شن.
+   =========================================================== */
+:root {
+  color-scheme: dark;
+
+  /* Backgrounds & surfaces */
+  --bg: #121214;               /* app background */
+  --surface: #1C1C20;          /* cards */
+  --surface-elevated: #2A2A30; /* inputs, modals, bottom sheets, inactive bars */
+  --border: #34343B;           /* dividers, outlines, secondary button border */
+  /* Text */
+  --text: #F5F2EC;             /* primary text, headings */
+  --text-secondary: #A0A0A8;   /* labels, captions */
+  --text-disabled: #6E6E76;    /* disabled only, never for body text */
+  /* Brand */
+  --primary: #D8C4A0;          /* primary buttons, active tab, selected state, links, current-week bar */
+  --primary-pressed: #C4AE86;  /* pressed/hover of primary */
+  --primary-soft: #2B2620;     /* chip/tag background, selected row background */
+  --on-primary: #121214;       /* text/icons on primary buttons */
+  /* Status */
+  --success: #7FB77E;
+  --warning: #E3B261;
+  --error: #E07A6B;
+  --info: #8AA9D6;
+  /* Training zones */
+  --zone-1: #8E9AA8;  /* Recovery */
+  --zone-2: #7FB7A4;  /* Easy */
+  --zone-3: #D8C4A0;  /* Tempo */
+  --zone-4: #E3A35E;  /* Threshold */
+  --zone-5: #D9695A;  /* VO2max */
+
+  /* ---- مشتق‌ها: فقط ترکیب رنگ‌های بالا، بدون رنگ تازه ---- */
+  /* زمینه‌ی کم‌رنگ برای نشان‌ها و پیام‌های وضعیت و ناحیه (رنگ با ۱۶٪ روی کارت) */
+  --success-soft: color-mix(in srgb, var(--success) 16%, var(--surface));
+  --warning-soft: color-mix(in srgb, var(--warning) 16%, var(--surface));
+  --error-soft: color-mix(in srgb, var(--error) 16%, var(--surface));
+  --info-soft: color-mix(in srgb, var(--info) 16%, var(--surface));
+  --zone-1-soft: color-mix(in srgb, var(--zone-1) 16%, var(--surface));
+  --zone-2-soft: color-mix(in srgb, var(--zone-2) 16%, var(--surface));
+  --zone-3-soft: color-mix(in srgb, var(--zone-3) 16%, var(--surface));
+  --zone-4-soft: color-mix(in srgb, var(--zone-4) 16%, var(--surface));
+  --zone-5-soft: color-mix(in srgb, var(--zone-5) 16%, var(--surface));
+  /* لایه‌ی تیره‌ی پشت پنجره‌ها و برگه‌ها، و حلقه‌ی فوکوس */
+  --scrim: color-mix(in srgb, var(--bg) 78%, transparent);
+  --focus-ring: color-mix(in srgb, var(--primary) 45%, transparent);
+}

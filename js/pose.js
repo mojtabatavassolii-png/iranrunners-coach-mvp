@@ -127,6 +127,14 @@
   }
 
   // تصویر فریم نمونه با اسکلت و زاویه‌ی مورد نظر (برای گزارش)
+  // رنگ‌های بوم از متغیرهای css/theme.css (بوم var() نمی‌فهمه، پس مقدارشون خونده می‌شه)؛ a = شفافیت اختیاری
+  function tok(name, a) {
+    var v = (getComputedStyle(document.documentElement).getPropertyValue(name) || '').trim();
+    var m = /^#([0-9a-f]{6})$/i.exec(v);
+    if (!m || a == null) return v;
+    var n = parseInt(m[1], 16);
+    return 'rgba(' + (n >> 16) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255) + ', ' + a + ')';
+  }
   var LINKS = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [27, 29], [29, 31], [27, 31],
     [24, 26], [26, 28], [28, 30], [30, 32], [28, 32], [7, 11], [8, 12], [0, 7], [0, 8]];
   function keyImage(video, t, lm, opts) {
@@ -138,11 +146,11 @@
       g.drawImage(video, 0, 0, W, H);
       if (lm) {
         var pt = function (k) { return [lm[k][0] * W, lm[k][1] * H]; };
-        g.lineWidth = 3; g.strokeStyle = 'rgba(0, 200, 160, 0.9)'; g.lineCap = 'round';
+        g.lineWidth = 3; g.strokeStyle = tok('--primary', 0.9); g.lineCap = 'round';
         LINKS.forEach(function (l) { var a = pt(l[0]), b = pt(l[1]); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); });
         (opts.focus || []).forEach(function (k) {
-          var p = pt(k); g.fillStyle = '#ff6b57'; g.beginPath(); g.arc(p[0], p[1], 6, 0, Math.PI * 2); g.fill();
-          g.lineWidth = 2; g.strokeStyle = '#fff'; g.stroke();
+          var p = pt(k); g.fillStyle = tok('--error'); g.beginPath(); g.arc(p[0], p[1], 6, 0, Math.PI * 2); g.fill();
+          g.lineWidth = 2; g.strokeStyle = tok('--text'); g.stroke();
         });
         if (opts.label && opts.labelAt != null) {
           var q = pt(opts.labelAt);
@@ -150,8 +158,8 @@
           g.font = '600 15px Vazirmatn, sans-serif';
           var w = g.measureText(opts.label).width + 12;
           var x = Math.min(W - w - 4, q[0] + 10), y = Math.max(4, q[1] - 30);
-          g.fillStyle = 'rgba(15, 42, 42, 0.85)'; g.fillRect(x, y, w, 24);
-          g.fillStyle = '#fff'; g.fillText(opts.label, x + 6, y + 17);
+          g.fillStyle = tok('--bg', 0.85); g.fillRect(x, y, w, 24);
+          g.fillStyle = tok('--text'); g.fillText(opts.label, x + 6, y + 17);
         }
       }
       return c.toDataURL('image/jpeg', 0.72);
@@ -165,7 +173,8 @@
 
   // ---------- پخش انیمیشنی: اسکلت روی فریم‌های خود ویدیو، هم‌زمان با دویدن ----------
   var LEFT = { 11: 1, 13: 1, 15: 1, 23: 1, 25: 1, 27: 1, 29: 1, 31: 1, 7: 1 }, RIGHT = { 12: 1, 14: 1, 16: 1, 24: 1, 26: 1, 28: 1, 30: 1, 32: 1, 8: 1 };
-  var COL = { l: '#4aa3ff', r: '#ff8a5c', c: '#ffffff', bad: '#ff3b30' };
+  // چپ = info، راست = zone-4، وسط = text، مشکل = error (موقع رسم خونده می‌شن)
+  function COLS() { return { l: tok('--info'), r: tok('--zone-4'), c: tok('--text'), bad: tok('--error') }; }
   // صاف کردن ملایم برای نمایش (لرزش نقاط کمتر)، فقط بین فریم‌های پشت‌سرهم
   function smoothFrames(F) {
     return F.map(function (f, i) {
@@ -194,38 +203,38 @@
     g.font = '700 ' + Math.round(Math.max(13, W / 34)) + 'px Vazirmatn, sans-serif';
     var w = g.measureText(text).width + 12, h = Math.round(Math.max(20, W / 22));
     x = Math.max(4, Math.min(W - w - 4, x)); y = Math.max(4, y);
-    g.fillStyle = 'rgba(10, 30, 28, 0.82)'; g.fillRect(x, y, w, h);
-    g.fillStyle = color || '#fff'; g.fillText(text, x + 6, y + h * 0.72);
+    g.fillStyle = tok('--bg', 0.82); g.fillRect(x, y, w, h);
+    g.fillStyle = color || tok('--text'); g.fillText(text, x + 6, y + h * 0.72);
   }
   function drawOverlay(g, lm, W, H, o) {
-    var pt = function (k) { return [lm[k][0] * W, lm[k][1] * H]; }, lw = Math.max(2.5, W / 160), r = Math.max(4, W / 110);
+    var pt = function (k) { return [lm[k][0] * W, lm[k][1] * H]; }, lw = Math.max(2.5, W / 160), r = Math.max(4, W / 110), COL = COLS(), TXT = tok('--text');
     g.lineCap = 'round';
     LINKS.forEach(function (l) {
       var a = pt(l[0]), b = pt(l[1]), side = LEFT[l[0]] && LEFT[l[1]] ? 'l' : RIGHT[l[0]] && RIGHT[l[1]] ? 'r' : 'c';
-      g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = lw + 2; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+      g.strokeStyle = tok('--bg', 0.45); g.lineWidth = lw + 2; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
       g.strokeStyle = COL[side]; g.lineWidth = lw; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
     });
     for (var k = 11; k <= 32; k++) {
       if (k > 16 && k < 23) continue; // انگشت‌های دست
       var p = pt(k), bad = o.bad && o.bad.indexOf(k) >= 0;
       g.beginPath(); g.arc(p[0], p[1], bad ? r * 1.6 : r, 0, Math.PI * 2);
-      g.fillStyle = bad ? COL.bad : '#fff'; g.fill();
-      g.lineWidth = 2; g.strokeStyle = bad ? '#fff' : (LEFT[k] ? COL.l : COL.r); g.stroke();
+      g.fillStyle = bad ? COL.bad : TXT; g.fill();
+      g.lineWidth = 2; g.strokeStyle = bad ? TXT : (LEFT[k] ? COL.l : COL.r); g.stroke();
     }
     // زاویه‌های زنده (مثلاً خم زانو و آرنج سمت نزدیک)
     (o.angles || []).forEach(function (a) {
       var v = angleAt(lm, a.k[0], a.k[1], a.k[2], W, H);
       if (v == null) return;
       var val = a.flex ? 180 - v : v, q = pt(a.k[1]);
-      tag(g, a.label + ' ' + o.digits(Math.round(val)) + '°', q[0] + r * 2, q[1] - r * 4, W, a.bad ? '#ffb4ab' : '#fff');
+      tag(g, a.label + ' ' + o.digits(Math.round(val)) + '°', q[0] + r * 2, q[1] - r * 4, W, a.bad ? COL.bad : TXT);
     });
     // از پشت: خط لگن و خط افق برای دیدن افت لگن
     if (o.back) {
       var l = pt(23), rr = pt(24), cx = (l[0] + rr[0]) / 2, cy = (l[1] + rr[1]) / 2, hw = Math.abs(rr[0] - l[0]) * 0.9;
-      g.setLineDash([6, 5]); g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 1.5;
+      g.setLineDash([6, 5]); g.strokeStyle = tok('--text', 0.8); g.lineWidth = 1.5;
       g.beginPath(); g.moveTo(cx - hw, cy); g.lineTo(cx + hw, cy); g.stroke(); g.setLineDash([]);
       var tilt = Math.atan2(rr[1] - l[1], Math.abs(rr[0] - l[0]) || 1) * 180 / Math.PI;
-      tag(g, o.labels.pelvis + ' ' + o.digits(Math.abs(Math.round(tilt))) + '°', cx + hw + 6, cy - 12, W, o.pelvisBad ? '#ffb4ab' : '#fff');
+      tag(g, o.labels.pelvis + ' ' + o.digits(Math.abs(Math.round(tilt))) + '°', cx + hw + 6, cy - 12, W, o.pelvisBad ? COL.bad : TXT);
     }
   }
   function pickMime() {
@@ -247,10 +256,10 @@
       if (video.readyState >= 2) g.drawImage(video, 0, 0, W, H);
       var t = video.currentTime, lm = lmAt(S, t);
       if (lm) drawOverlay(g, lm, W, H, o);
-      if (o.strikes && o.strikes.some(function (s) { return Math.abs(s - t) < 0.05; })) tag(g, o.labels.strike, 8, 8, W, '#ffd60a');
+      if (o.strikes && o.strikes.some(function (s) { return Math.abs(s - t) < 0.05; })) tag(g, o.labels.strike, 8, 8, W, tok('--warning'));
       // نوار زمان
-      g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(0, H - 4, W, 4);
-      g.fillStyle = '#00c8a0'; g.fillRect(0, H - 4, W * Math.min(1, t / dur), 4);
+      g.fillStyle = tok('--text', 0.35); g.fillRect(0, H - 4, W, 4);
+      g.fillStyle = tok('--primary'); g.fillRect(0, H - 4, W * Math.min(1, t / dur), 4);
     }
     function loop() {
       if (dead) return;

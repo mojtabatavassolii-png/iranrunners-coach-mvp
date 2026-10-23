@@ -491,7 +491,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="public/assets/gaam-logo-transparent.svg?v=65" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo" src="public/assets/gaam-logo-transparent.svg?v=66" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -1118,6 +1118,9 @@
   // =====================================================================
   // ۲. داشبورد و برنامه‌ی هفتگی
   // =====================================================================
+  // ناحیه‌ی تمرینی هر نوع جلسه (رنگ‌ها: --zone-1 تا --zone-5 در css/theme.css)
+  var ZONE_OF = { rest: 1, none: 1, easy: 2, runwalk: 2, walkrun: 2, long: 2, walkEasy: 2, walkLong: 2, tempo: 3, walkBrisk: 3,
+    fartlek: 4, hills: 4, walkPower: 4, interval: 5, reps: 5 };
   function sessionBody(s, opts) {
     opts = opts || {};
     var html = '<div class="sess-target">' + t(s.target) + '</div>';
@@ -1132,7 +1135,7 @@
         s.warmup.lines.map(function (x) { return '<li>' + t(x) + '</li>'; }).join('') + '</ul></div>';
     }
     if (s.steps && s.steps.length) {
-      html += (phases ? '<div class="sess-phase sess-mainset"><h4>' + esc(T('sess.main')) + '</h4>' : '') +
+      html += (phases ? '<div class="sess-phase sess-mainset z-' + (ZONE_OF[s.type] || 2) + '"><h4>' + esc(T('sess.main')) + '</h4>' : '') +
         '<ol class="sess-steps">' + s.steps.map(function (x) { return '<li>' + t(x) + '</li>'; }).join('') + '</ol>' + (phases ? '</div>' : '');
     }
     if (s.cooldown && s.cooldown.lines && s.cooldown.lines.length) {
@@ -2997,7 +3000,7 @@
       if (['rest', 'none'].indexOf(ns.type) < 0) next = { d: d, s: ns };
     }
     var dots = '';
-    for (var j = 0; j < 22; j++) dots += '<i style="inset-inline-start:' + (4 + (j * 37) % 92) + '%;animation-delay:' + (j % 7) * 0.08 + 's;background:' + ['#00866b', '#ff6b57', '#e89a0c', '#2d6cdf', '#9b5de5'][j % 5] + '"></i>';
+    for (var j = 0; j < 22; j++) dots += '<i style="inset-inline-start:' + (4 + (j * 37) % 92) + '%;animation-delay:' + (j % 7) * 0.08 + 's;background:' + ['var(--primary)', 'var(--success)', 'var(--warning)', 'var(--info)', 'var(--zone-5)'][j % 5] + '"></i>';
     modalRoot.innerHTML = '<div class="modal-backdrop" id="cele-modal"><div class="modal cele" role="dialog" aria-modal="true" aria-labelledby="cele-title" aria-describedby="cele-text">' +
       '<div class="cele-dots" aria-hidden="true">' + dots + '</div><div class="cele-ico" aria-hidden="true">✓</div>' +
       '<h2 id="cele-title">' + esc(T('cele.title')) + '</h2>' +
@@ -3024,8 +3027,17 @@
   // پیشرفت من: نمودارها از داده‌ی واقعی (C.analytics)؛ رسم با js/charts.js
   // =====================================================================
   // رنگ سری‌ها (پالت دسته‌ای اعتبارسنجی‌شده: آبی، نارنجی، فیروزه‌ای) و رنگ‌های وضعیت برای پایبندی
-  var SERIES = ['#6FA2EE', '#EF8A5C', '#3CC795'];
-  var STATUS = { completed: '#0ca30c', adapted: '#fab219', pain: '#d03b3b', missed: '#b9b8b0' };
+  // رنگ نمودارها، همه از css/theme.css:
+  // ستون‌ها خنثی و ستونِ هفته/روز جاری primary؛ میانگین متحرک text؛ خط مرجع (هدف) خط‌چین text-secondary
+  var BAR = 'var(--text-secondary)', HI = 'var(--primary)', MA = 'var(--text)', REF = 'var(--text-secondary)';
+  var SERIES = [BAR, MA, REF];
+  // پیس‌ها با رنگ ناحیه‌ی تمرینی؛ چک‌این و بار تمرین با رنگ‌های وضعیت
+  var ZONE = { e: 'var(--zone-2)', t: 'var(--zone-4)', i: 'var(--zone-5)' };
+  var CK = { fatigue: 'var(--warning)', sleep: 'var(--info)' };
+  var PMC = ['var(--primary)', 'var(--text-secondary)', 'var(--info)'];
+  var STATUS = { completed: 'var(--success)', adapted: 'var(--warning)', pain: 'var(--error)', missed: 'var(--text-secondary)' };
+  // اندیس ستون جاری: هفته‌ی ناتمام یا آخرین هفته‌ی غیرآینده
+  function curIdx(X) { var k = -1; X.forEach(function (w, i) { if (!w.future) k = i; }); return k; }
   var RANGES = { '4w': 28, '3m': 91, all: null };
   var chartSpecs = {};
   function kmTxt(x) { return fa(dKm(Math.round(x * 10) / 10)); }
@@ -3099,20 +3111,20 @@
         });
         var vs = [];
         X.forEach(function (s) { if (s.vdot) vs.push(s.e, s.t, s.i); });
-        body = '<div class="ch-legend">' + legendItem(SERIES[2], T('progress.pace.e')) + legendItem(SERIES[0], T('progress.pace.t')) + legendItem(SERIES[1], T('progress.pace.i')) + '</div>' +
+        body = '<div class="ch-legend">' + legendItem(ZONE.e, T('progress.pace.e')) + legendItem(ZONE.t, T('progress.pace.t')) + legendItem(ZONE.i, T('progress.pace.i')) + '</div>' +
           chartBox('pace', {
             rtl: rtl, n: X.length, aria: T('progress.pace.title'),
             y: vs.length ? { min: Math.min.apply(null, vs) - 5, max: Math.max.apply(null, vs) + 5, invert: true, fmt: paceTxt, label: T('progress.pace.unit') } : Object.assign({ label: T('progress.pace.unit') }, BLANK_Y),
-            lines: [['e', 2], ['t', 0], ['i', 1]].map(function (k) { return { values: X.map(function (s) { return s.vdot ? s[k[0]] : null; }), color: SERIES[k[1]], dots: 'last' }; }),
+            lines: [['e', 2], ['t', 0], ['i', 1]].map(function (k) { return { values: X.map(function (s) { return s.vdot ? s[k[0]] : null; }), color: ZONE[k[0]], dots: 'last' }; }),
             xLabels: function (i) { return faDate(X[i].date, true); }, xPx: 52,
             emptyLabel: vs.length ? null : T('progress.pace.empty'),
             tip: function (i) {
               var s = X[i];
               if (!s.vdot) return null;
               return { title: faDate(s.date), rows: [
-                { color: SERIES[2], label: T('progress.pace.e'), value: paceTxt(s.e) },
-                { color: SERIES[0], label: T('progress.pace.t'), value: paceTxt(s.t) },
-                { color: SERIES[1], label: T('progress.pace.i'), value: paceTxt(s.i) }] };
+                { color: ZONE.e, label: T('progress.pace.e'), value: paceTxt(s.e) },
+                { color: ZONE.t, label: T('progress.pace.t'), value: paceTxt(s.t) },
+                { color: ZONE.i, label: T('progress.pace.i'), value: paceTxt(s.i) }] };
             }
           });
       } else {
@@ -3126,21 +3138,21 @@
         S.forEach(function (s) { vals.push(s.e, s.t, s.i); });
         body = '<div class="pstats">' + statTile(T('progress.pace.vdot'), '<span dir="ltr">' + fa(f.vdot.toFixed(1)) + ' → ' + fa(l.vdot.toFixed(1)) + '</span>') +
           ['e', 't', 'i'].map(function (k) { return statTile(T('progress.pace.' + k), '<span dir="ltr">' + paceTxt(l[k]) + '</span>', esc(diff(k))); }).join('') + '</div>' +
-          '<div class="ch-legend">' + legendItem(SERIES[2], T('progress.pace.e')) + legendItem(SERIES[0], T('progress.pace.t')) + legendItem(SERIES[1], T('progress.pace.i')) +
+          '<div class="ch-legend">' + legendItem(ZONE.e, T('progress.pace.e')) + legendItem(ZONE.t, T('progress.pace.t')) + legendItem(ZONE.i, T('progress.pace.i')) +
           '<span class="lg-item lg-note">' + esc(T('progress.pace.faster')) + '</span></div>' +
           chartBox('pace', {
             rtl: rtl, n: S.length, aria: T('progress.pace.title'),
             y: { min: Math.min.apply(null, vals) - 5, max: Math.max.apply(null, vals) + 5, invert: true, fmt: paceTxt, label: T('progress.pace.unit') },
-            lines: [{ values: S.map(function (s) { return s.e; }), color: SERIES[2], step: true, dots: 'marked', marked: marked },
-              { values: S.map(function (s) { return s.t; }), color: SERIES[0], step: true, dots: 'marked', marked: marked },
-              { values: S.map(function (s) { return s.i; }), color: SERIES[1], step: true, dots: 'marked', marked: marked }],
+            lines: [{ values: S.map(function (s) { return s.e; }), color: ZONE.e, step: true, dots: 'marked', marked: marked },
+              { values: S.map(function (s) { return s.t; }), color: ZONE.t, step: true, dots: 'marked', marked: marked },
+              { values: S.map(function (s) { return s.i; }), color: ZONE.i, step: true, dots: 'marked', marked: marked }],
             xLabels: function (i) { return faDate(S[i].date, true); }, xPx: 52,
             tip: function (i) {
               var s = S[i];
               return { title: faDate(s.date) + (marked[i] && i > 0 ? SEP + T('progress.pace.newTest') : ''), rows: [
-                { color: SERIES[2], label: T('progress.pace.e'), value: paceTxt(s.e) },
-                { color: SERIES[0], label: T('progress.pace.t'), value: paceTxt(s.t) },
-                { color: SERIES[1], label: T('progress.pace.i'), value: paceTxt(s.i) },
+                { color: ZONE.e, label: T('progress.pace.e'), value: paceTxt(s.e) },
+                { color: ZONE.t, label: T('progress.pace.t'), value: paceTxt(s.t) },
+                { color: ZONE.i, label: T('progress.pace.i'), value: paceTxt(s.i) },
                 { color: 'transparent', label: 'VDOT', value: fa(s.vdot.toFixed(1)) }] };
             }
           }) +
@@ -3163,21 +3175,21 @@
         D0 = padDays(D0, 28);
         var pain0 = [];
         D0.forEach(function (x, i) { if (by0[x.date] && by0[x.date].pain) pain0.push(i); });
-        body = '<div class="ch-legend">' + legendItem(SERIES[1], T('progress.checkins.fatigue')) + legendItem(SERIES[0], T('progress.checkins.sleep')) +
+        body = '<div class="ch-legend">' + legendItem(CK.fatigue, T('progress.checkins.fatigue')) + legendItem(CK.sleep, T('progress.checkins.sleep')) +
           legendItem(STATUS.pain, T('progress.checkins.pain'), 'dot') + '</div>' +
           chartBox('ck', {
             rtl: rtl, n: D0.length, aria: T('progress.checkins.title'), height: 170,
             y: { min: 1, max: 5, ticks: [1, 2, 3, 4, 5], fmt: fa },
-            lines: [{ values: D0.map(function (x) { return by0[x.date] ? by0[x.date].fatigue : null; }), color: SERIES[1], dots: 'all' },
-              { values: D0.map(function (x) { return by0[x.date] ? by0[x.date].sleep : null; }), color: SERIES[0], dots: 'all' }],
+            lines: [{ values: D0.map(function (x) { return by0[x.date] ? by0[x.date].fatigue : null; }), color: CK.fatigue, dots: 'all' },
+              { values: D0.map(function (x) { return by0[x.date] ? by0[x.date].sleep : null; }), color: CK.sleep, dots: 'all' }],
             markers: { idx: pain0, color: STATUS.pain, label: T('progress.checkins.pain') },
             xLabels: function (i) { return faDate(D0[i].date, true); }, xPx: 52,
             emptyLabel: CK.length ? null : T('progress.checkins.empty'),
             tip: function (i) {
               var c = by0[D0[i].date];
               if (!c) return null;
-              var rows = [{ color: SERIES[1], label: T('progress.checkins.fatigue'), value: fa(c.fatigue ? T('progress.checkins.of5', { n: c.fatigue }) : '—') },
-                { color: SERIES[0], label: T('progress.checkins.sleep'), value: fa(c.sleep ? T('progress.checkins.of5', { n: c.sleep }) : '—') }];
+              var rows = [{ color: CK.fatigue, label: T('progress.checkins.fatigue'), value: fa(c.fatigue ? T('progress.checkins.of5', { n: c.fatigue }) : '—') },
+                { color: CK.sleep, label: T('progress.checkins.sleep'), value: fa(c.sleep ? T('progress.checkins.of5', { n: c.sleep }) : '—') }];
               if (c.pain) rows.push({ color: STATUS.pain, kind: 'dot', label: '', value: T('progress.checkins.painYes') });
               return { title: faDate(c.date), rows: rows };
             }
@@ -3208,21 +3220,21 @@
         body = '<div class="pstats">' + statTile(T('progress.checkins.avgF'), tt('progress.checkins.of5', { n: avg('fatigue').toFixed(1) })) +
           statTile(T('progress.checkins.avgS'), tt('progress.checkins.of5', { n: avg('sleep').toFixed(1) })) +
           statTile(T('progress.checkins.painDays'), fa(CK.filter(function (c) { return c.pain; }).length)) + '</div>' +
-          '<div class="ch-legend">' + legendItem(SERIES[1], T('progress.checkins.fatigue')) + legendItem(SERIES[0], T('progress.checkins.sleep')) +
+          '<div class="ch-legend">' + legendItem(CK.fatigue, T('progress.checkins.fatigue')) + legendItem(CK.sleep, T('progress.checkins.sleep')) +
           legendItem(STATUS.pain, T('progress.checkins.pain'), 'dot') + (weekly ? '<span class="lg-item lg-note">' + esc(T('progress.checkins.weeklyAvg')) + '</span>' : '') + '</div>' +
           chartBox('ck', {
             rtl: rtl, n: days.length, aria: T('progress.checkins.title'), height: 170,
             y: { min: 1, max: 5, ticks: [1, 2, 3, 4, 5], fmt: fa },
-            lines: [{ values: days.map(function (k) { return byDate[k] ? byDate[k].fatigue : null; }), color: SERIES[1], dots: days.length <= 35 ? 'all' : 'none' },
-              { values: days.map(function (k) { return byDate[k] ? byDate[k].sleep : null; }), color: SERIES[0], dots: days.length <= 35 ? 'all' : 'none' }],
+            lines: [{ values: days.map(function (k) { return byDate[k] ? byDate[k].fatigue : null; }), color: CK.fatigue, dots: days.length <= 35 ? 'all' : 'none' },
+              { values: days.map(function (k) { return byDate[k] ? byDate[k].sleep : null; }), color: CK.sleep, dots: days.length <= 35 ? 'all' : 'none' }],
             markers: { idx: painIdx, color: STATUS.pain, label: T('progress.checkins.pain') },
             xLabels: function (i) { return faDate(days[i], true); }, xPx: 52,
             tip: function (i) {
               var c = byDate[days[i]], title = weekly ? T('progress.weekOf', { d: weekLabel(days[i]) }) + SEP + T('progress.checkins.weeklyAvg') : faDate(days[i]);
               if (!c) return { title: title, rows: [{ color: 'transparent', label: '', value: '—' }] };
               var v = function (x) { return x ? T('progress.checkins.of5', { n: weekly ? x.toFixed(1) : x }) : '—'; };
-              var rows = [{ color: SERIES[1], label: T('progress.checkins.fatigue'), value: v(c.fatigue) },
-                { color: SERIES[0], label: T('progress.checkins.sleep'), value: v(c.sleep) }];
+              var rows = [{ color: CK.fatigue, label: T('progress.checkins.fatigue'), value: v(c.fatigue) },
+                { color: CK.sleep, label: T('progress.checkins.sleep'), value: v(c.sleep) }];
               if (c.pain) rows.push({ color: STATUS.pain, kind: 'dot', label: '', value: weekly ? T('progress.checkins.painN', { n: c.pain }) : T('progress.checkins.painYes') });
               return { title: title, rows: rows.map(function (r) { r.value = fa(r.value); return r; }) };
             }
@@ -3245,7 +3257,7 @@
           chartBox('vert', {
             rtl: rtl, n: X.length, aria: T('progress.vert.title'),
             y: { min: 0, max: Math.max.apply(null, X.map(function (w) { return w.vert; }).concat([100])), fmt: fa, label: T('progress.vert.unit') },
-            bars: { values: X.map(function (w) { return w.future ? null : w.vert; }), color: SERIES[0], faded: X.map(function (w) { return w.partial; }) },
+            bars: { values: X.map(function (w) { return w.future ? null : w.vert; }), color: BAR, hi: curIdx(X), hiColor: HI, faded: X.map(function (w) { return w.partial; }) },
             xLabels: function (i) { return weekLabel(X[i].start); }, xPx: 52,
             emptyLabel: wkWithRuns ? null : T('progress.vert.empty'),
             tip: function (i) {
@@ -3263,7 +3275,7 @@
           chartBox('vert', {
             rtl: rtl, n: W.length, aria: T('progress.vert.title'),
             y: { min: 0, max: Math.max.apply(null, W.map(function (w) { return w.vert; }).concat([100])), fmt: fa, label: T('progress.vert.unit') },
-            bars: { values: W.map(function (w) { return w.vert; }), color: SERIES[0], faded: W.map(function (w) { return w.partial; }) },
+            bars: { values: W.map(function (w) { return w.vert; }), color: BAR, hi: W.length - 1, hiColor: HI, faded: W.map(function (w) { return w.partial; }) },
             lines: [{ values: W.map(function (w) { return w.maVert; }), color: SERIES[1], dots: 'last' }],
             xLabels: function (i) { return weekLabel(W[i].start); }, xPx: 52,
             tip: function (i) {
@@ -3308,9 +3320,9 @@
       chartBox('vol', {
         rtl: rtl, n: X.length, aria: T('progress.volW.title'),
         y: { min: 0, max: Math.max.apply(null, X.map(function (w) { return w.min || 0; }).concat([160])), fmt: fa, label: T('progress.volW.unit') },
-        bars: { values: X.map(function (w) { return w.future ? null : w.min || 0; }), color: SERIES[0], faded: X.map(function (w) { return w.partial; }) },
+        bars: { values: X.map(function (w) { return w.future ? null : w.min || 0; }), color: BAR, hi: curIdx(X), hiColor: HI, faded: X.map(function (w) { return w.partial; }) },
         lines: has ? [{ values: X.map(function (w) { return w.maMin == null ? null : w.maMin; }), color: SERIES[1], dots: 'last' },
-          { values: X.map(function () { return 150; }), color: SERIES[2] }] : [],
+          { values: X.map(function () { return 150; }), color: REF, dash: true }] : [],
         xLabels: function (i) { return weekLabel(X[i].start); }, xPx: 52,
         emptyLabel: has ? null : T('progress.volW.empty'),
         tip: function (i) {
@@ -3336,8 +3348,8 @@
       chartBox('steps', {
         rtl: rtl, n: D.length, aria: T('progress.steps.title'),
         y: { min: 0, max: Math.max.apply(null, got.concat([target || 0, 10000])), fmt: function (v) { return fa(Math.round(v / 1000)); }, label: T('progress.steps.unit') },
-        bars: { values: vals, color: SERIES[0] },
-        lines: target ? [{ values: D.map(function () { return target; }), color: SERIES[2] }] : [],
+        bars: { values: vals, color: BAR, hi: vals.length - 1, hiColor: HI },
+        lines: target ? [{ values: D.map(function () { return target; }), color: REF, dash: true }] : [],
         xLabels: function (i) { return faDate(D[i].date, true); }, xPx: 52,
         emptyLabel: got.length ? null : T('progress.steps.empty'),
         tip: function (i) { return D[i].steps ? { title: faDate(D[i].date), rows: [{ color: SERIES[0], kind: 'bar', label: T('progress.steps.bars'), value: stepsTxt(D[i].steps) }] } : null; }
@@ -3354,7 +3366,7 @@
         chartBox('vol', {
           rtl: rtl, n: X.length, aria: T('progress.vol.title'),
           y: { min: 0, max: Math.max.apply(null, X.map(function (w) { return dKm(w.km); }).concat([isMi() ? 3 : 5])), fmt: fa, label: T('progress.vol.unit') },
-          bars: { values: X.map(function (w) { return w.future ? null : dKm(w.km); }), color: SERIES[0], faded: X.map(function (w) { return w.partial; }) },
+          bars: { values: X.map(function (w) { return w.future ? null : dKm(w.km); }), color: BAR, hi: curIdx(X), hiColor: HI, faded: X.map(function (w) { return w.partial; }) },
           xLabels: function (i) { return weekLabel(X[i].start); }, xPx: 52,
           emptyLabel: wkWithRuns ? null : T('progress.vol.empty'),
           tip: function (i) {
@@ -3375,7 +3387,7 @@
         chartBox('vol', {
           rtl: rtl, n: W.length, aria: T('progress.vol.title'),
           y: { min: 0, max: Math.max.apply(null, W.map(function (w) { return dKm(w.km); }).concat([isMi() ? 3 : 5])), fmt: fa, label: T('progress.vol.unit') },
-          bars: { values: W.map(function (w) { return dKm(w.km); }), color: SERIES[0], faded: W.map(function (w) { return w.partial; }) },
+          bars: { values: W.map(function (w) { return dKm(w.km); }), color: BAR, hi: W.length - 1, hiColor: HI, faded: W.map(function (w) { return w.partial; }) },
           lines: [{ values: W.map(function (w) { return w.maKm == null ? null : dKm(w.maKm); }), color: SERIES[1], dots: 'last' }],
           xLabels: function (i) { return weekLabel(W[i].start); }, xPx: 52,
           tip: function (i) {
@@ -3400,20 +3412,20 @@
       var none = !a.runsDone, X = padDays(D, c.minW * 7), v0 = [];
       if (!none) D.forEach(function (d) { v0.push(d.ctl, d.atl, d.tsb); });
       var sg = function (v) { return v < 0 ? '−' + fa(-v) : fa(v); };
-      body = '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.pmc.ctl')) + legendItem(SERIES[1], T('progress.pmc.atl')) + legendItem(SERIES[2], T('progress.pmc.tsb')) + '</div>' +
+      body = '<div class="ch-legend">' + legendItem(PMC[0], T('progress.pmc.ctl')) + legendItem(PMC[1], T('progress.pmc.atl')) + legendItem(PMC[2], T('progress.pmc.tsb')) + '</div>' +
         chartBox('pmc', {
           rtl: rtl, n: X.length, aria: T('progress.pmc.title'), zero: true,
           y: v0.length ? { min: Math.min(0, Math.min.apply(null, v0)), max: Math.max.apply(null, v0.concat([10])), fmt: sg, label: T('progress.pmc.unit') } : { min: 0, max: 40, fmt: sg, label: T('progress.pmc.unit') },
-          lines: ['ctl', 'atl', 'tsb'].map(function (k, j) { return { values: X.map(function (d) { return none || d.future ? null : d[k]; }), color: SERIES[j], dots: 'last' }; }),
+          lines: ['ctl', 'atl', 'tsb'].map(function (k, j) { return { values: X.map(function (d) { return none || d.future ? null : d[k]; }), color: PMC[j], dots: 'last' }; }),
           xLabels: function (i) { return faDate(X[i].date, true); }, xPx: 52,
           emptyLabel: none ? T('progress.pmc.empty') : null,
           tip: function (i) {
             var d = X[i];
             if (none || d.future) return null;
             return { title: faDate(d.date) + (d.load ? SEP + T('progress.pmc.load') + ' ' + fa(d.load) : ''), rows: [
-              { color: SERIES[0], label: T('progress.pmc.ctl'), value: fa(Math.round(d.ctl)) },
-              { color: SERIES[1], label: T('progress.pmc.atl'), value: fa(Math.round(d.atl)) },
-              { color: SERIES[2], label: T('progress.pmc.tsb'), value: signed(d.tsb) }] };
+              { color: PMC[0], label: T('progress.pmc.ctl'), value: fa(Math.round(d.ctl)) },
+              { color: PMC[1], label: T('progress.pmc.atl'), value: fa(Math.round(d.atl)) },
+              { color: PMC[2], label: T('progress.pmc.tsb'), value: signed(d.tsb) }] };
           }
         });
     } else {
@@ -3427,21 +3439,21 @@
         statTile(T('progress.pmc.tsb'), signed(tsb), esc(T('progress.pmc.' + st))) + '</div>' +
         '<ul class="pmc-keys">' +
         [['ctl', 0], ['atl', 1], ['tsb', 2]].map(function (k) {
-          return '<li><i class="ch-key ch-key-line" style="background:' + SERIES[k[1]] + '"></i><b>' + esc(T('progress.pmc.' + k[0])) + ':</b> ' + esc(T('progress.pmc.' + k[0] + 'Desc')) + '</li>';
+          return '<li><i class="ch-key ch-key-line" style="background:' + PMC[k[1]] + '"></i><b>' + esc(T('progress.pmc.' + k[0])) + ':</b> ' + esc(T('progress.pmc.' + k[0] + 'Desc')) + '</li>';
         }).join('') + '</ul>' +
         chartBox('pmc', {
           rtl: rtl, n: D.length, aria: T('progress.pmc.title'), zero: true,
           y: { min: Math.min(0, Math.min.apply(null, vals)), max: Math.max.apply(null, vals), fmt: function (v) { return v < 0 ? '−' + fa(-v) : fa(v); }, label: T('progress.pmc.unit') },
-          lines: [{ values: D.map(function (d) { return d.ctl; }), color: SERIES[0], dots: 'last' },
-            { values: D.map(function (d) { return d.atl; }), color: SERIES[1], dots: 'last' },
-            { values: D.map(function (d) { return d.tsb; }), color: SERIES[2], dots: 'last' }],
+          lines: [{ values: D.map(function (d) { return d.ctl; }), color: PMC[0], dots: 'last' },
+            { values: D.map(function (d) { return d.atl; }), color: PMC[1], dots: 'last' },
+            { values: D.map(function (d) { return d.tsb; }), color: PMC[2], dots: 'last' }],
           xLabels: function (i) { return faDate(D[i].date, true); }, xPx: 52,
           tip: function (i) {
             var d = D[i];
             return { title: faDate(d.date) + (d.load ? SEP + T('progress.pmc.load') + ' ' + fa(d.load) : ''), rows: [
-              { color: SERIES[0], label: T('progress.pmc.ctl'), value: fa(Math.round(d.ctl)) },
-              { color: SERIES[1], label: T('progress.pmc.atl'), value: fa(Math.round(d.atl)) },
-              { color: SERIES[2], label: T('progress.pmc.tsb'), value: signed(d.tsb) }] };
+              { color: PMC[0], label: T('progress.pmc.ctl'), value: fa(Math.round(d.ctl)) },
+              { color: PMC[1], label: T('progress.pmc.atl'), value: fa(Math.round(d.atl)) },
+              { color: PMC[2], label: T('progress.pmc.tsb'), value: signed(d.tsb) }] };
           }
         }) +
         dataTable([T('progress.date'), T('progress.pmc.load'), 'CTL', 'ATL', 'TSB'], D.filter(function (d, i) { return i % 7 === (D.length - 1) % 7; }).map(function (d) {
@@ -3461,12 +3473,12 @@
       var vs = [];
       X.forEach(function (s) { if (s.riegel) vs.push(s.riegel, s.vdotTime); });
       var tf = function (v) { return fa(C.formatDuration(Math.round(v))); };
-      body = '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.pred.riegel')) + legendItem(SERIES[1], T('progress.pred.vdot')) + '</div>' +
+      body = '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.pred.riegel')) + legendItem(HI, T('progress.pred.vdot')) + '</div>' +
         chartBox('pred', {
           rtl: rtl, n: X.length, aria: T('progress.pred.title', { race: race }), axisWidth: 58,
           y: vs.length ? { min: Math.min.apply(null, vs) - 10, max: Math.max.apply(null, vs) + 10, invert: true, fmt: tf } : BLANK_Y,
           lines: [{ values: X.map(function (s) { return s.riegel || null; }), color: SERIES[0], dots: 'last' },
-            { values: X.map(function (s) { return s.riegel ? s.vdotTime : null; }), color: SERIES[1], dots: 'last' }],
+            { values: X.map(function (s) { return s.riegel ? s.vdotTime : null; }), color: HI, dots: 'last' }],
           xLabels: function (i) { return faDate(X[i].date, true); }, xPx: 52,
           emptyLabel: vs.length ? null : T('progress.pred.empty'),
           tip: function (i) {
@@ -3474,7 +3486,7 @@
             if (!s.riegel) return null;
             return { title: faDate(s.date), rows: [
               { color: SERIES[0], label: T('progress.pred.riegel'), value: tf(s.riegel) },
-              { color: SERIES[1], label: T('progress.pred.vdot'), value: tf(s.vdotTime) }] };
+              { color: HI, label: T('progress.pred.vdot'), value: tf(s.vdotTime) }] };
           }
         });
     } else {
@@ -3485,20 +3497,20 @@
       var marked = P.map(function (s, i) { return i === 0 || s.entry !== P[i - 1].entry; });
       body = '<div class="pstats">' + statTile(T('progress.pred.now'), '<span dir="ltr">' + fa(C.formatDuration(Math.round(l.riegel))) + '</span>') +
         statTile(T('progress.pred.delta'), fa(dTxt)) + '</div>' +
-        '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.pred.riegel')) + legendItem(SERIES[1], T('progress.pred.vdot')) +
+        '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.pred.riegel')) + legendItem(HI, T('progress.pred.vdot')) +
         '<span class="lg-item lg-note">' + esc(T('progress.pace.faster')) + '</span></div>' +
         chartBox('pred', {
           rtl: rtl, n: P.length, aria: T('progress.pred.title', { race: race }),
           y: { min: Math.min.apply(null, vals) - 10, max: Math.max.apply(null, vals) + 10, invert: true, fmt: function (v) { return fa(C.formatDuration(Math.round(v))); } },
           axisWidth: 58,
           lines: [{ values: P.map(function (s) { return s.riegel; }), color: SERIES[0], step: true, dots: 'marked', marked: marked },
-            { values: P.map(function (s) { return s.vdotTime; }), color: SERIES[1], step: true, dots: 'marked', marked: marked }],
+            { values: P.map(function (s) { return s.vdotTime; }), color: HI, step: true, dots: 'marked', marked: marked }],
           xLabels: function (i) { return faDate(P[i].date, true); }, xPx: 52,
           tip: function (i) {
             var s = P[i];
             return { title: faDate(s.date), rows: [
               { color: SERIES[0], label: T('progress.pred.riegel'), value: fa(C.formatDuration(Math.round(s.riegel))) },
-              { color: SERIES[1], label: T('progress.pred.vdot'), value: fa(C.formatDuration(Math.round(s.vdotTime))) }] };
+              { color: HI, label: T('progress.pred.vdot'), value: fa(C.formatDuration(Math.round(s.vdotTime))) }] };
           }
         }) +
         dataTable([T('progress.date'), T('progress.pred.riegel'), T('progress.pred.vdot')], P.filter(function (s, i) { return marked[i]; }).map(function (s) {
@@ -3714,7 +3726,8 @@
       var adj = z.easyAdjustSec, P = C.paceSet(p, C.assessLevel(p).level);
       var row = function (key, a, b) {
         var r = T('fit.rows.' + key);
-        return '<tr' + (key === 'E' ? ' class="hl"' : '') + '><td>' + t(r[0]) + '</td><td dir="ltr">' + fa(paceFmt(a) + (b ? ' – ' + paceFmt(b) : '')) + '</td><td>' + t(r[1]) + '</td></tr>';
+        var zn = { E: 2, M: 3, HM: 3, T: 4, K10: 4, K5: 5, I: 5, R: 5 }[key];
+        return '<tr' + (key === 'E' ? ' class="hl"' : '') + '><td><span class="zdot z-' + zn + '" aria-hidden="true"></span>' + t(r[0]) + '</td><td dir="ltr">' + fa(paceFmt(a) + (b ? ' – ' + paceFmt(b) : '')) + '</td><td>' + t(r[1]) + '</td></tr>';
       };
       html += '<div class="table-wrap"><table class="pred-table pace-table"><thead><tr><th>' + esc(T('fit.thPace')) + '</th><th>' + esc(T('fit.thMinKm')) + '</th><th>' + esc(T('fit.thFor')) + '</th></tr></thead><tbody>' +
         row('E', z.easy[0], z.easy[1]) +
@@ -3731,7 +3744,7 @@
         (adj ? '<button type="button" class="btn btn-ghost" id="fit-reset">' + esc(T('fit.reset')) + '</button>' : '') + '</div></div>';
     }
     if (hr) {
-      html += '<p class="hr-line">' + esc(T('fit.hr')) + ' <b>' + tt('fit.hrRange', { a: hr.easy[0], b: hr.easy[1] }) + '</b> ' + esc(T('fit.hrUnit')) +
+      html += '<p class="hr-line"><span class="zdot z-2" aria-hidden="true"></span>' + esc(T('fit.hr')) + ' <b>' + tt('fit.hrRange', { a: hr.easy[0], b: hr.easy[1] }) + '</b> ' + esc(T('fit.hrUnit')) +
         (hr.maxEstimated ? ' <span class="small muted">' + tt('fit.hrEst', { n: hr.max }) + '</span>' : '') + '</p>';
     }
     html += '</section>';
@@ -3977,7 +3990,7 @@
       ]) + '<section class="card">' + signOutBlock() + '</section>' +
       '';
   }
-  // کارت هدف اصلی (گرادیان نعنایی به مرجانی): شمارش معکوس، زمان هدف، بقیه‌ی مسابقه‌ها
+  // کارت هدف اصلی (گرادیان کارت به primary-soft): شمارش معکوس، زمان هدف، بقیه‌ی مسابقه‌ها
   function profileGoalCard(p, g, race, now) {
     var head = '<span class="eyebrow">' + esc(T('race.mainLabel')) + '</span>';
     if (g.type === 'none') {

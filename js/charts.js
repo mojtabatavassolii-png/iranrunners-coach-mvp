@@ -94,25 +94,27 @@
       spec.bars.values.forEach(function (v, i) {
         if (v == null || v <= 0) return;
         var x = g.cx(i) - bw / 2;
-        s += '<path class="ch-bar' + (spec.bars.faded && spec.bars.faded[i] ? ' is-faded' : '') + '" data-i="' + i + '" fill="' + spec.bars.color + '" d="' + barPath(x, bw, y0, ys.f(v)) + '"/>';
+        // رنگ‌ها از متغیرهای css/theme.css (style تا var() کار کنه)؛ ستون جاری/انتخابی رنگ برجسته می‌گیره
+        var col = spec.bars.hi === i && spec.bars.hiColor ? spec.bars.hiColor : spec.bars.color;
+        s += '<path class="ch-bar' + (spec.bars.faded && spec.bars.faded[i] && spec.bars.hi !== i ? ' is-faded' : '') + '" data-i="' + i + '" style="fill:' + col + '" d="' + barPath(x, bw, y0, ys.f(v)) + '"/>';
       });
     }
     // خطوط
     (spec.lines || []).forEach(function (ln) {
       var d = linePath(ln.values, g, ys, ln.step);
-      if (d) s += '<path class="ch-line" fill="none" stroke="' + ln.color + '" d="' + d + '"/>';
+      if (d) s += '<path class="ch-line" fill="none" style="stroke:' + ln.color + (ln.dash ? ';stroke-dasharray:6 5' : '') + '" d="' + d + '"/>';
       var dots = ln.dots || 'none';
       ln.values.forEach(function (v, i) {
         if (v == null) return;
         var show = dots === 'all' || (dots === 'last' && i === lastIdx(ln.values)) || (dots === 'marked' && ln.marked && ln.marked[i]);
-        if (show) s += '<circle class="ch-dot" cx="' + g.cx(i).toFixed(1) + '" cy="' + ys.f(v).toFixed(1) + '" r="4" fill="' + ln.color + '"/>';
+        if (show) s += '<circle class="ch-dot" cx="' + g.cx(i).toFixed(1) + '" cy="' + ys.f(v).toFixed(1) + '" r="4" style="fill:' + ln.color + '"/>';
       });
     });
     // نوار رویدادها (مثلاً روزهای درد) زیر نمودار
     if (spec.markers) {
       var my = g.top + g.plotH + g.stripH / 2 + 3;
       spec.markers.idx.forEach(function (i) {
-        s += '<circle class="ch-dot" cx="' + g.cx(i).toFixed(1) + '" cy="' + my + '" r="4.5" fill="' + spec.markers.color + '"/>';
+        s += '<circle class="ch-dot" cx="' + g.cx(i).toFixed(1) + '" cy="' + my + '" r="4.5" style="fill:' + spec.markers.color + '"/>';
       });
       if (spec.markers.label) {
         s += '<text class="ch-tick" x="' + axisX + '" y="' + my + '" dy="0.35em" text-anchor="' + anchor + '">' + esc(spec.markers.label) + '</text>';
