@@ -1485,7 +1485,6 @@ a.ob-row:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px;
   border-radius: 20px; text-decoration: none; color: var(--text); text-align: start;
   background: var(--surface); border: 1px solid var(--border);
 }
-.goal-tile::before { content: ""; position: absolute; inset-block-start: 14px; inset-inline-start: 14px; width: 26px; height: 4px; border-radius: 2px; background: var(--primary); }
 .goal-tile:hover { background: var(--surface-elevated); }
 .goal-tile:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
 .gt-km { font-size: var(--fs-3xl); font-weight: 800; line-height: 1.1; }
@@ -1650,7 +1649,6 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--focus-ri
 /* کاشی‌های هدف */
 .goal-tile { background: var(--surface); border-color: var(--border); color: var(--text); }
 .goal-tile:hover { background: var(--surface-elevated); }
-.goal-tile::before { background: var(--primary); }
 .gt-eta { color: var(--text-secondary); }
 /* نوار پایین */
 .tabbar { background: var(--bg); border-top-color: var(--border); }

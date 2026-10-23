@@ -996,7 +996,7 @@
       remove: 'Remove',
       saved: 'Report saved; the videos are not stored.'
     },
-    goalTiles: { title: 'Pick a goal', titleNext: 'What\'s your next goal?', main: 'Main goal', eta: 'Ready in: {w}', names: { 5: 'Five K', 10: 'Ten K', 21: 'Half marathon', 42: 'Marathon' } },
+    goalTiles: { title: 'Pick a goal', titleNext: 'What\'s your next goal?', main: 'Main goal', eta: 'Ready in: {w}', names: { 5: '5 km', 10: '10 km', 21: 'Half marathon', 42: 'Marathon' } },
     wgoal: {
       pageTitle: 'Walking goal', intro: 'Pick a goal and your weekly plan will steer toward it. You can change it any time.',
       onbQ: 'What is your walking goal?', later: 'I\'ll choose later', onbHint: 'You can change it later from your profile.',
@@ -1083,7 +1083,7 @@
     },
     plans: {
       title: 'Suggested plans',
-      linkSub: '5K, 10K, half and full marathon for your level',
+      linkSub: '5 km, 10 km, half and full marathon for your level',
       intro: 'Ready-made templates for each distance, based on your current level and mileage and built with the same rules as your main plan. They are only suggestions: your plan does not change unless you add a race yourself.',
       volNow: 'current mileage {n:d} {u} per week',
       modeVolume: 'At your level, suggestions are based on mileage and distance only; the goal is to finish the distance healthy. From level 3 you can also set a target time.',
@@ -1511,7 +1511,7 @@
             '<dt>Long run</dt><dd>The longest run of the week, at an easy effort. Because of its volume load it counts as a hard day. Sometimes with a tempo or marathon-pace finish.</dd>' +
             '<dt>Tempo</dt><dd>Continuous running at threshold pace (T): "hard but controlled".</dd>' +
             '<dt>Threshold intervals</dt><dd>Several 5–10 minute pieces at T pace with short rests.</dd>' +
-            '<dt>Short / medium / long intervals</dt><dd>Reps of 400–800 m (5K pace), 1000–1600 m (5–10K pace) and 1600–2000 m (10K to half-marathon pace).</dd>' +
+            '<dt>Short / medium / long intervals</dt><dd>Reps of 400–800 m (5 km pace), 1000–1600 m (5–10 km pace) and 1600–2000 m (10 km to half-marathon pace).</dd>' +
             '<dt>Fartlek</dt><dd>Changes of speed within one continuous run; recovery is easy running and you never stop. Types: 1-1 (1 min fast, 1 min easy), pyramid (1-2-3-4-3-2-1), <b>Mona</b> for level 6 and up (2×90, 4×60, 4×30, 4×15 s with an equal "float"; 20 minutes), and <b>free, landmark-based</b> (6 to 10 surges of 15 s to 2 min to landmarks such as lamp posts).</dd>' +
             '<dt>Intervals vs fartlek</dt><dd>Intervals have a precise structure and fuller rests between reps; a fartlek is continuous.</dd>' +
             '<dt>Session-specific warm-up</dt><dd>Every session has its own warm-up: easy and long runs just start slowly; tempo gets 10–15 min of building running + dynamic moves + 3–4 strides; intervals and speed get a fuller warm-up with activation drills and 4–6 strides; hills emphasise leg and glute activation. Lower levels get simpler, more gradual warm-ups; higher levels more compact ones with more drills.</dd>' +
@@ -1543,7 +1543,7 @@
             '<li>15 min easy running + 4 strides to warm up.</li><li>2, 3 or 5 km on a flat route or track, at the hardest effort you can hold evenly to the end.</li>' +
             '<li>On a day you feel fresh (not after a hard session or poor sleep) and it isn\'t too hot.</li><li>10 min cool-down. If you feel pain, stop the test.</li></ol>' +
             '<h3>The pace table</h3><ul><li><b>E easy:</b> easy and long runs.</li><li><b>M marathon:</b> marathon-pace pieces.</li><li><b>T threshold:</b> tempo and threshold intervals.</li>' +
-            '<li><b>10K and 5K pace:</b> medium and short intervals.</li><li><b>I:</b> short intervals at levels 3–4.</li><li><b>R repetition:</b> short speed reps.</li></ul>'
+            '<li><b>10 km and 5 km pace:</b> medium and short intervals.</li><li><b>I:</b> short intervals at levels 3–4.</li><li><b>R repetition:</b> short speed reps.</li></ul>'
         },
         checkin: {
           title: 'Check-in and automatic adjustment',
