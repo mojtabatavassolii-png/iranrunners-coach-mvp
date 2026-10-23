@@ -1748,3 +1748,28 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 .nf-flash .nf-ico { width: 22px; height: 22px; }
 .nf-flash.out { opacity: 0; }
 @media (prefers-reduced-motion: reduce) { .nf-sheet, .nf-flash { animation: none; } }
+
+/* ===========================================================
+   هدر سه‌ستونی: آواتار (صفحه‌ی شخصی) در شروع، gaam وسط، زنگوله در پایان
+   =========================================================== */
+.site-header .header-inner { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.site-header .brand { grid-column: 2; justify-self: center; order: 0; min-height: 44px; }
+.site-header .brand-mark { height: 30px; }
+.hdr-me { grid-column: 1; grid-row: 1; justify-self: start; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; text-decoration: none; }
+.hdr-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); border: 1.5px solid var(--border); }
+.hdr-me[aria-current="page"] .hdr-avatar { border-color: var(--primary); }
+.hdr-me:focus-visible { outline: 3px solid var(--primary); outline-offset: 1px; }
+.hdr-avatar .avatar-initial { font-size: var(--fs-base); }
+.site-header .bell { grid-column: 3; grid-row: 1; justify-self: end; order: 0; margin: 0; }
+/* پروفایل: عکس فقط برای نمایش، بدون دکمه و حلقه */
+.pf-avatar { width: 96px; height: 96px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); }
+/* فرم ویرایش: عکس پروفایل کنار دکمه‌ها */
+.onb-photo { display: flex; align-items: center; gap: 14px; margin: 14px 0 6px; }
+.onb-photo-pic { flex: none; width: 72px; height: 72px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); }
+.onb-photo-pic .avatar-initial { font-size: var(--fs-2xl); }
+.onb-photo-txt { display: grid; gap: 4px; min-width: 0; text-align: start; }
+.onb-photo-txt .sub-legend { margin: 0; }
+.onb-photo-acts { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+.onb-photo-acts .btn { min-height: 44px; padding: 6px 16px; cursor: pointer; }
+.onb-photo-acts .linklike { min-height: 44px; }
+.onb-photo-acts:has(#avatar-file:focus-visible) label { outline: 3px solid var(--primary); outline-offset: 2px; }

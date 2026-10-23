@@ -159,6 +159,18 @@
     if (o.flash !== false) flashMessage(o.k, T('msg.' + o.m + '.t', o.p || {}));
     return true;
   }
+  // آواتار هدر (مثل استراوا): لینک به صفحه‌ی شخصی، با عکس یا حرف اول نام
+  function updateHeader() {
+    var a = document.getElementById('hdr-me');
+    if (!a) return;
+    var show = isEntered() && !!state.profile && !needsMigration() && (location.hash || '#home') !== '#onboarding';
+    a.hidden = !show;
+    if (!show) return;
+    a.querySelector('[data-avatar-slot]').innerHTML = avatarHtml(36);
+    a.setAttribute('aria-label', T('app.profileLink'));
+    if ((location.hash || '#home') === '#profile') a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    updateBell();
+  }
   function unreadCount() { return inbox().filter(function (x) { return !x.read; }).length; }
   function updateBell() {
     var b = document.getElementById('bell');
@@ -447,7 +459,7 @@
       renderLogin();
       lastView = null;
       closeInbox(true);
-      updateBell();
+      updateHeader();
       return;
     }
     var v = (location.hash || '#home').slice(1), sub = null;
@@ -501,7 +513,7 @@
     if (pk) openPainModal(pk);
     closeInbox(true);
     checkInbox();
-    updateBell();
+    updateHeader();
   }
   var pendingFocus = null;
   // «مشاهده جزئیات» از خانه: برنامه روی امروز، در هفته‌ی جاری
@@ -658,7 +670,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="public/assets/gaam-logo-transparent.svg?v=67" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo" src="public/assets/gaam-logo-transparent.svg?v=68" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -819,6 +831,12 @@
           return '<label class="act-opt"><input type="radio" name="activity" value="' + k + '"' + ((p.activity || 'run') === k ? ' checked' : '') + '>' +
             '<span><b>' + esc(T('onb.activity.' + k)) + '</b><small>' + esc(T('onb.activity.' + k + 'Sub')) + '</small></span></label>';
         }).join('') + '</div>' +
+        '<div class="onb-photo"><span class="onb-photo-pic" data-avatar-slot="72">' + avatarHtml(72) + '</span><div class="onb-photo-txt">' +
+        '<p class="sub-legend">' + esc(T('onb.photo')) + '</p><div class="onb-photo-acts">' +
+        '<label class="btn btn-ink btn-sm" for="avatar-file">' + esc(T(getAvatar() ? 'profile.photoChange' : 'profile.photoPick')) + '</label>' +
+        '<input type="file" id="avatar-file" accept="image/*" class="sr-only">' +
+        '<button type="button" class="linklike small" data-avatar-remove="1"' + (getAvatar() ? '' : ' hidden') + '>' + esc(T('profile.photoRemove')) + '</button></div>' +
+        '<small class="muted">' + esc(T('onb.photoHint')) + '</small></div></div>' +
         '<div class="row2">' +
         '<div class="field"><label for="fname">' + esc(T('onb.firstName')) + '</label><input id="fname" name="firstName" type="text" maxlength="40" autocomplete="given-name" value="' + esc(p.name || '') + '" placeholder="' + esc(T('onb.firstNamePh')) + '"></div>' +
         '<div class="field"><label for="lname">' + esc(T('onb.lastName')) + '</label><input id="lname" name="lastName" type="text" maxlength="40" autocomplete="family-name" value="' + esc(p.lastName || '') + '" placeholder="' + esc(T('onb.lastNamePh')) + '"></div>' +
@@ -4103,14 +4121,24 @@
     shrinkImage(f, function (data) {
       try { localStorage.setItem(AVATAR_KEY, data); showToast(T('profile.photoSaved')); }
       catch (err) { showToast(T('profile.photoFull')); }
-      route();
+      refreshAvatars();
     }, function () { showToast(T('profile.photoBad')); });
   });
   app.addEventListener('click', function (e) {
     if (!(e.target.closest && e.target.closest('[data-avatar-remove]'))) return;
     try { localStorage.removeItem(AVATAR_KEY); } catch (err) { /* */ }
-    route();
+    refreshAvatars();
   });
+  // همه‌ی جاهایی که عکس نشون داده می‌شه (هدر، فرم ویرایش، پروفایل)
+  function refreshAvatars() {
+    document.querySelectorAll('[data-avatar-slot]').forEach(function (el) { el.innerHTML = avatarHtml(Number(el.dataset.avatarSlot)); });
+    var has = !!getAvatar(), rm = document.querySelector('[data-avatar-remove]'), pick = document.querySelector('label[for="avatar-file"]');
+    if (rm) rm.hidden = !has;
+    if (pick) pick.textContent = T(has ? 'profile.photoChange' : 'profile.photoPick');
+    var f = document.getElementById('avatar-file');
+    if (f) f.value = '';
+    updateHeader();
+  }
 
   // کارت لینک یک‌خطی به یک صفحه‌ی فرعی
   function linkCard(href, title, sub) {
@@ -4122,15 +4150,11 @@
   function renderProfile() {
     var p = state.profile, lv = C.assessLevel(p), g = C.goalInfo(p), race = C.raceInfo(p), now = today();
     // نام کامل (نام خانوادگی از مرحله‌ی ۱ فرم)
-    var name = [p.name, p.lastName].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' '), hasPhoto = !!getAvatar();
+    var name = [p.name, p.lastName].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' ');
     var joined = p.createdAt && !isNaN(new Date(p.createdAt)) ? I.monthTitle(new Date(p.createdAt)) : null;
     var fit = C.currentFitness(p), lastGait = (state.gaitReports || [])[0];
     app.innerHTML = '<section class="pf-head">' +
-      '<label class="pf-avatar-btn" for="avatar-file" title="' + esc(T('profile.photoPick')) + '">' + avatarHtml(96) +
-      '<span class="pf-cam" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span>' +
-      '<span class="sr-only">' + esc(T('profile.photoPick')) + '</span></label>' +
-      '<input type="file" id="avatar-file" accept="image/*" class="sr-only">' +
-      (hasPhoto ? '<button type="button" class="linklike small" data-avatar-remove="1">' + esc(T('profile.photoRemove')) + '</button>' : '') +
+      '<span class="pf-avatar" data-avatar-slot="96">' + avatarHtml(96) + '</span>' +
       '<h1 class="pf-name">' + esc(name || T('profile.noName')) + '</h1>' +
       (joined ? '<p class="pf-joined">' + esc(T('profile.joined', { d: joined })) + '</p>' : '') +
       (name ? '' : '<p class="small muted">' + esc(T('profile.noNameHint')).replace('{link}', '<a href="#onboarding">' + esc(T('profile.noNameLink')) + '</a>') + '</p>') +
