@@ -1586,3 +1586,20 @@ body.goal-dragging .race-hero { box-shadow: 0 0 0 4px var(--brand-soft); }
 .day-walkBrisk, .hc-walkBrisk { border-top-color: var(--c-tempo); --dot: var(--c-tempo); }
 .day-walkPower, .hc-walkPower { border-top-color: var(--c-interval); --dot: var(--c-interval); }
 .day-walkLong, .hc-walkLong { border-top-color: var(--c-long); --dot: var(--c-long); }
+
+/* ===========================================================
+   مسیر پیاده‌روی: قدم روزانه، پیشنهاد دویدن، یادآوری، کاشی و کارت هدف
+   =========================================================== */
+.steps-form { display: flex; gap: 8px; align-items: stretch; margin: 10px 0 6px; }
+.steps-form input { flex: 1; min-width: 0; min-height: 44px; }
+.steps-form .btn { min-height: 44px; flex: none; }
+.steps-card .ob-bar { margin-top: 8px; }
+.run-bridge { border: 2px solid var(--accent); }
+.run-bridge h3 { margin: 0 0 6px; }
+.run-bridge .bridge-confirm { margin-top: 10px; }
+.remind-banner { margin-bottom: 14px; }
+.remind-banner p { margin: 0; }
+.walk-tiles .gt-icon { font-size: var(--fs-2xl); }
+.wgoal-card.is-on { border: 2px solid var(--brand); background: var(--brand-soft); }
+.wgoal-card .field { margin: 10px 0; }
+.wgoal-card .wgoal-clear { display: block; min-height: 44px; margin: 4px auto 0; padding: 0 12px; }

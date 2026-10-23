@@ -1298,4 +1298,48 @@ test('پیاده‌روی: پروفایل دویدن تغییری نمی‌کن�
   assert.ok(weekAt(p, 3).days.every(function (s) { return C.WALK_TYPES.indexOf(s.type) < 0; }));
 });
 
+
+test('پیاده‌روی، اهداف: سریع‌تر = یک جلسه‌ی تند بیشتر؛ رویداد = پیاده‌روی بلند، هفته‌ی سبک قبلش، روز رویداد', function () {
+  var base = walkP({ walkMin: 100, walkExp: 'gt1y', walk30: 'yes' });
+  var cnt = function (p, t) { return walkWeek(p, 1).days.filter(function (s) { return s.type === t; }).length; };
+  assert.strictEqual(cnt(Object.assign({}, base, { walkGoal: { kind: 'faster' } }), 'walkBrisk'), cnt(base, 'walkBrisk') + 1);
+  var ev = Object.assign({}, base, { walkGoal: { kind: 'event', km: 21.1, date: '2026-12-19' } });
+  assert.ok(walkWeek(ev, 2).days.some(function (s) { return s.type === 'walkLong'; }));
+  var d = C.sessionFor(ev, C.parseDate('2026-12-19'));
+  assert.strictEqual(d.type, 'walkEvent');
+  assert.strictEqual(C.sessionFor(ev, C.parseDate('2026-12-18')).type, 'rest');
+  var taper = C.buildWeek(ev, C.parseDate('2026-12-15')).days.filter(function (s) { return s.date >= '2026-12-13' && s.date < '2026-12-18'; });
+  assert.ok(taper.every(function (s) { return s.type !== 'walkPower'; }));
+});
+test('پیاده‌روی، مسیر: هفته‌ها تا ۱۵۰ دقیقه کم می‌شه با پیشرفت؛ رسیده = ready', function () {
+  var p = walkP({ walkMin: 60, walkExp: '3to12m', walk30: 'yes', walkGoal: { kind: 'min150' } });
+  var a = C.walkPath(p, C.parseDate('2026-09-26')), b = C.walkPath(p, C.parseDate('2026-11-07'));
+  assert.ok(a.weeks > 0 && a.need === 150);
+  assert.ok(b.weekMin >= a.weekMin && b.weeks <= a.weeks);
+  var done = C.walkPath(walkP({ walkMin: 200, walkExp: 'gt1y', walk30: 'yes', walkGoal: { kind: 'min150' } }), C.parseDate('2026-09-26'));
+  assert.strictEqual(done.weeks, 0); assert.strictEqual(done.status, 'ready');
+  assert.ok(C.walkPath(walkP(), C.parseDate('2026-09-26')).none);
+  var ev = C.walkPath(walkP({ walkMin: 30, walkExp: 'lt3m', walk30: 'no', walkGoal: { kind: 'event', km: 42.2, date: '2026-10-20' } }), C.parseDate('2026-09-26'));
+  assert.strictEqual(ev.status, 'tight');
+});
+test('پیاده‌روی، پیشنهاد سطح بعد: فقط بعد از دو هفته روی سقف سطح', function () {
+  var p = walkP({ walkMin: 100, walkExp: 'gt1y', walk30: 'yes' });
+  assert.strictEqual(C.walkLevelSuggestion(p, C.parseDate('2026-10-03')), null);
+  var late = C.walkLevelSuggestion(p, C.parseDate('2027-01-30'));
+  assert.ok(late && late.to > late.from && late.next.walkMin === C.WALK_LEVELS[late.from].cap);
+  assert.strictEqual(C.walkLevelSuggestion(profileFor(5), C.parseDate('2027-01-30')), null);
+});
+test('پیاده‌روی، آمار: دقیقه و قدم هفتگی، قدم روزانه بر قدم جلسه مقدمه', function () {
+  var p = walkP({ walkMin: 100, walkExp: 'gt1y', walk30: 'yes' });
+  var d1 = '2026-09-26', d2 = '2026-09-27';
+  var data = { profile: p, checkins: {}, done: {}, postRuns: {}, doneLog: {}, steps: {} };
+  data.done[d1] = true; data.doneLog[d1] = { type: 'walkBrisk', km: 0, minutes: 20, actual: { sec: 1800, steps: 4000 } };
+  data.steps[d2] = 9000;
+  var a = C.analytics(data, C.parseDate('2026-09-28'), null);
+  assert.ok(a.walk);
+  assert.strictEqual(a.weeks[0].min, 30);
+  assert.strictEqual(C.daySteps(data, d1), 4000); assert.strictEqual(C.daySteps(data, d2), 9000);
+  data.steps[d1] = 11000; assert.strictEqual(C.daySteps(data, d1), 11000);
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

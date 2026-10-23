@@ -24,6 +24,17 @@ async function setPlanView(p, mode) {
   const b = p.locator('[data-view-mode="' + mode + '"]');
   if (await b.count()) { await b.first().click(); await p.waitForTimeout(400); }
 }
+// پروفایل پیاده‌روی (سطح ۷، هدف قدم روزانه) روی همون داده‌ی ثابت
+async function asWalker(p, goal) {
+  await p.evaluate(([K, today, g]) => {
+    const s = JSON.parse(localStorage.getItem(K)), C = window.CoachLogic;
+    Object.assign(s.profile, { activity: 'walk', walkExp: 'gt1y', walkMin: 220, walk30: 'yes', walkGoal: g, goal: { type: 'none' }, races: [] });
+    s.steps = {};
+    for (let i = 1; i <= 40; i++) s.steps[C.dateKey(C.addDays(C.parseDate(today), -i))] = 5000 + ((i * 2731) % 7000);
+    localStorage.setItem(K, JSON.stringify(s));
+  }, [KEY, TODAY, goal || { kind: 'steps', steps: 10000 }]);
+  await p.reload(); await p.waitForTimeout(500);
+}
 // [کلید، مسیر، آماده‌سازی]؛ فرم با پروفایل موجود باز می‌شه (حالت ویرایش) تا همه‌ی مرحله‌ها در دسترس باشن
 const SCREENS = [
   ['onb-1', '#onboarding', async () => {}],
@@ -96,6 +107,13 @@ const SCREENS = [
     }, [KEY]);
     await p.reload(); await p.waitForTimeout(500);
   }],
+  // مسیر پیاده‌روی
+  ['walk-home', '#home', async (p) => asWalker(p)],
+  ['walk-plan', '#plan', async (p) => { await asWalker(p); await setPlanView(p, 'week'); }],
+  ['walk-goals', '#walkgoals', async (p) => asWalker(p, { kind: 'event', km: 21.1, date: '2027-04-10' })],
+  ['walk-progress', '#progress', async (p) => asWalker(p)],
+  ['walk-profile', '#profile', async (p) => asWalker(p)],
+  ['walk-settings', '#settings', async (p) => { await asWalker(p); const b = p.locator('[data-set-open="remind"]'); if (await b.count()) { await b.first().click(); await p.waitForTimeout(300); } }],
 ];
 
 async function launch() {

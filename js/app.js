@@ -268,7 +268,7 @@
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, settings: renderSettings, plans: renderPlans, progress: renderProgressPage, gait: renderGaitPage, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
+  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, settings: renderSettings, plans: renderPlans, walkgoals: renderWalkGoals, progress: renderProgressPage, gait: renderGaitPage, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
   function route() {
     var loginMode = !isEntered();
     document.body.classList.toggle('login-mode', loginMode);
@@ -340,7 +340,7 @@
     if (e.target.closest && e.target.closest('[data-focus-period]')) pendingFocus = 'period-card';
   }, true);
   // صفحه‌های فرعی: نوار برگشت بالای صفحه (برگشت واقعی تاریخچه، وگرنه تب مادر)
-  var SUB_PAGES = { checkin: '#home', race: '#profile', plans: '#race', progress: '#profile', gait: '#profile', fitness: '#progress', guide: '#learn', settings: '#profile' };
+  var SUB_PAGES = { checkin: '#home', race: '#profile', plans: '#race', walkgoals: '#profile', progress: '#profile', gait: '#profile', fitness: '#progress', guide: '#learn', settings: '#profile' };
   function backBar(v) {
     var s = navState(), from = s && s.depth > 0 ? s.from : null;
     return '<nav class="back-bar"><a class="learn-back" href="' + SUB_PAGES[v] + '"' + (from ? ' data-nav-back="1"' : '') + '>' +
@@ -348,7 +348,7 @@
   }
   // تب مادر هر صفحه
   var TABS = ['home', 'plan', 'learn', 'profile'];
-  var TAB_OF = { home: 'home', checkin: 'home', race: 'profile', plans: 'profile', progress: 'profile', gait: 'profile', plan: 'plan', fitness: 'profile',
+  var TAB_OF = { home: 'home', checkin: 'home', race: 'profile', plans: 'profile', walkgoals: 'profile', progress: 'profile', gait: 'profile', plan: 'plan', fitness: 'profile',
     learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile' };
   // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
   var lastView = null, lastTab = null;
@@ -738,6 +738,9 @@
         // تاریخ شروع برنامه: پیش‌فرض امروز (یا همون تاریخ قبلی در ویرایش)
         '<div class="field"><label for="sdate">' + esc(T('onb.startDate')) + '</label><input id="sdate" name="startDate" type="date" min="' + (editing && p.startDate && p.startDate < todayKey ? p.startDate : todayKey) + '" max="' + C.dateKey(C.addDays(today(), START_MAX_DAYS)) + '" value="' + esc(p.startDate || todayKey) + '">' +
         '<small class="muted" id="sdate-fa"></small><small class="muted">' + esc(T('onb.startDateHint')) + '</small></div>' +
+        '<div id="walk-goal5" hidden><p class="sub-legend">' + esc(T('wgoal.onbQ')) + '</p><div class="chips chips-stack">' +
+        ['none'].concat(C.WALK_GOALS).map(function (k) { return chip('walkGoal', k, k === 'none' ? T('wgoal.later') : walkGoalTitle(k), ((p.walkGoal && p.walkGoal.kind) || 'none') === k, 'radio'); }).join('') + '</div>' +
+        '<small class="muted">' + esc(T('wgoal.onbHint')) + '</small></div>' +
         '<div id="run-goal5"><div class="field"><label for="gtype">' + esc(T('onb.goalType')) + '</label><select id="gtype" name="goalType">' +
         // ترتیب صریح (کلیدهای عددی در Object.keys جلو می‌افتن)
         ['none', '5', '10', '21', '42', 'ultra'].map(function (k) { return '<option value="' + k + '"' + (goal.type === k ? ' selected' : '') + '>' + esc(C.GOAL_TYPES[k]) + '</option>'; }).join('') +
@@ -833,6 +836,7 @@
       document.getElementById('run-fields3').hidden = walk;
       document.getElementById('walk-fields3').hidden = !walk;
       document.getElementById('run-goal5').hidden = walk;
+      document.getElementById('walk-goal5').hidden = !walk;
       var wk = readWalk();
       document.getElementById('walkmin-field').hidden = wk.never;
       document.getElementById('walk30-block').hidden = wk.never;
@@ -1046,6 +1050,12 @@
         currentWeeklyKm: curKm, lastWeekKm: volP.lastWeekKm, monthAvgKm: volP.monthAvgKm, volumeReason: volP.volumeReason,
         experience: walkAct ? (p.experience || null) : fd.get('experience'), structured: !never && fd.get('structured') === 'yes',
         activity: walkAct ? 'walk' : 'run',
+        walkGoal: walkAct ? (function () {
+          var k = fd.get('walkGoal');
+          if (!k || k === 'none') return null;
+          // جزئیات قبلی همون هدف (قدم، رویداد) حفظ می‌شن؛ از صفحه‌ی اهداف قابل تغییرن
+          return p.walkGoal && p.walkGoal.kind === k ? p.walkGoal : (k === 'steps' ? { kind: k, steps: 8000 } : k === 'event' ? { kind: k, km: 10 } : { kind: k });
+        }()) : (p.walkGoal || null),
         walkExp: walkAct ? walkIn.exp : (p.walkExp || null), walkMin: walkAct ? walkIn.min : (p.walkMin != null ? p.walkMin : null), walk30: walkAct ? walkIn.w30 : (p.walk30 || null),
         schemaVersion: SCHEMA_VERSION,
         goal: p.goal && p.goal.type === goalObj.type && p.goal.targetSec ? Object.assign(goalObj, { targetSec: p.goal.targetSec }) : goalObj, pb: pbObj,
@@ -1627,6 +1637,8 @@
 
   // کارت «به‌روزرسانی فیتنس» روی داشبورد: یادآوری تایم‌تست، الگوی RPE بالا، پیشنهاد تغییر سطح
   function fitnessNotesCard(p, now) {
+    // همه‌ی موردها (تست فیتنس، روند RPE دویدن آسون، VDOT) مخصوص دویدنه
+    if (C.isWalk(p)) return '';
     var items = [];
     var rem = C.fitnessReminder(p, now);
     if (rem) items.push('<li>' + t(rem.message) + ' <a href="#fitness">' + esc(T('fitNotes.register')) + '</a></li>');
@@ -2526,8 +2538,8 @@
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
       '<h1>' + esc(T(greetKey())) + '</h1></header>' +
       '<div data-install-slot="home">' + installBanner() + '</div>' +
-      homeToday(base, r.session, ci, key) + homeChecklist(now) + (walker() ? '' : homeGoalTiles()) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
-      homeCycle(r, key, now) + homeProgress(now) + (walker() ? '' : homePath(now) + linkCard('#plans', T('plans.title'), T('plans.linkSub')));
+      homeToday(base, r.session, ci, key) + (walker() ? homeReminder(base, key) : '') + homeChecklist(now) + (walker() ? homeSteps(key) + walkLevelCard(now) + walkRunBridge() + homeWalkTiles() : homeGoalTiles()) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
+      homeCycle(r, key, now) + homeProgress(now) + (walker() ? homeWalkPath(now) : homePath(now) + linkCard('#plans', T('plans.title'), T('plans.linkSub')));
     app.innerHTML = '<div class="home">' + html + '</div>';
   }
   // کارت اصلی بالای خانه: «تمرین امروز» و زیرش «چک‌این امروز»
@@ -2685,12 +2697,255 @@
     if (f) { planFocus = f.dataset.planFocus; pendingFocus = 'plan-' + planFocus; }
   }, true);
 
+  // ---------- پیاده‌روی: اهداف، قدم روزانه، مسیر، پیشنهاد سطح بعد، پل به دویدن، یادآوری ----------
+  function walkGoalTitle(k) { return T('wgoal.' + k + '.t'); }
+  function homeWalkTiles() {
+    var wg = C.walkGoalInfo(state.profile);
+    return '<p class="group-label" role="heading" aria-level="2">' + esc(T(wg.kind === 'none' ? 'goalTiles.title' : 'goalTiles.titleNext')) + '</p><div class="goal-tiles walk-tiles">' +
+      C.WALK_GOALS.map(function (k) {
+        return '<a class="goal-tile' + (wg.kind === k ? ' is-main' : '') + '" href="#walkgoals" data-wgoal-focus="' + k + '">' +
+          (wg.kind === k ? '<span class="gt-badge">' + esc(T('goalTiles.main')) + '</span>' : '') +
+          '<span class="gt-km gt-icon" aria-hidden="true">' + esc(T('wgoal.' + k + '.big')) + '</span>' +
+          '<span class="gt-name">' + esc(walkGoalTitle(k)) + '</span><span class="gt-eta">' + esc(T('wgoal.' + k + '.short')) + '</span></a>';
+      }).join('') + '</div>';
+  }
+  var wgoalFocus = null;
+  document.addEventListener('click', function (e) {
+    var f = e.target.closest && e.target.closest('[data-wgoal-focus]');
+    if (f) { wgoalFocus = f.dataset.wgoalFocus; pendingFocus = 'wgoal-' + wgoalFocus; }
+  }, true);
+  function walkEta(gp) {
+    if (gp.status === 'ready') return T('path.ready');
+    return gp.weeks != null ? (gp.goal.date ? T('path.eta', { a: gp.weeks, b: gp.weeksHi }) : T('path.etaMonth', { m: I.monthTitle(C.parseDate(gp.readyDate)) })) : '';
+  }
+  function homeWalkPath(now) {
+    var p = state.profile, gp = C.walkPath(p, now);
+    if (gp.none) return linkCard('#walkgoals', T('wpath.none'), T('wpath.noneSub'));
+    if (gp.past) return '';
+    var lines = [gp.notStarted ? T('path.notStarted', { d: faDate(p.startDate) }) : T('wpath.weekMin', { n: fa(gp.weekMin) })];
+    if (gp.goal.kind === 'steps') {
+      var a = C.analytics(state, now, 7), got = a ? a.steps.filter(function (d) { return d.steps; }) : [];
+      var avg = got.length ? Math.round(got.reduce(function (x, d) { return x + d.steps; }, 0) / got.length) : 0;
+      gp.frac = Math.min(1, avg / gp.goal.steps);
+      lines.push(T('wpath.stepsAvg', { n: fa(avg.toLocaleString('en-US')), t: fa(gp.goal.steps.toLocaleString('en-US')) }));
+    } else if (gp.goal.kind === 'faster') {
+      gp.frac = Math.min(1, (gp.level - 1) / 9);
+      lines.push(T('wpath.faster'));
+    } else {
+      if (gp.daysLeft != null) lines.push(T('wpath.event', { n: gp.daysLeft, d: faDate(gp.goal.date) }));
+      lines.push(walkEta(gp));
+    }
+    var tight = gp.status === 'tight';
+    return '<a class="card hcard path-card" href="#walkgoals"><div class="hcard-top"><span class="hcard-label">' + esc(T('path.title')) + '</span>' +
+      '<span class="hcard-link">' + esc(T('path.more')) + '</span></div>' +
+      '<div class="path-ends"><span class="path-now"><span class="path-hex" aria-hidden="true">' + fa(gp.level) + '</span><span><small>' + esc(T('path.now')) + '</small><b>' + tt('path.level', { n: gp.level }) + '</b></span></span>' +
+      '<span class="path-goal"><small>' + esc(T('path.goal')) + '</small><b>' + esc(walkGoalTitle(gp.goal.kind)) + '</b></span></div>' +
+      pathBar({ frac: gp.frac || 0 }) + '<div class="path-meta">' + lines.filter(Boolean).map(function (l) { return '<span>' + t(l) + '</span>'; }).join('') + '</div>' +
+      (gp.status ? '<span class="path-pill">' + esc(T(tight ? 'wpath.tight' : 'path.st.' + gp.status)) + '</span>' : '') + '</a>';
+  }
+  function walkGoalCard(p, now) {
+    var gp = C.walkPath(p, now), wg = gp.goal, head = '<span class="eyebrow">' + esc(T('race.mainLabel')) + '</span>';
+    if (wg.kind === 'none') return '<a class="card pf-goalcard" href="#walkgoals">' + head + '<b class="pf-goal-name">' + esc(T('profile.noGoal')) + '</b><span class="pf-goal-cta">' + esc(T('profile.goalSet')) + '</span></a>';
+    var meta = wg.kind === 'steps' ? T('wgoal.stepsLine', { n: fa(wg.steps.toLocaleString('en-US')) }) : wg.kind === 'event' ? T('wgoal.eventLine', { km: fa(wg.km) }) + (wg.date ? T('progress.sep') + faDate(wg.date) : '') : '';
+    return '<a class="card pf-goalcard" href="#walkgoals">' + head + '<b class="pf-goal-name">' + esc(walkGoalTitle(wg.kind)) + '</b>' +
+      (meta ? '<span class="pf-goal-count">' + t(meta) + '</span>' : '') +
+      (gp.need && !gp.past ? pathBar(gp) + '<span class="pf-goal-meta">' + t(walkEta(gp)) + '</span>' : '') +
+      '<span class="pf-goal-cta">' + esc(T('wgoal.manage')) + '</span></a>';
+  }
+  function renderWalkGoals() {
+    var p = state.profile, wg = C.walkGoalInfo(p), now = today(), focus = wgoalFocus;
+    wgoalFocus = null;
+    var html = '<header class="page-head"><h1>' + esc(T('wgoal.pageTitle')) + '</h1></header><p class="page-intro">' + esc(T('wgoal.intro')) + '</p>';
+    html += C.WALK_GOALS.map(function (k) {
+      var on = wg.kind === k, est = C.walkPath(Object.assign({}, p, { walkGoal: { kind: k, km: 10 } }), now);
+      var extra = '';
+      if (k === 'steps') extra = '<div class="field"><label for="wg-steps">' + esc(T('wgoal.stepsQ')) + '</label><select id="wg-steps" data-wg-field="steps">' +
+        [6000, 7000, 8000, 10000, 12000].map(function (n) { return '<option value="' + n + '"' + ((on ? wg.steps : 8000) === n ? ' selected' : '') + '>' + fa(n.toLocaleString('en-US')) + '</option>'; }).join('') + '</select></div>';
+      if (k === 'event') extra = '<div class="row2"><div class="field"><label for="wg-km">' + esc(T('wgoal.eventKmQ')) + '</label><select id="wg-km" data-wg-field="km">' +
+        C.WALK_EVENT_KM.map(function (n) { return '<option value="' + n + '"' + ((on ? wg.km : 10) === n ? ' selected' : '') + '>' + t(T('s.km', { n: n })) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label for="wg-date">' + esc(T('wgoal.dateQ')) + '</label><input id="wg-date" type="date" data-wg-field="date" min="' + C.dateKey(C.addDays(now, 7)) + '" value="' + esc(on && wg.date ? wg.date : '') + '"></div></div>';
+      return '<section class="card plan-card wgoal-card' + (on ? ' is-on' : '') + (focus === k ? ' is-focus' : '') + '" id="wgoal-' + k + '"><div class="plan-head"><h2>' + esc(walkGoalTitle(k)) + '</h2>' +
+        (on ? '<span class="pill pill-level">' + esc(T('goalTiles.main')) + '</span>' : '') + '</div>' +
+        '<p class="small">' + esc(T('wgoal.' + k + '.desc')) + '</p>' +
+        (est.weeks ? '<p class="small muted">' + tt('wgoal.eta', { a: est.weeks, b: est.weeksHi }) + '</p>' : est.weeks === 0 && est.need ? '<p class="small muted">' + esc(T('path.ready')) + '</p>' : '') +
+        extra + '<p class="form-errors" hidden></p>' +
+        '<button type="button" class="btn ' + (on ? 'btn-outline' : 'btn-primary') + ' btn-block" data-wgoal-set="' + k + '">' + esc(T(on ? 'wgoal.update' : 'wgoal.choose')) + '</button>' +
+        (on ? '<button type="button" class="linklike small wgoal-clear" data-wgoal-clear="1">' + esc(T('wgoal.clear')) + '</button>' : '') + '</section>';
+    }).join('');
+    app.innerHTML = html;
+  }
+  app.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-wgoal-set]'), c = e.target.closest('[data-wgoal-clear]');
+    if (!b && !c) return;
+    var p = state.profile;
+    if (c) { delete p.walkGoal; save(); showToast(T('wgoal.cleared')); renderWalkGoals(); return; }
+    var k = b.dataset.wgoalSet, card = b.closest('section'), g = { kind: k };
+    var fv = function (n) { var el = card.querySelector('[data-wg-field="' + n + '"]'); return el ? el.value : ''; };
+    if (k === 'steps') g.steps = Number(fv('steps')) || 8000;
+    if (k === 'event') {
+      g.km = Number(fv('km')) || 10;
+      var d = fv('date');
+      if (d && d < C.dateKey(C.addDays(today(), 7))) { var er = card.querySelector('.form-errors'); er.hidden = false; er.textContent = T('wgoal.errDate'); return; }
+      g.date = d || null;
+    }
+    p.walkGoal = g;
+    save(); showToast(T('wgoal.saved', { g: walkGoalTitle(k) }));
+    if (location.hash === '#walkgoals') renderWalkGoals(); else route();
+  });
+  // قدم‌های امروز (کل روز، از گوشی یا ساعت هوشمند)
+  function homeSteps(key) {
+    var v = (state.steps || {})[key] || '', wg = C.walkGoalInfo(state.profile), target = wg.kind === 'steps' ? wg.steps : null;
+    var pct = v && target ? Math.min(100, Math.round(v / target * 100)) : null;
+    return '<section class="card hcard steps-card"><div class="hcard-top"><span class="hcard-label">' + esc(T('stepsCard.title')) + '</span>' +
+      (target ? '<span class="ob-count">' + tt('stepsCard.target', { n: fa(target.toLocaleString('en-US')) }) + '</span>' : '') + '</div>' +
+      (target ? '<div class="ob-bar" aria-hidden="true"><i style="width:' + (pct || 0) + '%"></i></div>' : '') +
+      '<form class="steps-form" data-steps-form="' + key + '" novalidate><label class="sr-only" for="steps-today">' + esc(T('stepsCard.label')) + '</label>' +
+      '<input id="steps-today" name="steps" type="number" inputmode="numeric" min="0" max="100000" step="1" placeholder="' + esc(T('stepsCard.ph')) + '" value="' + esc(v) + '">' +
+      '<button type="submit" class="btn btn-outline">' + esc(T('stepsCard.save')) + '</button></form>' +
+      '<p class="small muted">' + esc(T(pct === 100 ? 'stepsCard.hit' : 'stepsCard.hint')) + '</p></section>';
+  }
+  app.addEventListener('submit', function (e) {
+    var f = e.target.closest('[data-steps-form]');
+    if (!f) return;
+    e.preventDefault();
+    var raw = String(f.steps.value || '').trim(), n = raw === '' ? 0 : Number(raw);
+    if (!(n >= 0 && n <= 100000 && Math.floor(n) === n)) { showToast(T('post.errSteps')); return; }
+    state.steps = state.steps || {};
+    if (n) state.steps[f.dataset.stepsForm] = n; else delete state.steps[f.dataset.stepsForm];
+    save(); showToast(T('stepsCard.saved')); route();
+  });
+  // پیشنهاد سطح بعدی پیاده‌روی
+  function walkLevelCard(now) {
+    var sg = C.walkLevelSuggestion(state.profile, now);
+    if (!sg) return '';
+    return '<section class="card fitness-notes"><h3>' + esc(T('wlevel.title')) + '</h3><p>' + tt('wlevel.text', { from: sg.from, to: sg.to, n: sg.min }) + '</p>' +
+      '<div class="actions"><button type="button" class="btn btn-outline" data-wlevel-up="1">' + tt('fitNotes.apply', { n: sg.to }) + '</button></div></section>';
+  }
+  app.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-wlevel-up]')) return;
+    var p = state.profile, sg = C.walkLevelSuggestion(p, today());
+    if (!sg) return;
+    Object.assign(p, sg.next);
+    p.startDate = C.dateKey(today());
+    save(); showToast(fa(T('wlevel.done', { n: C.assessLevel(p).level }))); route();
+  });
+  // پل به دویدن: از سطح ۵ پیاده‌روی (قابل بستن)
+  function walkRunBridge() {
+    var p = state.profile;
+    if (C.assessLevel(p).level < 5 || p.runBridgeDismissed) return '';
+    return '<section class="card run-bridge"><h3>' + esc(T('bridge.title')) + '</h3><p>' + esc(T('bridge.text')) + '</p>' +
+      '<div class="actions"><button type="button" class="btn btn-primary" data-bridge-go="1">' + esc(T('bridge.go')) + '</button>' +
+      '<button type="button" class="btn btn-ghost" data-bridge-no="1">' + esc(T('bridge.no')) + '</button></div>' +
+      '<div class="alert alert-adapt bridge-confirm" hidden><p>' + esc(T('bridge.confirm')) + '</p><div class="actions"><button type="button" class="btn btn-primary" data-bridge-yes="1">' + esc(T('bridge.yes')) + '</button>' +
+      '<button type="button" class="btn btn-ghost" data-bridge-cancel="1">' + esc(T('app.cancel')) + '</button></div></div></section>';
+  }
+  app.addEventListener('click', function (e) {
+    var t0 = e.target.closest('[data-bridge-go], [data-bridge-no], [data-bridge-yes], [data-bridge-cancel]');
+    if (!t0) return;
+    var p = state.profile, box = t0.closest('.run-bridge');
+    if (t0.dataset.bridgeNo) { p.runBridgeDismissed = true; save(); route(); return; }
+    if (t0.dataset.bridgeGo) { box.querySelector('.bridge-confirm').hidden = false; return; }
+    if (t0.dataset.bridgeCancel) { box.querySelector('.bridge-confirm').hidden = true; return; }
+    // سطح ۰ دویدن (پیاده‌روی و دویدن تدریجی)؛ داده‌های پیاده‌روی برای برگشت می‌مونن
+    p.activity = 'run'; p.experience = 'never'; p.structured = false; p.currentWeeklyKm = p.lastWeekKm = p.monthAvgKm = 0; p.pb = null;
+    p.goal = p.goal || { type: 'none' };
+    p.startDate = C.dateKey(today()); p.zeroWeeks = {};
+    save(); showToast(T('bridge.done')); route();
+  });
+  // یادآوری: درون‌اپ (پیش‌فرض روشن برای پیاده‌روی) + فایل تقویم + اعلان مرورگر وقتی اپ بازه
+  function reminderCfg() {
+    var r = state.reminder || {};
+    return { on: r.on !== false, time: /^\d\d:\d\d$/.test(r.time || '') ? r.time : '18:00', notify: !!r.notify };
+  }
+  function remindSub() { var r = reminderCfg(); return r.on ? T('remind.subOn', { t: r.time }) : T('remind.subOff'); }
+  function homeReminder(base, key) {
+    var r = reminderCfg();
+    if (!r.on || ['rest', 'none'].indexOf(base.type) >= 0 || state.done[key]) return '';
+    var now = new Date(), hm = r.time.split(':').map(Number);
+    if (key !== C.dateKey(now) || now.getHours() * 60 + now.getMinutes() < hm[0] * 60 + hm[1]) return '';
+    return '<div class="alert alert-adapt remind-banner" role="status"><p><b>' + esc(T('remind.bannerT')) + '</b> ' + tt('remind.banner', { s: base.label, n: base.minutes || '' }) + '</p></div>';
+  }
+  // فایل تقویم: هر جلسه‌ی ۱۲ هفته‌ی آینده یک رویداد با یادآور در ساعت انتخابی (داده از گوشی بیرون نمی‌ره)
+  function icsFile() {
+    var p = state.profile, r = reminderCfg(), now = today(), hm = r.time.replace(':', '') + '00', lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//coach-mvp//fa', 'CALSCALE:GREGORIAN'];
+    var esc2 = function (x) { return String(x).replace(/[\\,;]/g, function (c) { return '\\' + c; }).replace(/\n/g, ' '); };
+    for (var i = 0; i < 84; i++) {
+      var d = C.addDays(now, i), s = C.sessionFor(p, d);
+      if (['rest', 'none'].indexOf(s.type) >= 0) continue;
+      var k = C.dateKey(d).replace(/-/g, '');
+      lines.push('BEGIN:VEVENT', 'UID:coach-' + k + '@coach-mvp', 'DTSTAMP:' + k + 'T000000Z', 'DTSTART:' + k + 'T' + hm,
+        'DURATION:PT' + (s.minutes || 45) + 'M', 'SUMMARY:' + esc2(s.label + (s.minutes ? ' · ' + T('s.min', { n: s.minutes }) : '')),
+        'DESCRIPTION:' + esc2((s.steps || []).join(' / ')), 'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + esc2(s.label), 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT');
+    }
+    lines.push('END:VCALENDAR');
+    // خط‌های بلندتر از ۷۵ بایت طبق RFC 5545 تا می‌خورن (متن فارسی چندبایتیه)
+    var fold = function (ln) {
+      var out = [], cur = '', n = 0;
+      Array.from(ln).forEach(function (ch) {
+        var b = unescape(encodeURIComponent(ch)).length;
+        if (n + b > (out.length ? 74 : 75)) { out.push(cur); cur = ''; n = 0; }
+        cur += ch; n += b;
+      });
+      out.push(cur);
+      return out.join('\r\n ');
+    };
+    return lines.map(fold).join('\r\n');
+  }
+  function remindSection() {
+    var r = reminderCfg();
+    return '<label class="check-row"><input type="checkbox" id="rm-on"' + (r.on ? ' checked' : '') + '> <span>' + esc(T('remind.inApp')) + '</span></label>' +
+      '<div class="field"><label for="rm-time">' + esc(T('remind.time')) + '</label><input id="rm-time" type="time" value="' + r.time + '"></div>' +
+      '<p class="small muted">' + esc(T('remind.calHint')) + '</p>' +
+      '<div class="actions"><button type="button" class="btn btn-outline" data-ics="1">' + esc(T('remind.cal')) + '</button>' +
+      ('Notification' in window ? '<button type="button" class="btn btn-ghost" data-notify="1">' + esc(T(r.notify && Notification.permission === 'granted' ? 'remind.notifyOn' : 'remind.notify')) + '</button>' : '') + '</div>' +
+      '<p class="small muted">' + esc(T('remind.privacy')) + '</p>';
+  }
+  app.addEventListener('change', function (e) {
+    if (e.target.id !== 'rm-on' && e.target.id !== 'rm-time') return;
+    var r = state.reminder = state.reminder || {};
+    if (e.target.id === 'rm-on') r.on = e.target.checked;
+    if (e.target.id === 'rm-time' && /^\d\d:\d\d$/.test(e.target.value)) r.time = e.target.value;
+    save(); showToast(T('settings.saved')); scheduleNotify();
+  });
+  app.addEventListener('click', function (e) {
+    if (e.target.closest('[data-ics]')) {
+      var blob = new Blob([icsFile()], { type: 'text/calendar' }), a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'walking-plan.ics'; document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+      showToast(T('remind.calDone'));
+      return;
+    }
+    if (e.target.closest('[data-notify]') && 'Notification' in window) {
+      Notification.requestPermission().then(function (perm) {
+        state.reminder = state.reminder || {}; state.reminder.notify = perm === 'granted';
+        save(); showToast(T(perm === 'granted' ? 'remind.notifyOk' : 'remind.notifyNo')); scheduleNotify(); route();
+      });
+    }
+  });
+  // اعلان در ساعت یادآوری، فقط وقتی اپ بازه (بدون سرور)
+  var notifyTimer = null;
+  function scheduleNotify() {
+    clearTimeout(notifyTimer);
+    if (!state.profile || !('Notification' in window) || Notification.permission !== 'granted') return;
+    var r = reminderCfg();
+    if (!r.on || !r.notify) return;
+    var now = new Date(), at = new Date(now), hm = r.time.split(':').map(Number);
+    at.setHours(hm[0], hm[1], 0, 0);
+    if (at <= now) return;
+    notifyTimer = setTimeout(function () {
+      var k = C.dateKey(new Date()), s = C.sessionFor(state.profile, new Date());
+      if (state.done[k] || ['rest', 'none'].indexOf(s.type) >= 0) return;
+      try { new Notification(T('remind.bannerT'), { body: fa(T('remind.banner', { s: s.label, n: s.minutes || '' })), icon: 'img/logo.png' }); } catch (er) { /* */ }
+    }, Math.min(at - now, 2147483000));
+  }
+  setTimeout(scheduleNotify, 1500);
+
   // ---------- چک‌لیست شروع (فقط کاربرهای تازه؛ بعد از کامل شدن، همون روز یک پیام و بعد محو) ----------
   function checklistSteps(p) {
     var g = C.goalInfo(p);
     return [
       { done: true, title: T('start.plan') },
-      C.isWalk(p) ? null : { done: g.type !== 'none', title: g.type !== 'none' ? T('start.goalDone', { g: C.goalLabel(g) }) : T('start.goal'), sub: g.type !== 'none' ? (g.date ? faDate(g.date) : '') : T('start.goalSub'), href: '#plans' },
+      C.isWalk(p) ? { done: C.walkGoalInfo(p).kind !== 'none', title: C.walkGoalInfo(p).kind !== 'none' ? T('start.goalDone', { g: T('wgoal.' + C.walkGoalInfo(p).kind + '.t') }) : T('start.goal'), sub: C.walkGoalInfo(p).kind !== 'none' ? '' : T('start.goalSubWalk'), href: '#walkgoals' } : { done: g.type !== 'none', title: g.type !== 'none' ? T('start.goalDone', { g: C.goalLabel(g) }) : T('start.goal'), sub: g.type !== 'none' ? (g.date ? faDate(g.date) : '') : T('start.goalSub'), href: '#plans' },
       { done: Object.keys(state.checkins).length > 0, title: T('start.checkin'), sub: T('start.checkinSub'), href: '#checkin' },
       { done: Object.keys(state.done).length > 0, title: T('start.run'), sub: T('start.runSub'), href: '#plan', attr: ' data-goto-today="1"' },
       { done: !!(p.name || '').trim(), title: T('start.name'), sub: T('start.nameSub'), href: '#settings', attr: ' data-set-open="person"' }
@@ -2815,22 +3070,22 @@
       ['4w', '3m', 'all'].map(function (k) {
         return '<button type="button" data-prange="' + k + '" aria-pressed="' + (k === rk) + '">' + esc(T('progress.r' + (k === '4w' ? '4w' : k === '3m' ? '3m' : 'All'))) + '</button>';
       }).join('') + '</div></div><p class="page-intro">' + esc(T('progress.intro')) + '</p>' +
-      (function () {
+      (a.walk ? '' : function () {
         var f = C.currentFitness(state.profile);
         return '<nav class="card list-group">' + listRows([['#fitness', 'watch', T('profile.linkFitness'), f ? 'VDOT ' + f.vdot.toFixed(1) + T('progress.sep') + T('profile.fitnessSub') : T('profile.registerTest')]]) + '</nav>';
-      })();
+      }());
 
     var W = a.weeks, wkWithRuns = W.filter(function (w) { return w.runs > 0; }).length;
     var pc = progCtx(a, rk === '4w' ? 4 : 13);
 
-    html += progVolCard(pc);
+    html += a.walk ? progWalkVolCard(pc) : progVolCard(pc);
 
     html += progPmcCard(pc);
 
     // ---- ۳. بهبود پیس ----
     // پیس‌ها به ثانیه در واحد کاربر (کیلومتر یا مایل)
     var S = pc.S, changed = pc.changed;
-    (function () {
+    if (!a.walk) (function () {
       var body;
       if (a.entriesCount < 2 || !changed) {
         // شروع کار: پیس هر هفته از آخرین رکورد/تایم‌تست (خط صاف)، هفته‌های پیش رو خالی
@@ -2891,7 +3146,7 @@
       }
       html += progCard('pace', T('progress.pace.title'), T('progress.pace.desc'), body, learnMore(['vdot']));
     })();
-    html += progTodCard();
+    html += a.walk ? progStepsCard(pc) : progTodCard();
 
     // ---- ۴. چک‌این‌ها (روزانه در کل بازه؛ روزهای بدون چک‌این خالی) ----
     (function () {
@@ -2975,7 +3230,7 @@
       html += progCard('ck', T('progress.checkins.title'), T('progress.checkins.desc'), body);
     })();
 
-    html += progPredCard(pc);
+    if (!a.walk) html += progPredCard(pc);
 
     // ---- ۶. صعود هفتگی (هدف تریل/اولترا) ----
     if (a.goal.ultra) (function () {
@@ -3037,6 +3292,53 @@
     });
     return { a: a, W: W, minW: minW || 13, wkWithRuns: W.filter(function (w) { return w.runs > 0; }).length, rtl: isRtl(), SEP: T('progress.sep'),
       S: S, changed: S.length > 1 && S.some(function (s) { return s.entry !== S[0].entry; }) };
+  }
+  // پیاده‌روی: دقیقه‌ی هفتگی و میانگین ۴ هفته
+  function progWalkVolCard(c) {
+    var W = c.W, rtl = c.rtl, SEP = c.SEP, X = padWeeks(W, c.minW), has = W.some(function (w) { return w.min > 0; });
+    var mins = function (v) { return T('progress.volW.val', { n: fa(Math.round(v)) }); };
+    var full = W.filter(function (w) { return !w.partial; }), cur = W[W.length - 1], ma = full.length ? full[full.length - 1].maMin : null;
+    var body = (has ? '<div class="pstats">' + statTile(T('progress.vol.thisWeek'), esc(mins(cur ? cur.min : 0))) +
+      (ma != null ? statTile(T('progress.vol.avg4'), esc(mins(ma))) : '') + statTile(T('progress.volW.who'), esc(mins(150))) + '</div>' : '') +
+      '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.volW.bars'), 'bar') + (has ? legendItem(SERIES[1], T('progress.vol.ma')) + legendItem(SERIES[2], T('progress.volW.who')) : '') + '</div>' +
+      chartBox('vol', {
+        rtl: rtl, n: X.length, aria: T('progress.volW.title'),
+        y: { min: 0, max: Math.max.apply(null, X.map(function (w) { return w.min || 0; }).concat([160])), fmt: fa, label: T('progress.volW.unit') },
+        bars: { values: X.map(function (w) { return w.future ? null : w.min || 0; }), color: SERIES[0], faded: X.map(function (w) { return w.partial; }) },
+        lines: has ? [{ values: X.map(function (w) { return w.maMin == null ? null : w.maMin; }), color: SERIES[1], dots: 'last' },
+          { values: X.map(function () { return 150; }), color: SERIES[2] }] : [],
+        xLabels: function (i) { return weekLabel(X[i].start); }, xPx: 52,
+        emptyLabel: has ? null : T('progress.volW.empty'),
+        tip: function (i) {
+          var w = X[i];
+          if (w.future) return null;
+          return { title: tt('progress.weekOf', { d: weekLabel(w.start) }) + (w.partial ? SEP + T('progress.partialTag') : ''), rows: [
+            { color: SERIES[0], kind: 'bar', label: T('progress.volW.bars'), value: mins(w.min || 0) },
+            { color: SERIES[1], label: T('progress.vol.ma'), value: w.maMin != null ? mins(w.maMin) : '—' }] };
+        }
+      });
+    return progCard('vol', T('progress.volW.title'), T('progress.volW.desc'), body);
+  }
+  // پیاده‌روی: قدم روزانه (ثبت روزانه یا قدم جلسه) و خط هدف قدم
+  function progStepsCard(c) {
+    var D = c.a.steps.slice(-Math.min(c.a.steps.length, Math.max(28, c.minW * 7))), rtl = c.rtl;
+    var wg = C.walkGoalInfo(state.profile), target = wg.kind === 'steps' ? wg.steps : null;
+    var vals = D.map(function (d) { return d.steps || null; }), got = vals.filter(Boolean);
+    var avg = got.length ? Math.round(got.reduce(function (x, y) { return x + y; }, 0) / got.length) : null;
+    var stepsTxt = function (n) { return T('progress.steps.val', { n: fa(n.toLocaleString('en-US')) }); };
+    var body = (avg ? '<div class="pstats">' + statTile(T('progress.steps.avg'), esc(stepsTxt(avg))) +
+      (target ? statTile(T('progress.steps.target'), esc(stepsTxt(target)), esc(tt('progress.steps.hit', { n: got.filter(function (v) { return v >= target; }).length, d: got.length }))) : '') + '</div>' : '') +
+      '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.steps.bars'), 'bar') + (target ? legendItem(SERIES[2], T('progress.steps.target')) : '') + '</div>' +
+      chartBox('steps', {
+        rtl: rtl, n: D.length, aria: T('progress.steps.title'),
+        y: { min: 0, max: Math.max.apply(null, got.concat([target || 0, 10000])), fmt: function (v) { return fa(Math.round(v / 1000)); }, label: T('progress.steps.unit') },
+        bars: { values: vals, color: SERIES[0] },
+        lines: target ? [{ values: D.map(function () { return target; }), color: SERIES[2] }] : [],
+        xLabels: function (i) { return faDate(D[i].date, true); }, xPx: 52,
+        emptyLabel: got.length ? null : T('progress.steps.empty'),
+        tip: function (i) { return D[i].steps ? { title: faDate(D[i].date), rows: [{ color: SERIES[0], kind: 'bar', label: T('progress.steps.bars'), value: stepsTxt(D[i].steps) }] } : null; }
+      });
+    return progCard('steps', T('progress.steps.title'), T('progress.steps.desc'), body);
   }
   // ۱. حجم هفتگی
   function progVolCard(c) {
@@ -3648,11 +3950,13 @@
       (joined ? '<p class="pf-joined">' + esc(T('profile.joined', { d: joined })) + '</p>' : '') +
       (name ? '' : '<p class="small muted">' + esc(T('profile.noNameHint')).replace('{link}', '<a href="#onboarding">' + esc(T('profile.noNameLink')) + '</a>') + '</p>') +
       '<a class="btn btn-ink pf-edit" href="#onboarding">' + esc(T('profile.edit')) + '</a></section>' +
-      (walker() ? '' : profileGoalCard(p, g, race, now)) +
+      (walker() ? walkGoalCard(p, now) : profileGoalCard(p, g, race, now)) +
       '<a class="card pf-level" href="' + (walker() ? '#plan' : '#plans') + '"><span class="pf-level-badge" aria-hidden="true"><b>' + fa(lv.level) + '</b><small>' + esc(T('level.of10')) + '</small></span>' +
       '<span class="pf-level-text"><b>' + tt('level.title', { n: lv.level, name: lv.info.name }) + '</b><small>' + esc(T(walker() ? 'profile.levelLinkWalk' : 'profile.levelLink')) + '</small></span>' + chevron(isRtl() ? 'left' : 'right') + '</a>' +
       periodCard(p, now, race) +
-      listGroup(T('profile.groups.mine'), walker() ? [['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgress')]] : [
+      listGroup(T('profile.groups.mine'), walker() ? [['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgressWalk')],
+        ['#walkgoals', 'flag', T('wgoal.pageTitle'), C.walkGoalInfo(p).kind !== 'none' ? T('wgoal.' + C.walkGoalInfo(p).kind + '.t') : T('profile.goalSetShort')],
+        ['#settings', 'cal', T('remind.title'), remindSub(), 'remind']] : [
         ['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgress')],
         ['#race', 'flag', T('race.pageTitle'), g.type !== 'none' ? C.goalLabel(g) + (race && race.date >= now ? T('progress.sep') + T('profile.goalIn', { n: Math.round(C.daysBetween(now, race.date)) }) : '') : T('profile.goalSetShort')],
         ['#plans', 'plans', T('plans.title'), T('plans.linkSub')],
@@ -3796,6 +4100,8 @@
         '<div class="field"><span class="field-label" id="units-lbl">' + esc(T('settings.units')) + '</span><div class="seg" role="group" aria-labelledby="units-lbl">' +
         ['km', 'mi'].map(function (u) { return '<button type="button" data-setunits="' + u + '" aria-pressed="' + (I.getUnits() === u) + '">' + esc(T('units.opt.' + u)) + '</button>'; }).join('') +
         '</div><small class="muted">' + esc(T('settings.unitsNote')) + '</small></div>') +
+      // یادآوری جلسه‌ها
+      setSection('remind', 'cal', T('remind.title'), esc(remindSub()), remindSection()) +
       // نصب اپلیکیشن
       setSection('install', 'install', T('install.title'), esc(T('install.short.' + installMode())), installSectionBody()) +
       // ۲. تقویم

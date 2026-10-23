@@ -40,6 +40,11 @@
       strengthMoves: 'squats, lunges, glute bridges, step-ups, calf raises, plank',
       crossStep: 'Optional: today you can cycle or swim easy for the same time instead of walking.',
       fewerReps: 'Do one or two fewer reps.',
+      eventTarget: '{km} km walking event',
+      eventMain: 'Event day! Start at an easy pace and pick it up in the second half if you feel good.',
+      eventHow: 'Bring water and a snack; wear tested shoes and clothes, nothing new.',
+      eventBefore: 'Your event is tomorrow; rest today, drink enough water and sleep early.',
+      eventAfter: 'The event was yesterday; rest today with some gentle stretching.',
       int: {
         easy: 'Intensity: easy; you can talk comfortably (RPE 3 to 4 out of 10).',
         brisk: 'Intensity: brisk; slightly out of breath, you can talk but not sing (RPE 5 to 6, about 100 to 120 steps a minute).',
@@ -94,7 +99,7 @@
     types: {
       rest: 'Rest', walkrun: 'Walk & light jog', easy: 'Easy run', runwalk: 'Easy run (run-walk)', tempo: 'Tempo', interval: 'Intervals',
       reps: 'Speed reps', fartlek: 'Fartlek', hills: 'Hills', long: 'Long run', race: 'Race day', cancelled: 'Cancelled', none: 'Before start',
-      walkEasy: 'Easy walk', walkBrisk: 'Brisk walk', walkPower: 'Power intervals', walkLong: 'Long walk'
+      walkEasy: 'Easy walk', walkBrisk: 'Brisk walk', walkPower: 'Power intervals', walkLong: 'Long walk', walkEvent: 'Event day'
     },
     periods: { base: 'Base phase', build: 'Build phase', peak: 'Peak phase' },
     phase: {
@@ -991,6 +996,47 @@
       saved: 'Report saved; the videos are not stored.'
     },
     goalTiles: { title: 'Pick a goal', titleNext: 'What\'s your next goal?', main: 'Main goal', eta: 'Ready in: {w}', names: { 5: 'Five K', 10: 'Ten K', 21: 'Half marathon', 42: 'Marathon' } },
+    wgoal: {
+      pageTitle: 'Walking goal', intro: 'Pick a goal and your weekly plan will steer toward it. You can change it any time.',
+      onbQ: 'What is your walking goal?', later: 'I\'ll choose later', onbHint: 'You can change it later from your profile.',
+      min150: { t: '150 minutes a week', big: '150', short: 'WHO recommendation', desc: 'Reach the minimum recommended activity for health: 150 minutes of brisk walking a week.' },
+      steps: { t: 'Daily steps', big: 'Steps', short: 'A step target every day', desc: 'Hit a set number of steps each day; read them from your phone or watch and log them.' },
+      faster: { t: 'Walk faster', big: 'Pace', short: 'Speed and endurance', desc: 'More brisk sessions in your plan so you cover more ground for the same effort.' },
+      event: { t: 'Walking event', big: 'Event', short: 'A set distance', desc: 'Get ready for a 5 to 42 km walk; your weekly long walk grows step by step.' },
+      run: { t: 'Get ready to run', big: 'Run', short: 'Next step: running', desc: 'We build your walking base so you can start running with confidence.' },
+      eta: 'Estimated arrival: {a} to {b} weeks', stepsQ: 'Daily step target', eventKmQ: 'Event distance', dateQ: 'Event date (optional)',
+      choose: 'Choose this goal', update: 'Update', clear: 'Remove goal', cleared: 'Goal removed',
+      saved: 'Goal saved: {g}', errDate: 'The event date must be at least a week away.',
+      manage: 'Change goal →', stepsLine: 'Target: {n} steps a day', eventLine: '{km} km event'
+    },
+    wpath: {
+      none: 'Your path: no goal yet', noneSub: 'Pick a walking goal to see your path',
+      weekMin: 'This week: {n} min', stepsAvg: 'Average steps, last 7 days: {n} of {t}',
+      faster: 'More brisk sessions each week', event: 'Event in {n} days ({d})', tight: 'Tight; build up gently'
+    },
+    stepsCard: {
+      title: 'Today\'s steps', target: 'Target: {n} steps', label: 'Steps today', ph: 'e.g. 7500', save: 'Save',
+      saved: 'Today\'s steps saved', hint: 'Read the number from your phone\'s health app or your watch; you can change it any time.', hit: 'You hit today\'s target!'
+    },
+    wlevel: {
+      title: 'Ready for the next level',
+      text: 'For two weeks you have walked about {n} minutes a week and the plan has become easy. Time to move from level {from} to level {to}.',
+      done: 'Your walking level is now {n}'
+    },
+    bridge: {
+      title: 'Ready to run?', text: 'Your walking base is solid. If you like, we can start a from-scratch running plan (run-walk intervals).',
+      go: 'Yes, let\'s run', no: 'Keep walking for now', confirm: 'The running plan replaces your walking plan from today. Your training history stays. Continue?',
+      yes: 'Start running', done: 'Your from-scratch running plan has started'
+    },
+    remind: {
+      title: 'Reminders', subOn: 'Every day at {t}', subOff: 'Off',
+      bannerT: 'Today\'s workout reminder', banner: '{s} is waiting for you today ({n} min).',
+      inApp: 'Show in-app reminders', time: 'Reminder time',
+      calHint: 'To be reminded even when the app is closed, add the next 12 weeks of sessions to your phone calendar.',
+      cal: 'Add to calendar (.ics)', calDone: 'Calendar file downloaded; open it to add it to your calendar',
+      notify: 'Allow notifications', notifyOn: 'Notifications on', notifyOk: 'Notifications on (only while the app is open)', notifyNo: 'Notification permission was not granted',
+      privacy: 'Reminders are created on this device and nothing is sent anywhere.'
+    },
     path: {
       title: 'Your path', now: 'Now', goal: 'Goal', level: 'Level {n}', aria: 'Progress toward your goal',
       week: 'Week {a} of about {b} weeks of preparation', notStarted: 'Your plan starts on {d}',
@@ -1002,7 +1048,7 @@
     start: {
       title: 'Getting started', count: '{a} of {b}', close: 'Close the getting-started list',
       plan: 'Your plan is ready',
-      goal: 'Pick your first goal', goalSub: 'From the suggested plans for your level', goalDone: 'First goal: {g}',
+      goal: 'Pick your first goal', goalSub: 'From the suggested plans for your level', goalSubWalk: '150 minutes a week, daily steps or an event', goalDone: 'First goal: {g}',
       checkin: 'Your first check-in', checkinSub: 'Under a minute; tunes today\'s session to how you feel',
       run: 'Mark your first run as done', runSub: 'After your run, from today\'s plan',
       name: 'Add your name', nameSub: 'Makes the plan more personal; you can add a photo too',
@@ -1194,7 +1240,7 @@
       editOnb: 'Edit your details (setup form)',
       photoPick: 'Choose a profile photo', photoRemove: 'Remove photo', photoSaved: 'Profile photo saved.',
       photoBad: 'This image can\'t be read; please choose another photo.', photoFull: 'Browser storage is full; the photo wasn\'t saved.',
-      rowProgress: 'Charts for mileage, training load, pace and check-ins', rowGait: 'Running form analysis from a short video', rowGaitLast: 'Latest analysis: {d} · score {s}',
+      rowProgress: 'Charts for mileage, training load, pace and check-ins', rowProgressWalk: 'Charts for weekly minutes, daily steps and check-ins', rowGait: 'Running form analysis from a short video', rowGaitLast: 'Latest analysis: {d} · score {s}',
       joined: 'Joined {d}', edit: 'Edit profile', levelLink: 'Suggested plans for your level', levelLinkWalk: 'This week\'s walking plan', goalSetShort: 'No goal set yet',
       groups: { mine: 'My stuff', prefs: 'My preferences' },
       noName: 'Runner', noNameHint: 'Add your name in {link}.', noNameLink: 'Edit profile',
@@ -1316,6 +1362,15 @@
       weekOf: 'Week of {d}',
       partialTag: 'in progress',
       sep: ' · ',
+      volW: {
+        title: 'Weekly walking minutes', desc: 'Total minutes of completed sessions each week, with a 4-week average and the recommended 150-minute line.',
+        bars: 'Minutes per week', unit: 'min', val: '{n} min', who: 'WHO guideline', empty: 'Fills in as you log your walks'
+      },
+      steps: {
+        title: 'Daily steps', desc: 'Steps you logged each day (or a walk session\'s steps), with your step target line.',
+        bars: 'Steps per day', unit: 'thousand steps', val: '{n} steps', avg: 'Daily average', target: 'Step target',
+        hit: 'Target hit on {n} of {d} days', empty: 'Log your steps from the home screen'
+      },
       vol: {
         title: 'Weekly volume', desc: 'Distance from completed sessions each week, with a 4-week moving average.',
         bars: 'Weekly {u}', ma: '4-week average', thisWeek: 'This week (so far)', avg4: '4-week average', trend: 'Trend',

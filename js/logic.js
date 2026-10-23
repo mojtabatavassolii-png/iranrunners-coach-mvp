@@ -366,7 +366,7 @@
     reps: { hard: true }, fartlek: { hard: true }, hills: { hard: true }, long: { hard: true }, race: { hard: true },
     cancelled: { hard: false }, none: { hard: false },
     // پیاده‌روی
-    walkEasy: { hard: false }, walkBrisk: { hard: false }, walkPower: { hard: true }, walkLong: { hard: true }
+    walkEasy: { hard: false }, walkBrisk: { hard: false }, walkPower: { hard: true }, walkLong: { hard: true }, walkEvent: { hard: true }
   };
   Object.keys(TYPE_INFO).forEach(function (k) {
     Object.defineProperty(TYPE_INFO[k], 'label', { enumerable: true, get: function () { return T('types.' + k); } });
@@ -1936,7 +1936,7 @@
   // آنالیز پیشرفت: همه از داده‌ی واقعی کاربر (جلسه‌های انجام‌شده، چک‌این‌ها، RPE بعد از جلسه، رکوردها)
   // =====================================================================
   // RPE پیش‌فرض هر نوع جلسه (اگه کاربر بعد از جلسه RPE ثبت نکرده باشه)
-  var LOAD_RPE = { walkEasy: 3, walkBrisk: 5, walkPower: 7, walkLong: 4.5, easy: 3.5, long: 4.5, runwalk: 3, walkrun: 2.5, tempo: 7, interval: 8, reps: 8, fartlek: 7, hills: 7, race: 9 };
+  var LOAD_RPE = { walkEvent: 5, walkEasy: 3, walkBrisk: 5, walkPower: 7, walkLong: 4.5, easy: 3.5, long: 4.5, runwalk: 3, walkrun: 2.5, tempo: 7, interval: 8, reps: 8, fartlek: 7, hills: 7, race: 9 };
   // نسبت پیس میانگین جلسه به پیس ایزی (برای تخمین مدت از کیلومتر)
   var LOAD_PACE = { tempo: 0.9, interval: 0.92, reps: 0.95, fartlek: 0.95, hills: 1.05, race: 0.85 };
   var CTL_DAYS = 42, ATL_DAYS = 7;
@@ -2046,6 +2046,13 @@
     keys.forEach(function (k) { if (k < first) first = k; });
     return parseDate(first);
   }
+  // قدم‌های یک روز: ثبت روزانه (کل روز) اولویت داره؛ وگرنه قدم ثبت‌شده‌ی جلسه
+  function daySteps(data, k) {
+    var d = data.steps && data.steps[k];
+    if (d > 0) return d;
+    var l = data.doneLog && data.doneLog[k];
+    return l && l.actual && l.actual.steps > 0 && data.done && data.done[k] ? l.actual.steps : 0;
+  }
   function mean(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : null; }
   // range: تعداد روز آخر (۲۸، ۹۱) یا null برای «از ابتدا»
   function analytics(data, today, rangeDays) {
@@ -2062,8 +2069,8 @@
     var postRuns = data.postRuns || {};
 
     // ---- بار تمرینی، CTL / ATL / TSB (میانگین نمایی؛ مقدار اولیه از حجم قبلی خود کاربر) ----
-    var priorKm = Number(p.monthAvgKm) || Number(p.currentWeeklyKm) || 0;
-    var seed = priorKm * pE / 60 * 4 / 7;
+    var priorKm = Number(p.monthAvgKm) || Number(p.currentWeeklyKm) || 0, walk = isWalk(p);
+    var seed = walk ? (Number(p.walkMin) || 0) * 3 / 7 : priorKm * pE / 60 * 4 / 7;
     var kC = 1 - Math.exp(-1 / CTL_DAYS), kA = 1 - Math.exp(-1 / ATL_DAYS), ctl = seed, atl = seed;
     var pmc = [];
     recs.forEach(function (r) {
@@ -2079,12 +2086,15 @@
     var weekMap = {}, weekKeys = [];
     recs.forEach(function (r) {
       var wk = dateKey(weekStart(r.d));
-      if (!weekMap[wk]) { weekMap[wk] = { start: wk, km: 0, vert: 0, runs: 0 }; weekKeys.push(wk); }
+      if (!weekMap[wk]) { weekMap[wk] = { start: wk, km: 0, vert: 0, runs: 0, min: 0, steps: 0, stepDays: 0 }; weekKeys.push(wk); }
       if (r.actual && isRunType(r.actual.type)) {
         weekMap[wk].km += r.actual.km || 0;
         weekMap[wk].vert += r.actual.vert || 0;
+        weekMap[wk].min += sessionMinutes(r.actual, pE);
         weekMap[wk].runs++;
       }
+      var st = daySteps(data, r.date);
+      if (st) { weekMap[wk].steps += st; weekMap[wk].stepDays++; }
     });
     var curWeek = dateKey(weekStart(today));
     var allWeeks = weekKeys.map(function (k) { var w = weekMap[k]; w.km = Math.round(w.km * 10) / 10; w.partial = k === curWeek; return w; });
@@ -2092,6 +2102,9 @@
       var full = allWeeks.slice(Math.max(0, i - 3), i + 1).filter(function (x) { return !x.partial; });
       w.maKm = !w.partial && i >= 3 ? mean(full.map(function (x) { return x.km; })) : null;
       w.maVert = !w.partial && i >= 3 ? mean(full.map(function (x) { return x.vert; })) : null;
+      w.min = Math.round(w.min);
+      w.maMin = !w.partial && i >= 3 ? mean(full.map(function (x) { return x.min; })) : null;
+      w.avgSteps = w.stepDays ? Math.round(w.steps / w.stepDays) : null;
     });
     var fromWeek = dateKey(weekStart(from));
     var weeks = allWeeks.filter(function (w) { return w.start >= fromWeek; });
@@ -2135,7 +2148,9 @@
       weeks: weeks, pmc: pmc, samples: samples, tests: testsInRange, entriesCount: entries.length,
       checkins: checks, adherence: adh,
       goal: { type: g.type, category: g.category, km: D || g.km || null, ultra: g.category === 'ultra' },
-      paceKnown: entries.length > 0
+      paceKnown: entries.length > 0, walk: walk,
+      // قدم روزانه (ثبت روزانه، وگرنه قدم جلسه‌ی پیاده‌روی همون روز)
+      steps: recs.filter(function (r) { return r.date >= fromKey; }).map(function (r) { return { date: r.date, steps: daySteps(data, r.date) }; })
     };
   }
 
@@ -2146,7 +2161,7 @@
   // هیچ دو روز سخت (اینتروال، پیاده‌روی بلند) پشت‌سرهم، حداقل یک روز استراحت. موتور دویدن دست نمی‌خوره.
   // =====================================================================
   function isWalk(profile) { return !!profile && profile.activity === 'walk'; }
-  var WALK_TYPES = ['walkEasy', 'walkBrisk', 'walkPower', 'walkLong'];
+  var WALK_TYPES = ['walkEasy', 'walkBrisk', 'walkPower', 'walkLong', 'walkEvent'];
   // min: کف دقیقه‌ی هفتگی سطح، cap: سقف رشد در همین سطح، ses: جلسه در هفته، len: بازه‌ی هر جلسه،
   // brisk/power: تعداد جلسه‌ی تند/اینتروال، long: سقف پیاده‌روی بلند (۰ = ندارد)، str: جلسه‌ی قدرتی، cross: جایگزین دوچرخه/شنا
   var WALK_LEVELS = [null,
@@ -2264,11 +2279,16 @@
     // حداقل یک روز استراحت کامل در هفته
     var nS = Math.min(avail.length, L.ses, 6);
     var sessionDays = chooseSessionDays(avail, nS);
-    var vol = walkWeeklyMin(profile, W, a), total = vol.min;
-    var longDay = L.long && nS >= 4 ? (sessionDays.indexOf(6) >= 0 ? 6 : sessionDays[sessionDays.length - 1]) : null;
-    var longMin = longDay !== null ? Math.min(L.long, r5(total * 0.3)) : 0;
+    var vol = walkWeeklyMin(profile, W, a), total = vol.min, wg = walkGoalInfo(profile);
+    // رویداد پیاده‌روی: پیاده‌روی بلند از سطح ۴، سقفش تا ۸۰٪ مدت رویداد (حداکثر ۱۸۰ دقیقه)
+    var longCap = L.long, evMin = wg.kind === 'event' ? wg.minutes : 0;
+    if (evMin && L.n >= 4) longCap = Math.max(L.long || 45, Math.min(180, r5(evMin * 0.8)));
+    var longDay = longCap && nS >= 4 ? (sessionDays.indexOf(6) >= 0 ? 6 : sessionDays[sessionDays.length - 1]) : null;
+    var longMin = longDay !== null ? Math.min(longCap, r5(total * (evMin ? 0.35 : 0.3))) : 0;
     // هفته‌ی سبک: اینتروال‌ها تند می‌شن
     var nPower = vol.deload ? 0 : L.power, nBrisk = L.brisk + (vol.deload ? L.power : 0);
+    // «پیاده‌روی سریع‌تر»: از سطح ۳ یک جلسه‌ی تند بیشتر
+    if (wg.kind === 'faster' && L.n >= 3) nBrisk++;
     var specs = [];
     for (var i = 0; i < nPower; i++) specs.push('power');
     for (i = 0; i < nBrisk; i++) specs.push('brisk');
@@ -2312,6 +2332,7 @@
       if (date < start) s = { type: 'none', km: null, hardKm: 0, target: '—', steps: [], how: T('s.notStarted') };
       else if (template[j]) s = JSON.parse(JSON.stringify(template[j]));
       else s = makeRest();
+      if (wg.kind === 'event' && wg.date && s.type !== 'none') s = applyWalkEvent(s, date, wg, profile);
       s.date = dateKey(date);
       s.dayName = T('days')[(date.getDay() + 1) % 7];
       s.dayShort = T('daysShort')[(date.getDay() + 1) % 7];
@@ -2329,6 +2350,87 @@
       zeroStage: null, zeroFinal: ZERO_FINAL, totalKm: 0, totalMin: totalMin, vert: 0, hardPct: 0
     };
   }
+  // ---------- اهداف پیاده‌روی ----------
+  // min150: ۱۵۰ دقیقه در هفته (WHO)، faster: پیاده‌روی سریع‌تر، event: رویداد پیاده‌روی یا کوهپیمایی (تاریخ اختیاری)،
+  // steps: قدم روزانه، run: آماده شدن برای شروع دویدن
+  var WALK_GOALS = ['min150', 'steps', 'faster', 'event', 'run'];
+  var WALK_EVENT_KM = [5, 10, 21.1, 42.2];
+  function walkGoalInfo(profile) {
+    var g = profile && profile.walkGoal;
+    if (!g || WALK_GOALS.indexOf(g.kind) < 0) return { kind: 'none' };
+    var out = { kind: g.kind, date: g.date || null };
+    if (g.kind === 'steps') out.steps = clamp(Number(g.steps) || 8000, 2000, 30000);
+    if (g.kind === 'event') { out.km = Number(g.km) || 10; out.minutes = Math.round(out.km * 11); }
+    return out;
+  }
+  // هفته‌ی آخر قبل از رویداد سبک‌تر (۷۰٪، بدون اینتروال)، روز رویداد، دو روز بعدش ریکاوری
+  function applyWalkEvent(s, date, wg, profile) {
+    var diff = daysBetween(date, parseDate(wg.date));
+    if (diff === 0) {
+      var e = walkSession('walkEvent', wg.minutes, profile);
+      e.target = T('walk.eventTarget', { km: wg.km });
+      e.steps = [T('walk.eventMain')];
+      e.how = T('walk.eventHow');
+      return e;
+    }
+    if (diff === 1 || diff === -1) return makeRest(T(diff > 0 ? 'walk.eventBefore' : 'walk.eventAfter'));
+    if (diff === -2 && s.type !== 'rest') return makeWalkEasy(r5((s.minutes || 20) * 0.6), profile);
+    if (diff > 1 && diff <= 7 && s.type !== 'rest') {
+      var m = r5((s.minutes || 20) * 0.7);
+      return s.type === 'walkPower' || s.type === 'walkLong' ? makeWalkEasy(m, profile) : makeWalkEasyLike(s, m, true);
+    }
+    return s;
+  }
+  // هفته‌ها تا رسیدن به یک حجم هفتگی با الگوی رشد موتور (۱۰٪، ۶۰+ سال ۵٪، هفته‌ی سبک هر ۴ هفته)
+  function walkWeeksTo(start, target, rate) {
+    if (start >= target) return 0;
+    var v = Math.max(5, start);
+    for (var w = 1; w <= 156; w++) {
+      if (progression(w).deload) continue;
+      v = Math.max(v + 5, Math.round(v * rate / 5) * 5);
+      if (v >= target) return w;
+    }
+    return 156;
+  }
+  // مسیر تا هدف پیاده‌روی: سطح، حجم فعلی برنامه، هفته‌های باقی‌مونده و وضعیت نسبت به تاریخ
+  function walkPath(profile, today) {
+    var a = assessWalkLevel(profile), wg = walkGoalInfo(profile), out = { level: a.level, goal: wg, walk: true };
+    if (wg.kind === 'none') { out.none = true; return out; }
+    var start = parseDate(profile.startDate), elapsed = start <= today ? Math.floor(daysBetween(start, today) / 7) : 0;
+    var cur = walkWeeklyMin(profile, Math.max(0, weekIndexFor(profile, today)), a).min, rate = a.cautious ? 1.05 : 1.1;
+    out.weekMin = cur; out.elapsed = elapsed; out.notStarted = start > today;
+    var need = wg.kind === 'min150' ? 150 : wg.kind === 'run' ? 120 : wg.kind === 'event' ? Math.max(150, wg.minutes * 2) : null;
+    if (wg.kind === 'run' && profile.walk30 === 'no') need = Math.max(need, 150);
+    if (need) {
+      out.need = need;
+      out.weeks = walkWeeksTo(cur, need, rate);
+      out.weeksHi = Math.ceil(out.weeks * 1.25);
+      out.frac = need ? Math.min(1, cur / need) : 1;
+      out.readyDate = dateKey(addDays(today, out.weeks * 7));
+      if (wg.date) {
+        out.daysLeft = Math.round(daysBetween(today, parseDate(wg.date)));
+        if (out.daysLeft < 0) out.past = true;
+        else out.status = out.weeks === 0 ? 'ready' : out.daysLeft / 7 >= out.weeks ? 'ok' : 'tight';
+      } else if (out.weeks === 0) out.status = 'ready';
+    }
+    return out;
+  }
+  // پیشنهاد سطح بعدی: وقتی دو هفته‌ی کامل به سقف دقیقه‌های سطح رسیده (مثل پیشنهاد تغییر سطح دویدن)
+  function walkLevelSuggestion(profile, today) {
+    if (!isWalk(profile)) return null;
+    var a = assessWalkLevel(profile);
+    if (a.level >= 10) return null;
+    var w = weekIndexFor(profile, today);
+    if (w < 2 || !walkWeeklyMin(profile, w - 1, a).atCeiling || !walkWeeklyMin(profile, w - 2, a).atCeiling) return null;
+    var cur = walkWeeklyMin(profile, w, a);
+    // سابقه با گذشت هفته‌های برنامه بیشتر می‌شه (۴ هفته: تازه‌کار، ۱۲: ۳ تا ۱۲ ماه، ۴۰: بیش از یک سال)
+    var order = ['never', 'lt3m', '3to12m', 'gt1y'], need = [0, 4, 12, 40], exp = profile.walkExp || 'never';
+    for (var i = order.indexOf(exp) + 1; i < order.length; i++) if (w >= need[i] + order.indexOf(exp) * 0) exp = order[i];
+    var next = { walkMin: a.info.cap, walkExp: exp, walk30: a.info.cap >= 120 ? 'yes' : profile.walk30 };
+    var to = assessWalkLevel(Object.assign({}, profile, next)).level;
+    return to > a.level ? { from: a.level, to: to, min: a.info.cap, weekMin: cur.min, next: next } : null;
+  }
+
   // تطبیق جلسه‌ی پیاده‌روی با چک‌این: خفیف = کمی کوتاه‌تر (فقط اینتروال و بلند)، متوسط = ملایم و کوتاه‌تر، جدی = استراحت فعال
   function walkAdapted(s, r) {
     if (r.tier === 'severe') return { session: { type: 'rest', km: null, hardKm: 0, target: T('cycle.activeRestTarget'), steps: [T('cycle.activeRestStep')], how: T('cycle.activeRestHow') }, act: 'rest' };
@@ -2492,7 +2594,7 @@
     ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,
     planSuggestion: planSuggestion, goalPath: goalPath,
-    isWalk: isWalk, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
+    isWalk: isWalk, walkGoalInfo: walkGoalInfo, walkPath: walkPath, walkLevelSuggestion: walkLevelSuggestion, walkWeeksTo: walkWeeksTo, WALK_GOALS: WALK_GOALS, WALK_EVENT_KM: WALK_EVENT_KM, daySteps: daySteps, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
     PACE_LEVEL: PACE_LEVEL, PLAN_NEEDS: PLAN_NEEDS, vdotStepWeeks: vdotStepWeeks,
     analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS
   };

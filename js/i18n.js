@@ -80,7 +80,7 @@
   function num(x) {
     var s = String(x);
     if (lang !== 'fa') return s;
-    return s.replace(/(\d)\.(\d)/g, '$1٫$2').replace(/\d/g, function (d) { return FA_DIGITS[d]; });
+    return s.replace(/(\d)\.(\d)/g, '$1٫$2').replace(/(\d),(\d)/g, '$1٬$2').replace(/\d/g, function (d) { return FA_DIGITS[d]; });
   }
 
   // تقویم نمایش: 'jalali' (شمسی) یا 'gregorian' (میلادی)، مستقل از زبان (پیش‌فرض رو app.js بر اساس زبان تعیین می‌کنه)
