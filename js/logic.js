@@ -2573,7 +2573,7 @@
     LEVELS: LEVELS, EXPERIENCE: EXPERIENCE, TIER_INFO: TIER_INFO, PERIOD_LABELS: PERIOD_LABELS,
     RACE_DISTANCES: RACE_DISTANCES, RACE_LABELS: RACE_LABELS,
     TYPE_INFO: TYPE_INFO, LOCATION_TIPS: LOCATION_TIPS, LOCATION_LABELS: LOCATION_LABELS,
-    dateKey: dateKey, parseDate: parseDate, addDays: addDays, weekStart: weekStart, daysBetween: daysBetween,
+    dateKey: dateKey, parseDate: parseDate, addDays: addDays, weekStart: weekStart, daysBetween: daysBetween, weekIndexFor: weekIndexFor,
     persianDayIndex: persianDayIndex, dayIndex: persianDayIndex, setWeekStart: setWeekStart, getWeekStart: getWeekStart, satToRel: satToRel, parseTime: parseTime, formatDuration: formatDuration, describeDuration: describeDuration,
     otherRaces: otherRaces, sideRaceWindow: sideRaceWindow, raceDistLabel: raceDistLabel, MAX_RACES: MAX_RACES,
     riegel: riegel, vdotFromRace: vdotFromRace, raceTimeFromVdot: raceTimeFromVdot,

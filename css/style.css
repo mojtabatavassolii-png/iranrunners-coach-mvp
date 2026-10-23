@@ -1694,3 +1694,57 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 .check-row:has(input:disabled) { cursor: not-allowed; color: var(--text-secondary); }
 /* نقطه‌ی رنگ ناحیه‌ی تمرینی کنار پیس‌ها و ضربان */
 .zdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--zone); margin-inline-end: 8px; vertical-align: 1px; }
+
+/* ===========================================================
+   صندوق پیام: زنگوله‌ی هدر، برگه‌ی پیام‌ها زیر هدر، پیام کوچیک لحظه‌ای
+   =========================================================== */
+.bell {
+  order: 4; margin-inline-start: auto; position: relative; width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center; background: none; border: 0; color: var(--text); cursor: pointer;
+}
+.bell:hover, .bell[aria-expanded="true"] { background: var(--surface-elevated); }
+.bell:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.bell-n {
+  position: absolute; top: 4px; inset-inline-end: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--primary); color: var(--on-primary); font-size: var(--fs-xs); font-weight: 800; line-height: 18px; text-align: center;
+}
+.nf-backdrop { position: fixed; inset-inline: 0; bottom: 0; z-index: 150; background: var(--scrim); display: flex; justify-content: center; align-items: flex-start; }
+.nf-sheet {
+  width: 100%; max-width: 560px; max-height: calc(100% - 24px); overflow: auto; overscroll-behavior: contain;
+  background: var(--surface-elevated); border: 1px solid var(--border); border-top: 0; border-radius: 0 0 22px 22px;
+  padding: 10px 12px 14px; animation: nfDown .22s ease-out;
+}
+@keyframes nfDown { from { transform: translateY(-14px); opacity: 0; } }
+.nf-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 6px 4px; }
+.nf-top h2 { margin: 0; font-size: var(--fs-lg); }
+.nf-tools { display: flex; gap: 2px; }
+.nf-tools button { font: inherit; font-size: var(--fs-sm); font-weight: 700; color: var(--primary); background: none; border: 0; min-height: 44px; padding: 0 8px; border-radius: 10px; cursor: pointer; }
+.nf-tools button:hover { background: var(--surface); }
+.nf-grp { margin: 10px 6px 4px; font-size: var(--fs-xs); font-weight: 700; color: var(--text-secondary); }
+.nf-msg { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 14px; }
+.nf-msg + .nf-msg { margin-top: 2px; }
+.nf-msg.unread { background: var(--primary-soft); }
+.nf-dot { flex: none; width: 8px; height: 8px; margin-top: 10px; border-radius: 50%; background: var(--primary); }
+.nf-msg:not(.unread) .nf-dot { visibility: hidden; }
+.nf-ico { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--nf-soft); color: var(--nf-c); }
+.nf-ico.s-success { --nf-c: var(--success); --nf-soft: var(--success-soft); }
+.nf-ico.s-warning { --nf-c: var(--warning); --nf-soft: var(--warning-soft); }
+.nf-ico.s-error { --nf-c: var(--error); --nf-soft: var(--error-soft); }
+.nf-ico.s-info { --nf-c: var(--info); --nf-soft: var(--info-soft); }
+.nf-txt { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: start; }
+.nf-txt b { font-size: var(--fs-md); }
+.nf-txt p { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.7; }
+.nf-act { justify-self: start; font: inherit; font-size: var(--fs-sm); font-weight: 800; color: var(--primary); background: none; border: 0; padding: 0; min-height: 36px; cursor: pointer; }
+.nf-msg time { flex: none; font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; margin-top: 2px; }
+.nf-empty { margin: 14px 8px; color: var(--text-secondary); font-size: var(--fs-md); }
+.nf-tools button:focus-visible, .nf-act:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.nf-flash {
+  position: fixed; top: calc(70px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 210;
+  display: flex; align-items: center; gap: 8px; max-width: calc(100% - 32px); padding: 6px 14px 6px 10px; border-radius: 999px;
+  background: var(--surface-elevated); border: 1px solid var(--border); color: var(--text); font-size: var(--fs-md); font-weight: 600;
+  animation: nfDown .22s ease-out; transition: opacity .4s;
+}
+[dir="rtl"] .nf-flash { padding: 6px 10px 6px 14px; }
+.nf-flash .nf-ico { width: 22px; height: 22px; }
+.nf-flash.out { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .nf-sheet, .nf-flash { animation: none; } }

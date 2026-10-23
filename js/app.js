@@ -133,6 +133,168 @@
     setTimeout(function () { el.remove(); }, 3700);
   }
 
+  // =====================================================================
+  // صندوق پیام: هر پیام مهم یک‌بار (با کلید یکتا) ذخیره می‌شه، زنگوله‌ی هدر تعداد خونده‌نشده‌ها رو نشون می‌ده
+  // و یک پیام کوچیک لحظه‌ای بالای صفحه می‌آد. متن‌ها موقع نمایش از دیکشنری ساخته می‌شن (با عوض شدن زبان درست می‌مونن).
+  // =====================================================================
+  var INBOX_MAX = 40;
+  var STATUS_ICON = {
+    success: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    warning: '<path d="M12 7.5v6"/><path d="M12 16.5v.5"/>',
+    error: '<path d="M7 7l10 10M17 7L7 17"/>',
+    info: '<path d="M12 11v6"/><path d="M12 7.5v.5"/>'
+  };
+  function statusIcon(k) {
+    return '<span class="nf-ico s-' + k + '" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">' + STATUS_ICON[k] + '</svg></span>';
+  }
+  function inbox() { return state.inbox || (state.inbox = []); }
+  // o: { key, k (success|warning|error|info), m (کلید پیام در msg.*), p (پارامترها), href, today (رفتن به روز جاری), flash }
+  function notify(o) {
+    var list = inbox();
+    if (list.some(function (x) { return x.key === o.key; })) return false;
+    list.unshift({ key: o.key, k: o.k, m: o.m, p: o.p || {}, href: o.href || '', today: !!o.today, day: C.dateKey(today()), at: new Date().toISOString(), read: false });
+    if (list.length > INBOX_MAX) list.length = INBOX_MAX;
+    save();
+    updateBell();
+    if (o.flash !== false) flashMessage(o.k, T('msg.' + o.m + '.t', o.p || {}));
+    return true;
+  }
+  function unreadCount() { return inbox().filter(function (x) { return !x.read; }).length; }
+  function updateBell() {
+    var b = document.getElementById('bell');
+    if (!b) return;
+    var show = isEntered() && !!state.profile && !needsMigration() && (location.hash || '#home') !== '#onboarding';
+    b.hidden = !show;
+    var n = unreadCount(), badge = b.querySelector('.bell-n');
+    badge.textContent = fa(n > 9 ? '9+' : n);
+    badge.hidden = !n;
+    b.setAttribute('aria-label', n ? T('inbox.ariaN', { n: fa(n) }) : T('inbox.aria'));
+    b.setAttribute('aria-expanded', String(!!document.getElementById('inbox')));
+  }
+  // پیام کوچیک لحظه‌ای بالای صفحه
+  function flashMessage(k, text) {
+    var old = document.querySelector('.nf-flash');
+    if (old) old.remove();
+    var el = document.createElement('div');
+    el.className = 'nf-flash';
+    el.setAttribute('role', k === 'error' || k === 'warning' ? 'alert' : 'status');
+    el.innerHTML = statusIcon(k) + '<span>' + t(text) + '</span>';
+    document.body.appendChild(el);
+    setTimeout(function () { el.classList.add('out'); }, 3400);
+    setTimeout(function () { el.remove(); }, 3900);
+  }
+  function msgTime(x) {
+    if (x.day === C.dateKey(today())) {
+      var d = new Date(x.at);
+      return fa((d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes());
+    }
+    return faDate(x.day, true);
+  }
+  function renderInbox() {
+    var list = inbox(), todayKey = C.dateKey(today()), html = '', grp = '';
+    if (!list.length) html = '<p class="nf-empty">' + esc(T('inbox.empty')) + '</p>';
+    list.forEach(function (x, i) {
+      var g = x.day === todayKey ? 'today' : 'earlier';
+      if (g !== grp) { grp = g; html += '<p class="nf-grp">' + esc(T('inbox.' + g)) + '</p>'; }
+      var act = T('msg.' + x.m + '.a', x.p);
+      html += '<div class="nf-msg' + (x.read ? '' : ' unread') + '"><span class="nf-dot" aria-hidden="true"></span>' + statusIcon(x.k) +
+        '<div class="nf-txt"><b>' + tt('msg.' + x.m + '.t', x.p) + '</b><p>' + tt('msg.' + x.m + '.b', x.p) + '</p>' +
+        (x.href && act ? '<button type="button" class="nf-act" data-nf-go="' + i + '">' + esc(act) + ' ' + (isRtl() ? '←' : '→') + '</button>' : '') +
+        '</div><time>' + esc(msgTime(x)) + '</time>' + (x.read ? '' : '<span class="sr-only">' + esc(T('inbox.unread')) + '</span>') + '</div>';
+    });
+    return '<div class="nf-top"><h2 id="inbox-title">' + esc(T('inbox.title')) + '</h2><div class="nf-tools">' +
+      (unreadCount() ? '<button type="button" data-nf-readall="1">' + esc(T('inbox.readAll')) + '</button>' : '') +
+      (list.some(function (x) { return x.read; }) ? '<button type="button" data-nf-clear="1">' + esc(T('inbox.clear')) + '</button>' : '') +
+      '</div></div><div class="nf-list">' + html + '</div>';
+  }
+  function openInbox() {
+    if (document.getElementById('inbox')) return;
+    var hdr = document.querySelector('.site-header'), top = hdr ? Math.max(0, hdr.getBoundingClientRect().bottom) : 0;
+    var el = document.createElement('div');
+    el.id = 'inbox';
+    el.className = 'nf-backdrop';
+    el.style.top = top + 'px';
+    el.innerHTML = '<div class="nf-sheet" role="dialog" aria-modal="true" aria-labelledby="inbox-title">' + renderInbox() + '</div>';
+    document.body.appendChild(el);
+    document.body.classList.add('modal-open');
+    updateBell();
+    var f = el.querySelector('button') || el.querySelector('.nf-sheet');
+    if (f) { if (!f.matches('button')) f.tabIndex = -1; f.focus(); }
+  }
+  // بستن: پیام‌هایی که دیده شدن خونده‌شده حساب می‌شن
+  function closeInbox(keepFocus) {
+    var el = document.getElementById('inbox');
+    if (!el) return;
+    el.remove();
+    document.body.classList.remove('modal-open');
+    if (unreadCount()) { inbox().forEach(function (x) { x.read = true; }); save(); }
+    updateBell();
+    if (!keepFocus) { var b = document.getElementById('bell'); if (b && !b.hidden) b.focus(); }
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return;
+    if (e.target.closest('#bell')) { if (document.getElementById('inbox')) closeInbox(); else openInbox(); return; }
+    var box = document.getElementById('inbox');
+    if (!box || !box.contains(e.target)) return;
+    if (e.target === box) { closeInbox(); return; }
+    var go = e.target.closest('[data-nf-go]');
+    if (go) {
+      var x = inbox()[Number(go.dataset.nfGo)];
+      if (!x) return;
+      x.read = true; save();
+      closeInbox(true);
+      if (x.today) { selectedDay = C.dateKey(today()); viewWeekOffset = 0; monthOffset = 0; }
+      if (location.hash === x.href) route(); else location.hash = x.href;
+      return;
+    }
+    if (e.target.closest('[data-nf-readall]')) { inbox().forEach(function (y) { y.read = true; }); save(); box.querySelector('.nf-sheet').innerHTML = renderInbox(); updateBell(); return; }
+    if (e.target.closest('[data-nf-clear]')) { state.inbox = inbox().filter(function (y) { return !y.read; }); save(); box.querySelector('.nf-sheet').innerHTML = renderInbox(); updateBell(); }
+  });
+  document.addEventListener('keydown', function (e) {
+    var box = document.getElementById('inbox');
+    if (!box) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeInbox(); return; }
+    if (e.key === 'Tab') {
+      var f = Array.prototype.slice.call(box.querySelectorAll('button'));
+      if (!f.length) return;
+      var i = f.indexOf(document.activeElement);
+      e.preventDefault();
+      f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+    }
+  });
+  // پیام‌های زمان‌دار (بعد از هر بار نمایش صفحه بررسی می‌شن؛ هر کدوم فقط یک‌بار)
+  function checkInbox() {
+    var p = state.profile;
+    if (!p || needsMigration() || !isEntered()) return;
+    var now = today(), todayKey = C.dateKey(now);
+    var first = !inbox().length && !(state.inboxSeen);
+    if (first) {
+      state.inboxSeen = true;
+      notify({ key: 'welcome', k: 'info', m: 'welcome', href: '#guide', flash: false });
+    }
+    // برنامه‌ی هفته‌ی تازه (از هفته‌ی دوم به بعد)
+    var wi = C.weekIndexFor(p, now);
+    if (wi != null && wi >= 1) {
+      var wk = C.buildWeek(p, now), ses = wk.days.filter(function (d) { return ['rest', 'none'].indexOf(d.type) < 0; }).length;
+      notify({ key: 'week-' + C.dateKey(C.weekStart(now)), k: 'info', m: 'week', p: { n: wi + 1, s: ses }, href: '#plan', today: true, flash: !first });
+    }
+    // یادآوری تمرین امروز (بعد از ساعت یادآوری، اگه جلسه هست و هنوز انجام نشده)
+    var r = reminderCfg(), real = new Date(), hm = r.time.split(':').map(Number);
+    if (r.on && todayKey === C.dateKey(real) && real.getHours() * 60 + real.getMinutes() >= hm[0] * 60 + hm[1] && !state.done[todayKey]) {
+      var base = C.sessionFor(p, now);
+      if (['rest', 'none'].indexOf(base.type) < 0) notify({ key: 'remind-' + todayKey, k: 'info', m: 'remind', p: { s: base.label, n: base.minutes || base.km || '' }, href: '#plan', today: true });
+    }
+    // پیشنهاد سطح بعدی پیاده‌روی
+    if (C.isWalk(p)) {
+      var sg = C.walkLevelSuggestion(p, now);
+      if (sg) notify({ key: 'wlevel-' + sg.to + '-' + p.startDate, k: 'success', m: 'wlevel', p: { from: sg.from, to: sg.to }, href: '#home' });
+    } else {
+      // وقت تست فیتنس (هفته‌ای یک‌بار تا ثبت تست)
+      var rem = C.fitnessReminder(p, now);
+      if (rem) notify({ key: 'fit-' + C.dateKey(C.weekStart(now)), k: 'info', m: 'fit', href: '#fitness' });
+    }
+  }
+
   // ---------- متن‌های ثابت صفحه (هدر، منو، بنر، فوتر) و جهت ----------
   function applyStatic() {
     applyCalendarSettings();
@@ -284,6 +446,8 @@
       document.getElementById('medical-banner').hidden = true;
       renderLogin();
       lastView = null;
+      closeInbox(true);
+      updateBell();
       return;
     }
     var v = (location.hash || '#home').slice(1), sub = null;
@@ -335,6 +499,9 @@
     }
     var pk = unackedPainToday();
     if (pk) openPainModal(pk);
+    closeInbox(true);
+    checkInbox();
+    updateBell();
   }
   var pendingFocus = null;
   // «مشاهده جزئیات» از خانه: برنامه روی امروز، در هفته‌ی جاری
@@ -491,7 +658,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="public/assets/gaam-logo-transparent.svg?v=66" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo" src="public/assets/gaam-logo-transparent.svg?v=67" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -1773,8 +1940,12 @@
       state.checkins[key] = { fatigue: fatigue, sleep: sleep, pain: pain === 'yes', painWhere: pain === 'yes' ? where : '', at: new Date().toISOString() };
       if (hours > 0 && hours <= 14) state.checkins[key].hours = Math.round(hours * 2) / 2;
       save();
-      if (pain === 'yes') { openPainModal(key); return; }
+      if (pain === 'yes') {
+        notify({ key: 'pain-' + key, k: 'error', m: 'pain', href: '#plan', today: true, flash: false });
+        openPainModal(key); return;
+      }
       var r = effectiveSession(base);
+      if (r.adaptation && r.adaptation.kind === 'downgrade') notify({ key: 'adapt-' + key, k: 'warning', m: 'adapt', p: { s: r.session.label }, href: '#plan', today: true, flash: false });
       showToast(T(r.adaptation && r.adaptation.kind === 'downgrade' ? 'checkin.toastDown' : 'checkin.toastOk'));
       location.hash = '#home';
     });
@@ -2142,7 +2313,9 @@
     // رکورد تازه = پیس‌ها از نو (مثل ثبت تایم‌تست)
     p.easyAdjustSec = 0;
     raceResultOpen = null;
-    save(); showToast(fa(T('race.resultSaved', { v: C.currentFitness(p).vdot.toFixed(1) }))); renderRace();
+    save(); showToast(fa(T('race.resultSaved', { v: C.currentFitness(p).vdot.toFixed(1) })));
+    notify({ key: 'vdot-' + rdate + '-' + tm, k: 'success', m: 'vdot', p: { v: C.currentFitness(p).vdot.toFixed(1) }, href: '#fitness', flash: false });
+    renderRace();
   });
   app.addEventListener('click', function (e) {
     var t0 = e.target.closest && e.target.closest('[data-race-result], [data-race-result-cancel], [data-race-main], [data-race-del], .race-add > summary');
@@ -2545,7 +2718,7 @@
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
       '<h1>' + esc(T(greetKey())) + '</h1></header>' +
       '<div data-install-slot="home">' + installBanner() + '</div>' +
-      homeToday(base, r.session, ci, key) + (walker() ? homeReminder(base, key) : '') + homeChecklist(now) + (walker() ? homeSteps(key) + walkLevelCard(now) + walkRunBridge() + homeWalkTiles() : homeGoalTiles()) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
+      homeToday(base, r.session, ci, key) + homeChecklist(now) + (walker() ? homeSteps(key) + walkLevelCard(now) + walkRunBridge() + homeWalkTiles() : homeGoalTiles()) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
       homeCycle(r, key, now) + homeProgress(now) + (walker() ? homeWalkPath(now) : homePath(now) + linkCard('#plans', T('plans.title'), T('plans.linkSub')));
     app.innerHTML = '<div class="home">' + html + '</div>';
   }
@@ -2865,13 +3038,7 @@
     return { on: r.on !== false, time: /^\d\d:\d\d$/.test(r.time || '') ? r.time : '18:00', notify: !!r.notify };
   }
   function remindSub() { var r = reminderCfg(); return r.on ? T('remind.subOn', { t: fa(r.time) }) : T('remind.subOff'); }
-  function homeReminder(base, key) {
-    var r = reminderCfg();
-    if (!r.on || ['rest', 'none'].indexOf(base.type) >= 0 || state.done[key]) return '';
-    var now = new Date(), hm = r.time.split(':').map(Number);
-    if (key !== C.dateKey(now) || now.getHours() * 60 + now.getMinutes() < hm[0] * 60 + hm[1]) return '';
-    return '<div class="alert alert-adapt remind-banner" role="status"><p><b>' + esc(T('remind.bannerT')) + '</b> ' + tt('remind.banner', { s: base.label, n: base.minutes || '' }) + '</p></div>';
-  }
+
   // فایل تقویم: هر جلسه‌ی ۱۲ هفته‌ی آینده یک رویداد با یادآور در ساعت انتخابی (داده از گوشی بیرون نمی‌ره)
   function icsFile() {
     var p = state.profile, r = reminderCfg(), now = today(), hm = r.time.replace(':', '') + '00', lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//gaam//fa', 'CALSCALE:GREGORIAN'];
@@ -3814,6 +3981,7 @@
       save();
       var after = C.paceZones(p);
       var arrow = isRtl() ? ' ← ' : ' → ';
+      notify({ key: 'vdot-' + date + '-' + tm, k: 'success', m: 'vdot', p: { v: after.vdot.toFixed(1) }, href: '#fitness', flash: false });
       showToast(fa(T('fit.toast', { vdot: (before && before.vdot ? before.vdot.toFixed(1) + arrow : '') + after.vdot.toFixed(1), a: paceFmt(after.easy[0]), b: paceFmt(after.easy[1]) })));
       renderFitness();
     });

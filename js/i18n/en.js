@@ -1009,6 +1009,21 @@
       saved: 'Goal saved: {g}', errDate: 'The event date must be at least a week away.',
       manage: 'Change goal →', stepsLine: 'Target: {n} steps a day', eventLine: '{km} km event'
     },
+    inbox: {
+      title: 'Messages', aria: 'Messages', ariaN: 'Messages, {n} unread', unread: '(unread)',
+      today: 'Today', earlier: 'Earlier', readAll: 'Mark all read', clear: 'Clear read',
+      empty: 'No messages yet. Reminders, plan changes and suggestions will collect here.'
+    },
+    msg: {
+      welcome: { t: 'Welcome to Gaam', b: 'Reminders, plan changes and important suggestions collect here.', a: 'App guide' },
+      week: { t: 'Your week {n} plan is ready', b: '{s} sessions this week.', a: 'See plan' },
+      remind: { t: 'Workout reminder', b: '{s} is waiting for you today.', a: 'See session' },
+      adapt: { t: 'Today\'s session is lighter', b: 'Based on your check-in, today is now: {s}.', a: 'See session' },
+      pain: { t: 'Pain logged', b: 'Skip training today. If the pain continues, see a doctor.', a: 'Today\'s plan' },
+      vdot: { t: 'New result saved', b: 'Your VDOT is now {v} and your paces are updated.', a: 'See paces' },
+      fit: { t: 'Time for a fitness test', b: 'A fresh time trial makes your paces more accurate.', a: 'Log a test' },
+      wlevel: { t: 'Ready for the next level', b: 'The plan has become easy; you can move from level {from} to level {to}.', a: 'See suggestion' }
+    },
     wpath: {
       none: 'Your path: no goal yet', noneSub: 'Pick a walking goal to see your path',
       weekMin: 'This week: {n} min', stepsAvg: 'Average steps, last 7 days: {n} of {t}',
