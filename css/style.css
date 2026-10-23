@@ -1554,3 +1554,15 @@ body.goal-dragging .race-hero { box-shadow: 0 0 0 4px var(--brand-soft); }
 .race-item-actions .linklike:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .race-item-actions [data-race-main] { background: var(--brand-soft); color: var(--brand-deep); }
 .race-item-actions .race-del { color: var(--danger); }
+
+/* خروج و ساخت پروفایل تازه / برگشت به پروفایل کنار گذاشته‌شده */
+.signout { display: grid; gap: 8px; text-align: start; }
+.onboarding .signout { margin-top: 22px; padding-top: 16px; border-top: 1.5px solid var(--line); }
+.signout-label { margin: 0; }
+.signout .small.muted { margin: 0; }
+.signout-btn { color: var(--danger); background: var(--card); border-color: var(--line); }
+.signout-btn:hover { background: var(--danger-soft); color: var(--danger-deep); border-color: var(--danger-soft); }
+.signout-confirm p { margin: 0 0 8px; }
+.signout-confirm .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.login-restore { display: grid; gap: 4px; margin-top: 14px; width: 100%; max-width: 360px; }
+.login-restore .btn { background: transparent; color: inherit; border-color: currentColor; }

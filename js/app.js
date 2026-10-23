@@ -487,7 +487,7 @@
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
-      '<p class="login-note">' + esc(T('login.note')) + '</p>' +
+      '<p class="login-note">' + esc(T('login.note')) + '</p>' + restoreBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
       '<span class="login-lang-label">' + esc(T('login.langLabel')) + '</span>' +
@@ -504,6 +504,71 @@
       window.scrollTo(0, 0);
     });
   }
+
+  // ---------- خروج و ساخت پروفایل تازه (برای امتحان دوباره‌ی فرم اولیه) ----------
+  // پروفایل فعلی و عکسش روی همین دستگاه کنار گذاشته می‌شن و از صفحه‌ی ورود برمی‌گردن.
+  // اگه قبلاً پروفایلی کنار گذاشته شده باشه، همون حفظ می‌شه و پروفایل فعلی (آزمایشی) پاک می‌شه.
+  var STASH_KEY = 'iranrunners-coach-stash', STASH_AVATAR_KEY = 'iranrunners-coach-stash-avatar';
+  function getStash() { try { var r = localStorage.getItem(STASH_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+  function stashName(st) {
+    var p = st && st.profile;
+    return p ? [p.name, p.lastName].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' ') || T('profile.noName') : '';
+  }
+  function signOutBlock() {
+    var has = !!getStash();
+    return '<div class="signout" id="signout"><p class="group-label signout-label" role="heading" aria-level="2">' + esc(T('signout.title')) + '</p>' +
+      '<p class="small muted">' + esc(T(has ? 'signout.hintStashed' : 'signout.hint')) + '</p>' +
+      '<button type="button" class="btn btn-outline btn-block signout-btn" data-signout="1">' + esc(T('signout.btn')) + '</button>' +
+      '<div class="alert alert-adapt signout-confirm" role="alertdialog" aria-live="polite" hidden><p>' + esc(T(has ? 'signout.confirmStashed' : 'signout.confirm')) + '</p>' +
+      '<div class="actions"><button type="button" class="btn btn-primary" data-signout-yes="1">' + esc(T('signout.yes')) + '</button>' +
+      '<button type="button" class="btn btn-ghost" data-signout-no="1">' + esc(T('app.cancel')) + '</button></div></div></div>';
+  }
+  function restoreBlock() {
+    var st = getStash();
+    if (!st || !st.profile) return '';
+    return '<div class="login-restore"><button type="button" class="btn btn-outline btn-block" data-restore="1">' + esc(T('signout.restore', { n: stashName(st) })) + '</button>' +
+      '<p class="login-note">' + esc(T(state.profile ? 'signout.restoreHintTest' : 'signout.restoreHint')) + '</p></div>';
+  }
+  function signOut() {
+    try {
+      if (!getStash() && state.profile) {
+        localStorage.setItem(STASH_KEY, JSON.stringify(state));
+        var av = localStorage.getItem(AVATAR_KEY);
+        if (av) localStorage.setItem(STASH_AVATAR_KEY, av);
+      }
+      localStorage.removeItem(STORE_KEY); localStorage.removeItem(AVATAR_KEY);
+    } catch (e) { showToast(T('app.saveFailed')); return; }
+    state = emptyState(); memoryFallback = null;
+    setEntered(false);
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* */ }
+    route();
+    window.scrollTo(0, 0);
+    showToast(T('signout.done'));
+  }
+  function restoreStash() {
+    var st = getStash();
+    if (!st) return;
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(st));
+      var av = localStorage.getItem(STASH_AVATAR_KEY);
+      if (av) localStorage.setItem(AVATAR_KEY, av); else localStorage.removeItem(AVATAR_KEY);
+      localStorage.removeItem(STASH_KEY); localStorage.removeItem(STASH_AVATAR_KEY);
+    } catch (e) { showToast(T('app.saveFailed')); return; }
+    state = Object.assign(emptyState(), st); memoryFallback = state;
+    setEntered(true);
+    if (location.hash === '#home') route(); else location.hash = '#home';
+    window.scrollTo(0, 0);
+    showToast(T('signout.restored', { n: stashName(st) }));
+  }
+  document.addEventListener('click', function (e) {
+    var t0 = e.target.closest && e.target.closest('[data-signout], [data-signout-yes], [data-signout-no], [data-restore]');
+    if (!t0) return;
+    if (t0.dataset.restore) { restoreStash(); return; }
+    var box = t0.closest('.signout'), c = box && box.querySelector('.signout-confirm');
+    if (t0.dataset.signout && c) { c.hidden = false; c.querySelector('[data-signout-yes]').focus(); return; }
+    if (t0.dataset.signoutNo && c) { c.hidden = true; box.querySelector('[data-signout]').focus(); return; }
+    if (t0.dataset.signoutYes) signOut();
+  });
 
   // =====================================================================
   // ۱. فرم اولیه
@@ -687,7 +752,7 @@
       '<button type="button" class="btn btn-ghost onb-back" id="onb-back">' + chevron(isRtl() ? 'right' : 'left') + '<span>' + esc(T('onb.back')) + '</span></button>' +
       (editing && !needsMigration() ? '<a class="btn btn-ghost onb-cancel" id="onb-cancel" href="#profile">' + esc(T('app.cancel')) + '</a>' : '') +
       '<button type="submit" class="btn btn-primary onb-next" id="onb-next"><span id="onb-next-lbl">' + esc(T('onb.next')) + '</span>' + chevron(isRtl() ? 'left' : 'right') + '</button>' +
-      '</div></form></section>';
+      '</div></form>' + (editing && !needsMigration() ? signOutBlock() : '') + '</section>';
 
     var form = document.getElementById('onb');
     window.CoachTimePicker.init(form);
@@ -3526,7 +3591,7 @@
         ['#settings', 'person', T('settingsPage.person'), T('settingsPage.personSub', { age: p.age, n: lv.level }), 'person'],
         ['#settings', 'install', T('install.title'), T('install.short.' + installMode()), 'install'],
         ['#settings', 'data', T('settingsPage.data'), T('profile.statsVal', { c: Object.keys(state.checkins).length, d: Object.keys(state.done).length }), 'data']
-      ]) +
+      ]) + '<section class="card">' + signOutBlock() + '</section>' +
       '';
   }
   // کارت هدف اصلی (گرادیان نعنایی به مرجانی): شمارش معکوس، زمان هدف، بقیه‌ی مسابقه‌ها

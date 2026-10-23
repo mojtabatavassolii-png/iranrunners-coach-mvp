@@ -435,6 +435,18 @@
       no: 'No',
       kmUnit: 'km'
     },
+    signout: {
+      title: 'Sign out',
+      hint: 'To try creating a profile from scratch. Your current profile and all its data are set aside on this device and come back from the sign-in page.',
+      hintStashed: 'A profile is already set aside and stays safe. Signing out deletes this current (test) profile.',
+      btn: 'Sign out and start a new profile',
+      confirm: 'Sign out? Your profile is not deleted; it is set aside and you can return to it from the sign-in page.',
+      confirmStashed: 'This test profile will be deleted. Your set-aside profile stays safe and comes back from the sign-in page.',
+      yes: 'Sign out', done: 'Signed out. Tap "Sign in" to create a new profile.',
+      restore: 'Back to your previous profile ({n})', restoreHint: 'The profile you set aside comes back with all its data.',
+      restoreHintTest: 'The current test profile is deleted and your previous profile comes back.',
+      restored: 'Welcome back, {n}! Your profile is restored.'
+    },
     login: {
       title: 'Log in',
       welcome: 'Welcome to Be Your Own Coach',
