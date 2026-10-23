@@ -553,7 +553,7 @@
       pbNone: 'No best time',
       pbOtherKm: 'Distance ({u})',
       pbTime: 'Finish time',
-      pbTimeHint: 'Swipe each column up or down to pick the hours, minutes and seconds of your result.',
+      pbTimeHint: 'Tap the field and pick the hours, minutes and seconds of your result on the wheels.',
       levelWait: 'Once you answer the required questions in "Your running right now", your level will appear here.',
       pbInvalid: 'The best time is incomplete or invalid and isn\'t being used for your level yet.',
       s2: '2. Body details',
@@ -766,7 +766,7 @@
       actHint: 'If you recorded this run on a watch or another app, enter the real numbers so your stats and charts are more accurate. Left empty, the planned volume is used.',
       actKm: 'Actual distance ({u})',
       actTime: 'Actual time',
-      actTimeHint: 'Turn the wheels; if you leave them, no time is saved.',
+      actTimeHint: 'Tap the field to pick the time; if you skip it, no time is saved.',
       actStart: 'Start time',
       actStartVal: 'started {t}',
       errStart: 'Enter the start time as hours:minutes (or leave it empty).',
@@ -1202,7 +1202,7 @@
       kinds: { t2: '2 km time trial', t3: '3 km time trial', t5: '5 km time trial', race: 'Race or another distance' },
       km: 'Distance ({u})',
       time: 'Time',
-      timeHint: 'Swipe each column up or down to set your time.',
+      timeHint: 'Tap the field and set your time on the wheels.',
       date: 'Date',
       submit: 'Save and recalculate paces',
       history: 'Fitness history',
@@ -1283,7 +1283,7 @@
       wipeQ: 'Delete all data (profile, check-ins, history) from this browser? This can\'t be undone.'
     },
 
-    tpick: { h: 'hours', m: 'min', s: 'sec' },
+    tpick: { h: 'hours', m: 'min', s: 'sec', ih: '{n}h', im: '{n}m', is: '{n}s', choose: 'Choose time', done: 'Done' },
 
     // ---------- Install the app (PWA) ----------
     install: {

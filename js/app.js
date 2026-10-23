@@ -111,6 +111,11 @@
   function paceFmt(secPerKm) { return C.formatDuration(I.pace(Math.round(secPerKm))); }
   // متن ترجمه‌شده با اعداد بومی و امن برای HTML
   function tt(key, params) { return t(T(key, params)); }
+  // انتخاب‌گر زمان (برگه‌ی پایین صفحه) با برچسب‌های زبان فعلی
+  function tpo(o) {
+    return window.CoachTimePicker.html(Object.assign({ digits: fa, labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s'),
+      item: { h: T('tpick.ih'), m: T('tpick.im'), s: T('tpick.is') }, choose: T('tpick.choose'), done: T('tpick.done'), cancel: T('app.cancel') } }, o));
+  }
   function faDate(key, short) { return I.date(C.parseDate(key), short); }
   function isRtl() { return I.dir() === 'rtl'; }
   function chevron(dir) {
@@ -308,8 +313,10 @@
     if (v !== 'race') raceDraft = null;
     // پخش‌کننده‌ها و ویدیوهای تحلیل دویدن کامل آزاد می‌شن؛ تب بیومکانیک دوباره می‌سازدشون
     destroyGaitPlayers();
+    // برگه‌ی انتخاب زمان با عوض شدن صفحه بسته می‌شه
+    window.CoachTimePicker.close(false);
+    window.CoachTimePicker.setDigits(fa);
     VIEWS[v](sub);
-    window.CoachTimePicker.init(app);
     if (SUB_PAGES[v]) {
       app.insertAdjacentHTML('afterbegin', backBar(v));
       // هشدار پزشکی صفحه‌ی چک‌این زیر نوار برگشت
@@ -404,9 +411,8 @@
     (d.picks || []).forEach(function (pk) {
       var sec = C.parseTime(pk.val);
       if (!sec) return;
-      window.CoachTimePicker.preset(pk.id, sec);
-      var el = document.getElementById(pk.id + '-picker');
-      if (pk.set && el) { el.classList.add('is-set'); var inp = el.querySelector('input[type=hidden]'); if (inp) inp.value = pk.val; }
+      if (pk.set) window.CoachTimePicker.set(pk.id, pk.val, true);
+      else window.CoachTimePicker.preset(pk.id, sec);
     });
     onbApi.setMax(d.max || 1);
     onbApi.go(d.step || 1, true);
@@ -726,8 +732,8 @@
         '<input id="pbother" name="pbOther" type="number" inputmode="decimal"' + limAttrs('dist', '0.1') + kmField(pbKey === 'other' ? pb.distanceKm : '') + '></div>' +
         '<div class="field field-tpick" id="pbtime-field"' + (pbKey ? '' : ' hidden') + '><span class="field-label" id="pbtime-lbl">' + esc(T('onb.pbTime')) + '</span>' +
         // انتخاب‌گر چرخشی؛ مقدار در input مخفی pbTime (h:mm:ss) — بدون دست زدن کاربر خالیه
-        window.CoachTimePicker.html({ id: 'pbtime', name: 'pbTime', sec: pb.timeSec || pbGuess(pb.distanceKm || 5), touched: !!pb.timeSec, preview: 'pbtime-read',
-          aria: T('onb.pbTime'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
+        tpo({ id: 'pbtime', name: 'pbTime', sec: pb.timeSec || pbGuess(pb.distanceKm || 5), touched: !!pb.timeSec, preview: 'pbtime-read',
+          aria: T('onb.pbTime'), }) +
         '<small class="muted">' + esc(T('onb.pbTimeHint')) + '</small><small class="time-read" id="pbtime-read" aria-live="polite">' +
         (pb.timeSec ? '= ' + fa(C.describeDuration(pb.timeSec)) : '') + '</small></div>' +
         '</div></div>' +
@@ -1188,12 +1194,12 @@
       '<input id="act-km-' + prefix + '" name="actKm" type="number" inputmode="decimal" min="0" step="0.01" placeholder="' + esc(s.km ? fa(dKm(s.km)) : '') + '"' +
       ' value="' + (a.km > 0 ? esc(dKm(Math.round(a.km * 100) / 100)) : '') + '"></div>' +
       '<div class="field field-tpick"><span class="field-label">' + esc(T('post.actTime')) + '</span>' +
-      window.CoachTimePicker.html({ id: 'act-time-' + prefix, name: 'actTime', sec: a.sec || guessSec(s), touched: a.sec > 0, preview: 'act-time-read-' + prefix,
-        aria: T('post.actTime'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
+      tpo({ id: 'act-time-' + prefix, name: 'actTime', sec: a.sec || guessSec(s), touched: a.sec > 0, preview: 'act-time-read-' + prefix,
+        aria: T('post.actTime'), }) +
       '<small class="muted">' + esc(T('post.actTimeHint')) + '</small><small class="time-read" id="act-time-read-' + prefix + '" aria-live="polite">' +
       (a.sec > 0 ? '= ' + fa(C.describeDuration(a.sec)) : '') + '</small></div>' +
       '<div class="field"><label for="act-start-' + prefix + '">' + esc(T('post.actStart')) + '</label>' +
-      '<input id="act-start-' + prefix + '" name="actStart" type="time" value="' + esc(a.start || '') + '"></div>' +
+      tpo({ id: 'act-start-' + prefix, name: 'actStart', mode: 'clock', value: a.start || '', aria: T('post.actStart') }) + '</div>' +
       (walk ? '<div class="field"><label for="act-steps-' + prefix + '">' + esc(T('post.walkSteps')) + '</label>' +
         '<input id="act-steps-' + prefix + '" name="actSteps" type="number" inputmode="numeric" min="0" max="100000" step="1" value="' + (a.steps > 0 ? a.steps : '') + '"></div>' : '') +
       '</fieldset>';
@@ -1895,8 +1901,8 @@
     var f = C.currentFitness(state.profile), guess = f ? C.raceTimeFromVdot(f.vdot, km) : km * 360;
     return '<form class="race-result-form" data-race-result-form="' + esc(id) + '" data-km="' + km + '" data-date="' + esc(dateKey) + '" novalidate>' +
       '<div class="field field-tpick"><span class="field-label">' + esc(T('race.resultTime')) + '</span>' +
-      window.CoachTimePicker.html({ id: 'rr-' + id, name: 'rtime', sec: Math.round(guess / 5) * 5, touched: false, preview: 'rr-read-' + id,
-        aria: T('race.resultTime'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
+      tpo({ id: 'rr-' + id, name: 'rtime', sec: Math.round(guess / 5) * 5, touched: false, preview: 'rr-read-' + id,
+        aria: T('race.resultTime'), }) +
       '<small class="time-read" id="rr-read-' + esc(id) + '" aria-live="polite"></small></div>' +
       '<p class="form-errors" hidden></p><div class="actions"><button type="submit" class="btn btn-primary">' + esc(T('race.resultSave')) + '</button>' +
       '<button type="button" class="btn btn-ghost" data-race-result-cancel="1">' + esc(T('app.cancel')) + '</button></div></form>';
@@ -1943,7 +1949,7 @@
         '<div class="field" id="ra-km-field" hidden><label for="ra-km">' + esc(T('race.km', { u: T('units.' + I.getUnits()) })) + '</label><input id="ra-km" name="km" type="number" inputmode="decimal"' + limAttrs('race', '0.1') + '></div>' +
         '<div class="field"><label for="ra-date">' + esc(T('race.date')) + '</label><input id="ra-date" name="date" type="date" min="' + nowKey + '"' + (dr.date ? ' value="' + dr.date + '"' : '') + '></div>' +
         (paceOk ? '<div class="field" id="ra-target-field"><label for="ra-target">' + esc(T('race.target')) + '</label>' +
-          '<input id="ra-target" name="target" type="text" inputmode="numeric" dir="ltr" autocomplete="off" placeholder="' + esc(T('race.targetPh')) + '"' + (dr.targetSec ? ' value="' + C.formatDuration(dr.targetSec) + '"' : '') + '>' +
+          tpo({ id: 'ra-target', name: 'target', sec: dr.targetSec || 3000, touched: !!dr.targetSec, aria: T('race.target') }) +
           '<small class="muted">' + esc(T('race.targetHint')) + '</small></div>' : '') +
         '<p class="form-errors" hidden></p><button type="submit" class="btn btn-primary">' + esc(T('race.addSave')) + '</button></form></details>';
     }
@@ -1983,8 +1989,7 @@
       ? tt('race.targetLine', { t: C.formatDuration(cur) }) + ' · ' + tt('race.targetPace', { p: C.formatDuration(Math.round(I.pace(cur / g.km))) })
       : esc(T('race.targetSet'))) + '</summary>' +
       '<form data-race-target-form="1" novalidate><p class="small muted">' + esc(T('race.targetHow')) + '</p>' +
-      '<div class="field"><label for="rt-time">' + esc(T('race.target')) + '</label><input id="rt-time" name="target" type="text" inputmode="numeric" dir="ltr" autocomplete="off" placeholder="' +
-      esc(T('race.targetPh')) + '"' + (cur ? ' value="' + C.formatDuration(cur) + '"' : '') + '></div>' +
+      '<div class="field"><label for="rt-time">' + esc(T('race.target')) + '</label>' + tpo({ id: 'rt-time', name: 'target', sec: cur || (g.km ? Math.round(g.km * 330) : 3000), touched: !!cur, aria: T('race.target') }) + '</div>' +
       '<p class="form-errors" hidden></p><div class="actions"><button type="submit" class="btn btn-primary">' + esc(T('race.targetSave')) + '</button>' +
       (cur ? '<button type="button" class="linklike small" data-race-target-clear="1">' + esc(T('race.targetClear')) + '</button>' : '') + '</div></form></details>';
   }
@@ -2048,8 +2053,7 @@
   function planPaceHtml(s, k) {
     var html = '<div class="plan-pace"><p class="plan-now">' + esc(T('plans.now')) + ' <b dir="ltr">' + fa(C.formatDuration(Math.round(s.predSec))) + '</b>' +
       (s.vdotKnown ? '' : ' <span class="small muted">' + esc(T('plans.nowEst')) + '</span>') + '</p>' +
-      '<div class="field plan-target"><label for="pt-' + k + '">' + esc(T('plans.target')) + '</label><input id="pt-' + k + '" type="text" inputmode="numeric" dir="ltr" autocomplete="off" data-plan-target="' + k + '"' +
-      ' placeholder="' + fa(C.formatDuration(s.presets[1].sec)) + '"' + (s.targetSec ? ' value="' + C.formatDuration(s.targetSec) + '"' : '') + '></div>' +
+      '<div class="field plan-target"><label for="pt-' + k + '">' + esc(T('plans.target')) + '</label>' + tpo({ id: 'pt-' + k, name: 'target', sec: s.targetSec || s.presets[1].sec, touched: !!s.targetSec, aria: T('plans.target'), attrs: ' data-plan-target="' + k + '"' }) + '</div>' +
       '<div class="chips plan-presets" role="group" aria-label="' + esc(T('plans.presetsAria')) + '">' + s.presets.map(function (x) {
         return '<button type="button" class="chip-btn" data-plan-preset="' + k + '" data-sec="' + x.sec + '" aria-pressed="' + (s.targetSec === x.sec) + '"><b dir="ltr">' + fa(C.formatDuration(x.sec)) + '</b><small>' + tt('plans.presetWeeks', { n: x.weeks }) + '</small></button>';
       }).join('') + '</div>';
@@ -2857,7 +2861,7 @@
     var r = state.reminder || {};
     return { on: r.on !== false, time: /^\d\d:\d\d$/.test(r.time || '') ? r.time : '18:00', notify: !!r.notify };
   }
-  function remindSub() { var r = reminderCfg(); return r.on ? T('remind.subOn', { t: r.time }) : T('remind.subOff'); }
+  function remindSub() { var r = reminderCfg(); return r.on ? T('remind.subOn', { t: fa(r.time) }) : T('remind.subOff'); }
   function homeReminder(base, key) {
     var r = reminderCfg();
     if (!r.on || ['rest', 'none'].indexOf(base.type) >= 0 || state.done[key]) return '';
@@ -2894,7 +2898,7 @@
   function remindSection() {
     var r = reminderCfg();
     return '<label class="check-row"><input type="checkbox" id="rm-on"' + (r.on ? ' checked' : '') + '> <span>' + esc(T('remind.inApp')) + '</span></label>' +
-      '<div class="field"><label for="rm-time">' + esc(T('remind.time')) + '</label><input id="rm-time" type="time" value="' + r.time + '"></div>' +
+      '<div class="field"><label for="rm-time">' + esc(T('remind.time')) + '</label>' + tpo({ id: 'rm-time', name: 'rmTime', mode: 'clock', value: r.time, aria: T('remind.time') }) + '</div>' +
       '<p class="small muted">' + esc(T('remind.calHint')) + '</p>' +
       '<div class="actions"><button type="button" class="btn btn-outline" data-ics="1">' + esc(T('remind.cal')) + '</button>' +
       ('Notification' in window ? '<button type="button" class="btn btn-ghost" data-notify="1">' + esc(T(r.notify && Notification.permission === 'granted' ? 'remind.notifyOn' : 'remind.notify')) + '</button>' : '') + '</div>' +
@@ -3744,8 +3748,8 @@
       '<div class="field"><label for="fk">' + esc(T('fit.kind')) + '</label><select id="fk" name="kind">' + TEST_KINDS.map(function (k) { return '<option value="' + k[0] + '">' + esc(T('fit.kinds.' + k[0])) + '</option>'; }).join('') + '</select></div>' +
       '<div class="field" id="fkm-field" hidden><label for="fkm">' + esc(T('fit.km')) + '</label><input id="fkm" name="km" type="number" inputmode="decimal"' + limAttrs('dist', '0.1') + '></div>' +
       '<div class="field field-tpick"><span class="field-label" id="ft-lbl">' + esc(T('fit.time')) + '</span>' +
-      window.CoachTimePicker.html({ id: 'ft', name: 'time', sec: fitGuess(2), touched: false, preview: 'ft-read',
-        aria: T('fit.time'), labels: { h: T('tpick.h'), m: T('tpick.m'), s: T('tpick.s') }, digits: fa }) +
+      tpo({ id: 'ft', name: 'time', sec: fitGuess(2), touched: false, preview: 'ft-read',
+        aria: T('fit.time'), }) +
       '<small class="muted">' + esc(T('fit.timeHint')) + '</small><small class="time-read" id="ft-read" aria-live="polite"></small></div>' +
       '<div class="field"><label for="fd">' + esc(T('fit.date')) + '</label><input id="fd" name="date" type="date" max="' + todayKey + '" value="' + todayKey + '"></div>' +
       '</div><p id="fit-err" class="form-errors" role="alert" hidden></p>' +
