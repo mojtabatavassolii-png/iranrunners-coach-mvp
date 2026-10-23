@@ -9,7 +9,7 @@ The owner sends one or more screenshots of another product and wants to know how
 
 ## Non-negotiables (brand identity)
 
-- Mint `#00866b` (and its family `--brand-*`) stays the identity / navigation colour; coral `#ff6b57` (`--accent-*`) stays the primary-action colour. The owner explicitly chose to keep this palette. You may tune shades, add neutrals, or add a secondary accent, but never replace mint or coral.
+- The Gaam palette stays (`css/brand.css`): charcoal `#121214` background, graphite `#2A2A30` surfaces, sand `#D8C4A0` for primary buttons and active states (text on sand `#121214`), off-white `#F5F2EC` text, `#A0A0A8` secondary text. You may tune shades, add neutrals, or add a secondary accent, but never replace sand as the primary colour or switch the app back to a light background.
 - The logo, the app name «گام» (Gaam), the bilingual RTL/LTR support and Persian digits stay.
 - Do not copy another brand's logo, icons, illustrations, wording or proprietary fonts. Borrow *principles* (density, rhythm, contrast, shape language), not assets.
 - Every proposed colour combination must still pass WCAG AA contrast (4.5:1 body text, 3:1 large text / UI parts). Check numerically.

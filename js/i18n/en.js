@@ -464,7 +464,7 @@
     // ================= User interface (app.js and index.html) =================
     app: {
       name: 'Gaam',
-      tagline: 'Your running plan · beta',
+      tagline: 'Your training plan · beta',
       metaDescription: 'Gaam: a weekly running plan built on fixed training rules, no server.',
       navAria: 'Sections',
       back: 'Back',

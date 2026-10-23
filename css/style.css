@@ -209,7 +209,7 @@ legend + * { clear: both; }
 .field label { font-weight: 500; font-size: var(--fs-md); }
 input[type=number], input[type=date], input[type=time], input[type=text], input:not([type]), select, textarea {
   font: inherit; font-size: var(--fs-base);
-  padding: 10px 12px; border: 1.5px solid var(--field-line); border-radius: 10px; background: #fff; color: var(--text);
+  padding: 10px 12px; border: 1.5px solid var(--field-line); border-radius: 10px; background: var(--field-bg); color: var(--text);
   width: 100%; min-height: 44px;
 }
 input:focus, select:focus, textarea:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px rgba(0, 134, 107, 0.2); }
@@ -1294,7 +1294,7 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .btn-outline:hover, .btn-ink:hover { background: #000; border-color: #000; color: #fff; }
 .btn-ghost:hover { background: var(--panel); }
 .race-hero .btn-outline { background: #fff; color: var(--ink); border-color: #fff; }
-input, select, textarea { background: #fff; }
+input, select, textarea { background: var(--field-bg); }
 /* برچسب گروه بالای فهرست‌ها (مثل MY STUFF) */
 .group-label { font-size: var(--fs-sm); font-weight: 700; color: var(--muted); margin: var(--sp-6) 6px var(--sp-2); letter-spacing: .02em; }
 [dir="ltr"] .group-label { text-transform: uppercase; letter-spacing: .06em; }
@@ -1635,7 +1635,7 @@ a { color: var(--brand-deep); }
 /* سطح‌ها و فیلدها */
 .card, .modal, .set-list { background: var(--card); color: var(--text); }
 input, select, textarea { background: var(--field-bg); color: var(--text); border-color: var(--field-line); }
-input::placeholder, textarea::placeholder { color: #7C7C85; }
+input::placeholder, textarea::placeholder { color: #8A8A93; opacity: 1; }
 input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(216, 196, 160, .25); }
 input[type="date"], input[type="time"] { color-scheme: dark; }
 .chip span, .chip-btn, .act-opt span, .scale-opt span { background: var(--field-bg); color: var(--text); }
@@ -1722,3 +1722,13 @@ input[type="date"], input[type="time"] { color-scheme: dark; }
 .race-hero .eyebrow, .race-hero .race-date { color: #E7DFD0; }
 .goal-tile .gt-eta { color: #B4B4BC; }
 .login-btn { box-shadow: none; color: var(--on-brand); }
+/* UX7-02: چک‌باکس سفارشی (خاموش = لبه‌ی روشن، روشن = شنی با تیک زغالی) */
+.check-row input[type=checkbox] {
+  -webkit-appearance: none; appearance: none; flex: none; width: 24px; height: 24px; margin: 0; cursor: pointer;
+  border: 2px solid var(--muted); border-radius: 7px; background: var(--field-bg); display: grid; place-items: center;
+}
+.check-row input[type=checkbox]:checked { background: var(--brand); border-color: var(--brand); }
+.check-row input[type=checkbox]:checked::after { content: ""; width: 6px; height: 12px; border: solid var(--on-brand); border-width: 0 3px 3px 0; transform: translateY(-1px) rotate(45deg); }
+.check-row input[type=checkbox]:focus-visible { outline: 3px solid var(--brand-deep); outline-offset: 2px; }
+.check-row input[type=checkbox]:disabled { opacity: .4; cursor: not-allowed; }
+.check-row:has(input:disabled) { cursor: not-allowed; color: var(--muted); }

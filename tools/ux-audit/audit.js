@@ -172,6 +172,20 @@ function probe(screenW) {
     const lines = Math.round(el.getBoundingClientRect().height / lh);
     out.type.push({ sel: sel(el), text: n.textContent.trim().slice(0, 40), size, weight, lh: Math.round(lh / size * 100) / 100, lines, rect: rect(el) });
   }
+  // فیلدهای متنی: مقدار تایپ‌شده و متن راهنما (placeholder) هم با زمینه‌ی خود فیلد سنجیده می‌شن
+  document.querySelectorAll('input:not([type]), input[type=text], input[type=number], input[type=date], input[type=time], input[type=email], textarea').forEach((el) => {
+    if (!visible(el)) return;
+    const ph = !el.value && el.placeholder;
+    const txt = el.value || el.placeholder;
+    if (!txt) return;
+    const s = cs(el), fg0 = parse(ph ? getComputedStyle(el, '::placeholder').color : s.color);
+    if (!fg0) return;
+    const { bg, grad } = bgOf(el), fg = over(fg0, bg);
+    const size = parseFloat(s.fontSize), weight = Number(s.fontWeight) || 400;
+    const rr = ratio(fg, bg);
+    out.contrast.push({ sel: sel(el) + (ph ? '::placeholder' : ''), text: txt.slice(0, 40), fg: hex(fg), bg: hex(bg), ratio: Math.round(rr * 100) / 100, need: 4.5, size, weight, grad, decorative: false, rect: rect(el) });
+  });
+
   document.querySelectorAll('h1, h2, h3, h4').forEach((h) => {
     if (!visible(h)) return;
     const s = cs(h);

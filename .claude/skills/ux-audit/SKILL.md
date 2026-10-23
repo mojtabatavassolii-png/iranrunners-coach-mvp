@@ -34,7 +34,7 @@ Screens audited (defined in `lib.js`, edit there if new main pages appear): `onb
 |---|---|---|
 | `touch-min` | interactive target smaller than 24×24 px and not spaced 24 px from neighbours (WCAG 2.5.8 AA). Inline links inside sentences are exempt. | high |
 | `touch-rec` | smaller than 44×44 px (Apple HIG / WCAG 2.5.5 AAA; Material uses 48) | medium if < 32, else low |
-| `contrast` | text vs. its real composited background below 4.5:1 (3:1 for ≥ 24 px or ≥ 18.7 px bold), WCAG 1.4.3. Faded/decorative text (aria-hidden, opacity < 0.6, picker neighbours) is "info". Gradients are approximate. | high if < 3, else medium |
+| `contrast` | text (including the typed value and placeholder of text, number, date and time fields) vs. its real composited background below 4.5:1 (3:1 for ≥ 24 px or ≥ 18.7 px bold), WCAG 1.4.3. Faded/decorative text (aria-hidden, opacity < 0.6, picker neighbours) is "info". Gradients are approximate. | high if < 3, else medium |
 | `font-small` | text under 12 px | medium |
 | `line-height` | multi-line body text with line-height < 1.35 | low |
 | `heading-*` | skipped heading levels, h1 not larger than h2, several h1 | low/medium |
@@ -47,7 +47,7 @@ Screens audited (defined in `lib.js`, edit there if new main pages appear): `onb
 | `justify-gap` | a justified line with a gap between two words over 4× a normal space and over 16 px; "(پیش‌بینی)" marks the gap a not-yet-justified paragraph would get. Headless Chromium on Linux has no hyphenation, so English gaps are overstated | medium if justified now, else low |
 
 The automated pass cannot judge everything. **Always also look at the annotated screenshots yourself** (at least fa 320 and fa 390, plus en 360) for:
-- visual hierarchy (is the primary action obvious? is coral used only for the main action?),
+- visual hierarchy (is the primary action obvious? is sand used only for the main action and active states?),
 - awkward wrapping (an icon alone on a line, labels breaking mid-phrase),
 - justified text creating large gaps in narrow boxes (the `justify-gap` rule finds candidates; confirm on the screenshot),
 - copy that no longer matches the UI (e.g. hints pointing to moved settings),
@@ -67,7 +67,7 @@ node compare.js proposals.json      # → out/compare/<id>-before.png and <id>-a
 
 The CSS is only injected into the test browser; nothing in the app changes. Look at every pair — if the "after" does not clearly show the improvement, adjust the CSS or the crop.
 
-When proposing colours, keep the brand: mint `#00866b` family for identity/navigation, coral `#ff6b57` family for the primary action. Darken or lighten within the same hue to meet contrast rather than switching hues. Check ratios numerically before proposing them.
+When proposing colours, keep the Gaam brand (`css/brand.css`): charcoal `#121214` background, graphite `#2A2A30` surfaces, sand `#D8C4A0` for the primary action and active states (text on sand `#121214`), off-white `#F5F2EC` text, `#A0A0A8` secondary text. Darken or lighten within the same hue to meet contrast rather than switching hues. Check ratios numerically before proposing them.
 
 ## 5. Report
 
