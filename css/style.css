@@ -1566,3 +1566,23 @@ body.goal-dragging .race-hero { box-shadow: 0 0 0 4px var(--brand-soft); }
 .signout-confirm .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .login-restore { display: grid; gap: 4px; margin-top: 14px; width: 100%; max-width: 360px; }
 .login-restore .btn { background: transparent; color: inherit; border-color: currentColor; }
+
+/* ===========================================================
+   مسیر پیاده‌روی: انتخاب نوع ورزش و رنگ جلسه‌ها
+   =========================================================== */
+.act-choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.act-opt { position: relative; cursor: pointer; }
+.act-opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.act-opt span { display: grid; gap: 2px; padding: 14px; border-radius: 16px; border: 1.5px solid var(--field-line); background: #fff; text-align: start; min-height: 84px; }
+.act-opt b { font-size: var(--fs-lg); }
+.act-opt small { color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
+.act-opt input:checked + span { border-color: var(--brand); background: var(--brand-soft); box-shadow: 0 0 0 2px var(--brand) inset; }
+.act-opt input:focus-visible + span { outline: 3px solid var(--brand); outline-offset: 2px; }
+.badge-walkEasy { background: var(--c-easy-bg); color: var(--c-easy-ink); }
+.badge-walkBrisk { background: var(--c-tempo-bg); color: var(--c-tempo-ink); }
+.badge-walkPower { background: var(--c-interval-bg); color: var(--c-interval-ink); }
+.badge-walkLong { background: var(--c-long-bg); color: var(--c-long-ink); }
+.day-walkEasy, .hc-walkEasy { border-top-color: var(--c-easy); --dot: var(--c-easy); }
+.day-walkBrisk, .hc-walkBrisk { border-top-color: var(--c-tempo); --dot: var(--c-tempo); }
+.day-walkPower, .hc-walkPower { border-top-color: var(--c-interval); --dot: var(--c-interval); }
+.day-walkLong, .hc-walkLong { border-top-color: var(--c-long); --dot: var(--c-long); }

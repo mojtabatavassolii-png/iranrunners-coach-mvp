@@ -1239,4 +1239,63 @@ test('مسیر تا هدف: باقی‌مونده با گذشت هفته‌ها 
   assert.ok(ultra.weeks >= C.minPrepWeeks(C.goalInfo(profileFor(6, { goal: goalOf('ultra') })), 6));
 });
 
+
+// ---------- مسیر پیاده‌روی ----------
+function walkP(over) {
+  return Object.assign({ age: 40, days: [0, 1, 2, 3, 4, 5, 6], locations: ['park'], activity: 'walk', walkMin: 0, walkExp: 'never', walk30: 'no', startDate: '2026-09-26' }, over || {});
+}
+function walkWeek(p, w) { return C.buildWeek(p, C.addDays(C.parseDate(p.startDate), w * 7)); }
+test('پیاده‌روی: سطح از دقیقه‌ی هفتگی، محدود به سابقه، توان ۳۰ دقیقه و سن', function () {
+  assert.strictEqual(C.assessLevel(walkP()).level, 1);
+  assert.strictEqual(C.assessLevel(walkP({ walkMin: 160, walkExp: 'gt1y', walk30: 'yes' })).level, 6);
+  assert.strictEqual(C.assessLevel(walkP({ walkMin: 500, walkExp: 'lt3m', walk30: 'yes' })).level, 3);
+  assert.strictEqual(C.assessLevel(walkP({ walkMin: 500, walkExp: 'gt1y', walk30: 'no' })).level, 4);
+  var old = C.assessLevel(walkP({ walkMin: 500, walkExp: 'gt1y', walk30: 'yes', age: 65 }));
+  assert.strictEqual(old.level, 9); assert.ok(old.walk && old.notes.length >= 1);
+});
+test('پیاده‌روی: فقط جلسه‌های پیاده‌روی، حداقل یک روز استراحت، بدون دو روز سخت پشت‌سرهم', function () {
+  [[0, 'never'], [45, 'lt3m'], [100, '3to12m'], [160, 'gt1y'], [220, 'gt1y'], [320, 'gt1y'], [450, 'gt1y']].forEach(function (x) {
+    var p = walkP({ walkMin: x[0], walkExp: x[1], walk30: 'yes' });
+    for (var w = 0; w < 12; w++) {
+      var d = walkWeek(p, w).days;
+      assert.ok(d.every(function (s) { return s.type === 'rest' || C.WALK_TYPES.indexOf(s.type) >= 0; }), x + ' w' + w);
+      assert.ok(d.some(function (s) { return s.type === 'rest'; }), 'rest ' + x + ' w' + w);
+      for (var i = 0; i < 7; i++) assert.ok(!(d[i].hard && d[(i + 1) % 7].hard), 'hard pair ' + x + ' w' + w + ' d' + i);
+      d.forEach(function (s) { if (s.strength) assert.ok(!d[(d.indexOf(s) + 1) % 7].hard, 'strength before hard'); });
+    }
+  });
+});
+test('پیاده‌روی: رشد هفتگی حداکثر ۱۰٪ (۶۰+ سال ۵٪)، هفته‌ی سبک هر ۴ هفته، سقف سطح', function () {
+  [walkP({ walkMin: 100, walkExp: 'gt1y', walk30: 'yes' }), walkP({ walkMin: 100, walkExp: 'gt1y', walk30: 'yes', age: 66 })].forEach(function (p) {
+    var a = C.assessLevel(p), rate = a.cautious ? 1.05 : 1.1, prev = C.walkWeeklyMin(p, 0, a).min;
+    for (var w = 1; w < 16; w++) {
+      var v = C.walkWeeklyMin(p, w, a);
+      assert.ok(v.min <= a.info.cap);
+      if (v.deload) assert.ok(v.min < prev, 'deload ' + w);
+      else if (!C.walkWeeklyMin(p, w - 1, a).deload) assert.ok(v.min <= Math.max(prev + 5, Math.round(prev * rate / 5) * 5) + 1e-9, 'growth ' + w + ': ' + prev + '→' + v.min);
+      prev = v.min;
+    }
+  });
+});
+test('پیاده‌روی: شدت‌ها و کراس‌ترینینگ به سطح بستگی داره', function () {
+  var types = function (p) { var t = {}; for (var w = 0; w < 8; w++) walkWeek(p, w).days.forEach(function (s) { t[s.type] = 1; if (s.strength) t.S = 1; if (s.cross) t.X = 1; }); return t; };
+  var l1 = types(walkP()), l5 = types(walkP({ walkMin: 130, walkExp: 'gt1y', walk30: 'yes' })), l9 = types(walkP({ walkMin: 320, walkExp: 'gt1y', walk30: 'yes' }));
+  assert.ok(l1.walkEasy && !l1.walkBrisk && !l1.walkPower && !l1.S);
+  assert.ok(l5.walkBrisk && !l5.walkPower && !l5.S);
+  assert.ok(l9.walkPower && l9.walkLong && l9.S && l9.X);
+});
+test('پیاده‌روی: تطبیق با چک‌این (متوسط = ملایم و کوتاه‌تر، جدی = استراحت، درد = لغو)', function () {
+  var p = walkP({ walkMin: 320, walkExp: 'gt1y', walk30: 'yes' }), d = walkWeek(p, 1).days;
+  var pw = d.filter(function (s) { return s.type === 'walkPower'; })[0];
+  var mod = C.adaptSession(pw, { fatigue: 4, sleep: 3 }, null, null);
+  assert.strictEqual(mod.session.type, 'walkEasy'); assert.ok(mod.session.minutes < pw.minutes);
+  assert.strictEqual(C.adaptSession(pw, { fatigue: 5, sleep: 1 }, null, null).session.type, 'rest');
+  assert.strictEqual(C.adaptSession(pw, { fatigue: 2, sleep: 4, pain: true }, null, null).session.type, 'cancelled');
+});
+test('پیاده‌روی: پروفایل دویدن تغییری نمی‌کنه', function () {
+  var p = profileFor(5);
+  assert.ok(!C.isWalk(p));
+  assert.ok(weekAt(p, 3).days.every(function (s) { return C.WALK_TYPES.indexOf(s.type) < 0; }));
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

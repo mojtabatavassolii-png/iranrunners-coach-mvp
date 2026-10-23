@@ -6,6 +6,47 @@
     daysShort: ['Sa', 'Su', 'Mo', 'Tu', 'We', 'Th', 'Fr'],
     dur: { h: '{n} h', m: '{n} min', s: '{n} s', join: ' ' },
 
+    walkLevels: {
+      1: { name: 'Gentle start', desc: 'Under 30 minutes a week so far; easy 5 to 10 minute walks' },
+      2: { name: 'Building the habit', desc: '30 to 60 minutes a week; easy 10 to 15 minute walks' },
+      3: { name: 'More steps', desc: '60 to 90 minutes; first short brisk segments' },
+      4: { name: 'Regular', desc: '90 to 120 minutes; one brisk walk a week' },
+      5: { name: 'Health target', desc: '120 to 150 minutes; reaching the WHO-recommended 150 minutes' },
+      6: { name: 'Active', desc: '150 to 200 minutes; brisk walks, one long walk and strength training' },
+      7: { name: 'Power', desc: '200 to 250 minutes; first power-walking intervals' },
+      8: { name: 'Advanced', desc: '250 to 300 minutes; intervals, a 75-minute long walk and cross-training' },
+      9: { name: 'Endurance', desc: '300 to 400 minutes; two interval sessions, hills and stairs, a 90-minute long walk' },
+      10: { name: 'Expert', desc: 'Over 400 minutes; ready for long-distance walks and hiking' }
+    },
+    walkNote: {
+      expCap: 'Given your history, we start at level {to} (your volume matches level {from}) so your body adapts to the increase.',
+      no30: 'Since you can\'t walk 30 minutes non-stop yet, we start at level 4 (instead of {from}).',
+      age: 'For better recovery, we start one level lower ({to} instead of {from}) and add at most 5% a week.'
+    },
+    walk: {
+      easyMain: '{n} minutes of easy, continuous walking',
+      segMain: '{n} minutes of easy walking with {reps} two-minute brisk segments (after the first 5 minutes)',
+      segVariant: 'with brisk segments',
+      warm: '{n} minutes easy to warm up', cool: '{n} minutes easy to cool down',
+      briskMain: '{n} minutes of continuous brisk walking',
+      briskTarget: '{n} minutes ({b} brisk)',
+      powerMain: '{reps} times: {on} min very fast with active arms, {off} min easy',
+      powerTarget: '{n} minutes ({reps} reps)',
+      hillsVariant: 'hills or stairs',
+      hillsMain: '{reps} times: {on} min fast uphill or up stairs, easy on the way back',
+      longMain: '{n} minutes of continuous walking at an easy to slightly brisk pace',
+      longHow: ' Bring water; over 60 minutes, take a small snack too.',
+      strengthStep: 'After the walk: 20 to 25 minutes of strength (2 to 3 sets of 10 to 15): squats, lunges, glute bridges, step-ups, calf raises, plank.',
+      strengthMoves: 'squats, lunges, glute bridges, step-ups, calf raises, plank',
+      crossStep: 'Optional: today you can cycle or swim easy for the same time instead of walking.',
+      fewerReps: 'Do one or two fewer reps.',
+      int: {
+        easy: 'Intensity: easy; you can talk comfortably (RPE 3 to 4 out of 10).',
+        brisk: 'Intensity: brisk; slightly out of breath, you can talk but not sing (RPE 5 to 6, about 100 to 120 steps a minute).',
+        power: 'Intensity: very fast; only a few words at a time, arms bent and active (RPE 7 to 8, about 130+ steps a minute).',
+        hr: ' Target heart rate: {a} to {b}.'
+      }
+    },
     levels: {
       0: { name: 'Complete beginner', desc: 'Has never run regularly and wants to start from zero' },
       1: { name: 'Novice', desc: 'A little running experience (under three months), can run a few minutes without stopping' },
@@ -52,7 +93,8 @@
     },
     types: {
       rest: 'Rest', walkrun: 'Walk & light jog', easy: 'Easy run', runwalk: 'Easy run (run-walk)', tempo: 'Tempo', interval: 'Intervals',
-      reps: 'Speed reps', fartlek: 'Fartlek', hills: 'Hills', long: 'Long run', race: 'Race day', cancelled: 'Cancelled', none: 'Before start'
+      reps: 'Speed reps', fartlek: 'Fartlek', hills: 'Hills', long: 'Long run', race: 'Race day', cancelled: 'Cancelled', none: 'Before start',
+      walkEasy: 'Easy walk', walkBrisk: 'Brisk walk', walkPower: 'Power intervals', walkLong: 'Long walk'
     },
     periods: { base: 'Base phase', build: 'Build phase', peak: 'Peak phase' },
     phase: {
@@ -361,6 +403,9 @@
         keepHard: 'The session stays. If the first rep or block feels harder than usual, drop one rep (or a few minutes of the fast part).',
         keepLong: 'The session stays; keep the effort fully easy and drop the last few kilometres if the second half feels heavy.',
         keepEasy: 'Today\'s session is easy and hasn\'t changed; keep the effort truly gentle and cut it short if you don\'t feel good.',
+        keepWalk: 'The session stays; walk at a pace where you can talk easily and cut it short if you don\'t feel good.',
+        walkShorter: 'Make it shorter: {km} minutes instead of {orig}, at a pace where you can talk easily.',
+        walkEasier: 'Instead, walk easy for {km} minutes (instead of {orig}): you still move, without piling up fatigue.',
         rwShorter: 'Today, do only about two-thirds of the session and walk the rest.',
         dropPm: ' If today is a double day, skip the evening run.'
       },
@@ -466,8 +511,17 @@
       fromZero: 'Starting from zero, step by step'
     },
     onb: {
+      activityQ: 'What do you want to start with?',
+      activity: { run: 'Running', runSub: 'Running plans from zero to marathon', walk: 'Walking', walkSub: 'Walking plans from easy to power walking' },
+      walkExpQ: 'How long have you been walking regularly?',
+      walkExp: { never: 'Not regularly', lt3m: 'Under 3 months', '3to12m': '3 to 12 months', gt1y: 'Over a year' },
+      walkMin: 'How many minutes a week do you usually walk?',
+      walkMinHint: 'Average of the last 4 weeks; purposeful walks only, not short errands. For example 3 × 20 minutes = 60.',
+      walk30Q: 'Can you walk briskly for 30 minutes without stopping?',
+      pbWalk: 'Walking needs no best time; your level comes from your history and weekly minutes.',
+      walkStartPreview: 'The plan starts at about {n} minutes a week and grows a little each week.',
       titleEdit: 'Edit profile',
-      titleNew: 'Let\'s build your running plan',
+      titleNew: 'Let\'s build your running plan', titleNewWalk: 'Let\'s build your walking plan',
       migTitle: 'New level system',
       migText: 'Please complete section 1 and save.',
       introEdit: 'If your mileage or level changes, the plan restarts from this week.',
@@ -526,8 +580,8 @@
       steps: {
         1: { t: 'About you', sub: 'Tell us your name to make the plan feel like yours; all of this is optional.' },
         2: { t: 'Body', sub: 'Age, height and weight help set training intensity and volume.' },
-        3: { t: 'Your running right now', sub: 'Your experience and current volume decide where the plan starts.' },
-        4: { t: 'Recent best time', sub: 'A real result lets us calculate your training paces accurately.' },
+        3: { t: 'Your running right now', sub: 'Your experience and current volume decide where the plan starts.' , tw: 'Your walking now', subw: 'So the plan starts where you are.' },
+        4: { t: 'Recent best time', sub: 'A real result lets us calculate your training paces accurately.' , tw: 'Walking level', subw: 'Based on your answers.' },
         5: { t: 'Goal and weekly schedule', sub: 'Your target race, free days, training places and heart rate.' }
       },
       next: 'Next',
@@ -545,7 +599,7 @@
       submitNew: 'Build my plan',
       toastEdit: 'Plan updated.',
       toastNew: 'Your plan is ready!',
-      err: {
+      err: { walkExp: 'Tell us how long you have been walking regularly.', walkMin: 'Enter your weekly walking minutes between 0 and 2000.', walk30: 'Tell us whether you can walk 30 minutes non-stop.',
         km: 'Enter how many {uw} you currently run per week on average (a number from 0 to {max}).',
         lastWeek: 'Enter last week\'s volume (0 to {max} {u}; enter 0 if you didn\'t run).',
         monthAvg: 'Enter last month\'s average weekly volume (0 to {max} {u}).',
@@ -685,6 +739,8 @@
       opt: { km: 'Kilometres (km)', mi: 'Miles (mi)' } },
     sess: { original: 'Original plan:', warmup: 'Warm-up', main: 'Main set', cooldown: 'Cool-down', about: 'about {n} min' },
     post: {
+      walkKm: 'Distance (optional)', walkSteps: 'Steps (optional)', walkRpeQ: 'How hard was it? 1 (very easy) to 10 (very hard); optional',
+      errSteps: 'Steps must be a whole number between 0 and 100,000.',
       summary: 'After the run: effort {rpe} out of 10',
       paceOk: ' · pace as planned',
       paceFast: ' · faster than the range',
@@ -1139,7 +1195,7 @@
       photoPick: 'Choose a profile photo', photoRemove: 'Remove photo', photoSaved: 'Profile photo saved.',
       photoBad: 'This image can\'t be read; please choose another photo.', photoFull: 'Browser storage is full; the photo wasn\'t saved.',
       rowProgress: 'Charts for mileage, training load, pace and check-ins', rowGait: 'Running form analysis from a short video', rowGaitLast: 'Latest analysis: {d} · score {s}',
-      joined: 'Joined {d}', edit: 'Edit profile', levelLink: 'Suggested plans for your level', goalSetShort: 'No goal set yet',
+      joined: 'Joined {d}', edit: 'Edit profile', levelLink: 'Suggested plans for your level', levelLinkWalk: 'This week\'s walking plan', goalSetShort: 'No goal set yet',
       groups: { mine: 'My stuff', prefs: 'My preferences' },
       noName: 'Runner', noNameHint: 'Add your name in {link}.', noNameLink: 'Edit profile',
       tabs: { aria: 'Profile sections', progress: 'Progress', gait: 'Biomechanics' },

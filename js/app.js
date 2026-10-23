@@ -291,6 +291,8 @@
     var noProfile = !state.profile || needsMigration();
     if (noProfile && v !== 'guide' && v !== 'learn') v = 'onboarding';
     if (!VIEWS[v]) v = 'home';
+    // صفحه‌های فقط دویدن برای کاربر پیاده‌روی
+    if (!noProfile && C.isWalk(state.profile) && ['plans', 'race', 'fitness', 'gait'].indexOf(v) >= 0) v = 'home';
     // نوار پایین: همه‌جا به‌جز ورود و فرم اولیه؛ صفحه‌های فرعی زیر تب مادرشون فعال می‌شن
     var tab = TAB_OF[v] || null;
     tabbar.hidden = v === 'onboarding' || noProfile;
@@ -632,13 +634,18 @@
     app.innerHTML =
       '<section class="card onboarding onb-wizard">' +
       '<div class="onb-top">' +
-      '<p class="onb-kicker">' + esc(T(editing ? 'onb.titleEdit' : 'onb.titleNew')) + '</p>' + dots + '</div>' +
+      '<p class="onb-kicker" id="onb-kicker">' + esc(T(editing ? 'onb.titleEdit' : (p.activity === 'walk' ? 'onb.titleNewWalk' : 'onb.titleNew'))) + '</p>' + dots + '</div>' +
       (migrating ? '<div class="alert alert-adapt" role="status"><strong>' + esc(T('onb.migTitle')) + '</strong>' +
         '<p>' + esc(T('onb.migText')) + '</p></div>' : '') +
       '<form id="onb" novalidate><div class="onb-stage">' +
 
-      // ۱. اطلاعات هویتی
+      // ۱. نوع ورزش و اطلاعات هویتی
       step(1,
+        '<p class="sub-legend" id="act-q">' + esc(T('onb.activityQ')) + '</p><div class="act-choice" role="radiogroup" aria-labelledby="act-q">' +
+        ['run', 'walk'].map(function (k) {
+          return '<label class="act-opt"><input type="radio" name="activity" value="' + k + '"' + ((p.activity || 'run') === k ? ' checked' : '') + '>' +
+            '<span><b>' + esc(T('onb.activity.' + k)) + '</b><small>' + esc(T('onb.activity.' + k + 'Sub')) + '</small></span></label>';
+        }).join('') + '</div>' +
         '<div class="row2">' +
         '<div class="field"><label for="fname">' + esc(T('onb.firstName')) + '</label><input id="fname" name="firstName" type="text" maxlength="40" autocomplete="given-name" value="' + esc(p.name || '') + '" placeholder="' + esc(T('onb.firstNamePh')) + '"></div>' +
         '<div class="field"><label for="lname">' + esc(T('onb.lastName')) + '</label><input id="lname" name="lastName" type="text" maxlength="40" autocomplete="family-name" value="' + esc(p.lastName || '') + '" placeholder="' + esc(T('onb.lastNamePh')) + '"></div>' +
@@ -673,6 +680,16 @@
 
       // ۳. وضعیت فعلی دویدن
       step(3,
+        '<div id="walk-fields3" hidden>' +
+        '<p class="sub-legend">' + esc(T('onb.walkExpQ')) + req + '</p><div class="chips">' +
+        ['never', 'lt3m', '3to12m', 'gt1y'].map(function (k) { return chip('walkExp', k, T('onb.walkExp.' + k), p.walkExp === k, 'radio'); }).join('') + '</div>' +
+        '<div class="field" id="walkmin-field"><label for="walkmin">' + esc(T('onb.walkMin')) + req + '</label>' +
+        '<input id="walkmin" name="walkMin" type="number" inputmode="numeric" min="0" max="2000" step="5" value="' + esc(p.walkMin != null ? p.walkMin : '') + '">' +
+        '<small class="muted">' + esc(T('onb.walkMinHint')) + '</small></div>' +
+        '<div id="walk30-block"><p class="sub-legend">' + esc(T('onb.walk30Q')) + req + '</p><div class="chips">' +
+        chip('walk30', 'yes', T('app.yes'), p.walk30 === 'yes', 'radio') + chip('walk30', 'no', T('app.no'), p.walk30 === 'no', 'radio') + '</div></div>' +
+        '</div>' +
+        '<div id="run-fields3">' +
         '<p class="sub-legend">' + esc(T('onb.expQ')) + req + '</p><div class="chips">' +
         Object.keys(C.EXPERIENCE).map(function (k) { return chip('experience', k, C.EXPERIENCE[k].label, p.experience === k, 'radio'); }).join('') + '</div>' +
         '<p class="alert alert-good zero-note" id="zero-note" hidden>' + esc(T('onb.zeroNote')) + '</p>' +
@@ -689,7 +706,7 @@
         VOL_REASONS.map(function (k) { return chip('volumeReason', k, T('onb.reasons.' + k), p.volumeReason === k, 'radio'); }).join('') + '</div></div>' +
         '<p class="sub-legend">' + esc(T('onb.structQ')) + req + '</p><div class="chips">' +
         chip('structured', 'yes', T('app.yes'), p.structured === true, 'radio') + chip('structured', 'no', T('app.no'), p.structured === false, 'radio') + '</div>' +
-        '</div>' +
+        '</div></div>' +
         '<div class="field onb-injury"><label for="injury">' + esc(T('onb.injuryQ')) + '</label>' +
         '<textarea id="injury" name="injury" rows="2" maxlength="300" placeholder="' + esc(T('onb.injuryPh')) + '">' + esc(p.injury || '') + '</textarea>' +
         '<small class="muted">' + esc(T('onb.injuryLabel')) + '</small></div>') +
@@ -697,6 +714,7 @@
       // ۴. بهترین رکورد اخیر
       step(4,
         '<p class="alert alert-good" id="pb-never" hidden>' + esc(T('onb.pbNever')) + '</p>' +
+        '<p class="alert alert-good" id="pb-walk" hidden>' + esc(T('onb.pbWalk')) + '</p>' +
         '<div id="pb-fields">' +
         '<p class="small pb-intro">' + esc(T('onb.pbIntro')) + '</p>' +
         '<p class="small muted">' + esc(T('onb.pbOptional')) + '</p>' +
@@ -720,7 +738,7 @@
         // تاریخ شروع برنامه: پیش‌فرض امروز (یا همون تاریخ قبلی در ویرایش)
         '<div class="field"><label for="sdate">' + esc(T('onb.startDate')) + '</label><input id="sdate" name="startDate" type="date" min="' + (editing && p.startDate && p.startDate < todayKey ? p.startDate : todayKey) + '" max="' + C.dateKey(C.addDays(today(), START_MAX_DAYS)) + '" value="' + esc(p.startDate || todayKey) + '">' +
         '<small class="muted" id="sdate-fa"></small><small class="muted">' + esc(T('onb.startDateHint')) + '</small></div>' +
-        '<div class="field"><label for="gtype">' + esc(T('onb.goalType')) + '</label><select id="gtype" name="goalType">' +
+        '<div id="run-goal5"><div class="field"><label for="gtype">' + esc(T('onb.goalType')) + '</label><select id="gtype" name="goalType">' +
         // ترتیب صریح (کلیدهای عددی در Object.keys جلو می‌افتن)
         ['none', '5', '10', '21', '42', 'ultra'].map(function (k) { return '<option value="' + k + '"' + (goal.type === k ? ' selected' : '') + '>' + esc(C.GOAL_TYPES[k]) + '</option>'; }).join('') +
         '</select></div>' +
@@ -739,7 +757,7 @@
         '<div class="field"><label for="ualt">' + esc(T('onb.altitude')) + '</label>' +
         '<input id="ualt" name="ultraAlt" type="number" inputmode="numeric" min="0" max="6000" step="10" value="' + esc(goal.altitude || '') + '"></div></div>' +
         '<p id="ultra-ratio" class="ultra-ratio" aria-live="polite"></p>' +
-        '</div></div>' +
+        '</div></div></div>' +
         '<fieldset class="onb-sub"><legend>' + esc(T('onb.daysQ')) + req + '</legend><div class="chips">' +
         C.WEEK_ORDER.map(function (i) { return chip('days', i, C.DAY_NAMES[i], days.indexOf(i) >= 0); }).join('') + '</div></fieldset>' +
         '<fieldset class="onb-sub"><legend>' + esc(T('onb.locsQ')) + req + '</legend><div class="chips">' +
@@ -773,6 +791,15 @@
       return { distanceKm: km, timeSec: tt2 };
     }
     function isNever() { var e = form.querySelector('input[name=experience]:checked'); return !!e && e.value === 'never'; }
+    function isWalkForm() { var e = form.querySelector('input[name=activity]:checked'); return !!e && e.value === 'walk'; }
+    // پیاده‌روی: سابقه، دقیقه‌ی هفتگی، توان ۳۰ دقیقه‌ی پیوسته (بی‌سابقه = «نه»)
+    function readWalk() {
+      var ex = form.querySelector('input[name=walkExp]:checked'), w3 = form.querySelector('input[name=walk30]:checked');
+      var raw = String(form.walkMin.value || '').trim(), m = raw === '' ? null : Number(raw);
+      var never = !!ex && ex.value === 'never';
+      return { exp: ex ? ex.value : null, min: never ? 0 : m, w30: never ? 'no' : (w3 ? w3.value : null), never: never,
+        ok: !!ex && (never || (m !== null && m >= 0 && m <= 2000 && !!w3)) };
+    }
     // حجم: هفته‌ی اخیر و میانگین ماه؛ اگه افت شدید باشه، دلیلش لازمه
     function readVolume() {
       if (!inLim('vol', rawIn(form.lastWeekKm)) || !inLim('vol', rawIn(form.monthAvgKm))) return null;
@@ -787,6 +814,10 @@
       return vp;
     }
     function readLevelInputs() {
+      if (isWalkForm()) {
+        var wk = readWalk(), ag = Number(form.age.value);
+        return wk.ok ? { activity: 'walk', walkExp: wk.exp, walkMin: wk.min, walk30: wk.w30, age: ag > 0 ? ag : 30 } : null;
+      }
       if (isNever()) return { currentWeeklyKm: 0, experience: 'never', structured: false, pb: null };
       var v = readVolume();
       var exp = form.querySelector('input[name=experience]:checked');
@@ -798,11 +829,24 @@
       return out;
     }
     function syncLevel() {
-      var never = isNever();
+      var walk = isWalkForm(), never = !walk && isNever();
+      document.getElementById('run-fields3').hidden = walk;
+      document.getElementById('walk-fields3').hidden = !walk;
+      document.getElementById('run-goal5').hidden = walk;
+      var wk = readWalk();
+      document.getElementById('walkmin-field').hidden = wk.never;
+      document.getElementById('walk30-block').hidden = wk.never;
+      if (!editing) document.getElementById('onb-kicker').textContent = T(walk ? 'onb.titleNewWalk' : 'onb.titleNew');
+      // عنوان مرحله‌های ۳ و ۴ با نوع ورزش
+      [3, 4].forEach(function (n) {
+        document.getElementById('onb-step-title-' + n).textContent = T('onb.steps.' + n + (walk ? '.tw' : '.t'));
+        document.getElementById('onb-step-title-' + n).nextElementSibling.textContent = T('onb.steps.' + n + (walk ? '.subw' : '.sub'));
+      });
       document.getElementById('runner-fields').hidden = never;
       document.getElementById('zero-note').hidden = !never;
       document.getElementById('pb-never').hidden = !never;
-      document.getElementById('pb-fields').hidden = never;
+      document.getElementById('pb-walk').hidden = !walk;
+      document.getElementById('pb-fields').hidden = never || walk;
       var vol = never ? null : readVolume();
       document.getElementById('reason-block').hidden = !(vol && vol.gap === 'drop');
       var sel = form.pbSel.value;
@@ -817,6 +861,11 @@
       var inp = readLevelInputs();
       if (!inp) {
         box.innerHTML = '<p class="small muted level-wait">' + esc(T('onb.levelWait')) + '</p>';
+        return;
+      }
+      if (walk) {
+        var wl = C.assessLevel(inp);
+        box.innerHTML = levelCard(wl) + '<p class="small start-preview">' + tt('onb.walkStartPreview', { n: C.walkWeeklyMin(inp, 0, wl).start }) + '</p>';
         return;
       }
       box.innerHTML = levelCard(C.assessLevel(inp)) +
@@ -942,6 +991,14 @@
         // تغییرهای دستی دوره‌ها با ویرایش پروفایل حفظ می‌شن
         cycleObj = { enabled: true, lastStart: cs, cycleLen: cl, periodLen: cp, periodMode: pm, periodOverrides: (p.cycle && p.cycle.periodOverrides) || {} };
       }
+      var walkAct = fd.get('activity') === 'walk', walkIn = walkAct ? readWalk() : null;
+      if (walkAct) {
+        // پیاده‌روی: سابقه، دقیقه‌ی هفتگی و توان ۳۰ دقیقه
+        if (!walkIn.exp) E(3, T('onb.err.walkExp'));
+        else if (!walkIn.never && !(walkIn.min !== null && walkIn.min >= 0 && walkIn.min <= 2000)) E(3, T('onb.err.walkMin'));
+        else if (!walkIn.never && !walkIn.w30) E(3, T('onb.err.walk30'));
+        never = true;
+      } else
       // ۳. وضعیت فعلی دویدن
       if (!fd.get('experience')) E(3, T('onb.err.exp'));
       if (!never) {
@@ -961,7 +1018,7 @@
       if (!sd) E(5, T('onb.err.startDate'));
       else if (sd < todayKey && !(editing && sd === p.startDate)) E(5, T('onb.err.startPast'));
       else if (sd > maxStart) E(5, fa(T('onb.err.startFar', { n: START_MAX_DAYS })));
-      var gType = fd.get('goalType') || 'none', goalObj = { type: gType, date: null };
+      var gType = walkAct ? 'none' : (fd.get('goalType') || 'none'), goalObj = { type: gType, date: null };
       if (gType !== 'none') {
         var rd = fd.get('raceDate');
         if (rd && C.daysBetween(today(), C.parseDate(rd)) < 1) E(5, T('onb.err.raceDate'));
@@ -987,7 +1044,9 @@
         days: selDays.sort(), locations: selLocs,
         injury: String(fd.get('injury') || '').trim(),
         currentWeeklyKm: curKm, lastWeekKm: volP.lastWeekKm, monthAvgKm: volP.monthAvgKm, volumeReason: volP.volumeReason,
-        experience: fd.get('experience'), structured: !never && fd.get('structured') === 'yes',
+        experience: walkAct ? (p.experience || null) : fd.get('experience'), structured: !never && fd.get('structured') === 'yes',
+        activity: walkAct ? 'walk' : 'run',
+        walkExp: walkAct ? walkIn.exp : (p.walkExp || null), walkMin: walkAct ? walkIn.min : (p.walkMin != null ? p.walkMin : null), walk30: walkAct ? walkIn.w30 : (p.walk30 || null),
         schemaVersion: SCHEMA_VERSION,
         goal: p.goal && p.goal.type === goalObj.type && p.goal.targetSec ? Object.assign(goalObj, { targetSec: p.goal.targetSec }) : goalObj, pb: pbObj,
         hrMax: hrIn.max, hrRest: hrIn.rest,
@@ -1026,7 +1085,7 @@
         pbObj.date = same && p.pb.date ? p.pb.date : C.dateKey(today());
       }
       // تغییر سطح یا حجم فعلی = نقطه‌ی شروع جدید؛ بقیه‌ی تغییرات پیشرفت برنامه رو حفظ می‌کنن
-      var keep = editing && !migrating && p.startDate && p.currentWeeklyKm === curKm && p.monthAvgKm === next.monthAvgKm && p.lastWeekKm === next.lastWeekKm &&
+      var keep = editing && !migrating && p.startDate && (p.activity || 'run') === next.activity && p.walkMin === next.walkMin && p.currentWeeklyKm === curKm && p.monthAvgKm === next.monthAvgKm && p.lastWeekKm === next.lastWeekKm &&
         C.assessLevel(p).level === C.assessLevel(next).level;
       // تاریخ شروعی که کاربر انتخاب کرده؛ اگه دست نزده: همون قبلی (یا امروز، وقتی سطح/حجم عوض شده و تاریخ قبلی گذشته)
       var chosen = r.startDate, todayK = C.dateKey(today());
@@ -1112,9 +1171,10 @@
     if (postRunOpen !== key) return '';
     var a = ((state.doneLog || {})[key] || {}).actual || {};
     var n = 'rpe-' + prefix, timeBased = !s.km && s.minutes;
-    var h = '<form class="postrun" data-postrun-form="' + key + '" data-type="' + s.type + '" data-easy="' + (s.easyEffort ? 1 : 0) + '" novalidate>' +
+    var walk = C.WALK_TYPES.indexOf(s.type) >= 0;
+    var h = '<form class="postrun" data-postrun-form="' + key + '" data-type="' + s.type + '" data-easy="' + (s.easyEffort ? 1 : 0) + '" data-walk="' + (walk ? 1 : 0) + '" novalidate>' +
       '<fieldset class="actual-fs"><legend>' + esc(T('post.actTitle')) + '</legend><p class="small muted">' + esc(T('post.actHint')) + '</p>' +
-      '<div class="field"><label for="act-km-' + prefix + '">' + esc(T('post.actKm')) + '</label>' +
+      '<div class="field"><label for="act-km-' + prefix + '">' + esc(T(walk ? 'post.walkKm' : 'post.actKm')) + '</label>' +
       '<input id="act-km-' + prefix + '" name="actKm" type="number" inputmode="decimal" min="0" step="0.01" placeholder="' + esc(s.km ? fa(dKm(s.km)) : '') + '"' +
       ' value="' + (a.km > 0 ? esc(dKm(Math.round(a.km * 100) / 100)) : '') + '"></div>' +
       '<div class="field field-tpick"><span class="field-label">' + esc(T('post.actTime')) + '</span>' +
@@ -1123,7 +1183,15 @@
       '<small class="muted">' + esc(T('post.actTimeHint')) + '</small><small class="time-read" id="act-time-read-' + prefix + '" aria-live="polite">' +
       (a.sec > 0 ? '= ' + fa(C.describeDuration(a.sec)) : '') + '</small></div>' +
       '<div class="field"><label for="act-start-' + prefix + '">' + esc(T('post.actStart')) + '</label>' +
-      '<input id="act-start-' + prefix + '" name="actStart" type="time" value="' + esc(a.start || '') + '"></div></fieldset>';
+      '<input id="act-start-' + prefix + '" name="actStart" type="time" value="' + esc(a.start || '') + '"></div>' +
+      (walk ? '<div class="field"><label for="act-steps-' + prefix + '">' + esc(T('post.walkSteps')) + '</label>' +
+        '<input id="act-steps-' + prefix + '" name="actSteps" type="number" inputmode="numeric" min="0" max="100000" step="1" value="' + (a.steps > 0 ? a.steps : '') + '"></div>' : '') +
+      '</fieldset>';
+    if (walk) {
+      h += '<p class="sub-legend">' + esc(T('post.walkRpeQ')) + '</p><div class="scale scale10" role="radiogroup" aria-label="' + esc(T('post.rpeAria')) + '">';
+      for (var wi = 1; wi <= 10; wi++) h += '<label class="scale-opt"><input type="radio" name="rpe" id="' + n + '-' + wi + '" value="' + wi + '"' + (post && post.rpe === wi ? ' checked' : '') + '><span>' + fa(wi) + '</span></label>';
+      h += '</div><div class="scale-ends"><span>' + esc(T('post.low')) + '</span><span>' + esc(T('post.high')) + '</span></div>';
+    }
     if (s.easyEffort) {
       h += '<p class="sub-legend">' + esc(T('post.q1')) + '</p><div class="scale scale10" role="radiogroup" aria-label="' + esc(T('post.rpeAria')) + '">';
       for (var i = 1; i <= 10; i++) h += '<label class="scale-opt"><input type="radio" name="rpe" id="' + n + '-' + i + '" value="' + i + '"' + (post && post.rpe === i ? ' checked' : '') + '><span>' + fa(i) + '</span></label>';
@@ -1209,7 +1277,7 @@
     var week = C.buildWeek(p, viewDate);
     var todayKey = C.dateKey(now);
     var lv = C.assessLevel(p);
-    var isRunWalk = lv.level <= 1;
+    var isRunWalk = lv.level <= 1 || !!lv.walk;
     // فلش‌ها: آیکون SVG (کاراکترهای ‹ › در متن راست‌به‌چپ توسط بعضی مرورگرها مثل Safari آینه می‌شن).
     // «قبلی» همیشه به سمت شروع خط اشاره می‌کنه: راست در فارسی، چپ در انگلیسی.
     var prevGlyph = chevron(isRtl() ? 'right' : 'left'), nextGlyph = chevron(isRtl() ? 'left' : 'right');
@@ -1255,9 +1323,9 @@
           (ws.d ? '<small class="done-tag">' + tt('week.doneKm', { n: ws.dkm }) + '</small>' : '') +
           (kmChanged ? '<small class="period-tag">' + tt('week.plannedKm', { n: week.totalKm }) + '</small>' : '') +
           (week.goal && week.goal.category === 'ultra' && week.vert ? '<small class="period-tag">' + tt('week.vert', { n: week.vert }) + '</small>' : '') + '</div>') +
-      (zero ? '' : '<div class="stat stat-ratio"><span>' + esc(T('week.ratio')) + ' ' + helpLink('week', T('week.ratioHelp')) + '</span><b dir="ltr">' + fa(100 - week.hardPct) + ' / ' + fa(week.hardPct) + '</b>' +
+      (zero || week.walk ? '' : '<div class="stat stat-ratio"><span>' + esc(T('week.ratio')) + ' ' + helpLink('week', T('week.ratioHelp')) + '</span><b dir="ltr">' + fa(100 - week.hardPct) + ' / ' + fa(week.hardPct) + '</b>' +
       '<div class="ratio-bar" aria-hidden="true"><i style="width:' + (100 - week.hardPct) + '%"></i></div></div>') +
-      '</div>' + learnMore(zero ? ['tenpct'] : ['eighty', 'tenpct']);
+      '</div>' + learnMore(zero || week.walk ? ['tenpct'] : ['eighty', 'tenpct']);
 
     var keys = week.days.map(function (d) { return d.date; });
     if (keys.indexOf(selectedDay) < 0) {
@@ -1494,6 +1562,8 @@
     var err = f.querySelector('.form-errors');
     var easy = f.dataset.easy === '1';
     var noPace = f.dataset.type === 'runwalk' || f.dataset.type === 'walkrun';
+    var walk = f.dataset.walk === '1';
+    var stepsRaw = walk && f.actSteps ? String(f.actSteps.value || '').trim() : '', steps = stepsRaw === '' ? null : Number(stepsRaw);
     var errs = [];
     // مسافت و زمان واقعی: هر دو اختیاری؛ خالی = ثبت نمی‌شه
     var kmRaw = rawIn(f.actKm), km = kmRaw === null ? null : (isMi() ? Math.round(I.toKm(kmRaw) * 100) / 100 : kmRaw);
@@ -1505,9 +1575,12 @@
       var now = new Date(), hm = start.split(':').map(Number);
       if (hm[0] * 60 + hm[1] > now.getHours() * 60 + now.getMinutes()) errs.push(T('post.errStartFuture'));
     }
-    if (km !== null && !(km >= 0.5 && km <= 100)) errs.push(fa(T('post.errKm', { min: dKm(0.5), max: Math.round(dKm(100)) })));
+    var kmMin = walk ? 0.2 : 0.5;
+    if (km !== null && !(km >= kmMin && km <= 100)) errs.push(fa(T('post.errKm', { min: dKm(kmMin), max: Math.round(dKm(100)) })));
     if (sec !== null && !(sec >= 60 && sec <= 86400)) errs.push(T('post.errTime'));
-    if (km && sec && !errs.length && (sec / km < 120 || sec / km > 1200)) errs.push(fa(T('post.errPace', { p: paceFmt(sec / km) })));
+    // پیس ممکن: دویدن ۲ تا ۲۰ دقیقه در کیلومتر، پیاده‌روی ۵ تا ۳۰
+    if (km && sec && !errs.length && (walk ? (sec / km < 300 || sec / km > 1800) : (sec / km < 120 || sec / km > 1200))) errs.push(fa(T('post.errPace', { p: paceFmt(sec / km) })));
+    if (steps !== null && !(steps >= 0 && steps <= 100000 && Math.floor(steps) === steps)) errs.push(T('post.errSteps'));
     if (easy && (!rpe || (!noPace && !pace))) errs.push(T(noPace ? 'post.errRpe' : 'post.errBoth'));
     if (errs.length) {
       err.hidden = false;
@@ -1517,7 +1590,8 @@
     var key = f.dataset.postrunForm;
     if (!state.done[key]) markDone(key);
     var log = state.doneLog[key];
-    if (km || sec || start) { log.actual = {}; if (km) log.actual.km = km; if (sec) log.actual.sec = sec; if (start) log.actual.start = start; } else delete log.actual;
+    if (km || sec || start || steps) { log.actual = {}; if (km) log.actual.km = km; if (sec) log.actual.sec = sec; if (start) log.actual.start = start; if (steps) log.actual.steps = steps; } else delete log.actual;
+    if (walk) { if (rpe) state.postRuns[key] = { rpe: Number(rpe.value), walk: true, type: f.dataset.type, at: new Date().toISOString() }; else delete state.postRuns[key]; }
     if (easy) state.postRuns[key] = { rpe: Number(rpe.value), pace: pace ? pace.value : null, easy: true, type: f.dataset.type, at: new Date().toISOString() };
     // سطح ۰: جلسه‌ی خیلی سخت → هفته «سخت» حساب می‌شه (مگه اینکه خود کاربر جواب داده باشه)
     if (easy && f.dataset.type === 'walkrun' && Number(rpe.value) >= 8) {
@@ -2452,8 +2526,8 @@
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
       '<h1>' + esc(T(greetKey())) + '</h1></header>' +
       '<div data-install-slot="home">' + installBanner() + '</div>' +
-      homeToday(base, r.session, ci, key) + homeChecklist(now) + homeGoalTiles() + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
-      homeCycle(r, key, now) + homeProgress(now) + homePath(now) + linkCard('#plans', T('plans.title'), T('plans.linkSub'));
+      homeToday(base, r.session, ci, key) + homeChecklist(now) + (walker() ? '' : homeGoalTiles()) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
+      homeCycle(r, key, now) + homeProgress(now) + (walker() ? '' : homePath(now) + linkCard('#plans', T('plans.title'), T('plans.linkSub')));
     app.innerHTML = '<div class="home">' + html + '</div>';
   }
   // کارت اصلی بالای خانه: «تمرین امروز» و زیرش «چک‌این امروز»
@@ -2593,6 +2667,7 @@
   }
 
   // ---------- کاشی‌های تیره‌ی هدف: هر مسافت → برنامه‌ی پیشنهادی همون مسافت ----------
+  function walker() { return C.isWalk(state.profile); }
   function homeGoalTiles() {
     var p = state.profile, g = C.goalInfo(p);
     return '<p class="group-label" role="heading" aria-level="2">' + esc(T(g.type === 'none' ? 'goalTiles.title' : 'goalTiles.titleNext')) + '</p><div class="goal-tiles">' + PLAN_KEYS.map(function (k) {
@@ -2615,11 +2690,11 @@
     var g = C.goalInfo(p);
     return [
       { done: true, title: T('start.plan') },
-      { done: g.type !== 'none', title: g.type !== 'none' ? T('start.goalDone', { g: C.goalLabel(g) }) : T('start.goal'), sub: g.type !== 'none' ? (g.date ? faDate(g.date) : '') : T('start.goalSub'), href: '#plans' },
+      C.isWalk(p) ? null : { done: g.type !== 'none', title: g.type !== 'none' ? T('start.goalDone', { g: C.goalLabel(g) }) : T('start.goal'), sub: g.type !== 'none' ? (g.date ? faDate(g.date) : '') : T('start.goalSub'), href: '#plans' },
       { done: Object.keys(state.checkins).length > 0, title: T('start.checkin'), sub: T('start.checkinSub'), href: '#checkin' },
       { done: Object.keys(state.done).length > 0, title: T('start.run'), sub: T('start.runSub'), href: '#plan', attr: ' data-goto-today="1"' },
       { done: !!(p.name || '').trim(), title: T('start.name'), sub: T('start.nameSub'), href: '#settings', attr: ' data-set-open="person"' }
-    ];
+    ].filter(Boolean);
   }
   function homeChecklist(now) {
     var c = state.checklist;
@@ -3573,11 +3648,11 @@
       (joined ? '<p class="pf-joined">' + esc(T('profile.joined', { d: joined })) + '</p>' : '') +
       (name ? '' : '<p class="small muted">' + esc(T('profile.noNameHint')).replace('{link}', '<a href="#onboarding">' + esc(T('profile.noNameLink')) + '</a>') + '</p>') +
       '<a class="btn btn-ink pf-edit" href="#onboarding">' + esc(T('profile.edit')) + '</a></section>' +
-      profileGoalCard(p, g, race, now) +
-      '<a class="card pf-level" href="#plans"><span class="pf-level-badge" aria-hidden="true"><b>' + fa(lv.level) + '</b><small>' + esc(T('level.of10')) + '</small></span>' +
-      '<span class="pf-level-text"><b>' + tt('level.title', { n: lv.level, name: lv.info.name }) + '</b><small>' + esc(T('profile.levelLink')) + '</small></span>' + chevron(isRtl() ? 'left' : 'right') + '</a>' +
+      (walker() ? '' : profileGoalCard(p, g, race, now)) +
+      '<a class="card pf-level" href="' + (walker() ? '#plan' : '#plans') + '"><span class="pf-level-badge" aria-hidden="true"><b>' + fa(lv.level) + '</b><small>' + esc(T('level.of10')) + '</small></span>' +
+      '<span class="pf-level-text"><b>' + tt('level.title', { n: lv.level, name: lv.info.name }) + '</b><small>' + esc(T(walker() ? 'profile.levelLinkWalk' : 'profile.levelLink')) + '</small></span>' + chevron(isRtl() ? 'left' : 'right') + '</a>' +
       periodCard(p, now, race) +
-      listGroup(T('profile.groups.mine'), [
+      listGroup(T('profile.groups.mine'), walker() ? [['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgress')]] : [
         ['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgress')],
         ['#race', 'flag', T('race.pageTitle'), g.type !== 'none' ? C.goalLabel(g) + (race && race.date >= now ? T('progress.sep') + T('profile.goalIn', { n: Math.round(C.daysBetween(now, race.date)) }) : '') : T('profile.goalSetShort')],
         ['#plans', 'plans', T('plans.title'), T('plans.linkSub')],

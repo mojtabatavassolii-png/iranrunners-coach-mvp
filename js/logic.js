@@ -225,6 +225,7 @@
    *  ۳) اگه رکورد خیلی سریع‌تر از حجم باشه (۲+ سطح فاصله): افزایش حجم با احتیاط
    */
   function assessLevel(profile) {
+    if (isWalk(profile)) return assessWalkLevel(profile);
     var vi = volumeInfo(profile);
     var km = vi.level;
     var exp = profile.experience || 'gt3y';
@@ -363,7 +364,9 @@
   var TYPE_INFO = {
     rest: { hard: false }, easy: { hard: false }, runwalk: { hard: false }, walkrun: { hard: false }, tempo: { hard: true }, interval: { hard: true },
     reps: { hard: true }, fartlek: { hard: true }, hills: { hard: true }, long: { hard: true }, race: { hard: true },
-    cancelled: { hard: false }, none: { hard: false }
+    cancelled: { hard: false }, none: { hard: false },
+    // پیاده‌روی
+    walkEasy: { hard: false }, walkBrisk: { hard: false }, walkPower: { hard: true }, walkLong: { hard: true }
   };
   Object.keys(TYPE_INFO).forEach(function (k) {
     Object.defineProperty(TYPE_INFO[k], 'label', { enumerable: true, get: function () { return T('types.' + k); } });
@@ -477,7 +480,7 @@
 
   // یادآوری تایم‌تست
   function fitnessReminder(profile, today) {
-    if (profile.experience === 'never') return null;
+    if (profile.experience === 'never' || isWalk(profile)) return null;
     var fit = currentFitness(profile);
     if (!fit) return { kind: 'none', message: T('reminder.none') };
     var weeks = Math.floor(daysBetween(parseDate(fit.entry.date), today) / 7);
@@ -1307,6 +1310,7 @@
   function weekIndexFor(profile, date) { return Math.floor(daysBetween(planStart(profile), weekStart(date)) / 7); }
 
   function buildWeek(profile, anyDateInWeek) {
+    if (isWalk(profile)) return buildWalkWeek(profile, anyDateInWeek);
     var a = assessLevel(profile);
     var L = a.info, level = a.level;
     var ws = weekStart(anyDateInWeek);
@@ -1614,6 +1618,7 @@
   }
   // نسخه‌ی تطبیق‌یافته‌ی جلسه بر اساس درجه؛ { session, act, params } یا null (بدون تغییر ساختاری)
   function adaptedVersion(s, r, zones) {
+    if (WALK_TYPES.indexOf(s.type) >= 0) return walkAdapted(s, r);
     var t = s.type, label = s.label;
     var rw = t === 'runwalk' || t === 'walkrun';
     if (r.tier === 'severe') {
@@ -1750,7 +1755,7 @@
     if (session.type === 'race') {
       return { session: session, adaptation: { kind: 'caution', tier: r.tier, message: T('adapt.race', { why: reasons }) } };
     }
-    var v = core.version, act = v ? v.act : (session.hard ? 'keepHard' : session.type === 'long' ? 'keepLong' : 'keepEasy');
+    var v = core.version, act = v ? v.act : WALK_TYPES.indexOf(session.type) >= 0 ? 'keepWalk' : (session.hard ? 'keepHard' : session.type === 'long' ? 'keepLong' : 'keepEasy');
     var meaning = T('adapt.mean.' + r.tier) + ((r.streak3 >= 2 || r.streak4 >= 1 || r.sleepStreak >= 2) && r.tier !== 'mild' ? T('adapt.mean.accum') : '');
     var risk = !core.changed && !v ? '' : r.tier === 'mild' ? (session.hard ? T('adapt.risk.mildHard') : '') :
       T(session.hard && session.type !== 'long' ? 'adapt.risk.hard' : session.type === 'long' ? 'adapt.risk.long' : 'adapt.risk.easy', { label: session.label });
@@ -1931,7 +1936,7 @@
   // آنالیز پیشرفت: همه از داده‌ی واقعی کاربر (جلسه‌های انجام‌شده، چک‌این‌ها، RPE بعد از جلسه، رکوردها)
   // =====================================================================
   // RPE پیش‌فرض هر نوع جلسه (اگه کاربر بعد از جلسه RPE ثبت نکرده باشه)
-  var LOAD_RPE = { easy: 3.5, long: 4.5, runwalk: 3, walkrun: 2.5, tempo: 7, interval: 8, reps: 8, fartlek: 7, hills: 7, race: 9 };
+  var LOAD_RPE = { walkEasy: 3, walkBrisk: 5, walkPower: 7, walkLong: 4.5, easy: 3.5, long: 4.5, runwalk: 3, walkrun: 2.5, tempo: 7, interval: 8, reps: 8, fartlek: 7, hills: 7, race: 9 };
   // نسبت پیس میانگین جلسه به پیس ایزی (برای تخمین مدت از کیلومتر)
   var LOAD_PACE = { tempo: 0.9, interval: 0.92, reps: 0.95, fartlek: 0.95, hills: 1.05, race: 0.85 };
   var CTL_DAYS = 42, ATL_DAYS = 7;
@@ -2135,6 +2140,219 @@
   }
 
   // =====================================================================
+  // مسیر پیاده‌روی: سطح ۱ تا ۱۰ بر اساس دقیقه‌ی هفتگی، سابقه، توان ۳۰ دقیقه پیاده‌روی پیوسته و سن.
+  // سه شدت: ملایم (تست حرف زدن، RPE ۳–۴)، تند (کمی نفس‌نفس، RPE ۵–۶، حدود ۱۰۰–۱۲۰ قدم در دقیقه)،
+  // اینتروال قدرتی (RPE ۷–۸، ۱۳۰+ قدم). رشد هفتگی حداکثر ۱۰٪ (۶۰ سال به بالا ۵٪)، هفته‌ی سبک هر ۴ هفته،
+  // هیچ دو روز سخت (اینتروال، پیاده‌روی بلند) پشت‌سرهم، حداقل یک روز استراحت. موتور دویدن دست نمی‌خوره.
+  // =====================================================================
+  function isWalk(profile) { return !!profile && profile.activity === 'walk'; }
+  var WALK_TYPES = ['walkEasy', 'walkBrisk', 'walkPower', 'walkLong'];
+  // min: کف دقیقه‌ی هفتگی سطح، cap: سقف رشد در همین سطح، ses: جلسه در هفته، len: بازه‌ی هر جلسه،
+  // brisk/power: تعداد جلسه‌ی تند/اینتروال، long: سقف پیاده‌روی بلند (۰ = ندارد)، str: جلسه‌ی قدرتی، cross: جایگزین دوچرخه/شنا
+  var WALK_LEVELS = [null,
+    { n: 1, min: 0, cap: 60, ses: 3, len: [5, 10], brisk: 0, power: 0, long: 0, str: 0 },
+    { n: 2, min: 30, cap: 90, ses: 4, len: [10, 15], brisk: 0, power: 0, long: 0, str: 0 },
+    { n: 3, min: 60, cap: 120, ses: 4, len: [15, 20], brisk: 1, segments: true, power: 0, long: 0, str: 0 },
+    { n: 4, min: 90, cap: 150, ses: 5, len: [20, 30], brisk: 1, power: 0, long: 0, str: 0 },
+    { n: 5, min: 120, cap: 200, ses: 5, len: [25, 40], brisk: 2, power: 0, long: 0, str: 0 },
+    { n: 6, min: 150, cap: 250, ses: 5, len: [30, 45], brisk: 2, power: 0, long: 60, str: 1 },
+    { n: 7, min: 200, cap: 300, ses: 5, len: [40, 50], brisk: 1, power: 1, long: 60, str: 2 },
+    { n: 8, min: 250, cap: 360, ses: 6, len: [45, 60], brisk: 1, power: 1, long: 75, str: 2, cross: true },
+    { n: 9, min: 300, cap: 450, ses: 6, len: [50, 65], brisk: 1, power: 2, long: 90, str: 2, cross: true, hills: true },
+    { n: 10, min: 400, cap: 600, ses: 6, len: [60, 90], brisk: 1, power: 2, long: 120, str: 2, cross: true, hills: true }
+  ];
+  WALK_LEVELS.forEach(function (L) {
+    if (!L) return;
+    Object.defineProperty(L, 'name', { enumerable: true, get: function () { return T('walkLevels.' + L.n + '.name'); } });
+    Object.defineProperty(L, 'desc', { enumerable: true, get: function () { return T('walkLevels.' + L.n + '.desc'); } });
+  });
+  var WALK_EXP_CAP = { never: 2, lt3m: 3, '3to12m': 6, gt1y: 10 };
+  function walkLevelFromMin(m) {
+    for (var n = 10; n >= 1; n--) if (m >= WALK_LEVELS[n].min) return n;
+    return 1;
+  }
+  function assessWalkLevel(profile) {
+    var m = Math.max(0, Number(profile.walkMin) || 0), exp = profile.walkExp || 'never';
+    var vol = walkLevelFromMin(m), lv = Math.min(vol, WALK_EXP_CAP[exp] || 2), notes = [];
+    if (lv < vol) notes.push(T('walkNote.expCap', { from: vol, to: lv }));
+    if (profile.walk30 === 'no' && lv > 4) { notes.push(T('walkNote.no30', { from: lv })); lv = 4; }
+    var older = Number(profile.age) >= 60;
+    if (older && lv > 1) { notes.push(T('walkNote.age', { from: lv, to: lv - 1 })); lv--; }
+    return { level: lv, volLevel: vol, vdot: null, pbLevel: null, cautious: older, notes: notes, source: 'walk', walk: true,
+      info: WALK_LEVELS[lv], volume: { start: m, level: m, weighted: m, last: m, avg: m, gap: null } };
+  }
+  // دقیقه‌ی هفتگی هفته‌ی w: از حجم فعلی (حداقل ۵ دقیقه برای هر جلسه)، رشد ۱۰٪ (۶۰+ سال: ۵٪)، هفته‌ی سبک ۸۰٪
+  function walkWeeklyMin(profile, w, a) {
+    a = a || assessWalkLevel(profile);
+    var L = a.info, n = Math.min((profile.days || []).length || 3, L.ses);
+    var start = Math.max(n * L.len[0], Math.min(Number(profile.walkMin) || 0, L.cap));
+    var rate = a.cautious ? 1.05 : 1.1, pr = progression(Math.max(0, w)), v = start;
+    for (var i = 0; i < pr.steps; i++) v = Math.min(L.cap, Math.max(v + 5, Math.round(v * rate / 5) * 5));
+    v = Math.min(L.cap, v);
+    return { min: pr.deload ? Math.round(v * 0.8 / 5) * 5 : v, atCeiling: pr.steps > 0 && v >= L.cap, deload: pr.deload, start: start };
+  }
+  function r5(x) { return Math.max(5, Math.round(x / 5) * 5); }
+  function walkIntensity(kind, profile) {
+    var hr = hrZones(profile), out = T('walk.int.' + kind);
+    if (hr && hr.max) {
+      var pct = { easy: [0.5, 0.6], brisk: [0.64, 0.76], power: [0.77, 0.85] }[kind];
+      var rest = Number(profile.hrRest) || 0, mx = hr.max;
+      var b = function (f) { return Math.round(rest ? rest + f * (mx - rest) : f * mx); };
+      out += T('walk.int.hr', { a: b(pct[0]), b: b(pct[1]) });
+    }
+    return out;
+  }
+  function walkSession(type, min, profile, extra) {
+    var s = { type: type, minutes: min, km: null, hardKm: 0, target: T('s.min', { n: min }), steps: [], how: '', walk: true };
+    for (var k in extra || {}) s[k] = extra[k];
+    return s;
+  }
+  function makeWalkEasy(min, profile) {
+    var s = walkSession('walkEasy', min, profile);
+    s.steps = [T('walk.easyMain', { n: min })];
+    s.how = walkIntensity('easy', profile);
+    return s;
+  }
+  function makeWalkBrisk(min, profile, L) {
+    var s = walkSession('walkBrisk', min, profile);
+    if (L.segments || min < 20) {
+      var reps = Math.max(2, Math.min(4, Math.floor(min / 6)));
+      s.steps = [T('walk.segMain', { n: min, reps: reps })];
+      s.variant = T('walk.segVariant');
+    } else {
+      var hard = Math.max(5, min - 15);
+      s.steps = [T('walk.warm', { n: 10 }), T('walk.briskMain', { n: hard }), T('walk.cool', { n: 5 })];
+      s.target = T('walk.briskTarget', { n: min, b: hard });
+    }
+    s.how = walkIntensity('brisk', profile);
+    return s;
+  }
+  // اینتروال قدرتی: سطح ۷ از ۵×(۱ تند، ۲ آروم)، سطح ۸ از ۶×(۲، ۲)، سطح ۹ و ۱۰ از ۶×(۳، ۲)؛ با هفته‌ها تا ۸ تکرار و استراحت کوتاه‌تر
+  function makeWalkPower(profile, L, w, hills) {
+    var p = Math.min(1, Math.max(0, w) / 8);
+    var base = L.n === 7 ? [5, 1, 2] : L.n === 8 ? [6, 2, 2] : [6, 3, 2];
+    var reps = Math.round(base[0] + 2 * p), on = base[1], off = Math.max(1, base[2] - (p >= 0.75 ? 1 : 0));
+    var min = 15 + reps * (on + off);
+    var s = walkSession('walkPower', min, profile, { spec: true });
+    if (hills) {
+      s.variant = T('walk.hillsVariant');
+      s.steps = [T('walk.warm', { n: 10 }), T('walk.hillsMain', { reps: reps, on: on }), T('walk.cool', { n: 5 })];
+    } else {
+      s.steps = [T('walk.warm', { n: 10 }), T('walk.powerMain', { reps: reps, on: on, off: off }), T('walk.cool', { n: 5 })];
+    }
+    s.target = T('walk.powerTarget', { n: min, reps: reps });
+    s.how = walkIntensity('power', profile);
+    return s;
+  }
+  function makeWalkLong(min, profile) {
+    var s = walkSession('walkLong', min, profile);
+    s.steps = [T('walk.longMain', { n: min })];
+    s.how = walkIntensity('easy', profile) + T('walk.longHow');
+    return s;
+  }
+  // کراس‌ترینینگ: قدرتی ۲۰–۳۰ دقیقه (ACSM: ۲ بار در هفته، روزهای غیرپشت‌سرهم)
+  function addWalkStrength(s) {
+    s.steps = s.steps.concat([T('walk.strengthStep')]);
+    s.strength = { min: 25, moves: T('walk.strengthMoves') };
+    return s;
+  }
+  function buildWalkWeek(profile, anyDateInWeek) {
+    var a = assessWalkLevel(profile), L = a.info, level = a.level;
+    var ws = weekStart(anyDateInWeek), w = weekIndexFor(profile, ws), W = Math.max(0, w);
+    var start = parseDate(profile.startDate);
+    var avail = (profile.days || []).map(satToRel);
+    // حداقل یک روز استراحت کامل در هفته
+    var nS = Math.min(avail.length, L.ses, 6);
+    var sessionDays = chooseSessionDays(avail, nS);
+    var vol = walkWeeklyMin(profile, W, a), total = vol.min;
+    var longDay = L.long && nS >= 4 ? (sessionDays.indexOf(6) >= 0 ? 6 : sessionDays[sessionDays.length - 1]) : null;
+    var longMin = longDay !== null ? Math.min(L.long, r5(total * 0.3)) : 0;
+    // هفته‌ی سبک: اینتروال‌ها تند می‌شن
+    var nPower = vol.deload ? 0 : L.power, nBrisk = L.brisk + (vol.deload ? L.power : 0);
+    var specs = [];
+    for (var i = 0; i < nPower; i++) specs.push('power');
+    for (i = 0; i < nBrisk; i++) specs.push('brisk');
+    var others = sessionDays.filter(function (d) { return d !== longDay; });
+    specs = specs.slice(0, Math.max(0, others.length - 1));
+    // اینتروال‌ها (سخت) روی روزهای غیرمجاور با پیاده‌روی بلند؛ تندها روی روزهای باقی‌مونده
+    var hardFixed = longDay !== null ? [longDay] : [];
+    var pDays = nPower ? placeQuality(sessionDays, hardFixed, specs.filter(function (x) { return x === 'power'; }).length) : [];
+    var rest = others.filter(function (d) { return pDays.indexOf(d) < 0; });
+    var bDays = rest.slice(0, specs.length - pDays.length);
+    var each = r5((total - longMin) / Math.max(1, others.length));
+    // هفته‌ی سبک می‌تونه زیر کف بازه‌ی جلسه بره تا واقعاً سبک باشه
+    each = Math.max(vol.deload ? r5(L.len[0] * 0.75) : L.len[0], Math.min(L.len[1], each));
+    var hardDays = pDays.concat(hardFixed);
+    var template = {};
+    sessionDays.forEach(function (d) {
+      var sx;
+      if (d === longDay) sx = makeWalkLong(Math.max(vol.deload ? r5(longMin * 0.8) : longMin, each), profile);
+      else if (pDays.indexOf(d) >= 0) sx = makeWalkPower(profile, L, W, L.hills && W % 2 === 1);
+      else if (bDays.indexOf(d) >= 0) sx = makeWalkBrisk(each, profile, L);
+      else sx = makeWalkEasy(each, profile);
+      template[d] = sx;
+    });
+    // قدرتی روی روزهای آسون که فرداشون روز سخت نیست؛ جایگزین دوچرخه/شنا روی یک روز آسون دیگه (سطح ۸+)
+    var easyDays = sessionDays.filter(function (d) { return template[d].type === 'walkEasy' || template[d].type === 'walkBrisk'; });
+    var strDays = easyDays.filter(function (d) { return hardDays.indexOf((d + 1) % 7) < 0 && hardDays.indexOf(d) < 0; });
+    var nStr = vol.deload ? Math.min(1, L.str) : L.str, picked = [];
+    strDays.forEach(function (d) {
+      if (picked.length >= nStr) return;
+      if (picked.some(function (x) { return circDist(x, d) < 2; })) return;
+      picked.push(d);
+    });
+    picked.forEach(function (d) { addWalkStrength(template[d]); });
+    if (L.cross) {
+      var cd = easyDays.filter(function (d) { return template[d].type === 'walkEasy' && picked.indexOf(d) < 0; })[0];
+      if (cd !== undefined) { template[cd].steps = template[cd].steps.concat([T('walk.crossStep')]); template[cd].cross = true; }
+    }
+    var days = [];
+    for (var j = 0; j < 7; j++) {
+      var date = addDays(ws, j), s;
+      if (date < start) s = { type: 'none', km: null, hardKm: 0, target: '—', steps: [], how: T('s.notStarted') };
+      else if (template[j]) s = JSON.parse(JSON.stringify(template[j]));
+      else s = makeRest();
+      s.date = dateKey(date);
+      s.dayName = T('days')[(date.getDay() + 1) % 7];
+      s.dayShort = T('daysShort')[(date.getDay() + 1) % 7];
+      s.label = TYPE_INFO[s.type].label + (s.variant ? ' (' + s.variant + ')' : '');
+      s.hard = isHard(s.type);
+      days.push(s);
+    }
+    var totalMin = days.reduce(function (x, d) { return x + (d.minutes || 0); }, 0);
+    var phase = w === -1 && addDays(ws, 6) >= start ? { key: 'intro', label: T('phase.intro') } : w < 0 ? { key: 'before', label: T('phase.before') }
+      : vol.deload ? { key: 'deload', label: T('phase.deload') } : w === 0 ? { key: 'first', label: T('phase.first') }
+      : vol.atCeiling ? { key: 'maintain', label: T('phase.maintain') } : { key: 'build', label: T('phase.build') };
+    return {
+      weekIndex: w, start: dateKey(ws), days: days, level: level, tier: 'W', goal: goalInfo(profile), walk: true,
+      period: null, periodLabel: null, phase: phase, volumeTarget: null, minutesTarget: total, atCeiling: vol.atCeiling, b2b: false,
+      zeroStage: null, zeroFinal: ZERO_FINAL, totalKm: 0, totalMin: totalMin, vert: 0, hardPct: 0
+    };
+  }
+  // تطبیق جلسه‌ی پیاده‌روی با چک‌این: خفیف = کمی کوتاه‌تر (فقط اینتروال و بلند)، متوسط = ملایم و کوتاه‌تر، جدی = استراحت فعال
+  function walkAdapted(s, r) {
+    if (r.tier === 'severe') return { session: { type: 'rest', km: null, hardKm: 0, target: T('cycle.activeRestTarget'), steps: [T('cycle.activeRestStep')], how: T('cycle.activeRestHow') }, act: 'rest' };
+    var p = {};
+    if (r.tier === 'mild') {
+      if (s.type !== 'walkPower' && s.type !== 'walkLong') return null;
+      var m1 = r5(s.minutes * 0.85);
+      return { session: makeWalkEasyLike(s, m1, s.type === 'walkPower'), act: 'walkShorter', params: { km: m1, orig: s.minutes } };
+    }
+    var m = r5(s.minutes * (s.type === 'walkLong' ? 0.75 : 0.8));
+    p = { km: m, orig: s.minutes };
+    if (s.type === 'walkEasy') return { session: makeWalkEasyLike(s, m, false), act: 'walkShorter', params: p };
+    return { session: makeWalkEasyLike(s, m, false, true), act: 'walkEasier', params: p };
+  }
+  function makeWalkEasyLike(s, min, keepType, toEasy) {
+    var n = JSON.parse(JSON.stringify(s));
+    if (toEasy) { n.type = 'walkEasy'; n.variant = null; n.steps = [T('walk.easyMain', { n: min })]; n.how = T('walk.int.easy'); }
+    else if (keepType && s.type === 'walkPower') n.steps = n.steps.map(function (x) { return x; }).concat([T('walk.fewerReps')]);
+    else n.steps = [T(n.type === 'walkLong' ? 'walk.longMain' : 'walk.easyMain', { n: min })];
+    n.minutes = min; n.target = T('s.min', { n: min });
+    return n;
+  }
+
+  // =====================================================================
   // برنامه‌های پیشنهادی (اختیاری): برای هر مسافت، از سطح و حجم فعلی کاربر
   // با همون قواعد موتور اصلی: رشد ۱۰٪ (احتیاط ۵٪) با هفته‌ی سبک هر ۴ هفته، حداقل آماده‌سازی هر سطح،
   // برنامه‌ی سطح ۰، و برای سطح ۳ به بالا رسیدن به زمان هدف با پله‌های ۱ واحدی VDOT (دنیلز: هر ۴ تا ۶ هفته).
@@ -2273,7 +2491,8 @@
     periodPlan: periodPlan, periodSession: periodSession, periodsAhead: periodsAhead, PERIOD_MODES: PERIOD_MODES, dayRecords: dayRecords,
     ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,
-    planSuggestion: planSuggestion, goalPath: goalPath, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
+    planSuggestion: planSuggestion, goalPath: goalPath,
+    isWalk: isWalk, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
     PACE_LEVEL: PACE_LEVEL, PLAN_NEEDS: PLAN_NEEDS, vdotStepWeeks: vdotStepWeeks,
     analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS
   };
