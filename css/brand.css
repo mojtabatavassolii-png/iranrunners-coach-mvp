@@ -1,0 +1,9 @@
+:root {
+  /* Gaam brand palette — Pure Sand */
+  --gaam-charcoal: #121214;   /* main background */
+  --gaam-graphite: #2A2A30;   /* cards, surfaces, borders */
+  --gaam-sand: #D8C4A0;       /* primary: buttons, highlights, active states */
+  --gaam-offwhite: #F5F2EC;   /* text and secondary accent */
+  --gaam-muted: #A0A0A8;     /* secondary text */
+  --gaam-on-sand: #121214;    /* text on sand buttons */
+}

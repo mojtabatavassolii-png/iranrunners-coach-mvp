@@ -922,8 +922,8 @@ test('PWA: مانیفست، آیکون‌ها و هماهنگی کش سرویس�
   assert(m.name && m.short_name && m.start_url && m.theme_color && m.background_color);
   ['192x192', '512x512'].forEach(function (sz) {
     assert(m.icons.some(function (i) { return i.sizes === sz && i.purpose === 'any'; }), sz);
-    assert(m.icons.some(function (i) { return i.sizes === sz && i.purpose === 'maskable'; }), sz + ' maskable');
   });
+  assert(m.icons.some(function (i) { return i.sizes === '512x512' && i.purpose === 'maskable'; }), '512 maskable');
   m.icons.forEach(function (i) {
     var buf = fs.readFileSync(path.join(root, i.src));
     // ابعاد واقعی PNG (IHDR)

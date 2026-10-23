@@ -1,11 +1,11 @@
 /*
- * سرویس‌ورکر «مربی خودت باش»: کش پوسته‌ی اپ برای باز شدن سریع و کار بدون اینترنت.
+ * سرویس‌ورکر «گام»: کش پوسته‌ی اپ برای باز شدن سریع و کار بدون اینترنت.
  * - صفحه (ناوبری): اول شبکه، اگه نشد (آفلاین) نسخه‌ی کش‌شده.
  * - فایل‌های نسخه‌دار (?v=…): اول کش؛ با هر انتشار آدرس عوض می‌شه، پس فایل قدیمی هیچ‌وقت با صفحه‌ی جدید قاطی نمی‌شه.
  * - بقیه (آیکون‌ها، فونت): کش و به‌روزرسانی در پس‌زمینه.
  * با هر انتشار، VERSION و نسخه‌ی فایل‌ها در index.html با هم بالا می‌رن (تست این هماهنگی رو بررسی می‌کنه).
  */
-var VERSION = '63';
+var VERSION = '64';
 var CACHE = 'coach-v' + VERSION;
 // فایل‌های بزرگ تحلیل دویدن (MediaPipe و مدل، حدود ۳۵ مگابایت): کش جدا و ماندگار، فقط بعد از اولین استفاده؛
 // با انتشار نسخه‌ی تازه‌ی اپ پاک نمی‌شن. با عوض شدن نسخه‌ی MediaPipe، این اسم عوض می‌شه.
@@ -28,11 +28,14 @@ var SHELL = [
   'js/gait.js?v=' + VERSION,
   'js/pose.js?v=' + VERSION,
   'js/app.js?v=' + VERSION,
-  'img/logo.png?v=' + VERSION,
-  'img/favicon.png',
-  'img/apple-touch-icon.png',
-  'img/icon-192.png',
-  'img/icon-512.png'
+  'css/brand.css?v=' + VERSION,
+  'public/assets/gaam-logo-transparent.svg?v=' + VERSION,
+  'public/assets/favicon.svg',
+  'public/assets/favicon-32.png',
+  'public/assets/apple-touch-icon.png',
+  'public/assets/icon-192.png',
+  'public/assets/icon-512.png',
+  'public/assets/icon-maskable-512.png'
 ];
 
 self.addEventListener('install', function (e) {

@@ -1,5 +1,5 @@
 /*
- * رابط کاربری «مربی خودت باش» — بدون فریم‌ورک، داده‌ها فقط در localStorage.
+ * رابط کاربری «گام» — بدون فریم‌ورک، داده‌ها فقط در localStorage.
  * همه‌ی متن‌ها از دیکشنری ترجمه خونده می‌شن (js/i18n/fa.js و en.js)؛ T('کلید', {پارامتر}).
  */
 (function () {
@@ -491,7 +491,7 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo" src="img/logo.png?v=26" alt="' + esc(T('app.name')) + '" width="168" height="168">' +
+      '<img class="login-logo" src="public/assets/gaam-logo-transparent.svg?v=64" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
@@ -2871,7 +2871,7 @@
   }
   // فایل تقویم: هر جلسه‌ی ۱۲ هفته‌ی آینده یک رویداد با یادآور در ساعت انتخابی (داده از گوشی بیرون نمی‌ره)
   function icsFile() {
-    var p = state.profile, r = reminderCfg(), now = today(), hm = r.time.replace(':', '') + '00', lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//coach-mvp//fa', 'CALSCALE:GREGORIAN'];
+    var p = state.profile, r = reminderCfg(), now = today(), hm = r.time.replace(':', '') + '00', lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//gaam//fa', 'CALSCALE:GREGORIAN'];
     var esc2 = function (x) { return String(x).replace(/[\\,;]/g, function (c) { return '\\' + c; }).replace(/\n/g, ' '); };
     for (var i = 0; i < 84; i++) {
       var d = C.addDays(now, i), s = C.sessionFor(p, d);
@@ -2939,7 +2939,7 @@
     notifyTimer = setTimeout(function () {
       var k = C.dateKey(new Date()), s = C.sessionFor(state.profile, new Date());
       if (state.done[k] || ['rest', 'none'].indexOf(s.type) >= 0) return;
-      try { new Notification(T('remind.bannerT'), { body: fa(T('remind.banner', { s: s.label, n: s.minutes || '' })), icon: 'img/logo.png' }); } catch (er) { /* */ }
+      try { new Notification(T('remind.bannerT'), { body: fa(T('remind.banner', { s: s.label, n: s.minutes || '' })), icon: 'public/assets/icon-192.png' }); } catch (er) { /* */ }
     }, Math.min(at - now, 2147483000));
   }
   setTimeout(scheduleNotify, 1500);
@@ -3024,7 +3024,7 @@
   // پیشرفت من: نمودارها از داده‌ی واقعی (C.analytics)؛ رسم با js/charts.js
   // =====================================================================
   // رنگ سری‌ها (پالت دسته‌ای اعتبارسنجی‌شده: آبی، نارنجی، فیروزه‌ای) و رنگ‌های وضعیت برای پایبندی
-  var SERIES = ['#2a78d6', '#eb6834', '#1baf7a'];
+  var SERIES = ['#6FA2EE', '#EF8A5C', '#3CC795'];
   var STATUS = { completed: '#0ca30c', adapted: '#fab219', pain: '#d03b3b', missed: '#b9b8b0' };
   var RANGES = { '4w': 28, '3m': 91, all: null };
   var chartSpecs = {};
@@ -4241,7 +4241,7 @@
     if ((m !== 'prompt' && m !== 'ios') || installDismissed()) return '';
     return '<section class="card hcard install-card" role="region" aria-label="' + esc(T('install.title')) + '">' +
       '<button type="button" class="install-x" data-install-dismiss="1" aria-label="' + esc(T('install.dismiss')) + '">×</button>' +
-      '<div class="install-row"><img src="img/icon-192.png" alt="" width="52" height="52"><div><b>' + esc(T('install.bannerTitle')) + '</b>' +
+      '<div class="install-row"><img src="public/assets/icon-192.png" alt="" width="52" height="52"><div><b>' + esc(T('install.bannerTitle')) + '</b>' +
       '<p class="small muted">' + esc(T('install.bannerText')) + '</p></div></div>' +
       '<button type="button" class="btn btn-primary btn-block" data-install="1">' + DL_ICON + esc(T(m === 'ios' ? 'install.how' : 'install.btn')) + '</button></section>';
   }
@@ -4267,7 +4267,7 @@
     var share = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>';
     var plus = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg>';
     modalRoot.innerHTML = '<div class="modal-backdrop" id="ios-guide"><div class="modal install-modal" role="dialog" aria-modal="true" aria-labelledby="ig-title">' +
-      '<img src="img/icon-192.png" alt="" width="64" height="64" class="install-modal-icon">' +
+      '<img src="public/assets/icon-192.png" alt="" width="64" height="64" class="install-modal-icon">' +
       '<h2 id="ig-title">' + esc(T('install.iosTitle')) + '</h2>' +
       '<ol class="install-steps">' +
       '<li><span class="step-ico">' + share + '</span><span>' + T('install.iosStep1') + '</span></li>' +

@@ -1,9 +1,9 @@
 ---
 name: ux-audit
-description: Run the periodic UX/UI audit of the «مربی خودت باش» app — touch-target size, text contrast, spacing consistency, type hierarchy and phone-size compatibility on the onboarding wizard, Home, Plan and Profile — and report a prioritized list of proposals with before/after comparisons for the owner to approve. Use when the user asks for a UX review, UI audit, accessibility check, «بازبینی UX» or similar. Never changes the app itself.
+description: Run the periodic UX/UI audit of the «گام» app — touch-target size, text contrast, spacing consistency, type hierarchy and phone-size compatibility on the onboarding wizard, Home, Plan and Profile — and report a prioritized list of proposals with before/after comparisons for the owner to approve. Use when the user asks for a UX review, UI audit, accessibility check, «بازبینی UX» or similar. Never changes the app itself.
 ---
 
-# UX/UI audit for «مربی خودت باش»
+# UX/UI audit for «گام»
 
 This is a **report-only** process. Do not edit `css/`, `js/`, `index.html` or anything that ships, and do not commit or push app changes. The owner picks which proposals to implement; implementation is a separate, later request that follows the repo's normal approve-then-commit rule.
 

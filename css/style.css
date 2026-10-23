@@ -1,35 +1,37 @@
 /* ===========================================================
-   مربی خودت باش (MVP)
-   پالت نعنایی و مرجانی
+   گام (Gaam)
+   پالت زغالی، گرافیتی و شنی
    =========================================================== */
 :root {
-  /* پالت «نعنایی و مرجانی»: نعنایی = هویت و ناوبری، مرجانی = اقدام اصلی، قرمز = فقط خطر/درد */
-  --brand: #00866b;
-  --brand-deep: #006b56;
-  --brand-soft: #e4f4f0;
-  --brand-light: #c9efe6;
-  --accent: #ff6b57;
-  --accent-strong: #d4412c;  /* متن سفید روی این رنگ: ۴٫۶ به ۱ */
-  --accent-deep: #b8361f;
-  --accent-soft: #ffe9e5;
-  --danger: #b42318;
-  --danger-deep: #8f1a12;
-  --danger-soft: #fdecea;
-  --danger-text: #5a0f0a;
-  --info: #2d6cdf;
-  --info-soft: #e6eefc;
-  --info-line: #b9cef5;
-  /* سبک Runna: زمینه‌ی خاکستری‌آبی روشن، کارت تخت با حاشیه‌ی نازک، متن جوهری؛ نعنایی و مرجانی فقط برای معنا */
-  --ink: #121a24;
-  --bg: #f1f4f8;
-  --card: #f9fbfd;
-  --panel: #e8edf3;
-  --panel-raised: #dde4ec;
-  --text: #121a24;
-  --muted: #556170;
-  --faint: #5f6b79;
-  --field-line: #cfd8e3;
-  --line: #e0e6ee;
+  /* پالت «گام» (css/brand.css): زغالی = زمینه، گرافیتی = کارت، شنی = اقدام اصلی و حالت فعال، سفید استخوانی = متن */
+  --brand: var(--gaam-sand);
+  --brand-deep: #E6D6B8;     /* شنی روشن‌تر برای لینک و متن تأکیدی روی زمینه‌ی تیره */
+  --brand-soft: #38342D;     /* زمینه‌ی کم‌رنگ شنی (حالت انتخاب) */
+  --brand-light: #554B3B;
+  --on-brand: var(--gaam-on-sand);
+  --accent: var(--gaam-sand);
+  --accent-strong: var(--gaam-sand);
+  --accent-deep: #E6D6B8;
+  --accent-soft: #38342D;
+  --danger: #C4372C;         /* زمینه با متن سفید: ۵٫۵ به ۱ */
+  --danger-ink: #FF9389;     /* متن قرمز روی زمینه‌ی تیره */
+  --danger-deep: #A02A21;
+  --danger-soft: #3B2220;
+  --danger-text: #FFD5CF;
+  --info: #8DB4F5;
+  --info-soft: #1F2736;
+  --info-line: #3A5180;
+  --ink: var(--gaam-offwhite);
+  --bg: var(--gaam-charcoal);
+  --card: var(--gaam-graphite);
+  --panel: #35353C;
+  --panel-raised: #414149;
+  --field-bg: #1D1D21;
+  --text: var(--gaam-offwhite);
+  --muted: var(--gaam-muted);
+  --faint: var(--gaam-muted);
+  --field-line: #4C4C55;
+  --line: #3A3A42;
 
   /* مقیاس تایپوگرافی: همه‌ی اندازه‌ها از این پله‌ها (حداقل ۱۲ پیکسل) */
   --fs-xs: 0.75rem;     /* 12 برچسب */
@@ -47,14 +49,14 @@
   --shadow: none;
 
   /* رنگ جلسه‌ها به ترتیب شدت؛ -ink برای متن روی زمینه‌ی کم‌رنگ */
-  --c-easy: #00a884;      --c-easy-ink: #00705a;     --c-easy-bg: #dcf5ee;
-  --c-long: #2d6cdf;      --c-long-ink: #1f55b8;     --c-long-bg: #e6eefc;
-  --c-tempo: #e89a0c;     --c-tempo-ink: #8a5a00;    --c-tempo-bg: #fdf0d5;
-  --c-fartlek: #d6336c;   --c-fartlek-ink: #a8214f;  --c-fartlek-bg: #fce4ee;
-  --c-interval: #e8590c;  --c-interval-ink: #b3430a; --c-interval-bg: #fde5d6;
-  --c-reps: #9b5de5;      --c-reps-ink: #6f3fb8;     --c-reps-bg: #f1e8fc;
-  --c-hills: #8d6a45;     --c-hills-ink: #6d5033;    --c-hills-bg: #f2e9de;
-  --c-rest: #94a7a3;      --c-rest-ink: #5f716e;     --c-rest-bg: #edf3f1;
+  --c-easy: #34C294;      --c-easy-ink: #86E2C2;     --c-easy-bg: #1A3A31;
+  --c-long: #5B8DEF;      --c-long-ink: #ABC5FA;     --c-long-bg: #1D2942;
+  --c-tempo: #E8A23A;     --c-tempo-ink: #F5CC88;    --c-tempo-bg: #3A2F18;
+  --c-fartlek: #E05A8A;   --c-fartlek-ink: #F6A8C3;  --c-fartlek-bg: #3E1E2A;
+  --c-interval: #EE7A3C;  --c-interval-ink: #F8B58F;  --c-interval-bg: #3E2519;
+  --c-reps: #A97BEA;      --c-reps-ink: #D0B8F7;     --c-reps-bg: #2F2441;
+  --c-hills: #B58E64;     --c-hills-ink: #DCC2A2;    --c-hills-bg: #382D22;
+  --c-rest: #8A8A93;      --c-rest-ink: #BDBDC4;     --c-rest-bg: #313137;
 }
 
 * { box-sizing: border-box; }
@@ -100,7 +102,7 @@ small { font-size: var(--fs-sm); }
 /* ---------- هدر ---------- */
 .site-header {
   background: var(--brand);
-  color: #fff;
+  color: var(--on-brand);
   position: sticky; top: 0; z-index: 20;
   border-bottom: 3px solid var(--accent);
 }
@@ -151,7 +153,7 @@ small { font-size: var(--fs-sm); }
 .medical-banner strong { color: var(--accent-deep); }
 .medical-icon {
   flex: 0 0 auto; width: 48px; height: 48px; border-radius: 50%;
-  background: var(--accent-strong); color: #fff; display: grid; place-items: center;
+  background: var(--accent-strong); color: var(--on-brand); display: grid; place-items: center;
 }
 @media (max-width: 519px) {
   .medical-banner { font-size: var(--fs-md); padding: 12px 14px; }
@@ -181,10 +183,10 @@ main { outline: none; }
   cursor: pointer; text-decoration: none; line-height: 1.5; min-height: 44px;
 }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.btn-primary { background: var(--accent-strong); color: #fff; }
+.btn-primary { background: var(--accent-strong); color: var(--on-brand); }
 .btn-primary:hover { background: var(--accent-deep); }
 .btn-outline { background: #fff; color: var(--brand-deep); border-color: var(--brand); }
-.btn-outline:hover { background: var(--brand); color: #fff; }
+.btn-outline:hover { background: var(--brand); color: var(--on-brand); }
 .btn-ghost { background: transparent; color: var(--muted); }
 .btn-ghost:hover { background: var(--panel); }
 .btn-danger { background: var(--danger); color: #fff; width: 100%; }
@@ -192,7 +194,7 @@ main { outline: none; }
 .btn-done { background: var(--c-easy-ink); color: #fff; }
 .btn-icon { width: 44px; height: 44px; padding: 0; font-size: var(--fs-2xl); background: var(--panel); color: var(--ink); }
 .btn-icon:hover:not(:disabled) { background: var(--panel-raised); }
-.danger-text { color: var(--danger); }
+.danger-text { color: var(--danger-ink); }
 .linklike { font: inherit; background: none; border: 0; color: var(--brand-deep); cursor: pointer; padding: 0; text-decoration: underline; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
 :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
@@ -222,7 +224,7 @@ textarea { resize: vertical; }
   display: inline-block; padding: 8px 16px; border-radius: 999px; border: 1.5px solid var(--field-line);
   font-weight: 500; background: #fff; min-height: 44px; line-height: 1.7;
 }
-.chip input:checked + span { background: var(--brand); color: #fff; border-color: var(--brand); }
+.chip input:checked + span { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
 .chip-danger input:checked + span { background: var(--danger); border-color: var(--danger); }
 .chip input:focus-visible + span { outline: 3px solid var(--brand); outline-offset: 2px; }
 
@@ -239,7 +241,7 @@ textarea { resize: vertical; }
 .race-fields { background: var(--panel); border-radius: 14px; padding: 14px 16px 4px; margin-top: 8px; }
 
 .form-errors { background: var(--danger-soft); border: 1px solid var(--danger); border-radius: 10px; padding: 10px 14px; color: var(--danger-text); margin-top: 12px; }
-.req { color: var(--danger); font-weight: 700; font-size: var(--fs-md); }
+.req { color: var(--danger-ink); font-weight: 700; font-size: var(--fs-md); }
 .form-errors ul { margin: 0; padding-inline-start: 18px; }
 
 /* مقیاس ۱ تا ۵ */
@@ -250,7 +252,7 @@ textarea { resize: vertical; }
   display: grid; place-items: center; height: 52px; border-radius: 12px; border: 1.5px solid var(--field-line);
   font-weight: 800; font-size: var(--fs-lg); cursor: pointer;
 }
-.scale-opt input:checked + span { background: var(--brand); color: #fff; border-color: var(--brand); }
+.scale-opt input:checked + span { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
 .scale-opt input:focus-visible + span { outline: 3px solid var(--brand); outline-offset: 2px; }
 .scale-ends { display: flex; justify-content: space-between; max-width: 420px; color: var(--muted); font-size: var(--fs-sm); margin: 4px 0 8px; }
 
@@ -266,7 +268,7 @@ textarea { resize: vertical; }
 .badge-reps { background: var(--c-reps-bg); color: var(--c-reps-ink); }
 .badge-hills { background: var(--c-hills-bg); color: var(--c-hills-ink); }
 .badge-long { background: var(--c-long-bg); color: var(--c-long-ink); }
-.badge-race { background: var(--accent-strong); color: #fff; }
+.badge-race { background: var(--accent-strong); color: var(--on-brand); }
 .badge-cancelled { background: var(--danger); color: #fff; }
 .badge-none { background: transparent; color: var(--faint); border: 1px dashed var(--field-line); }
 
@@ -341,7 +343,7 @@ textarea { resize: vertical; }
 .type-dot { display: none; width: 12px; height: 12px; border-radius: 50%; background: var(--dot, var(--c-rest)); }
 .day-target { font-weight: 800; font-size: var(--fs-base); }
 .day-target small { font-weight: 500; font-size: var(--fs-xs); color: var(--muted); margin-inline-start: 2px; }
-.today-tag { position: absolute; top: -12px; background: var(--brand); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 0 8px; border-radius: 6px; }
+.today-tag { position: absolute; top: -12px; background: var(--brand); color: var(--on-brand); font-size: var(--fs-xs); font-weight: 700; padding: 0 8px; border-radius: 6px; }
 .done-mark { position: absolute; top: 4px; inset-inline-start: 6px; color: var(--c-easy-ink); font-weight: 900; }
 @media (max-width: 759px) {
   .week-grid { gap: 4px; }
@@ -362,7 +364,7 @@ textarea { resize: vertical; }
 .legend { margin-top: 14px; }
 
 /* ---------- مسابقه ---------- */
-.race-hero { background: var(--brand-deep); color: #fff; border: 0; position: relative; overflow: hidden; }
+.race-hero { background: var(--brand-deep); color: var(--on-brand); border: 0; position: relative; overflow: hidden; }
 .race-hero::after { content: ""; position: absolute; inset: auto auto -60px -40px; width: 220px; height: 220px; border-radius: 50%; background: var(--accent); opacity: 0.9; }
 .race-hero h1 { font-size: var(--fs-2xl); position: relative; z-index: 1; }
 .race-hero > * { position: relative; z-index: 1; }
@@ -400,7 +402,7 @@ textarea { resize: vertical; }
   padding: 26px 22px; border-top: 8px solid var(--danger); max-height: calc(100vh - 32px); overflow-y: auto;
 }
 .modal-icon { width: 54px; height: 54px; border-radius: 50%; background: var(--danger); color: #fff; display: grid; place-items: center; font-size: var(--fs-3xl); font-weight: 900; margin-bottom: 10px; }
-.modal h2 { color: var(--danger); }
+.modal h2 { color: var(--danger-ink); }
 .modal .pain-msg { font-size: var(--fs-lg); font-weight: 800; background: var(--danger-soft); border-radius: 10px; padding: 12px 14px; }
 .modal ul { padding-inline-start: 20px; }
 .ack { display: flex; gap: 10px; align-items: flex-start; background: var(--panel); border-radius: 10px; padding: 12px; margin: 12px 0; cursor: pointer; font-weight: 500; }
@@ -419,12 +421,12 @@ textarea { resize: vertical; }
 .level-card { display: flex; gap: 16px; align-items: flex-start; background: var(--panel); border-radius: 14px; padding: 14px 16px; margin-top: 12px; }
 .level-card.compact { margin-top: 0; background: transparent; padding: 0; }
 .level-num {
-  flex: 0 0 auto; width: 64px; height: 64px; border-radius: 16px; background: var(--brand-deep); color: #fff;
+  flex: 0 0 auto; width: 64px; height: 64px; border-radius: 16px; background: var(--brand-deep); color: var(--on-brand);
   display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1;
   border-bottom: 4px solid var(--accent);
 }
 .level-num b { font-size: var(--fs-2xl); font-weight: 900; }
-.level-num small { font-size: var(--fs-xs); color: var(--brand-light); }
+.level-num small { font-size: var(--fs-xs); color: var(--on-brand); opacity: .8; }
 .level-body { min-width: 0; }
 .level-body h3 { margin-bottom: 4px; }
 .level-body p { margin-bottom: 6px; }
@@ -448,7 +450,7 @@ textarea { resize: vertical; }
 .scale10 + .scale-ends { max-width: 520px; }
 .fit-head { display: flex; align-items: center; gap: 14px; margin: 8px 0 12px; }
 .fit-head p { margin: 0; }
-.vdot-badge { flex: 0 0 auto; width: 72px; height: 72px; border-radius: 16px; background: var(--brand-deep); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; border-bottom: 4px solid var(--accent); line-height: 1.1; }
+.vdot-badge { flex: 0 0 auto; width: 72px; height: 72px; border-radius: 16px; background: var(--brand-deep); color: var(--on-brand); display: flex; flex-direction: column; align-items: center; justify-content: center; border-bottom: 4px solid var(--accent); line-height: 1.1; }
 .vdot-badge b { font-size: var(--fs-xl); font-weight: 900; }
 .vdot-badge small { font-size: var(--fs-xs); color: var(--brand-light); }
 .table-wrap { overflow-x: auto; }
@@ -464,7 +466,7 @@ textarea { resize: vertical; }
 @media (max-width: 519px) { .scale.scale10 { grid-template-columns: repeat(5, 1fr); } }
 
 .time-read { color: var(--c-easy-ink); font-weight: 700; min-height: 1.4em; }
-.time-read.bad { color: var(--danger); }
+.time-read.bad { color: var(--danger-ink); }
 
 .ultra-ratio { background: var(--panel); border-radius: 10px; padding: 8px 12px; font-size: var(--fs-md); }
 .ultra-ratio:empty { display: none; }
@@ -477,7 +479,7 @@ textarea { resize: vertical; }
   background: var(--brand-soft); color: var(--brand-deep); border: 1px solid var(--brand);
   font-size: var(--fs-sm); font-weight: 700; text-decoration: none; vertical-align: middle; line-height: 1;
 }
-.help-link:hover { background: var(--brand); color: #fff; }
+.help-link:hover { background: var(--brand); color: var(--on-brand); }
 .help-link { position: relative; }
 .help-link::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; }
 .guide-toc ol { margin: 0; padding-inline-start: 26px; columns: 2 220px; list-style: persian; }
@@ -515,7 +517,7 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .login h1 { font-size: var(--fs-xl); font-weight: 900; color: var(--ink); margin: 0; text-wrap: balance; }
 .login-sub { color: var(--muted); margin: 0 0 22px; max-width: 34ch; }
 .login-btn {
-  background: var(--accent-strong); color: #fff; font-size: var(--fs-lg); font-weight: 800;
+  background: var(--accent-strong); color: var(--on-brand); font-size: var(--fs-lg); font-weight: 800;
   width: min(100%, 340px); min-height: 56px; border-radius: 14px; border: 0;
   box-shadow: 0 10px 24px -12px rgba(232, 81, 61, 0.7);
 }
@@ -523,11 +525,11 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .login-btn:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
 .login-note { color: var(--faint); font-size: var(--fs-md); margin-top: 14px; }
 .login-lang {
-  background: var(--brand); color: #fff; display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--brand); color: var(--on-brand); display: flex; align-items: center; justify-content: center; gap: 10px;
   border-top: 3px solid var(--accent);
   padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); flex-wrap: wrap;
 }
-.login-lang-label { font-size: var(--fs-md); color: var(--brand-light); }
+.login-lang-label { font-size: var(--fs-md); color: var(--muted); }
 .lang-opt {
   font: inherit; font-size: var(--fs-base); cursor: pointer; color: #fff; background: transparent;
   border: 1.5px solid rgba(255, 255, 255, 0.6); border-radius: 999px; padding: 6px 16px; min-height: 44px; display: inline-flex; align-items: center; gap: 8px;
@@ -560,7 +562,7 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
   font: inherit; font-weight: 700; font-size: var(--fs-md); border: 0; background: transparent; color: var(--muted);
   padding: 8px 18px; border-radius: 999px; cursor: pointer; min-height: 44px;
 }
-.view-tabs button[aria-selected="true"] { background: var(--brand); color: #fff; }
+.view-tabs button[aria-selected="true"] { background: var(--brand); color: var(--on-brand); }
 
 /* ---------- نمای ماهانه ---------- */
 .month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--sp-1); margin-top: 12px; }
@@ -589,7 +591,7 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .btn-icon .chev { display: block; }
 
 /* ---------- چرخه‌ی قاعدگی ---------- */
-:root { --cy-period: #d6336c; --cy-ovulation: #9b5de5; --cy-follicular: #00a884; --cy-late: #e8879f; }
+:root { --cy-period: #E05A8A; --cy-ovulation: #A97BEA; --cy-follicular: #34C294; --cy-late: #E8879F; }
 .check-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-weight: 500; cursor: pointer; }
 .check-row input { width: 20px; height: 20px; accent-color: var(--brand); }
 .cycle-box { background: #fdeef3; border: 1px solid #f3c1d2; }
@@ -656,7 +658,7 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 /* ---------- پیشرفت من: نمودارها ---------- */
 .prange { display: inline-flex; flex-wrap: wrap; gap: 4px; background: var(--panel); border-radius: 999px; padding: 4px; margin-top: 10px; }
 .prange button { font: inherit; font-weight: 700; font-size: var(--fs-md); border: 0; background: transparent; color: var(--muted); padding: 8px 16px; border-radius: 999px; cursor: pointer; min-height: 44px; }
-.prange button[aria-pressed="true"] { background: var(--brand); color: #fff; }
+.prange button[aria-pressed="true"] { background: var(--brand); color: var(--on-brand); }
 .prange button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .pcard h2 { margin-bottom: 2px; }
 .pcard > .small.muted { margin: 0 0 12px; }
@@ -834,7 +836,7 @@ body.has-tabbar #app { max-width: 720px; margin: 0 auto; }
 .pf-facts dd small { font-weight: 500; color: var(--muted); font-size: var(--fs-xs); }
 .seg { display: inline-flex; gap: 4px; background: var(--panel); border-radius: 999px; padding: 4px; }
 .seg button { font: inherit; font-weight: 700; border: 0; background: transparent; color: var(--muted); padding: 8px 18px; border-radius: 999px; cursor: pointer; min-height: 44px; }
-.seg button[aria-pressed="true"] { background: var(--brand); color: #fff; }
+.seg button[aria-pressed="true"] { background: var(--brand); color: var(--on-brand); }
 .field-label { display: block; font-weight: 500; font-size: var(--fs-md); margin-bottom: 6px; }
 .link-list { list-style: none; margin: 0; padding: 0; }
 .link-list li + li { border-top: 1px solid var(--line); }
@@ -885,7 +887,7 @@ html:has(body.has-tabbar) { scroll-padding-bottom: calc(90px + env(safe-area-ins
 #avatar-file:focus-visible + * , .pf-avatar-btn:focus-within { outline: 3px solid var(--brand); outline-offset: 6px; }
 .avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 .avatar-initial { font-size: var(--fs-display); font-weight: 800; color: var(--brand-deep); line-height: 1; }
-.pf-cam { position: absolute; bottom: 2px; inset-inline-end: 2px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: #fff; box-shadow: 0 0 0 3px #fff; }
+.pf-cam { position: absolute; bottom: 2px; inset-inline-end: 2px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: var(--on-brand); box-shadow: 0 0 0 3px #fff; }
 .pf-name { margin: 8px 0 0; font-size: var(--fs-xl); }
 .pf-card .small.muted { margin: 0; text-align: center; }
 .pf-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin: 12px 0 4px; }
@@ -918,8 +920,8 @@ td .linklike { padding: 10px 8px; margin: -10px -8px; }
 .set-body .btn { justify-self: start; }
 .set-body .level-strip { border-top: 1px solid var(--line); padding-top: 12px; }
 #set-data .danger-zone { border: 1.5px solid var(--danger-soft); background: #fff8f7; border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; }
-.danger-zone b { color: var(--danger); }
-.btn-danger-outline { background: #fff; color: var(--danger); border-color: var(--danger); }
+.danger-zone b { color: var(--danger-ink); }
+.btn-danger-outline { background: #fff; color: var(--danger-ink); border-color: var(--danger); }
 .btn-danger-outline:hover { background: var(--danger); color: #fff; }
 .confirm-box .check-row { margin: 6px 0; }
 
@@ -1499,7 +1501,7 @@ a.ob-row:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; b
 .pf-goalcard .path-line { margin: 10px 0 6px; }
 
 .modal.cele { position: relative; text-align: center; border-top: 0; overflow: hidden; }
-.cele .cele-ico { width: 72px; height: 72px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; margin: 6px auto 14px; font-size: 38px; font-weight: 900; box-shadow: 0 0 0 10px var(--brand-soft); animation: obTick .5s ease-out; }
+.cele .cele-ico { width: 72px; height: 72px; border-radius: 50%; background: var(--brand); color: var(--on-brand); display: grid; place-items: center; margin: 6px auto 14px; font-size: 38px; font-weight: 900; box-shadow: 0 0 0 10px var(--brand-soft); animation: obTick .5s ease-out; }
 .cele h2 { color: var(--ink); font-size: var(--fs-xl); text-align: center; }
 .cele p { text-align: center; color: var(--muted); }
 .cele-next { display: grid; gap: 2px; background: var(--panel); border-radius: 14px; padding: 10px 14px; margin: 12px 0 16px; text-align: start; }
@@ -1527,7 +1529,7 @@ a.ob-row:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; b
 .gt-km { font-size: var(--fs-3xl); font-weight: 800; line-height: 1.1; }
 .gt-name { font-weight: 700; font-size: var(--fs-md); }
 .gt-eta { font-size: var(--fs-xs); color: #b9c3cf; }
-.gt-badge { position: absolute; inset-block-start: 10px; inset-inline-end: 10px; font-size: var(--fs-xs); font-weight: 700; padding: 0 8px; border-radius: 999px; background: var(--brand); color: #fff; }
+.gt-badge { position: absolute; inset-block-start: 10px; inset-inline-end: 10px; font-size: var(--fs-xs); font-weight: 700; padding: 0 8px; border-radius: 999px; background: var(--brand); color: var(--on-brand); }
 .plan-card.is-focus { animation: obGlow 1.6s ease-out; border-color: var(--brand); }
 
 .race-item.has-grip { grid-template-columns: auto 1fr; align-items: start; column-gap: 6px; }
@@ -1564,14 +1566,14 @@ body.goal-dragging .race-hero { box-shadow: 0 0 0 4px var(--brand-soft); }
 .race-item-actions .linklike:hover { background: var(--panel-raised); }
 .race-item-actions .linklike:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .race-item-actions [data-race-main] { background: var(--brand-soft); color: var(--brand-deep); }
-.race-item-actions .race-del { color: var(--danger); }
+.race-item-actions .race-del { color: var(--danger-ink); }
 
 /* خروج و ساخت پروفایل تازه / برگشت به پروفایل کنار گذاشته‌شده */
 .signout { display: grid; gap: 8px; text-align: start; }
 .onboarding .signout { margin-top: 22px; padding-top: 16px; border-top: 1.5px solid var(--line); }
 .signout-label { margin: 0; }
 .signout .small.muted { margin: 0; }
-.signout-btn { color: var(--danger); background: var(--card); border-color: var(--line); }
+.signout-btn { color: var(--danger-ink); background: var(--card); border-color: var(--line); }
 .signout-btn:hover { background: var(--danger-soft); color: var(--danger-deep); border-color: var(--danger-soft); }
 .signout-confirm p { margin: 0 0 8px; }
 .signout-confirm .actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -1614,3 +1616,109 @@ body.goal-dragging .race-hero { box-shadow: 0 0 0 4px var(--brand-soft); }
 .wgoal-card.is-on { border: 2px solid var(--brand); background: var(--brand-soft); }
 .wgoal-card .field { margin: 10px 0; }
 .wgoal-card .wgoal-clear { display: block; min-height: 44px; margin: 4px auto 0; padding: 0 12px; }
+
+/* ===========================================================
+   برند «گام»: لایه‌ی نهایی رنگ‌ها روی زمینه‌ی تیره
+   (رنگ‌های ثابت روشنِ قبلی این‌جا به پالت زغالی، گرافیتی و شنی برمی‌گردن)
+   =========================================================== */
+html { color-scheme: dark; }
+body { background: var(--bg); color: var(--text); }
+a { color: var(--brand-deep); }
+/* هدر: لوگوی متنی گام */
+.site-header { background: var(--bg); color: var(--text); }
+.brand-mark { width: auto; height: 32px; border-radius: 0; background: none; box-shadow: none; }
+.lang-toggle { background: var(--card); color: var(--text); border-color: var(--line); }
+.lang-toggle:hover { background: var(--panel-raised); color: var(--text); }
+.main-nav a { color: var(--muted); }
+.main-nav a:hover { background: var(--panel); }
+.main-nav a[aria-current="page"] { background: var(--brand); color: var(--on-brand); }
+/* سطح‌ها و فیلدها */
+.card, .modal, .set-list { background: var(--card); color: var(--text); }
+input, select, textarea { background: var(--field-bg); color: var(--text); border-color: var(--field-line); }
+input::placeholder, textarea::placeholder { color: #7C7C85; }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(216, 196, 160, .25); }
+input[type="date"], input[type="time"] { color-scheme: dark; }
+.chip span, .chip-btn, .act-opt span, .scale-opt span { background: var(--field-bg); color: var(--text); }
+.adh-bar { background: var(--panel); }
+.ch-dot { stroke: var(--card); }
+.ch-grid { stroke: #3A3A42; }
+.ch-zero, .ch-base { stroke: #5A5A63; }
+.ch-cross { stroke: #6A6A73; }
+/* اقدام اصلی و حالت فعال: شنی با متن زغالی */
+.btn-primary, .badge-race, .today-tag, .gt-badge, .help-link:hover, .login-cta, .cele .cele-ico, .pf-cam,
+.chip input:checked + span, .scale-opt input:checked + span, .chip-btn[aria-pressed="true"], .view-tabs button[aria-selected="true"],
+.prange button[aria-pressed="true"], .seg button[aria-pressed="true"], .period-opts button[aria-pressed="true"],
+.pf-panel .prange button[aria-pressed="true"], .btn-outline:hover {
+  background: var(--brand); border-color: var(--brand); color: var(--on-brand);
+}
+.period-opts button[aria-pressed="true"] small { color: var(--on-brand); }
+.btn-primary:hover { background: #E6D6B8; }
+.btn-primary:focus-visible, .btn:focus-visible { outline: 3px solid var(--brand-deep); outline-offset: 2px; }
+/* دکمه‌ی خنثی: قرص گرافیتی روشن */
+.btn-outline, .btn-ink { background: var(--panel-raised); color: var(--text); border-color: var(--panel-raised); }
+.btn-ink:hover { background: #4D4D56; border-color: #4D4D56; color: var(--text); }
+.btn-ghost { color: var(--text); }
+.btn-done { background: var(--c-easy); color: var(--on-brand); }
+.btn-danger-outline { background: transparent; color: var(--danger-ink); border-color: var(--danger-ink); }
+.btn-danger-outline:hover { background: var(--danger); border-color: var(--danger); color: #fff; }
+#set-data .danger-zone { background: var(--danger-soft); }
+.ob-tick { color: var(--on-brand); }
+/* هاله‌ی آواتار و حلقه‌ها */
+.pf-avatar-btn { box-shadow: 0 0 0 4px var(--bg), 0 0 0 6px var(--brand-light); }
+.pf-avatar-btn:hover { box-shadow: 0 0 0 4px var(--bg), 0 0 0 6px var(--brand); }
+.pf-cam { box-shadow: 0 0 0 3px var(--bg); }
+.login-logo { width: 200px; height: auto; border-radius: 0; background: none; box-shadow: none; margin: 0 auto 22px; }
+.login, .login h1 { color: var(--text); }
+.lang-opt { color: var(--text); border-color: var(--field-line); }
+.lang-opt[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+.lang-opt:focus-visible { outline-color: var(--brand-deep); }
+.login-cta, .login .btn-primary { box-shadow: none; }
+/* کارت‌های گرادیانی (مسیر، هدف، مسابقه): گرافیتی به شنی تیره، متن روشن */
+.path-card, .pf-goalcard, .race-hero, .hcard-race {
+  background: linear-gradient(120deg, #26262B 0%, #3B352B 55%, #5E4F37 100%); color: var(--text); border: 1px solid #4A4234;
+}
+.path-card .hcard-label, .path-card .hcard-link, .path-ends small, .path-meta, .pf-goalcard .eyebrow, .pf-goal-count, .pf-goal-meta,
+.hcard-race .hcard-label, .hcard-race .small.muted { color: #E7DFD0; }
+.path-card .hcard-link, .pf-goal-cta { color: var(--brand); }
+.path-line i { background: var(--brand); }
+.path-line b { background: var(--brand); box-shadow: 0 0 0 4px rgba(216, 196, 160, .3); }
+.race-hero h2, .race-hero .race-result, .race-hero .race-change, .race-hero .race-target > summary { color: var(--text); }
+.race-hero .btn-outline { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+.race-hero .race-target form { background: var(--card); color: var(--text); }
+.pf-level-badge { background: linear-gradient(160deg, var(--brand) 0%, #B9A47E 100%); color: var(--on-brand); }
+.vdot-badge, .race-countdown, .hero-num { background: var(--brand); color: var(--on-brand); }
+.pf-goalcard:focus-visible, .path-card:focus-visible { outline-color: var(--brand); }
+/* کاشی‌های هدف */
+.goal-tile { background: radial-gradient(120% 90% at 100% 0%, #3A3A42 0%, #232328 62%); border-color: var(--line); color: var(--text); }
+.goal-tile:hover { background: radial-gradient(120% 90% at 100% 0%, #44444C 0%, #2A2A30 62%); }
+.goal-tile::before { background: var(--brand); }
+.gt-eta { color: var(--muted); }
+/* نوار پایین */
+.tabbar { background: rgba(18, 18, 20, .97); border-top-color: var(--line); }
+.tabbar a { color: var(--muted); }
+.tabbar a.is-active { color: var(--brand); }
+.tabbar a.is-active .tab-ico { background: var(--brand-soft); color: var(--brand); }
+/* کارت‌های رنگی هشدار */
+.alert-good { border-color: #2E6B57; }
+.ready-fresh .ready-dot { background: var(--c-easy); box-shadow: 0 0 0 4px var(--c-easy-bg); }
+.ready-tired .ready-dot { background: var(--c-tempo); }
+.cycle-box, .cycle-card.cycle-soon { background: #3E1E2A; border-color: #6B3249; }
+.install-card { background: linear-gradient(135deg, var(--card), var(--brand-soft)); }
+/* تحلیل دویدن */
+.gait-item.gi-good, .gait-risk.gr-low { border-inline-start-color: var(--c-easy); }
+.gait-item.gi-warn, .gait-risk.gr-moderate { border-inline-start-color: var(--c-tempo); }
+.gi-good .gi-chip, .gr-low .gi-chip { color: var(--c-easy-ink); }
+.gi-warn .gi-chip, .gr-moderate .gi-chip, .gait-axis.risk-moderate b { color: var(--c-tempo-ink); }
+.pf-panel .gi-good .gi-chip, .pf-panel .gr-low .gi-chip { background: var(--c-easy-bg); }
+/* سایه‌ها و پس‌زمینه‌ی پنجره‌ها */
+.modal-backdrop { background: rgba(0, 0, 0, .7); }
+.tp-backdrop { background: rgba(0, 0, 0, .6); }
+.hcard, body.has-tabbar .card { box-shadow: none; }
+.toast { background: var(--text); color: var(--bg); }
+.toast-undo button { color: #7A5E2C; }
+@keyframes obGlow { from { box-shadow: 0 0 0 0 rgba(216, 196, 160, .45); } to { box-shadow: 0 0 0 16px rgba(216, 196, 160, 0); } }
+.login-lang { background: var(--card); color: var(--text); border: 1.5px solid var(--line); }
+.login-btn:hover { background: #E6D6B8; }
+.race-hero .eyebrow, .race-hero .race-date { color: #E7DFD0; }
+.goal-tile .gt-eta { color: #B4B4BC; }
+.login-btn { box-shadow: none; color: var(--on-brand); }

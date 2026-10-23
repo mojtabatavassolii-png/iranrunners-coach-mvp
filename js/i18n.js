@@ -1,5 +1,5 @@
 /*
- * ترجمه‌ی مرکزی «مربی خودت باش» / Central translation layer.
+ * ترجمه‌ی مرکزی «گام» / Central translation layer.
  * همه‌ی متن‌های ثابت از js/i18n/fa.js و js/i18n/en.js خونده می‌شن.
  * t('path.to.key', { n: 5 }) → رشته با جای‌گذاری {n}؛ اگه کلید در زبان فعلی نبود، از فارسی.
  */

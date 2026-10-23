@@ -10,7 +10,7 @@ The owner sends one or more screenshots of another product and wants to know how
 ## Non-negotiables (brand identity)
 
 - Mint `#00866b` (and its family `--brand-*`) stays the identity / navigation colour; coral `#ff6b57` (`--accent-*`) stays the primary-action colour. The owner explicitly chose to keep this palette. You may tune shades, add neutrals, or add a secondary accent, but never replace mint or coral.
-- The logo, the app name «مربی خودت باش», the bilingual RTL/LTR support and Persian digits stay.
+- The logo, the app name «گام» (Gaam), the bilingual RTL/LTR support and Persian digits stay.
 - Do not copy another brand's logo, icons, illustrations, wording or proprietary fonts. Borrow *principles* (density, rhythm, contrast, shape language), not assets.
 - Every proposed colour combination must still pass WCAG AA contrast (4.5:1 body text, 3:1 large text / UI parts). Check numerically.
 

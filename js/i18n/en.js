@@ -463,9 +463,9 @@
 
     // ================= User interface (app.js and index.html) =================
     app: {
-      name: 'Be Your Own Coach',
+      name: 'Gaam',
       tagline: 'Your running plan · beta',
-      metaDescription: 'Be Your Own Coach: a weekly running plan built on fixed training rules, no server.',
+      metaDescription: 'Gaam: a weekly running plan built on fixed training rules, no server.',
       navAria: 'Sections',
       back: 'Back',
       nav: { plan: 'Plan', checkin: 'Today\'s check-in', fitness: 'Fitness', race: 'Race goal', progress: 'My progress', learn: 'Learn', guide: 'Guide', profile: 'Profile' },
@@ -499,7 +499,7 @@
     },
     login: {
       title: 'Log in',
-      welcome: 'Welcome to Be Your Own Coach',
+      welcome: 'Welcome to Gaam',
       subtitle: 'A smart running plan built on proven training rules',
       button: 'Log in',
       langLabel: 'Language',
@@ -1288,7 +1288,7 @@
     // ---------- Install the app (PWA) ----------
     install: {
       title: 'Install the app',
-      bannerTitle: 'Install Be Your Own Coach on your phone',
+      bannerTitle: 'Install Gaam on your phone',
       bannerText: 'It opens from your home screen like a real app, loads faster and works offline.',
       btn: 'Install app', how: 'How do I install on iPhone?', dismiss: 'Close', done: 'The app is installed.',
       short: { installed: 'Installed', prompt: 'Ready to install', ios: 'Install via Safari', other: 'From the browser menu' },
@@ -1304,7 +1304,7 @@
       iosStep1: 'In <b>Safari</b>, tap the <b>Share</b> button (a square with an up arrow) in the bottom bar.',
       iosStep2: 'Scroll down the list and choose <b>Add to Home Screen</b>.',
       iosAdd: 'Add',
-      iosStep3: 'Tap <b>Add</b> at the top. The "Be Your Own Coach" icon appears on your home screen.',
+      iosStep3: 'Tap <b>Add</b> at the top. The "Gaam" icon appears on your home screen.',
       iosNote: 'If you opened this page in another browser, open the link in Safari first.',
       close: 'Got it'
     },
