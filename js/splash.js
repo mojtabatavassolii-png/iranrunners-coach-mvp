@@ -27,6 +27,8 @@
   var STAGGER = 80, REVEAL = 400, STEPS = 3;
   // قبل از اندازه‌گیری: صبر برای فونت‌ها و رندر صفحه‌ی ورود، ولی حداکثر این‌قدر (فونت گوگل ممکنه کند یا مسدود باشه)
   var READY_MAX = 900, TARGET_MAX = 1500, START_MAX = 4000;
+  // مکث روی صفحه‌ی مشکی قبل از شروع انیمیشن لوگو
+  var HOLD = 1000, t0 = Date.now();
   // viewBox لوگوی صفحه‌ی ورود (public/assets/gaam-logo-transparent*.svg)؛ مسیرها با SVG معرفی در یک دستگاه مختصات‌ان
   var LOGIN_VB = { x: 1120, y: -60, w: 2174, h: 1005 };
   var state = 'play', timer = 0, anims = [];
@@ -132,7 +134,10 @@
     var go = function () {
       if (state !== 'play' || el.classList.contains('go')) return;
       requestAnimationFrame(function () { requestAnimationFrame(function () {
-        if (state !== 'play') return;
+        if (state !== 'play' || el.classList.contains('go')) return;
+        // حداقل HOLD میلی‌ثانیه صفحه‌ی مشکی، بعد انیمیشن
+        var wait = HOLD - (Date.now() - t0);
+        if (wait > 0) { setTimeout(go, wait); return; }
         el.classList.add('go');
         timer = setTimeout(fly, FALLBACK);
       }); });
