@@ -21,12 +21,12 @@
   root.classList.add('intro');
 
   // انیمیشن خود SVG حدود ۱٫۲۵ ثانیه‌ست (آخرین حرف، m، از ۰٫۸۵ تا ۱٫۲۵). پرواز از لحظه‌ی آخر کشیده شدن m
-  // (۳۵۰ میلی‌ثانیه بعد از شروعش) شروع می‌شه تا کل معرفی + گذار زیر ~۲٫۵ ثانیه بمونه
-  var M_LEAD = 350, FALLBACK = 1600;
+  // (۲۲۰ میلی‌ثانیه بعد از شروعش، وقتی m تقریباً بالا اومده) شروع می‌شه تا کل معرفی + گذار زیر ~۲٫۵ ثانیه بمونه
+  var M_LEAD = 220, FALLBACK = 1600;
   var MOVE = 700, EASE = 'cubic-bezier(.4,0,.2,1)';
   var STAGGER = 80, REVEAL = 400, STEPS = 3;
   // قبل از اندازه‌گیری: صبر برای فونت‌ها و رندر صفحه‌ی ورود، ولی حداکثر این‌قدر (فونت گوگل ممکنه کند یا مسدود باشه)
-  var READY_MAX = 900, TARGET_MAX = 1500;
+  var READY_MAX = 900, TARGET_MAX = 1500, START_MAX = 4000;
   // viewBox لوگوی صفحه‌ی ورود (public/assets/gaam-logo-transparent*.svg)؛ مسیرها با SVG معرفی در یک دستگاه مختصات‌ان
   var LOGIN_VB = { x: 1120, y: -60, w: 2174, h: 1005 };
   var state = 'play', timer = 0, anims = [];
@@ -120,6 +120,19 @@
   } else {
     var mPath = el.querySelector('.m'), started = false;
     if (mPath) mPath.addEventListener('animationstart', function () { if (started) return; started = true; clearTimeout(timer); timer = setTimeout(fly, M_LEAD); });
-    timer = setTimeout(fly, FALLBACK);
+    // انیمیشن SVG (روی Safari/iOS) روی رشته‌ی اصلی اجرا می‌شه؛ اگه هم‌زمان با بار شدن اسکریپت‌های سنگین اپ پخش بشه،
+    // ساعتش جلو می‌ره ولی فریمی کشیده نمی‌شه و فقط حالت آخر دیده می‌شه. پس تا وقتی اپ بار نشده و دو فریم واقعی
+    // کشیده نشده، روی زمینه‌ی تیره متوقف می‌مونه و بعد از اول پخش می‌شه
+    var go = function () {
+      if (state !== 'play' || el.classList.contains('go')) return;
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
+        if (state !== 'play') return;
+        el.classList.add('go');
+        timer = setTimeout(fly, FALLBACK);
+      }); });
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+    // اگه DOMContentLoaded خیلی دیر شد (شبکه‌ی کند)، بیشتر از این منتظر نمی‌مونه
+    setTimeout(go, START_MAX);
   }
 })();
