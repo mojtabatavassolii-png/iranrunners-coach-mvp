@@ -1776,3 +1776,12 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--focus-ri
 /* انتخاب ظاهر: سه گزینه با آیکون */
 .theme-seg button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .theme-seg svg { flex: none; }
+
+/* معرفی (splash): روی همه‌چیز، زمینه‌ی زغالی، لوگو وسط؛ با لمس یا بعد از انیمیشن محو می‌شه */
+#splash {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
+  background: var(--splash-bg); cursor: pointer; transition: opacity .3s ease;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+#splash.out { opacity: 0; pointer-events: none; }
+#splash .splash-logo { width: 60vw; max-width: 320px; height: auto; display: block; }

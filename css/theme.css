@@ -46,6 +46,8 @@
   --zone-5-soft: color-mix(in srgb, var(--zone-5) 16%, var(--surface));
   /* لایه‌ی تیره‌ی پشت پنجره‌ها و برگه‌ها، و حلقه‌ی فوکوس */
   --scrim: color-mix(in srgb, var(--bg) 78%, transparent);
+  /* زمینه‌ی معرفی (لوگوی متحرک) در هر دو حالت زغالیه */
+  --splash-bg: #121214;
   /* کدوم نسخه‌ی لوگو دیده بشه */
   --logo-on-dark: inline-block;
   --logo-on-light: none;
