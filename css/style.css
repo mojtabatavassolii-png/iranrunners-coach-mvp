@@ -478,26 +478,26 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .login h1 { font-size: var(--fs-xl); font-weight: 900; color: var(--text); margin: 0; text-wrap: balance; }
 .login-sub { color: var(--text-secondary); margin: 0 0 22px; max-width: 34ch; }
 .login-btn {
-  background: var(--primary); color: var(--on-primary); font-size: var(--fs-lg); font-weight: 800;
-  width: min(100%, 340px); min-height: 56px; border-radius: 14px; border: 0;
+  background: var(--primary); color: var(--on-primary); font-size: var(--fs-base); font-weight: 800;
+  width: auto; min-width: 180px; min-height: 46px; padding: 0 28px; border-radius: 12px; border: 0;
   box-shadow: none;
 }
 .login-btn:hover { background: var(--primary); }
 .login-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
 .login-note { color: var(--text-secondary); font-size: var(--fs-md); margin-top: 14px; }
 .login-lang {
-  background: var(--primary); color: var(--on-primary); display: flex; align-items: center; justify-content: center; gap: 10px;
-  border-top: 3px solid var(--primary);
-  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); flex-wrap: wrap;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 16px calc(14px + env(safe-area-inset-bottom, 0px));
 }
-.login-lang-label { font-size: var(--fs-md); color: var(--text-secondary); }
-.lang-opt {
-  font: inherit; font-size: var(--fs-base); cursor: pointer; color: var(--text); background: transparent;
-  border: 1.5px solid var(--border); border-radius: 999px; padding: 6px 16px; min-height: 44px; display: inline-flex; align-items: center; gap: 8px;
+/* انتخاب زبان: پرچم گرد کوچیک؛ هدف لمسی ۴۴px، زبان فعلی با حلقه‌ی شنی */
+.lang-flag {
+  width: 44px; height: 44px; padding: 0; border: 0; background: transparent; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;
 }
-.lang-opt b { font-weight: 900; letter-spacing: 0.04em; }
-.lang-opt[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-.lang-opt:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.lang-flag img { width: 28px; height: 28px; border-radius: 50%; display: block; opacity: .55; transition: opacity .15s; box-shadow: 0 0 0 1px var(--border); }
+.lang-flag:hover img { opacity: .85; }
+.lang-flag[aria-pressed="true"] img { opacity: 1; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary); }
+.lang-flag:focus-visible { outline: 3px solid var(--primary); outline-offset: 0; }
 
 /* ---------- سطح ۰: شروع از صفر ---------- */
 .cheer { background: var(--primary-soft); color: var(--text); border-radius: 10px; padding: 8px 12px; font-weight: 500; }
@@ -1627,9 +1627,6 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--focus-ri
 .pf-cam { box-shadow: 0 0 0 3px var(--bg); }
 .login-logo { width: 200px; height: auto; border-radius: 0; background: none; box-shadow: none; margin: 0 auto 22px; }
 .login, .login h1 { color: var(--text); }
-.lang-opt { color: var(--text); border-color: var(--border); }
-.lang-opt[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-.lang-opt:focus-visible { outline-color: var(--primary); }
 .login-cta, .login .btn-primary { box-shadow: none; }
 /* کارت‌های گرادیانی (مسیر، هدف، مسابقه): گرافیتی به شنی تیره، متن روشن */
 .path-card, .pf-goalcard, .race-hero, .hcard-race {
@@ -1673,7 +1670,6 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--focus-ri
 .hcard, body.has-tabbar .card { box-shadow: none; }
 .toast { background: var(--surface-elevated); color: var(--text); border: 1px solid var(--border); }
 .toast-undo button { color: var(--primary); }
-.login-lang { background: var(--surface); color: var(--text); border: 1.5px solid var(--border); }
 .login-btn:hover, .login-btn:active { background: var(--primary-pressed); }
 .race-hero .eyebrow, .race-hero .race-date { color: var(--text-secondary); }
 .goal-tile .gt-eta { color: var(--text-secondary); }

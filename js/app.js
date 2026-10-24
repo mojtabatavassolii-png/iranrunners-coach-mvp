@@ -681,17 +681,16 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=72" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
-      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=72" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=73" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=73" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
-      '<p class="login-note">' + esc(T('login.note')) + '</p>' + restoreBlock() +
+      restoreBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
-      '<span class="login-lang-label">' + esc(T('login.langLabel')) + '</span>' +
-      '<button type="button" class="lang-opt" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '"><b>FA</b> فارسی</button>' +
-      '<button type="button" class="lang-opt" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '"><b>EN</b> English</button>' +
+      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=73" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=73" alt="" width="28" height="28"></button>' +
       '</div></section>';
     app.querySelectorAll('[data-lang]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.lang !== I.getLang()) switchLang(b.dataset.lang); });
@@ -848,7 +847,7 @@
         '<label class="btn btn-ink btn-sm" for="avatar-file">' + esc(T(getAvatar() ? 'profile.photoChange' : 'profile.photoPick')) + '</label>' +
         '<input type="file" id="avatar-file" accept="image/*" class="sr-only">' +
         '<button type="button" class="linklike small" data-avatar-remove="1"' + (getAvatar() ? '' : ' hidden') + '>' + esc(T('profile.photoRemove')) + '</button></div>' +
-        '<small class="muted">' + esc(T('onb.photoHint')) + '</small></div></div>' +
+        '</div></div>' +
         '<div class="row2">' +
         '<div class="field"><label for="fname">' + esc(T('onb.firstName')) + '</label><input id="fname" name="firstName" type="text" maxlength="40" autocomplete="given-name" value="' + esc(p.name || '') + '" placeholder="' + esc(T('onb.firstNamePh')) + '"></div>' +
         '<div class="field"><label for="lname">' + esc(T('onb.lastName')) + '</label><input id="lname" name="lastName" type="text" maxlength="40" autocomplete="family-name" value="' + esc(p.lastName || '') + '" placeholder="' + esc(T('onb.lastNamePh')) + '"></div>' +
@@ -878,7 +877,7 @@
         '<p class="sub-legend" id="pmode-q">' + esc(T('cycle.periodQ')) + req + '</p><div class="chips chips-stack" role="radiogroup" aria-labelledby="pmode-q">' +
         C.PERIOD_MODES.map(function (k) { return chip('periodMode', k, T('cycle.mode.' + k), cyc.periodMode === k, 'radio'); }).join('') + '</div>' +
         '<small class="muted">' + esc(T('cycle.periodQHint')) + '</small>' +
-        '<p class="small muted">' + esc(T('cycle.privacy')) + '</p></div>' +
+        '</div>' +
         '</fieldset>') +
 
       // ۳. وضعیت فعلی دویدن
@@ -3102,7 +3101,7 @@
       '<p class="small muted">' + esc(T('remind.calHint')) + '</p>' +
       '<div class="actions"><button type="button" class="btn btn-outline" data-ics="1">' + esc(T('remind.cal')) + '</button>' +
       ('Notification' in window ? '<button type="button" class="btn btn-ghost" data-notify="1">' + esc(T(r.notify && Notification.permission === 'granted' ? 'remind.notifyOn' : 'remind.notify')) + '</button>' : '') + '</div>' +
-      '<p class="small muted">' + esc(T('remind.privacy')) + '</p>';
+      '';
   }
   app.addEventListener('change', function (e) {
     if (e.target.id !== 'rm-on' && e.target.id !== 'rm-time') return;
@@ -4386,7 +4385,7 @@
         '</dl>' + '<div class="level-strip">' + levelCard(lv, true) + '</div>' + warningsCard(C.profileWarnings(p, today()))) +
       // ۵. داده‌ها
       setSection('data', 'data', T('settingsPage.data'), tt('profile.statsVal', { c: nCheck, d: nDone }),
-        '<p class="small muted">' + esc(T('app.footer')) + '</p><div class="actions">' +
+        '<div class="actions">' +
         '<button type="button" class="btn btn-outline" id="restart">' + esc(T('profile.restart')) + '</button>' +
         '<button type="button" class="btn btn-ghost" id="logout">' + esc(T('login.logout')) + '</button></div>' +
         '<div class="danger-zone"><b>' + esc(T('settingsPage.dangerTitle')) + '</b><p class="small">' + esc(T('settingsPage.dangerText')) + '</p>' +

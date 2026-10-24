@@ -5,7 +5,7 @@
  * - بقیه (آیکون‌ها، فونت): کش و به‌روزرسانی در پس‌زمینه.
  * با هر انتشار، VERSION و نسخه‌ی فایل‌ها در index.html با هم بالا می‌رن (تست این هماهنگی رو بررسی می‌کنه).
  */
-var VERSION = '72';
+var VERSION = '73';
 var CACHE = 'coach-v' + VERSION;
 // فایل‌های بزرگ تحلیل دویدن (MediaPipe و مدل، حدود ۳۵ مگابایت): کش جدا و ماندگار، فقط بعد از اولین استفاده؛
 // با انتشار نسخه‌ی تازه‌ی اپ پاک نمی‌شن. با عوض شدن نسخه‌ی MediaPipe، این اسم عوض می‌شه.
@@ -32,6 +32,8 @@ var SHELL = [
   'css/theme.css?v=' + VERSION,
   'public/assets/gaam-logo-transparent.svg?v=' + VERSION,
   'public/assets/gaam-logo-transparent-light.svg?v=' + VERSION,
+  'public/assets/flag-ir.svg?v=' + VERSION,
+  'public/assets/flag-gb.svg?v=' + VERSION,
   'public/assets/gaam-splash.svg',
   'public/assets/favicon.svg',
   'public/assets/favicon-32.png',

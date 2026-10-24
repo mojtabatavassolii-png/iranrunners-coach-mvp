@@ -474,7 +474,6 @@
       bannerAria: 'Medical notice',
       bannerStrong: 'This system can replace an in-person coach for planning your training, but never a doctor.',
       bannerText: 'If you have pain or any health problem, please see a doctor.',
-      footer: 'Demo version (MVP): all data is stored only in your own browser (localStorage) and is never sent to any server.',
       saveFailed: 'Couldn\'t save in the browser; your data will only last until you close this page.',
       help: 'Explained in the Guide',
       helpMark: '?',
@@ -503,7 +502,6 @@
       subtitle: 'A smart running plan built on proven training rules',
       button: 'Log in',
       langLabel: 'Language',
-      note: 'Your data stays on this device only.',
       logout: 'Log out'
     },
     pbDist: { m1500: '1500 m', m3000: '3000 m', 5: '5 km', 10: '10 km', 21: 'Half marathon', 42: 'Marathon', other: 'Another distance' },
@@ -591,7 +589,7 @@
       },
       next: 'Next',
       back: 'Back',
-      photo: 'Profile photo (optional)', photoHint: 'Stored on this phone only.',
+      photo: 'Profile photo (optional)',
       firstName: 'First name',
       firstNamePh: 'e.g. Sara',
       lastName: 'Last name',
@@ -631,7 +629,7 @@
     },
     cycle: {
       sexQ: 'Sex (optional)',
-      sexHint: 'Only used for training suggestions and stays on this device.',
+      sexHint: 'Only used for training suggestions.',
       sex: { female: 'Woman', male: 'Man', na: 'Prefer not to say' },
       title: 'Adapting to your menstrual cycle (optional)',
       intro: 'If you like, you can enter details of your menstrual cycle so your training plan can take it into account. This is completely optional, and you can turn it off or change it at any time.',
@@ -640,7 +638,6 @@
       cycleLen: 'Average cycle length (days)',
       cycleLenHint: 'From the first day of one period to the first day of the next; usually 21 to 35 days.',
       periodLen: 'Average period length (days)',
-      privacy: 'This information is stored only on this device (localStorage) and is never sent anywhere.',
       err: {
         lastStart: 'Enter the first day of your last period (today or earlier, at most 120 days ago).',
         cycleLen: 'Cycle length must be between 21 and 45 days.',
@@ -1055,8 +1052,7 @@
       inApp: 'Show in-app reminders', time: 'Reminder time',
       calHint: 'To be reminded even when the app is closed, add the next 12 weeks of sessions to your phone calendar.',
       cal: 'Add to calendar (.ics)', calDone: 'Calendar file downloaded; open it to add it to your calendar',
-      notify: 'Allow notifications', notifyOn: 'Notifications on', notifyOk: 'Notifications on (only while the app is open)', notifyNo: 'Notification permission was not granted',
-      privacy: 'Reminders are created on this device and nothing is sent anywhere.'
+      notify: 'Allow notifications', notifyOn: 'Notifications on', notifyOk: 'Notifications on (only while the app is open)', notifyNo: 'Notification permission was not granted'
     },
     path: {
       title: 'Your path', now: 'Now', goal: 'Goal', level: 'Level {n}', aria: 'Progress toward your goal',
@@ -1320,7 +1316,7 @@
         other: 'This browser hasn\'t offered us a direct install button.'
       },
       otherHelp: 'In Chrome or Edge on Android or a computer, open the browser menu (three dots) and choose "Install app" or "Add to Home screen". If the app is already installed, the option won\'t appear.',
-      offline: 'Once installed, the app opens without internet too. As before, your data stays only on this device.',
+      offline: 'Once installed, the app opens without internet too.',
       iosTitle: 'Install on iPhone',
       iosStep1: 'In <b>Safari</b>, tap the <b>Share</b> button (a square with an up arrow) in the bottom bar.',
       iosStep2: 'Scroll down the list and choose <b>Add to Home Screen</b>.',
@@ -1575,7 +1571,7 @@
             '<li>From the first day of your last period, your cycle length and period length, each day\'s phase is estimated: <b>period days</b>, the <b>follicular phase</b> (after your period until around ovulation; often more energy), <b>around ovulation</b> (about 14 days before the next period), the <b>luteal phase</b> and the <b>days before your period</b> (you may feel more tired).</li>' +
             '<li>The plan <b>never changes on its own</b>. If you have a hard session on period days or just before your period, we ask whether to make it lighter, switch to active rest (period days) or keep the original plan.</li>' +
             '<li>The dashboard shows when your next period is expected and reminds you a few days ahead. If it starts earlier or later, the "My period started today" button makes the estimates more accurate.</li>' +
-            '<li>Small markers on the calendar show the phases and can be switched off in Settings. All of this stays on this device.</li></ul>'
+            '<li>Small markers on the calendar show the phases and can be switched off in Settings.</li></ul>'
         },
         places: { title: 'Training location tips', body: '<ul>{tips}</ul>' },
         data: {
