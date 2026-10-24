@@ -5,7 +5,7 @@
  * - بقیه (آیکون‌ها، فونت): کش و به‌روزرسانی در پس‌زمینه.
  * با هر انتشار، VERSION و نسخه‌ی فایل‌ها در index.html با هم بالا می‌رن (تست این هماهنگی رو بررسی می‌کنه).
  */
-var VERSION = '73';
+var VERSION = '74';
 var CACHE = 'coach-v' + VERSION;
 // فایل‌های بزرگ تحلیل دویدن (MediaPipe و مدل، حدود ۳۵ مگابایت): کش جدا و ماندگار، فقط بعد از اولین استفاده؛
 // با انتشار نسخه‌ی تازه‌ی اپ پاک نمی‌شن. با عوض شدن نسخه‌ی MediaPipe، این اسم عوض می‌شه.
@@ -43,8 +43,15 @@ var SHELL = [
   'public/assets/icon-maskable-512.png'
 ];
 
+// نسخه‌ی تازه بلافاصله فعال می‌شه (منتظر بسته شدن همه‌ی تب‌ها نمی‌مونه). فایل‌ها با cache:'reload' گرفته می‌شن
+// تا کش HTTP مرورگر (GitHub Pages تا ۱۰ دقیقه) نسخه‌ی قدیمی رو توی کش جدید نذاره. نبودِ یک فایل نصب رو خراب نمی‌کنه.
 self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
+  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE).then(function (c) {
+    return Promise.all(SHELL.map(function (u) {
+      return fetch(new Request(u, { cache: 'reload' })).then(function (res) { if (res.ok) return c.put(u, res); }).catch(function () { /* */ });
+    }));
+  }));
 });
 
 self.addEventListener('activate', function (e) {
@@ -71,7 +78,9 @@ self.addEventListener('fetch', function (e) {
 
   // صفحه: اول شبکه (تا نسخه‌ی تازه برسه)، آفلاین → صفحه‌ی کش‌شده (پارامترهایی مثل ?source=pwa نادیده)
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then(function (res) {
+    var fresh;
+    try { fresh = fetch(req, { cache: 'no-cache' }); } catch (err) { fresh = fetch(req); }
+    e.respondWith(fresh.then(function (res) {
       if (res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put('./', copy); }); }
       return res;
     }).catch(function () {

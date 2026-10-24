@@ -25,6 +25,8 @@
   var M_LEAD = 350, FALLBACK = 1600;
   var MOVE = 700, EASE = 'cubic-bezier(.4,0,.2,1)';
   var STAGGER = 80, REVEAL = 400, STEPS = 3;
+  // قبل از اندازه‌گیری: صبر برای فونت‌ها و رندر صفحه‌ی ورود، ولی حداکثر این‌قدر (فونت گوگل ممکنه کند یا مسدود باشه)
+  var READY_MAX = 900, TARGET_MAX = 1500;
   // viewBox لوگوی صفحه‌ی ورود (public/assets/gaam-logo-transparent*.svg)؛ مسیرها با SVG معرفی در یک دستگاه مختصات‌ان
   var LOGIN_VB = { x: 1120, y: -60, w: 2174, h: 1005 };
   var state = 'play', timer = 0, anims = [];
@@ -61,10 +63,34 @@
     el.classList.add('out');
     setTimeout(function () { if (state === 'done') return; state = 'done'; remove(); }, 300);
   }
+  // آماده شدن چیدمان: فونت‌ها بار شده باشن (با سقف زمانی)، لوگوی ورود رندر شده باشه، و دو فریم گذشته باشه
+  // تا اندازه‌ها نهایی باشن (روی گوشی‌های کندتر، app.js ممکنه هنوز صفحه‌ی ورود رو نساخته باشه)
+  function whenReady(cb) {
+    var t0 = Date.now(), fontsDone = false;
+    try {
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fontsDone = true; }, function () { fontsDone = true; });
+      else fontsDone = true;
+    } catch (e) { fontsDone = true; }
+    (function poll() {
+      if (state !== 'wait') return;
+      var waited = Date.now() - t0;
+      var target = loginLogo();
+      var fontsOk = fontsDone || waited >= READY_MAX;
+      if ((target && fontsOk) || waited >= TARGET_MAX) {
+        requestAnimationFrame(function () { requestAnimationFrame(function () { if (state === 'wait') cb(loginLogo()); }); });
+        return;
+      }
+      requestAnimationFrame(poll);
+    })();
+  }
   function fly() {
     if (state !== 'play') return;
-    var target = loginLogo();
-    if (!target || !logo || !logo.animate) { fadeOut(); return; }
+    if (!logo || !logo.animate) { fadeOut(); return; }
+    state = 'wait';
+    whenReady(flyTo);
+  }
+  function flyTo(target) {
+    if (!target) { fadeOut(); return; }
     state = 'fly';
     var r1 = logo.getBoundingClientRect(), r2 = target.getBoundingClientRect(), vb1 = logo.viewBox.baseVal;
     var m1 = mapper(r1, { x: vb1.x, y: vb1.y, w: vb1.width, h: vb1.height }), m2 = mapper(r2, LOGIN_VB);
@@ -92,7 +118,7 @@
     // کاهش حرکت: لوگوی ثابت کوتاه، بعد محو شدن ساده (بدون جابه‌جایی و پله)
     timer = setTimeout(function () { fadeOut(); }, 500);
   } else {
-    var mPath = el.querySelector('path.m'), started = false;
+    var mPath = el.querySelector('.m'), started = false;
     if (mPath) mPath.addEventListener('animationstart', function () { if (started) return; started = true; clearTimeout(timer); timer = setTimeout(fly, M_LEAD); });
     timer = setTimeout(fly, FALLBACK);
   }

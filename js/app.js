@@ -681,16 +681,16 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=73" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
-      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=73" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=74" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=74" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
       restoreBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
-      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=73" alt="" width="28" height="28"></button>' +
-      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=73" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=74" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=74" alt="" width="28" height="28"></button>' +
       '</div></section>';
     app.querySelectorAll('[data-lang]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.lang !== I.getLang()) switchLang(b.dataset.lang); });
@@ -4539,7 +4539,28 @@
 
   // سرویس‌ورکر: فقط روی HTTPS یا localhost
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () { /* بدون کش آفلاین ادامه می‌ده */ }); });
+    // نسخه‌ی تازه: سرویس‌ورکر جدید خودش فعال می‌شه (skipWaiting + clients.claim) و صفحه یک بار دوباره بار می‌شه.
+    // بار اول نصب (صفحه هنوز کنترل‌کننده نداشته) نیازی به بارگذاری دوباره نیست.
+    var swHadController = !!navigator.serviceWorker.controller, swReloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!swHadController || swReloading) { swHadController = true; return; }
+      try {
+        // جلوگیری از حلقه: حداکثر یک بار در هر ۱۰ ثانیه
+        var last = +sessionStorage.getItem('gaam-sw-reload') || 0;
+        if (Date.now() - last < 10000) return;
+        sessionStorage.setItem('gaam-sw-reload', String(Date.now()));
+        // اگه معرفی هنوز در حال اجراست، بعد از بارگذاری دوباره از اول پخش بشه
+        if (document.getElementById('splash')) sessionStorage.removeItem('gaam-intro');
+      } catch (e) { /* */ }
+      swReloading = true;
+      location.reload();
+    });
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+        // PWA نصب‌شده (مخصوصاً iOS) معمولاً بدون بارگذاری دوباره از پس‌زمینه برمی‌گرده: اون موقع دنبال نسخه‌ی تازه بگرد
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') reg.update().catch(function () { /* */ }); });
+      }).catch(function () { /* بدون کش آفلاین ادامه می‌ده */ });
+    });
   }
 
   applyStatic();
