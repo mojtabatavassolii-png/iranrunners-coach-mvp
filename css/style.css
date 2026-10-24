@@ -1780,8 +1780,21 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--focus-ri
 /* معرفی (splash): روی همه‌چیز، زمینه‌ی زغالی، لوگو وسط؛ با لمس یا بعد از انیمیشن محو می‌شه */
 #splash {
   position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center;
-  background: var(--splash-bg); cursor: pointer; transition: opacity .3s ease;
+  cursor: pointer; transition: opacity .3s ease;
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 #splash.out { opacity: 0; pointer-events: none; }
-#splash .splash-logo { width: 60vw; max-width: 320px; height: auto; display: block; }
+#splash .splash-bg { position: absolute; inset: 0; background: var(--splash-bg); }
+#splash .splash-logo { position: relative; width: 60vw; max-width: 320px; height: auto; display: block; transform-origin: 0 0; will-change: transform; }
+/* گذار به صفحه‌ی ورود: تا لوگو ننشسته، محتوای ورود و لوگوی واقعیش پنهانه؛ بعد پله‌پله (۸۰ میلی‌ثانیه فاصله) بالا می‌آد */
+html.intro #app .login-logo { opacity: 0; }
+html.intro.intro-landed #app .login-logo, html.intro.intro-reveal #app .login-logo { opacity: 1; }
+html.intro #app .login h1, html.intro #app .login-sub, html.intro #app .login-btn, html.intro #app .login-note,
+html.intro #app .login-restore, html.intro #app .login-lang { opacity: 0; transform: translateY(16px); }
+html.intro.intro-reveal #app .login h1, html.intro.intro-reveal #app .login-sub, html.intro.intro-reveal #app .login-btn, html.intro.intro-reveal #app .login-note,
+html.intro.intro-reveal #app .login-restore, html.intro.intro-reveal #app .login-lang {
+  opacity: 1; transform: none; transition: opacity .4s ease, transform .4s cubic-bezier(.4,0,.2,1);
+}
+html.intro.intro-reveal #app .login-btn, html.intro.intro-reveal #app .login-note, html.intro.intro-reveal #app .login-restore { transition-delay: 80ms; }
+html.intro.intro-reveal #app .login-lang { transition-delay: 160ms; }
+html.intro.intro-instant #app .login * , html.intro.intro-instant #app .login-lang { transition: none !important; }
