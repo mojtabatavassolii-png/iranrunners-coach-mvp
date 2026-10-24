@@ -13,7 +13,7 @@
   var seen = false;
   try { seen = sessionStorage.getItem('gaam-intro') === '1'; sessionStorage.setItem('gaam-intro', '1'); } catch (e) { /* */ }
   // بار دوم در همین نشست، یا حالت تست با ?today=: بدون معرفی
-  if (seen || /[?&]today=/.test(location.search)) { el.parentNode.removeChild(el); return; }
+  if (seen || /[?&]today=/.test(location.search)) { el.parentNode.removeChild(el); root.classList.remove('pre-intro'); return; }
 
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var logo = el.querySelector('.splash-logo'), bg = el.querySelector('.splash-bg');
@@ -31,7 +31,13 @@
   var LOGIN_VB = { x: 1120, y: -60, w: 2174, h: 1005 };
   var state = 'play', timer = 0, anims = [];
 
-  function remove() { if (el.parentNode) el.parentNode.removeChild(el); }
+  function remove() {
+    if (el.parentNode) el.parentNode.removeChild(el);
+    // زمینه‌ی تیره‌ی اولیه دیگه لازم نیست؛ رنگ نوار مرورگر به تم خود اپ برمی‌گرده
+    root.classList.remove('pre-intro');
+    var meta = document.querySelector('meta[name=theme-color]');
+    if (meta) meta.setAttribute('content', getComputedStyle(root).getPropertyValue('--bg').trim() || '#121214');
+  }
   function loginLogo() {
     var list = document.querySelectorAll('#app .login-logo');
     for (var i = 0; i < list.length; i++) if (getComputedStyle(list[i]).display !== 'none' && list[i].getBoundingClientRect().width > 0) return list[i];
