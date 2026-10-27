@@ -297,6 +297,9 @@
       out.cls = ultraClass(out.ratio);
       // مسیر با سرازیری خیلی بیشتر از صعود (نقطه به نقطه)
       out.netDownhill = out.loss !== null && out.loss > out.gain * 1.2;
+      // ارتفاعی که دونده الان در هفته بالا می‌ره (نقطه‌ی شروع پله‌های ارتفاع) و دسترسی به تپه (short / long / treadmill)
+      out.weeklyVert = u.weeklyVert != null && u.weeklyVert !== '' ? Number(u.weeklyVert) : null;
+      out.hillAccess = u.hillAccess || null;
     } else {
       out.km = RACE_DISTANCES[g.type];
       // زمان هدف (اختیاری، از سطح ۳ به بالا): بخش‌های «پیس مسابقه» با این هدف تمرین می‌شن
@@ -690,6 +693,41 @@
     return goal.category;
   }
 
+  // ---------- تپه و ارتفاع در اولترا/تریل: از هفته‌ی اول، پله‌پله ----------
+  // مرحله‌ی ۰ (۳ هفته‌ی اول): استراید سربالایی کوتاه و سرازیری ملایم کوتاه روی جلسه‌ی آسون؛ مرحله‌ی ۱ (تا هفته‌ی ۸): سربالایی ۲ تا ۳ دقیقه‌ای؛
+  // مرحله‌ی ۲: سربالایی‌های بلند و جلسه‌ی اختصاصی ارتفاع. گروه A و B حداکثر مرحله‌ی ۱.
+  // ارتفاع هفتگی: از ارتفاع فعلی دونده، هر هفته‌ی پیشرفت حداکثر ۱۰٪ بیشتر (هفته‌ی سبک ۳۵٪ کمتر)؛ چون لانگ‌ران حداکثر ۵۰٪ این سقفه،
+  // ارتفاع یک جلسه هم هیچ‌وقت بیشتر از ۱۱۰٪ بیشترین جلسه‌ی چهار هفته‌ی قبل نمی‌شه (قاعده‌ی محتاطانه؛ Nielsen 2014، Frandsen 2025 برای مسافت).
+  // سرازیری (بار اکسنتریک، Vernillo 2017) جدا محدود می‌شه: نصف سقف صعود در مرحله‌ی ۰ و ۱، ۸۰٪ بعدش؛ در هفته‌ی سبک و ۱۰ روز آخر قبل از مسابقه جلسه‌ی سرازیری نیست.
+  var VERT_GROWTH = 1.1, VERT_DELOAD = 0.65;
+  // بدون عدد از دونده: حدود ۱۰ متر برای هر کیلومتر حجم فعلی (مسیر معمولی کمی ناهموار)
+  function defaultWeeklyVert(level, km0) { return Math.max(60, level * 40, round10(km0 * 10)); }
+  function hillPlan(goal, W, pr, tier, race, ws, weeklyKm, level, km0) {
+    var stage = W < 3 ? 0 : W < 8 ? 1 : 2;
+    if (tier === 'A' || tier === 'B') stage = Math.min(stage, 1);
+    var v0 = goal.weeklyVert != null && goal.weeklyVert >= 0 ? goal.weeklyVert : defaultWeeklyVert(level, km0);
+    var need = Math.max(v0, weeklyKm * (goal.ratio || 0));
+    var cap = Math.min(need, Math.max(v0, 60) * Math.pow(VERT_GROWTH, Math.max(0, pr.steps)));
+    if (pr.deload) cap *= VERT_DELOAD;
+    cap = Math.max(30, round10(cap));
+    var nearRace = race && race.date >= ws && daysBetween(ws, race.date) <= 16;
+    return { stage: stage, cap: cap, descentCap: round10(cap * (stage < 2 ? 0.5 : 0.8)), noDownhill: pr.deload || nearRace };
+  }
+  // منوی کیفی اولترا با مرحله‌ی تپه هماهنگ می‌شه
+  function adaptHillSpecs(specs, hp, goal, tier) {
+    return specs.map(function (q) {
+      if (q.type === 'longHills') {
+        if (hp.stage === 0) return Q(tier === 'B' ? 'tempoMild' : 'steady', q.share);
+        if (hp.stage === 1) return Q('longHills', q.share, { repMin: 2, repMax: 3 });
+      }
+      if (q.type === 'downhill') {
+        if (hp.stage === 0 || hp.noDownhill) return Q(tier === 'B' ? 'tempoMild' : 'steady', Math.max(q.share, 0.05));
+        if (hp.stage === 1) return Q('downhill', q.share, { maxReps: 5 });
+      }
+      return q;
+    });
+  }
+
   // menu: { quality: [...], long: {kind, share}, strides, hills, strength, doubles, vertFactor }
   function weekWorkouts(tier, level, w, deload, goal, period) {
     goal = goal || { category: 'general', type: 'none' };
@@ -865,6 +903,18 @@
   function addHills(s) {
     s.steps.push(T('s.hillSprints'));
     s.hills = true;
+    return s;
+  }
+  // استراید سربالایی (مرحله‌ی ۰ تپه در تریل): کوتاه و کنترل‌شده، نه اسپرینت
+  function addHillStrides(s) {
+    s.steps.push(T('s.hillStrides'));
+    s.hills = true; s.vert = (s.vert || 0) + 40;
+    return s;
+  }
+  // سرازیری ملایم کوتاه برای آشنا کردن عضله با بار اکسنتریک (اثر تکرار: یک دوز کم از بعدی‌ها محافظت می‌کنه)
+  function addDownStrides(s) {
+    s.steps.push(T('s.downStrides'));
+    s.descent = (s.descent || 0) + 30;
     return s;
   }
   function addStrength(s) {
@@ -1111,21 +1161,23 @@
       T('s.longFartlek.how') + paceHint(ctx, T('lbl.paceFastParts'), ctx.P.pM - 5, ctx.P.pM + 3) + T('s.fartlekVsInterval'), { minutes: null });
   }
   // تریل — تپه‌ی بلند: ۴ تا ۸ × ۵ تا ۱۰ دقیقه سربالایی مداوم با تلاش کنترل‌شده، پایین اومدن آروم
-  function makeLongHills(main, ctx) {
+  function makeLongHills(main, ctx, o) {
+    o = o || {};
     var pUp = ctx.P.pE * 1.35, mm = main * pUp / 60;
-    var repMin = clamp(Math.round(mm / 6), 5, 10), reps = clamp(Math.round(mm / repMin), 4, 8);
+    var repMin = clamp(Math.round(mm / 6), o.repMin || 5, o.repMax || 10), reps = clamp(Math.round(mm / repMin), 4, o.repMax ? 6 : 8);
     var hard = reps * repMin * 60 / pUp, vert = round10(reps * repMin * 10);
     return sess('hills', T('s.longHills.variant'), hard, ctx.wu + hard * 2,
       [T('s.longHills.main', { reps: reps, min: repMin }), T('s.longHills.back')],
-      T('s.longHills.how', { vert: vert }),
+      T('s.longHills.how', { vert: vert }) + hillAccessNote(ctx),
       { vert: vert, rpeOnly: true });
   }
+  function hillAccessNote(ctx) { var a = ctx.goal && ctx.goal.hillAccess; return a === 'short' || a === 'treadmill' ? T('s.hillAccess.' + a) : ''; }
   // تمرین فرود: تکرارهای کوتاه سرازیری کنترل‌شده برای عضلات چهارسر
-  function makeDownhill(main, ctx) {
-    var reps = clamp(Math.round(main / 0.3), 6, 10), hard = reps * 0.3;
+  function makeDownhill(main, ctx, maxReps) {
+    var reps = clamp(Math.round(main / 0.3), maxReps ? 4 : 6, maxReps || 10), hard = reps * 0.3;
     return sess('hills', T('s.downhill.variant'), hard, ctx.wu + reps * 0.6,
       [T('s.downhill.main', { reps: reps }), T('s.downhill.back')],
-      T('s.downhill.how'),
+      T('s.downhill.how') + (ctx.goal && ctx.goal.hillAccess === 'treadmill' ? T('s.hillAccess.treadmill') : ''),
       { rpeOnly: true, descent: reps * 12 });
   }
   // تریل با مسیر نسبتاً تخت — دویدن استیدی بر اساس RPE
@@ -1157,8 +1209,8 @@
       case 'longTempo': s = makeLongTempo(main, ctx); break;
       case 'mpInt': s = makeMpInt(main, ctx); break;
       case 'longFartlek': s = makeLongFartlek(main, ctx, weeklyKm); break;
-      case 'longHills': s = makeLongHills(main, ctx); break;
-      case 'downhill': s = makeDownhill(main, ctx); break;
+      case 'longHills': s = makeLongHills(main, ctx, spec); break;
+      case 'downhill': s = makeDownhill(main, ctx, spec.maxReps); break;
       case 'steady': s = makeSteady(main, ctx); break;
       case 'hillsB': s = makeHillsB(main, ctx); break;
       case 'tempoMild': s = makeTempo(main, ctx.wu, ctx.zones, true); break;
@@ -1255,12 +1307,87 @@
   function otherRaces(profile) {
     var main = raceInfo(profile), mk = main ? dateKey(main.date) : null;
     return (profile.races || []).filter(function (r) { return r && r.date && Number(r.km) > 0 && r.date !== mk; })
-      .map(function (r) { return { id: r.id, name: r.name || '', km: Number(r.km), key: r.date, date: parseDate(r.date), result: r.result || null }; })
+      .map(function (r) { return { id: r.id, name: r.name || '', km: Number(r.km), key: r.date, date: parseDate(r.date), result: r.result || null,
+        kind: r.kind === 'test' ? 'test' : 'race', mode: r.mode === 'train' ? 'train' : 'race', source: r.source === 'coach' ? 'coach' : 'self' }; })
       .sort(function (a, b) { return a.key < b.key ? -1 : a.key > b.key ? 1 : 0; });
   }
   // روزهای سبک قبل و روزهای ریکاوری بعد از مسابقه‌ی فرعی، بر اساس مسافت
   function sideRaceWindow(km) {
     return { pre: km <= 10 ? 2 : km <= 21.1 ? 3 : 5, post: km <= 5 ? 1 : km <= 10 ? 2 : km <= 21.1 ? 4 : km <= 42.2 ? 7 : Math.ceil(km / 6) };
+  }
+  // ---------- اهداف فرعی (مسابقه یا تایم‌تست) کنار مسابقه‌ی اصلی ----------
+  // مسابقه‌ی اصلی ستون برنامه‌ست؛ هدف فرعی فقط روزهای اطرافش رو تنظیم می‌کنه:
+  // تیپر کوچک (pre روز، حجم cut کمتر، جلسه‌ی تیزکننده می‌مونه؛ light روز آخر آسون) و ریکاوری (post روز بدون جلسه‌ی شدید؛ rest روز اول خیلی سبک).
+  // تیپر کامل حدود دو هفته با ۴۰ تا ۶۰٪ کاهش حجمه (Bosquet 2007)؛ تیپر کوچک عمداً خفیف‌تره تا آمادگی مسابقه‌ی اصلی قطع نشه (قاعده‌ی مربی‌گری).
+  function miniTaper(km) {
+    var w = sideRaceWindow(km);
+    if (km <= 5) return { pre: 7, cut: 0.12, post: 2, light: w.pre, rest: w.post };
+    if (km <= 10) return { pre: 7, cut: 0.15, post: 3, light: w.pre, rest: w.post };
+    if (km <= 21.1) return { pre: 10, cut: 0.2, post: 6, light: w.pre, rest: w.post };
+    if (km <= 42.2) return { pre: 14, cut: 0.28, post: 14, light: w.pre, rest: w.post };
+    return { pre: 14, cut: 0.3, post: Math.max(14, Math.ceil(km / 4)), light: w.pre, rest: w.post };
+  }
+  // دو هفته‌ی آخر قبل از مسابقه‌ی اصلی (تیپر): مسابقه یا رکوردگیری فرعی گذاشته نمی‌شه
+  var SIDE_BLOCK_DAYS = 14;
+  function sideBlocked(profile, r) {
+    var main = raceInfo(profile);
+    if (!main) return false;
+    var gap = daysBetween(r.date, main.date);
+    return gap >= 0 && gap < SIDE_BLOCK_DAYS;
+  }
+  // لانگ‌ران‌های کلیدی برنامه‌ی اصلی (بدون اهداف فرعی): حداقل ۹۰٪ بلندترین لانگ‌ران، در ۸ هفته‌ی آخر قبل از مسابقه
+  function keyLongRuns(profile, now) {
+    var main = raceInfo(profile);
+    if (!main || main.date <= now) return [];
+    var base = Object.assign({}, profile, { races: [] }), longs = [];
+    var from = weekStart(now > parseDate(profile.startDate) ? now : parseDate(profile.startDate));
+    for (var ws = from; ws <= main.date; ws = addDays(ws, 7)) {
+      buildWeek(base, ws).days.forEach(function (d) { if (d.type === 'long' && d.km) longs.push({ date: parseDate(d.date), km: d.km }); });
+    }
+    var peak = longs.reduce(function (m, x) { return Math.max(m, x.km); }, 0);
+    return longs.filter(function (x) { return x.km >= peak * 0.9 && x.date > now && daysBetween(x.date, main.date) <= 56; });
+  }
+  // بررسی یک هدف فرعی پیش از اضافه شدن: block = در دو هفته‌ی آخر (اضافه نمی‌شه)، issues = هشدار با پیشنهاد جایگزین
+  // r: { id, km, date (Date یا yyyy-mm-dd), mode }
+  function sideCheck(profile, r, opt) {
+    opt = opt || {};
+    var now = opt.now || parseDate(dateKey(new Date()));
+    var d = typeof r.date === 'string' ? parseDate(r.date) : r.date, km = Number(r.km), main = raceInfo(profile);
+    var out = { block: false, issues: [] }, mt = miniTaper(km);
+    if (main) {
+      var gap = daysBetween(d, main.date);
+      if (gap >= 0 && gap < SIDE_BLOCK_DAYS) { out.block = true; out.issues.push({ code: 'taperBlock', days: gap }); }
+      else if (gap > 0) {
+        var min = km >= 42 ? 56 : km >= 21 && main.km >= 42 ? 28 : 0;
+        if (min && gap < min) out.issues.push({ code: 'spacing', days: gap, min: min });
+      } else if (-gap < 14 && main.km >= 21) out.issues.push({ code: 'afterMain', days: -gap });
+    }
+    if (!out.block && r.mode !== 'train') {
+      var K = opt.keyLongs || keyLongRuns(profile, now);
+      // ۵ و ۱۰ کیلومتر: لانگ‌ران داخل تیپر کوچک فقط کمی کوتاه می‌شه؛ تداخل فقط با روزهای خیلی سبک قبل و ریکاوری اول.
+      // نیمه و بیشتر: کل تیپر کوچک و ریکاوری
+      var from = addDays(d, -(km <= 10 ? mt.light : mt.pre)), to = addDays(d, km <= 10 ? mt.rest : mt.post);
+      var hit = K.filter(function (k) { return k.date >= from && k.date <= to; })[0];
+      if (hit) out.issues.push({ code: 'keyLong', date: dateKey(hit.date), km: hit.km });
+    }
+    otherRaces(profile).forEach(function (o) {
+      if (o.id === r.id || !o.date) return;
+      var first = o.date < d ? o : null, gapO = Math.abs(daysBetween(o.date, d));
+      var need = first ? miniTaper(o.km).post + mt.light : mt.post + miniTaper(o.km).light;
+      if (gapO < need) out.issues.push({ code: 'overlap', id: o.id, name: sideRaceLabel(o), days: gapO });
+    });
+    out.ok = !out.issues.length;
+    if (!out.ok && !opt.noSuggest) {
+      var K2 = opt.keyLongs || keyLongRuns(profile, now);
+      // در دو هفته‌ی آخر: فقط تاریخ‌های زودتر (هدف فرعی معمولاً برای سنجیدن آمادگی قبل از مسابقه‌ی اصلیه)
+      (out.block ? [-7, -14, -21, -28, -35, -42] : [-7, 7, -14, 14, -21, 21, -28, 28]).some(function (off) {
+        var c = addDays(d, off);
+        if (c <= now) return false;
+        if (sideCheck(profile, Object.assign({}, r, { date: c }), { now: now, keyLongs: K2, noSuggest: true }).ok) { out.suggest = dateKey(c); return true; }
+        return false;
+      });
+    }
+    return out;
   }
   function raceDistLabel(km) {
     for (var k in RACE_DISTANCES) if (Math.abs(RACE_DISTANCES[k] - km) < 0.15) return RACE_LABELS[k];
@@ -1268,7 +1395,7 @@
   }
   function sideRaceLabel(r) { return (r.name ? r.name + ' · ' : '') + raceDistLabel(r.km); }
   function makeSideRace(profile, r, level) {
-    var fit = currentFitness(profile), h = T('s.race2.how');
+    var fit = currentFitness(profile), h = T(r.mode === 'train' ? 's.race2.howTrain' : r.kind === 'test' ? 's.race2.howTest' : 's.race2.how');
     if (fit) h += T('s.race.pred', { time: formatDuration(riegel(fit.entry.timeSec, fit.entry.distanceKm, r.km)) });
     if (level <= 1) h += T('s.race.runwalk');
     var rk = level <= 1 || r.km > 21.2 ? 'long' : r.km <= 10 ? 'short' : 'half';
@@ -1276,11 +1403,35 @@
   }
   function applySideRaces(profile, s, date, races, ctx, rw, level) {
     if (s.type === 'race' || s.type === 'none') return s; // روز مسابقه‌ی اصلی دست نمی‌خوره
-    var i, r, diff, w;
+    // هدف فرعی در دو هفته‌ی آخر قبل از مسابقه‌ی اصلی اعمال نمی‌شه (تیپر اصلی مقدمه)
+    races = races.filter(function (x) { return !sideBlocked(profile, x); });
+    var i, r, diff, w, mt;
     for (i = 0; i < races.length; i++) if (daysBetween(date, races[i].date) === 0) return makeSideRace(profile, races[i], level);
     if (s.type === 'rest' || s.type === 'walkrun') return s;
     for (i = 0; i < races.length; i++) {
-      r = races[i]; diff = daysBetween(date, r.date); w = sideRaceWindow(r.km);
+      r = races[i]; diff = daysBetween(date, r.date); w = sideRaceWindow(r.km); mt = miniTaper(r.km);
+      // «به‌عنوان تمرین»: بدون تیپر؛ فقط روز قبل و بعدش جلسه‌ی شدید نیست
+      if (r.mode === 'train') {
+        if (Math.abs(diff) === 1 && isHard(s.type)) return rw ? makeRunWalk(rw, 0.7, T('s.race2.trainAround', { race: sideRaceLabel(r) })) : makeEasy(Math.min(s.km || 5, 8), ctx.zones, T('s.race2.trainAround', { race: sideRaceLabel(r) }));
+        continue;
+      }
+      // تیپر کوچک: روزهای قبل از «light» حجم کمی کمتر، جلسه‌ی کیفی با همون نوع (تیزکننده) ولی کوتاه‌تر
+      if (diff > w.pre && diff <= mt.pre) {
+        var tn = T('s.race2.mini', { race: sideRaceLabel(r) }), f = 1 - mt.cut;
+        if (rw) return makeRunWalk(rw, f, tn);
+        if (s.type === 'long') { var lg = makeLong(s.km * f, ctx, (s.segKm || 0) * f, s.kind || 'plain', { vert: s.vert ? round10(s.vert * f) : 0 }); lg.how = tn + ' ' + lg.how; return lg; }
+        if (s.spec) { var q = makeQuality(s.spec, s.specWeekly * f, ctx); q.how = tn + ' ' + q.how; return q; }
+        if (s.type === 'easy' && s.km) { var ez = makeEasy(s.km * f, ctx.zones, tn); if (s.strides) addStrides(ez); return ez; }
+        return s;
+      }
+      // بعد از روزهای خیلی سبک تا آخر ریکاوری: جلسه‌ی شدید نیست، لانگ‌ران کوتاه‌تر (بعد از نیمه و بیشتر)
+      if (diff < -w.post && -diff <= mt.post) {
+        var rn = T('s.race2.post', { race: sideRaceLabel(r) });
+        if (rw) return isHard(s.type) && s.type !== 'long' ? makeRunWalk(rw, 0.8, rn) : s;
+        if (s.type === 'long' && r.km >= 21) return makeLong(s.km * 0.75, ctx, 0, s.kind === 'ultra' ? 'ultra' : 'plain', { vert: s.vert ? round10(s.vert * 0.75) : 0 });
+        if (isHard(s.type) && s.type !== 'long') return makeEasy((s.km || 5) * 0.8, ctx.zones, rn);
+        return s;
+      }
       if (diff > 0 && diff <= w.pre) {
         var note = T('s.race2.pre', { race: sideRaceLabel(r) });
         if (diff === 1 && r.km >= 21) return makeRest(T('s.taper.dayBefore'));
@@ -1309,6 +1460,43 @@
   }
   function weekIndexFor(profile, date) { return Math.floor(daysBetween(planStart(profile), weekStart(date)) / 7); }
 
+  // سقف ارتفاع هفته: لانگ‌ران حداکثر ۵۰٪ و روز دوم پشت‌سرهم ۲۵٪؛ باقی‌مونده برای جلسه‌های تپه (اگه جا نبود: تکرار کمتر یا جلسه‌ی استیدی).
+  // در هفته‌ای که لانگ‌ران پرارتفاع داره، حداکثر یک جلسه‌ی تپه‌ی دیگه. سرازیری جدا به descentCap محدود می‌شه.
+  function capHills(hp, qs, qDays, weeklyKm, ctx, tier, set, longVert, b2bVert, W) {
+    longVert = Math.min(longVert, round10(hp.cap * 0.5));
+    b2bVert = Math.min(b2bVert, round10(hp.cap * 0.25));
+    var room = hp.cap - longVert - b2bVert, down = hp.descentCap, hillCount = 0;
+    var heavyLong = longVert >= hp.cap * 0.4;
+    var easyQ = function (d) { qs[d] = makeQuality(Q(tier === 'B' ? 'tempoMild' : 'steady', 0.05), weeklyKm, ctx); };
+    // وقتی فقط یک جلسه‌ی تپه جا داره، هفته‌ها یکی‌درمیون سربالایی و سرازیری می‌گیرن تا هر دو پیشرفت کنن
+    var preferDown = W % 2 === 1 || W % 3 === 1;
+    var order = qDays.slice().sort(function (x, y) { var dx = qs[x] && qs[x].descent ? 1 : 0, dy = qs[y] && qs[y].descent ? 1 : 0; return preferDown ? dy - dx : dx - dy; });
+    order.forEach(function (d) {
+      var q = qs[d];
+      if (!q || q.type !== 'hills') return;
+      if (heavyLong && hillCount >= 1) return easyQ(d);
+      if (q.descent) {
+        if (q.descent > down) {
+          var f = down / q.descent;
+          if (f < 0.4) return easyQ(d);
+          qs[d] = makeQuality(Object.assign({}, q.spec, { share: q.spec.share * f, maxReps: Math.max(4, Math.floor((q.descent / 12) * f)) }), weeklyKm, ctx);
+        }
+        down -= qs[d].descent || 0; hillCount++;
+        return;
+      }
+      if ((q.vert || 0) > room) {
+        var g = room / q.vert;
+        if (g < 0.4) return easyQ(d);
+        qs[d] = makeQuality(Object.assign({}, q.spec, { share: q.spec.share * g }), weeklyKm, ctx);
+        // هنوز زیاده: سربالایی‌های کوتاه‌تر (۲ تا ۳ دقیقه)، وگرنه جلسه‌ی استیدی
+        if ((qs[d].vert || 0) > room && q.spec.type === 'longHills') qs[d] = makeQuality(Object.assign({}, q.spec, { share: q.spec.share * g, repMin: 2, repMax: 3 }), weeklyKm, ctx);
+        if ((qs[d].vert || 0) > room) return easyQ(d);
+      }
+      room -= qs[d].vert || 0; hillCount++;
+    });
+    set(longVert, b2bVert);
+  }
+
   function buildWeek(profile, anyDateInWeek) {
     if (isWalk(profile)) return buildWalkWeek(profile, anyDateInWeek);
     var a = assessLevel(profile);
@@ -1329,7 +1517,7 @@
     var nSessions = Math.min(avail.length, L.sessions);
     var sessionDays = chooseSessionDays(avail, nSessions);
     var longDay = sessionDays.indexOf(6) >= 0 ? 6 : sessionDays[sessionDays.length - 1];
-    var days = [], weeklyKm = null, template = {}, vol = null, workouts = null, period = null, b2bDay = null;
+    var days = [], weeklyKm = null, template = {}, vol = null, workouts = null, period = null, b2bDay = null, hp = null;
 
     // ضریب برگشت بعد از مسابقه برای کل هفته (۰٫۷، ۰٫۷۷، ... تا ۱)
     var rfWeek = race && race.date < ws ? returnFactor(daysBetween(addDays(ws, 6), race.date)) : 1;
@@ -1373,6 +1561,12 @@
       }
       var hardFixed = b2bDay !== null ? [longDay, b2bDay] : [longDay];
       var specs = nSessions >= 3 ? workouts.quality : [];
+      hp = ultra && level >= 2 ? hillPlan(goal, W, pr, tier, race, ws, weeklyKm, level, startKm(profile)) : null;
+      if (hp) {
+        specs = adaptHillSpecs(specs, hp, goal, tier);
+        // مرحله‌ی ۰ و ۱: استراید سربالایی هر هفته؛ مرحله‌ی ۰: سرازیری ملایم کوتاه هم
+        if (hp.stage < 2) { workouts.hillStrides = true; workouts.downStrides = hp.stage === 0 && !hp.noDownhill; }
+      }
       var qDays = specs.length ? placeQuality(sessionDays, hardFixed, specs.length) : [];
       var longShare = nSessions <= 3 ? 0.35 : (nSessions >= 7 ? 0.25 : 0.3);
       if (ultra) longShare = b2bDay !== null ? 0.27 : Math.max(longShare, 0.33);
@@ -1385,6 +1579,13 @@
       // جلسات کیفی به ترتیب منو (اولی زودتر در هفته)؛ اگه روز غیرمجاور کافی نبود، آخری‌ها حذف می‌شن
       var qSessions = {};
       qDays.forEach(function (d, i) { qSessions[d] = makeQuality(specs[i], weeklyKm, ctx); });
+      // ارتفاع هدف لانگ‌ران تریل = مسافت × شاخص مسیر × ضریب دوره، محدود به سقف ارتفاع هفته
+      // با برنامه‌ی تپه (سطح ۲+): ضریب دوره حذف می‌شه و پیشرفت فقط از سقف هفتگی میاد (هر هفته حداکثر ۱۰٪)، تا ارتفاع لانگ‌ران
+      // با عوض شدن دوره ناگهان بالا نره؛ حجم هفته هم حداکثر ۱۰٪ رشد می‌کنه، پس ارتفاع هر جلسه هم همین‌طور
+      var rUl = ultra ? (goal.ratio || 0) : 0, vf = hp ? 1 : workouts.vertFactor || 0.5;
+      var longVert = ultra ? Math.min(round10(longKm * rUl * vf), round10(longKm * 80)) : 0;
+      var b2bVert = ultra && b2bKm ? Math.min(round10(b2bKm * rUl * vf * 0.8), round10(b2bKm * 80)) : 0;
+      if (hp) capHills(hp, qSessions, qDays, weeklyKm, ctx, tier, function (lv, bv) { longVert = lv; b2bVert = bv; }, longVert, b2bVert, W);
 
       // سقف ۸۰/۲۰: اگه به‌خاطر حداقل تکرارها رد شد، اول بخش تند لانگ‌ران، بعد جلسات آخر منو حذف می‌شن
       var hardBudget = weeklyKm * 0.2;
@@ -1414,14 +1615,12 @@
         var each = Math.floor(units / easyDays.length);
         easyDays.forEach(function (d, i) { easyAlloc[d] = (each + (i < units - each * easyDays.length ? 1 : 0)) / 2; });
       }
-      // ارتفاع‌گیری هدف لانگ‌ران تریل = مسافت × شاخص مسیر × ضریب دوره
-      var r = ultra ? (goal.ratio || 0) : 0, vf = workouts.vertFactor || 0.5;
-      var longVert = ultra ? Math.min(round10(longKm * r * vf), round10(longKm * 80)) : 0;
-      var b2bVert = ultra && b2bKm ? Math.min(round10(b2bKm * r * vf * 0.8), round10(b2bKm * 80)) : 0;
 
       var hardDays = Object.keys(qSessions).map(Number).concat(nSessions >= 2 ? hardFixed : []);
       var safeEasy = easyDays.filter(function (d) { return hardDays.indexOf((d + 1) % 7) < 0; });
-      var accentDay = (workouts.strides || workouts.hills) ? safeEasy[0] : undefined;
+      var accentDay = (workouts.strides || workouts.hills || workouts.hillStrides) ? safeEasy[0] : undefined;
+      // سرازیری ملایم روی یک روز آسون دیگه؛ اگه نبود، آخر همون جلسه‌ی استراید سربالایی
+      var downDay = workouts.downStrides ? (safeEasy.filter(function (d) { return d !== accentDay; })[0] !== undefined ? safeEasy.filter(function (d) { return d !== accentDay; })[0] : accentDay) : undefined;
       var strengthDays = safeEasy.slice(1).concat(easyDays.filter(function (d) { return safeEasy.indexOf(d) < 0; }))
         .slice(0, workouts.strength || 0);
 
@@ -1435,7 +1634,8 @@
         } else if (easyAlloc[d] !== undefined) {
           var e = makeEasy(easyAlloc[d], zones);
           if (workouts.doubles && e.km >= 14) makeDouble(e);
-          if (d === accentDay) (workouts.hills && W % 2 === 1 ? addHills : addStrides)(e);
+          if (d === accentDay) (workouts.hillStrides ? addHillStrides : workouts.hills && W % 2 === 1 ? addHills : addStrides)(e);
+          if (d === downDay) addDownStrides(e);
           if (strengthDays.indexOf(d) >= 0) addStrength(e);
           template[d] = { session: e };
         }
@@ -1471,7 +1671,7 @@
       weekIndex: w, start: dateKey(ws), days: days, level: level, tier: tier, goal: goal,
       period: period, periodLabel: period ? PERIOD_LABELS[period] : null,
       phase: weekPhase(profile, ws, pr, w, vol),
-      volumeTarget: weeklyKm, b2b: b2bDay !== null,
+      volumeTarget: weeklyKm, b2b: b2bDay !== null, vertCap: hp ? hp.cap : null, hillStage: hp ? hp.stage : null,
       zeroStage: level === 0 ? template._zero : null, zeroFinal: ZERO_FINAL,
       totalKm: round05(totalKm), totalMin: totalMin, vert: vert,
       hardPct: totalKm ? Math.round(hardKm / totalKm * 100) : 0
@@ -2576,6 +2776,7 @@
     dateKey: dateKey, parseDate: parseDate, addDays: addDays, weekStart: weekStart, daysBetween: daysBetween, weekIndexFor: weekIndexFor,
     persianDayIndex: persianDayIndex, dayIndex: persianDayIndex, setWeekStart: setWeekStart, getWeekStart: getWeekStart, satToRel: satToRel, parseTime: parseTime, formatDuration: formatDuration, describeDuration: describeDuration,
     otherRaces: otherRaces, sideRaceWindow: sideRaceWindow, raceDistLabel: raceDistLabel, MAX_RACES: MAX_RACES,
+    miniTaper: miniTaper, sideCheck: sideCheck, sideBlocked: sideBlocked, keyLongRuns: keyLongRuns, SIDE_BLOCK_DAYS: SIDE_BLOCK_DAYS,
     riegel: riegel, vdotFromRace: vdotFromRace, raceTimeFromVdot: raceTimeFromVdot,
     levelFromKm: levelFromKm, levelFromVdot: levelFromVdot, assessLevel: assessLevel,
     paceZones: paceZones, bmi: bmi, progression: progression, weeklyVolumeKm: weeklyVolumeKm,

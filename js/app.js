@@ -682,16 +682,16 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=85" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
-      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=85" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=86" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=86" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
       restoreBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
-      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=85" alt="" width="28" height="28"></button>' +
-      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=85" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=86" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=86" alt="" width="28" height="28"></button>' +
       '</div></section>';
     app.querySelectorAll('[data-lang]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.lang !== I.getLang()) switchLang(b.dataset.lang); });
@@ -962,6 +962,11 @@
         Object.keys(C.TERRAIN_LABELS).map(function (k) { return '<option value="' + k + '"' + (goal.terrain === k ? ' selected' : '') + '>' + esc(C.TERRAIN_LABELS[k]) + '</option>'; }).join('') + '</select></div>' +
         '<div class="field"><label for="ualt">' + esc(T('onb.altitude')) + '</label>' +
         '<input id="ualt" name="ultraAlt" type="number" inputmode="numeric" min="0" max="6000" step="10" value="' + esc(goal.altitude || '') + '"></div></div>' +
+        // نقطه‌ی شروع پله‌های ارتفاع و نوع تپه‌ای که در دسترسه (اختیاری)
+        '<div class="row2"><div class="field"><label for="uvert">' + esc(T('onb.weeklyVert')) + '</label>' +
+        '<input id="uvert" name="ultraVert" type="number" inputmode="numeric" min="0" max="10000" step="10" value="' + esc(goal.weeklyVert != null ? goal.weeklyVert : '') + '"><small class="muted">' + esc(T('onb.weeklyVertHint')) + '</small></div>' +
+        '<div class="field"><label for="uhill">' + esc(T('onb.hillAccess')) + '</label><select id="uhill" name="ultraHill"><option value="">' + esc(T('onb.notSelected')) + '</option>' +
+        ['long', 'short', 'treadmill'].map(function (k) { return '<option value="' + k + '"' + (goal.hillAccess === k ? ' selected' : '') + '>' + esc(T('onb.hill.' + k)) + '</option>'; }).join('') + '</select></div></div>' +
         '<p id="ultra-ratio" class="ultra-ratio" aria-live="polite"></p>' +
         '</div></div></div>' +
         '<fieldset class="onb-sub"><legend>' + esc(T('onb.daysQ')) + req + '</legend><div class="chips">' +
@@ -1233,12 +1238,13 @@
         goalObj.date = rd || null;
         if (gType === 'ultra') {
           var num = function (n) { var v = String(fd.get(n) || '').trim(); return v === '' ? null : Number(v); };
-          var uk = kmIn(form.ultraKm), ug = num('ultraGain'), ul = num('ultraLoss'), ua = num('ultraAlt');
+          var uk = kmIn(form.ultraKm), ug = num('ultraGain'), ul = num('ultraLoss'), ua = num('ultraAlt'), uv = num('ultraVert');
           if (!inLim('ultra', rawIn(form.ultraKm))) E(5, fa(T('onb.err.ultraKm', limParams('ultra'))));
           if (ug === null || !(ug >= 0 && ug <= 20000)) E(5, T('onb.err.ultraGain'));
           if (ul !== null && !(ul >= 0 && ul <= 20000)) E(5, T('onb.err.ultraLoss'));
           if (ua !== null && !(ua >= 0 && ua <= 6000)) E(5, T('onb.err.ultraAlt'));
-          goalObj.ultra = { km: uk, gain: ug, loss: ul, terrain: fd.get('ultraTerrain') || null, altitude: ua };
+          if (uv !== null && !(uv >= 0 && uv <= 10000)) E(5, T('onb.err.weeklyVert'));
+          goalObj.ultra = { km: uk, gain: ug, loss: ul, terrain: fd.get('ultraTerrain') || null, altitude: ua, weeklyVert: uv, hillAccess: fd.get('ultraHill') || null };
         }
       }
       if (!selDays.length) E(5, T('onb.err.days'));
@@ -1504,6 +1510,9 @@
       ['week', 'month'].map(function (m) {
         return '<button type="button" role="tab" data-view-mode="' + m + '" aria-selected="' + (settings.planView === m) + '">' + esc(T('plan.' + m)) + '</button>';
       }).join('') + '</div></header>';
+    // چرخه (از خانه): فقط وقتی فعاله و مرتبطه
+    var ts = todayState();
+    html += homeCycle(ts.r, ts.key, ts.now);
     if (lv.level === 0) html += zeroCard(p, now);
     if (settings.planView === 'month') {
       html += monthCard(p, now, todayKey, isRunWalk, prevGlyph, nextGlyph);
@@ -2035,6 +2044,18 @@
       (g.altitude ? '<li>' + tt('race.altitude', { n: g.altitude }) + '</li>' : '') + '</ul>';
   }
 
+  // تپه و ارتفاع این هفته: مرحله، ارتفاع برنامه‌ریزی‌شده و سقف (هر هفته حداکثر ۱۰٪ بیشتر)
+  function ultraHillsHtml(p, g, now) {
+    var wk = C.buildWeek(p, now);
+    if (wk.vertCap == null) return '';
+    return '<div class="ultra-hills"><h3>' + esc(T('race.hills.title')) + '</h3>' +
+      '<p><b>' + esc(T('race.hills.stage' + wk.hillStage)) + '</b></p>' +
+      '<p class="small">' + tt('race.hills.week', { v: wk.vert, c: wk.vertCap }) + '</p>' +
+      '<p class="small muted">' + esc(fa(T('race.hills.rules'))) + '</p>' +
+      '<p class="small muted">' + tt(g.weeklyVert != null ? 'race.hills.start' : 'race.hills.startEst', { v: g.weeklyVert }) +
+      (g.hillAccess ? T('progress.sep') + esc(T('onb.hill.' + g.hillAccess)) : '') +
+      ' <a href="#onboarding" data-onb-focus="goal">' + esc(T('race.hills.edit')) + '</a></p></div>';
+  }
   // هدف اصلی: [کارت شمارش معکوس و تیپر، کارت‌های مسیر اولترا و پیش‌بینی زمان]
   function mainRaceHtml(p, g) {
     if (g.type === 'none') {
@@ -2062,7 +2083,7 @@
     var hero = html;
     html = '';
 
-    if (g.category === 'ultra') html += '<section class="card"><h2>' + esc(T('race.route')) + ' ' + helpLink('goals', T('race.routeHelp')) + '</h2>' + ultraSummary(g) + '</section>';
+    if (g.category === 'ultra') html += '<section class="card"><h2>' + esc(T('race.route')) + ' ' + helpLink('goals', T('race.routeHelp')) + '</h2>' + ultraSummary(g) + ultraHillsHtml(p, g, now) + '</section>';
 
     // پیش‌بینی زمان
     if (g.category === 'ultra') {
@@ -2094,7 +2115,7 @@
 
   // نتیجه‌ی ثبت‌شده‌ی یک مسابقه = رکورد «مسابقه» با همون تاریخ و مسافت در تاریخچه‌ی فیتنس
   function raceResult(km, dateKey) {
-    return (state.profile.fitnessTests || []).filter(function (x) { return x.kind === 'race' && x.date === dateKey && Math.abs(x.distanceKm - km) < 0.15; })[0] || null;
+    return (state.profile.fitnessTests || []).filter(function (x) { return (x.kind === 'race' || x.kind === 'test') && x.date === dateKey && Math.abs(x.distanceKm - km) < 0.15; })[0] || null;
   }
   // ثبت نتیجه (فقط بعد از روز مسابقه): رکورد تازه → VDOT و پیس‌ها خودکار به‌روز می‌شن
   function resultBlock(id, km, dateKey) {
@@ -2103,7 +2124,7 @@
       'VDOT ' + fa(C.vdotFromRace(r.distanceKm, r.timeSec).toFixed(1)) + '</p>';
     if (raceResultOpen !== id) return '<button type="button" class="btn btn-outline race-result-btn" data-race-result="' + esc(id) + '">' + esc(T('race.resultAdd')) + '</button>';
     var f = C.currentFitness(state.profile), guess = f ? C.raceTimeFromVdot(f.vdot, km) : km * 360;
-    return '<form class="race-result-form" data-race-result-form="' + esc(id) + '" data-km="' + km + '" data-date="' + esc(dateKey) + '" novalidate>' +
+    return '<form class="race-result-form" data-race-result-form="' + esc(id) + '" data-km="' + km + '" data-date="' + esc(dateKey) + '" data-kind="' + (((state.profile.races || []).filter(function (x) { return x.id === id; })[0] || {}).kind === 'test' ? 'test' : 'race') + '" novalidate>' +
       '<div class="field field-tpick"><span class="field-label">' + esc(T('race.resultTime')) + '</span>' +
       tpo({ id: 'rr-' + id, name: 'rtime', sec: Math.round(guess / 5) * 5, touched: false, preview: 'rr-read-' + id,
         aria: T('race.resultTime'), }) +
@@ -2113,39 +2134,78 @@
   }
   var raceResultOpen = null;
   var RACE_KM = [['5', 5], ['10', 10], ['21', 21.1], ['42', 42.2]];
+  // ---------- مسابقه و اهداف: هدف اصلی (ستون برنامه)، اهداف فرعی، اهداف مسافت، مسیر کوهستانی، پیش‌بینی ----------
+  function sideMeta(r) {
+    return [T('race.kind.' + r.kind), T('race.source.' + r.source)].concat(r.mode === 'train' ? [T('race.asTraining')] : []).join(T('progress.sep'));
+  }
+  // تیپر کوچک و ریکاوری هر هدف فرعی، یا «به‌عنوان تمرین»
+  function sideWindowLine(r) {
+    if (r.mode === 'train') return T('race.miniTrain');
+    var mt = C.miniTaper(r.km);
+    return T('race.mini', { d: faDate(C.dateKey(C.addDays(r.date, -mt.pre))), c: Math.round(mt.cut * 100), n: mt.post });
+  }
+  function sideIssueText(i) {
+    switch (i.code) {
+      case 'taperBlock': return T('race.issue.taperBlock');
+      case 'spacing': return T('race.issue.spacing', { n: i.days, m: Math.round(i.min / 7) });
+      case 'keyLong': return T('race.issue.keyLong', { km: i.km, d: faDate(i.date) });
+      case 'afterMain': return T('race.issue.afterMain', { n: i.days });
+      case 'overlap': return T('race.issue.overlap', { g: i.name, n: i.days });
+    }
+    return '';
+  }
+  function sideSig(c) { return c.issues.map(function (i) { return i.code + (i.date || ''); }).join(','); }
+  // هشدار و پیشنهاد جایگزین (روی فهرست یا داخل فرم افزودن)
+  function sideWarnHtml(c, id, inForm) {
+    var attr = inForm ? 'data-race-add-opt' : 'data-race-opt';
+    var btn = function (act, label, extra) { return '<button type="button" class="btn btn-outline" ' + attr + '="' + act + '" data-id="' + esc(id || '') + '"' + (extra || '') + '>' + esc(label) + '</button>'; };
+    var canTrain = !c.block && c.issues.some(function (i) { return i.code === 'keyLong' || i.code === 'spacing' || i.code === 'overlap'; });
+    return '<div class="race-warn' + (c.block ? ' is-block' : '') + '" role="alert"><ul>' + c.issues.map(function (i) { return '<li>' + t(sideIssueText(i)) + '</li>'; }).join('') + '</ul>' +
+      '<div class="race-warn-acts">' + (c.suggest ? btn('move', fa(T('race.opt.move', { d: faDate(c.suggest) })), ' data-date="' + c.suggest + '"') : '') +
+      (canTrain ? btn('train', T('race.opt.train')) : '') + (c.block ? (inForm ? '' : btn('del', T('race.remove'))) : btn('keep', T(inForm ? 'race.opt.keepAdd' : 'race.opt.keep'))) + '</div></div>';
+  }
   function renderRace() {
     var p = state.profile, g = C.goalInfo(p), now = today(), nowKey = C.dateKey(now), main = C.raceInfo(p);
     var mainParts = mainRaceHtml(p, g);
-    var html = '<header class="page-head"><h1>' + esc(T('race.pageTitle')) + '</h1></header>' + mainParts[0] + linkCard('#plans', T('plans.title'), T('plans.linkSub'));
-    // مسابقه‌های دیگه
-    var list = goalList(p);
+    var html = '<header class="page-head"><h1>' + esc(T('race.pageTitle')) + '</h1></header>' + mainParts[0] + (g.type !== 'none' ? homePath(now, true) : '');
+    // اهداف فرعی
+    var list = goalList(p), K = null;
     html += '<section class="card races-card" id="races-card"><h2>' + esc(T('race.others')) + '</h2><p class="small muted">' + esc(T('race.othersHint')) + '</p>';
     if (!list.length) html += '<p class="muted races-empty">' + esc(T('race.othersEmpty')) + '</p>';
     else html += '<ul class="race-list">' + list.map(function (r) {
-      var dated = !!r.key, days = dated ? Math.round(C.daysBetween(now, r.date)) : null, w = C.sideRaceWindow(r.km), past = dated && r.key <= nowKey;
-      var near = dated && main && main.date > r.date && C.daysBetween(r.date, main.date) <= C.taperWeeks(main.key) * 7 + 7;
+      var dated = !!r.key, days = dated ? Math.round(C.daysBetween(now, r.date)) : null, past = dated && r.key <= nowKey;
       var std = RACE_KM.filter(function (x) { return Math.abs(x[1] - r.km) < 0.15; })[0];
       var src = (p.races || []).filter(function (x) { return x.id === r.id; })[0] || {};
       var canMain = !past && (std || src.goal);
       var label = r.name || C.raceDistLabel(r.km);
-      return '<li class="race-item' + (past ? ' is-past' : '') + (canMain ? ' has-grip' : '') + '" data-race-id="' + esc(r.id) + '">' +
+      var chk = null;
+      if (dated && !past) {
+        if (!K) K = C.keyLongRuns(p, now);
+        chk = C.sideCheck(p, { id: r.id, km: r.km, date: r.date, mode: r.mode }, { now: now, keyLongs: K });
+        if (!chk.block && (chk.ok || src.ack === sideSig(chk))) chk = null;
+      }
+      return '<li class="race-item' + (past ? ' is-past' : '') + (canMain ? ' has-grip' : '') + (chk ? ' has-warn' : '') + '" data-race-id="' + esc(r.id) + '">' +
         (canMain ? '<button type="button" class="race-grip" data-race-grip="' + esc(r.id) + '" aria-label="' + esc(T('race.dragAria', { g: label })) + '">' + GRIP_SVG + '</button>' : '') +
-        '<div class="race-item-body"><div class="race-item-head"><b>' + t(r.name || C.raceDistLabel(r.km)) + '</b>' +
+        '<div class="race-item-body"><div class="race-item-head"><b>' + t(label) + '</b>' +
         (r.name ? '<span class="muted small">' + t(C.raceDistLabel(r.km)) + '</span>' : '') + '</div>' +
+        '<p class="small race-meta">' + esc(sideMeta(r)) + '</p>' +
         ((src.targetSec || (src.goal && src.goal.targetSec)) && !past ? '<p class="small race-target-line">' + tt('race.targetLine', { t: C.formatDuration(src.targetSec || src.goal.targetSec) }) + '</p>' : '') +
         (dated ? '<p class="small race-item-date">' + esc(faDate(r.key)) + T('progress.sep') + (past ? esc(T('race.past')) : days === 0 ? esc(T('race.todayBang')) : tt('race.inDays', { n: days })) + '</p>' +
-          (!past ? '<p class="small muted">' + tt('race.window', { pre: w.pre, post: w.post }) + '</p>' : '')
+          (!past && !(chk && chk.block) ? '<p class="small muted">' + t(sideWindowLine(r)) + '</p>' : '')
           : '<p class="small muted">' + esc(T('race.noDateSec')) + '</p>') +
-        (near && !past ? '<p class="small race-near">' + esc(T('race.nearMain')) + '</p>' : '') +
+        (chk ? sideWarnHtml(chk, r.id) : '') +
         (past ? resultBlock(r.id, r.km, r.key) : '') +
         '<div class="race-item-actions">' + (canMain ? '<button type="button" class="linklike small" data-race-main="' + esc(r.id) + '">' + esc(T('race.makeMain')) + '</button>' : '') +
         '<button type="button" class="linklike small race-del" data-race-del="' + esc(r.id) + '">' + esc(T('race.remove')) + '</button></div></div></li>';
     }).join('') + '</ul>';
-    // افزودن مسابقه
+    // افزودن هدف فرعی
     if ((p.races || []).length < C.MAX_RACES) {
       var dr = raceDraft || {}, paceOk = C.assessLevel(p).level >= C.PACE_LEVEL;
+      var chips = function (name, keys, cur) { return '<div class="chips">' + keys.map(function (k) { return '<label class="chip"><input type="radio" name="' + name + '" value="' + k + '"' + (cur === k ? ' checked' : '') + '><span>' + esc(T('race.' + name + '.' + k)) + '</span></label>'; }).join('') + '</div>'; };
       html += '<details class="race-add" id="race-add"' + (raceAddOpen ? ' open' : '') + '><summary>' + esc(T('race.add')) + '</summary><form id="race-add-form" novalidate>' +
         (raceDraft ? '<p class="small race-draft">' + esc(T('race.fromPlan')) + '</p>' : '') +
+        '<p class="sub-legend">' + esc(T('race.kindQ')) + '</p>' + chips('kind', ['race', 'test'], 'race') +
+        '<p class="sub-legend">' + esc(T('race.sourceQ')) + '</p>' + chips('source', ['self', 'coach'], 'self') +
         '<div class="field"><label for="ra-name">' + esc(T('race.name')) + '</label><input id="ra-name" name="name" type="text" maxlength="40" placeholder="' + esc(T('race.namePh')) + '"></div>' +
         '<p class="sub-legend">' + esc(T('race.dist')) + '</p><div class="chips">' +
         RACE_KM.map(function (x, i) { return '<label class="chip"><input type="radio" name="dist" value="' + x[1] + '"' + ((dr.key ? dr.key === x[0] : i === 1) ? ' checked' : '') + '><span>' + t(C.RACE_LABELS[x[0]]) + '</span></label>'; }).join('') +
@@ -2155,9 +2215,13 @@
         (paceOk ? '<div class="field" id="ra-target-field"><label for="ra-target">' + esc(T('race.target')) + '</label>' +
           tpo({ id: 'ra-target', name: 'target', sec: dr.targetSec || 3000, touched: !!dr.targetSec, aria: T('race.target') }) +
           '<small class="muted">' + esc(T('race.targetHint')) + '</small></div>' : '') +
-        '<p class="form-errors" hidden></p><button type="submit" class="btn btn-primary">' + esc(T('race.addSave')) + '</button></form></details>';
+        '<p class="form-errors" hidden></p><div class="race-add-warn"></div><button type="submit" class="btn btn-primary">' + esc(T('race.addSave')) + '</button></form></details>';
     }
-    html += '</section>' + mainParts[1];
+    html += '</section>';
+    // اهداف مسافت (از خانه): هر مسافت → برنامه‌ی پیشنهادی همون مسافت (اختیاری)
+    html += '<section class="card race-tiles"><h2>' + esc(T('race.tilesTitle')) + '</h2><p class="small muted">' + esc(T('race.tilesHint')) + '</p>' + homeGoalTiles() +
+      '<a class="btn btn-outline btn-block" href="#plans">' + esc(T('plans.title')) + '</a></section>';
+    html += mainParts[1];
     app.innerHTML = html;
     var rf = app.querySelector('.race-result-form');
     if (rf) window.CoachTimePicker.init(rf);
@@ -2167,13 +2231,16 @@
       document.getElementById('ra-km-field').hidden = !other;
       // زمان هدف فقط برای مسافت‌های استاندارد (پیس مسابقه‌ی همون مسافت)
       if (tf) tf.hidden = other;
+      raceAddPending = null; var w = af.querySelector('.race-add-warn'); if (w) w.innerHTML = '';
     });
   }
+  var raceAddPending = null;
   var raceAddOpen = false, raceDraft = null;
   function goalList(p) {
     var main = C.raceInfo(p), mk = main ? C.dateKey(main.date) : null;
     return (p.races || []).filter(function (r) { return r && Number(r.km) > 0 && (!r.date || r.date !== mk); })
-      .map(function (r) { return { id: r.id, name: r.name || '', km: Number(r.km), key: r.date || null, date: r.date ? C.parseDate(r.date) : null, result: r.result || null }; })
+      .map(function (r) { return { id: r.id, name: r.name || '', km: Number(r.km), key: r.date || null, date: r.date ? C.parseDate(r.date) : null, result: r.result || null,
+        kind: r.kind === 'test' ? 'test' : 'race', source: r.source === 'coach' ? 'coach' : 'self', mode: r.mode === 'train' ? 'train' : 'race' }; })
       .sort(function (a, b) { return a.key === b.key ? 0 : !a.key ? 1 : !b.key ? -1 : a.key < b.key ? -1 : 1; });
   }
   // زمان هدف: ورودی «۲۵:۰۰» یا «۱:۴۵:۰۰»؛ سرعت باید ممکن باشه
@@ -2305,6 +2372,34 @@
     location.hash = '#race';
     setTimeout(function () { var d = document.getElementById('race-add'); if (d) d.scrollIntoView({ block: 'start' }); }, 50);
   });
+  function addSideGoal(nr) {
+    var p = state.profile;
+    raceAddOpen = false; raceDraft = null; raceAddPending = null;
+    p.races = (p.races || []).concat([nr]);
+    save(); showToast(T(nr.date ? 'race.toastAdded' : 'race.toastAddedSec')); renderRace();
+  }
+  // گزینه‌های هشدار: جابه‌جایی تاریخ، به‌عنوان تمرین، همین‌طور بمونه، حذف (روی فهرست) یا ذخیره با همون گزینه (داخل فرم)
+  app.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-race-opt], [data-race-add-opt]');
+    if (!b || location.hash !== '#race') return;
+    var p = state.profile, act = b.dataset.raceOpt || b.dataset.raceAddOpt;
+    if (b.dataset.raceAddOpt) {
+      var pd = raceAddPending;
+      if (!pd) return;
+      if (act === 'move') pd.nr.date = b.dataset.date;
+      if (act === 'train') pd.nr.mode = 'train';
+      if (act === 'keep') pd.nr.ack = sideSig(pd.chk);
+      addSideGoal(pd.nr);
+      return;
+    }
+    var r = (p.races || []).filter(function (x) { return x.id === b.dataset.id; })[0];
+    if (!r) return;
+    if (act === 'del') { p.races = p.races.filter(function (x) { return x !== r; }); save(); showToast(T('race.toastRemoved')); renderRace(); return; }
+    if (act === 'move') { r.date = b.dataset.date; delete r.ack; }
+    if (act === 'train') r.mode = 'train';
+    if (act === 'keep') r.ack = sideSig(C.sideCheck(p, { id: r.id, km: Number(r.km), date: r.date, mode: r.mode }, { now: today() }));
+    save(); showToast(T('race.opt.saved')); renderRace();
+  });
   function newRaceId() { return 'r' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36); }
   app.addEventListener('submit', function (e) {
     var af = e.target.closest('#race-add-form'), rf = e.target.closest('[data-race-result-form]');
@@ -2322,24 +2417,37 @@
       var tgt = af.target && af.target.value.trim() ? targetIn(af.target.value, km) : null;
       if (tgt && tgt.error) return fail(tgt.error);
       var stdK = RACE_KM.filter(function (x) { return x[1] === km; })[0];
-      raceAddOpen = false; raceDraft = null;
       // بدون هدف اصلی: هدف تازه (مسافت استاندارد) هدف اصلی می‌شه و برنامه بر اساسش چیده می‌شه
       if (C.goalInfo(p).type === 'none' && stdK) {
+        raceAddOpen = false; raceDraft = null;
         p.goal = { type: stdK[0], date: date || null };
         if (tgt) p.goal.targetSec = tgt.sec;
         save(); showToast(T('race.toastAddedMain')); renderRace();
         return;
       }
-      var nr = { id: newRaceId(), name: af.name.value.trim().slice(0, 40), km: km, date: date || null };
+      var fv = function (n) { var x = af.querySelector('input[name=' + n + ']:checked'); return x ? x.value : ''; };
+      var nr = { id: newRaceId(), name: af.name.value.trim().slice(0, 40), km: km, date: date || null, kind: fv('kind') === 'test' ? 'test' : 'race', source: fv('source') === 'coach' ? 'coach' : 'self' };
       if (tgt && dv !== 'other') nr.targetSec = tgt.sec;
-      p.races = (p.races || []).concat([nr]);
-      save(); showToast(T(date ? 'race.toastAdded' : 'race.toastAddedSec')); renderRace();
+      // بی‌صدا اضافه نمی‌شه: دو هفته‌ی آخر قبل از مسابقه‌ی اصلی رد می‌شه؛ تداخل‌ها با پیشنهاد جایگزین نشون داده می‌شن
+      if (date) {
+        var chk = C.sideCheck(p, { km: km, date: date }, { now: today() });
+        if (!chk.ok) {
+          raceAddOpen = true; raceDraft = raceDraft || null;
+          raceAddPending = { nr: nr, chk: chk };
+          var w = af.querySelector('.race-add-warn');
+          w.innerHTML = sideWarnHtml(chk, nr.id, true);
+          w.scrollIntoView({ block: 'nearest' });
+          return;
+        }
+      }
+      addSideGoal(nr);
       return;
     }
     var tm = C.parseTime(rf.rtime.value), rkm = Number(rf.dataset.km), rdate = rf.dataset.date, v = tm ? rkm / (tm / 3600) : 0;
     if (!tm) return fail(T('race.resultErr'));
     if (v > 26 || v < 2) return fail(fa(T('fit.err.impossible', { km: rkm, d: C.describeDuration(tm) })));
-    p.fitnessTests = (p.fitnessTests || []).concat([{ date: rdate, distanceKm: rkm, timeSec: tm, kind: 'race' }]);
+    // نتیجه‌ی هدف فرعی یا اصلی = داده‌ی تازه: VDOT، پیس‌ها و تخمین‌ها از همین به‌روز می‌شن
+    p.fitnessTests = (p.fitnessTests || []).concat([{ date: rdate, distanceKm: rkm, timeSec: tm, kind: rf.dataset.kind === 'test' ? 'test' : 'race' }]);
     // رکورد تازه = پیس‌ها از نو (مثل ثبت تایم‌تست)
     p.easyAdjustSec = 0;
     raceResultOpen = null;
@@ -2965,15 +3073,20 @@
     var p = state.profile, now = today(), key = C.dateKey(now);
     var base = C.sessionFor(p, now), ci = state.checkins[key];
     var r = ci ? effectiveSession(base) : withCycle({ session: base, adaptation: null });
+    // خانه فقط «تمرین امروز» (با پیام تطبیق امروز) و «چک‌این امروز»؛ بقیه‌ی کارت‌ها در صفحه‌ی مربوط به خودشون:
+    // آمادگی، پیشرفت هفته و نکته‌های فیتنس/قدم‌ها → پیشرفت؛ چرخه → برنامه؛ چک‌لیست شروع و نصب → پروفایل؛ اهداف و مسیر → مسابقه و اهداف
+    void p;
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
-      '<h1>' + esc(T(greetKey())) + '</h1></header>' +
-      '<div data-install-slot="home">' + installBanner() + '</div>' +
-      homeToday(base, r.session, ci, key) + homeChecklist(now) + (walker() ? homeSteps(key) + walkLevelCard(now) + walkRunBridge() + homeWalkTiles() : homeGoalTiles()) + homeReadiness(ci, key, now) + homeSmart(r, key) + fitnessNotesCard(p, now) +
-      homeCycle(r, key, now) + homeProgress(now) + (walker() ? homeWalkPath(now) : homePath(now) + linkCard('#plans', T('plans.title'), T('plans.linkSub')));
+      '<h1>' + esc(T(greetKey())) + '</h1></header>' + homeToday(base, r.session, ci, key, r);
     app.innerHTML = '<div class="home">' + html + '</div>';
   }
+  // تمرین امروز با تطبیق و چک‌این امروز (برای صفحه‌های دیگه که کارت‌های قبلی خانه رو نشون می‌دن)
+  function todayState() {
+    var now = today(), key = C.dateKey(now), base = C.sessionFor(state.profile, now), ci = state.checkins[key];
+    return { now: now, key: key, base: base, ci: ci, r: ci ? effectiveSession(base) : withCycle({ session: base, adaptation: null }) };
+  }
   // کارت اصلی بالای خانه: «تمرین امروز» و زیرش «چک‌این امروز»
-  function homeToday(base, s, ci, key) {
+  function homeToday(base, s, ci, key, r) {
     var runDay = ['rest', 'none'].indexOf(base.type) < 0, done = !!state.done[key], cancelled = s.type === 'cancelled';
     var main = cancelled ? T('home.cancelled') : (s.steps && s.steps[0]) || '';
     var wu = !cancelled && s.warmup && s.warmup.min ? T('home.withWarmup', { n: s.warmup.min }) : '';
@@ -2987,7 +3100,7 @@
       (main ? '<p class="today-sum">' + t(main) + (wu ? ' <span class="muted">' + t(wu) + '</span>' : '') + '</p>' : '') +
       (base.type === 'none' && state.profile.startDate > key ? '<p class="today-sum">' + esc(T('home.startsOn', { d: faDate(state.profile.startDate) })) + '</p>' : '') +
       btn + '</div>';
-    return '<section class="card hcard hcard-today hc-' + s.type + '">' + session + homeCheckinSec(base, ci, key, runDay, done) + '</section>';
+    return '<section class="card hcard hcard-today hc-' + s.type + '">' + session + (r ? homeSmartSec(r) : '') + homeCheckinSec(base, ci, key, runDay, done) + '</section>';
   }
   function homeCheckinSec(base, ci, key, runDay, done) {
     var head = function (pill) {
@@ -3012,6 +3125,7 @@
   }
   // وضعیت آمادگی: بدترِ دو نشانه (TSB از بار تمرینی، و چک‌این امروز با تاریخچه)
   var READY = { fresh: 0, ok: 1, tired: 2, recover: 3, pain: 4 };
+  // در صفحه‌ی پیشرفت نشون داده می‌شن؛ لینک «بیشتر» به همون صفحه لازم نیست
   function homeReadiness(ci, key, now) {
     var a = C.analytics(state, now, 56);
     var pm = a && a.pmc.length >= 14 && a.runsDone >= 3 ? a.pmc[a.pmc.length - 1] : null;
@@ -3031,7 +3145,7 @@
     }
     var sign = function (n) { n = Math.round(n); return '‎' + (n > 0 ? '+' : n < 0 ? '−' : '') + fa(Math.abs(n)); };
     return '<section class="card hcard hcard-ready ready-' + st + '"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.ready.title')) + '</span>' +
-      '<a class="hcard-link" href="#progress">' + esc(T('home.more')) + '</a></div>' +
+      '</div>' +
       '<div class="ready-row"><span class="ready-dot" aria-hidden="true"></span><div><b class="ready-line">' + esc(T('home.ready.' + st)) + '</b>' +
       (why.length ? '<span class="small muted">' + esc(why.join(' ')) + '</span>' : '') + '</div></div>' +
       (pm ? '<div class="mini-stats">' +
@@ -3041,12 +3155,12 @@
       '</section>';
   }
   // پیام هوشمند: تطبیق امروز (با دلیلش)، درد، یا افزودنی اختیاری
-  function homeSmart(r, key) {
-    var s = r.session, inner = '';
+  function homeSmartSec(r) {
+    var s = r.session, inner = '', key = C.dateKey(today());
     if (r.adaptation) inner = adaptationBox(r.adaptation, key, true);
     else if (s.makeup) inner = '<div class="makeup-box"><strong>' + esc(T('adapt.makeupBox.title')) + '</strong><p>' + t(s.makeup.text) + '</p></div>';
     if (!inner) return '';
-    return '<section class="card hcard hcard-smart"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.smartTitle')) + '</span></div>' + inner + '</section>';
+    return '<div class="ht-sec ht-smart"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.smartTitle')) + '</span></div>' + inner + '</div>';
   }
   // چرخه: فقط وقتی فعاله و مرتبطه (روزهای پریود، نزدیک پریود بعدی، یا پیشنهاد برای جلسه‌ی امروز)
   function homeCycle(r, key, now) {
@@ -3078,8 +3192,7 @@
         '<span class="muted">' + tt('home.prog.runs', { n: w ? w.runs : 0 }) + (!lastWeek && prev ? T('progress.sep') + tt('home.prog.prev', { n: Math.round(prev.km * 10) / 10 }) : '') + '</span></div>' +
         (hl ? '<p class="prog-hl">' + hl + '</p>' : '');
     }
-    return '<section class="card hcard"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.prog.title')) + '</span>' +
-      '<a class="hcard-link" href="#progress">' + esc(T('home.more')) + '</a></div>' + body + '</section>';
+    return '<section class="card hcard"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.prog.title')) + '</span></div>' + body + '</section>';
   }
   // ---------- مسیر تو: سطح فعلی → هدف اصلی، با تخمین زمان باقی‌مونده (C.goalPath) ----------
   function pathBar(gp) {
@@ -3091,28 +3204,29 @@
     if (gp.status === 'ready') return T('path.ready');
     return gp.goal.date ? T('path.eta', { a: gp.weeks, b: gp.weeksHi }) : T('path.etaMonth', { m: I.monthTitle(C.parseDate(gp.readyDate)) });
   }
-  function homePath(now) {
+  // مسیر تو (در صفحه‌ی مسابقه و اهداف): وقتی زمان کمه به برنامه‌های پیشنهادی لینک می‌شه
+  function homePath(now, inRace) {
     var p = state.profile, gp = C.goalPath(p, now);
     if (gp.none) return linkCard('#plans', T('path.none'), T('path.noneSub'));
     if (gp.past) return '';
     var lines = [gp.notStarted ? T('path.notStarted', { d: faDate(p.startDate) }) : T('path.week', { a: gp.elapsed + 1, b: gp.total })];
     if (gp.daysLeft != null) lines.push(gp.daysLeft === 0 ? T('home.race.today') : T('path.race', { n: gp.daysLeft, d: faDate(gp.goal.date) }));
     lines.push(pathEta(gp));
-    var tight = gp.status === 'tight';
-    return '<a class="card hcard path-card" href="' + (tight ? '#plans' : '#race') + '"><div class="hcard-top"><span class="hcard-label">' + esc(T('path.title')) + '</span>' +
-      '<span class="hcard-link">' + esc(T(tight ? 'path.seePlans' : 'path.more')) + '</span></div>' +
+    var tight = gp.status === 'tight', link = !inRace || tight;
+    return (link ? '<a class="card hcard path-card" href="' + (tight ? '#plans' : '#race') + '">' : '<div class="card hcard path-card">') + '<div class="hcard-top"><span class="hcard-label">' + esc(T('path.title')) + '</span>' +
+      (link ? '<span class="hcard-link">' + esc(T(tight ? 'path.seePlans' : 'path.more')) + '</span>' : '') + '</div>' +
       '<div class="path-ends"><span class="path-now"><span class="path-hex" aria-hidden="true">' + fa(gp.level) + '</span><span><small>' + esc(T('path.now')) + '</small><b>' + tt('path.level', { n: gp.level }) + '</b></span></span>' +
       '<span class="path-goal"><small>' + esc(T('path.goal')) + '</small><b>' + t(C.goalLabel(gp.goal)) + '</b>' +
       (gp.goal.targetSec ? '<small dir="ltr">' + fa(C.formatDuration(gp.goal.targetSec)) + '</small>' : '') + '</span></div>' +
       pathBar(gp) + '<div class="path-meta">' + lines.map(function (l) { return '<span>' + t(l) + '</span>'; }).join('') + '</div>' +
-      (gp.status ? '<span class="path-pill">' + esc(T('path.st.' + gp.status)) + '</span>' : '') + '</a>';
+      (gp.status ? '<span class="path-pill">' + esc(T('path.st.' + gp.status)) + '</span>' : '') + (link ? '</a>' : '</div>');
   }
 
   // ---------- کاشی‌های تیره‌ی هدف: هر مسافت → برنامه‌ی پیشنهادی همون مسافت ----------
   function walker() { return C.isWalk(state.profile); }
   function homeGoalTiles() {
     var p = state.profile, g = C.goalInfo(p);
-    return '<p class="group-label" role="heading" aria-level="2">' + esc(T(g.type === 'none' ? 'goalTiles.title' : 'goalTiles.titleNext')) + '</p><div class="goal-tiles">' + PLAN_KEYS.map(function (k) {
+    return '<div class="goal-tiles">' + PLAN_KEYS.map(function (k) {
       var s = C.planSuggestion(p, k), km = C.RACE_DISTANCES[k], main = g.type === k;
       return '<a class="goal-tile' + (main ? ' is-main' : '') + '" href="#plans" data-plan-focus="' + k + '">' +
         (main ? '<span class="gt-badge">' + esc(T('goalTiles.main')) + '</span>' : '') +
@@ -3129,16 +3243,6 @@
 
   // ---------- پیاده‌روی: اهداف، قدم روزانه، مسیر، پیشنهاد سطح بعد، پل به دویدن، یادآوری ----------
   function walkGoalTitle(k) { return T('wgoal.' + k + '.t'); }
-  function homeWalkTiles() {
-    var wg = C.walkGoalInfo(state.profile);
-    return '<p class="group-label" role="heading" aria-level="2">' + esc(T(wg.kind === 'none' ? 'goalTiles.title' : 'goalTiles.titleNext')) + '</p><div class="goal-tiles walk-tiles">' +
-      C.WALK_GOALS.map(function (k) {
-        return '<a class="goal-tile' + (wg.kind === k ? ' is-main' : '') + '" href="#walkgoals" data-wgoal-focus="' + k + '">' +
-          (wg.kind === k ? '<span class="gt-badge">' + esc(T('goalTiles.main')) + '</span>' : '') +
-          '<span class="gt-km gt-icon" aria-hidden="true">' + esc(T('wgoal.' + k + '.big')) + '</span>' +
-          '<span class="gt-name">' + esc(walkGoalTitle(k)) + '</span><span class="gt-eta">' + esc(T('wgoal.' + k + '.short')) + '</span></a>';
-      }).join('') + '</div>';
-  }
   var wgoalFocus = null;
   document.addEventListener('click', function (e) {
     var f = e.target.closest && e.target.closest('[data-wgoal-focus]');
@@ -3186,6 +3290,8 @@
     var p = state.profile, wg = C.walkGoalInfo(p), now = today(), focus = wgoalFocus;
     wgoalFocus = null;
     var html = '<header class="page-head"><h1>' + esc(T('wgoal.pageTitle')) + '</h1></header><p class="page-intro">' + esc(T('wgoal.intro')) + '</p>';
+    // از خانه: مسیر تا هدف، پیشنهاد سطح بعد و پل به دویدن
+    html += homeWalkPath(now) + walkLevelCard(now) + walkRunBridge();
     html += C.WALK_GOALS.map(function (k) {
       var on = wg.kind === k, est = C.walkPath(Object.assign({}, p, { walkGoal: { kind: k, km: 10 } }), now);
       var extra = '';
@@ -3507,6 +3613,10 @@
         var f = C.currentFitness(state.profile);
         return '<nav class="card list-group">' + listRows([['#fitness', 'watch', T('profile.linkFitness'), f ? 'VDOT ' + f.vdot.toFixed(1) + T('progress.sep') + T('profile.fitnessSub') : T('profile.registerTest')]]) + '</nav>';
       }());
+    // از خانه: آمادگی امروز، پیشرفت هفته و نکته‌های فیتنس (دویدن) یا قدم‌های امروز (پیاده‌روی)
+    var ts = todayState();
+    html += '<div class="prog-today">' + homeReadiness(ts.ci, ts.key, ts.now) + homeProgress(ts.now) +
+      (a.walk ? homeSteps(ts.key) : fitnessNotesCard(state.profile, ts.now)) + '</div>';
 
     var W = a.weeks, wkWithRuns = W.filter(function (w) { return w.runs > 0; }).length;
     var pc = progCtx(a, rk === '4w' ? 4 : 13);
@@ -4396,6 +4506,8 @@
       (joined ? '<p class="pf-joined">' + esc(T('profile.joined', { d: joined })) + '</p>' : '') +
       (name ? '' : '<p class="small muted">' + esc(T('profile.noNameHint')).replace('{link}', '<a href="#onboarding">' + esc(T('profile.noNameLink')) + '</a>') + '</p>') +
       '<a class="btn btn-ink pf-edit" href="#onboarding">' + esc(T('profile.edit')) + '</a></section>' +
+      // از خانه: نصب برنامه و چک‌لیست شروع
+      '<div data-install-slot="home">' + installBanner() + '</div>' + homeChecklist(now) +
       (walker() ? walkGoalCard(p, now) : profileGoalCard(p, g, race, now)) +
       '<a class="card pf-level" href="' + (walker() ? '#plan' : '#plans') + '"><span class="pf-level-badge" aria-hidden="true"><b>' + fa(lv.level) + '</b><small>' + esc(T('level.of10')) + '</small></span>' +
       '<span class="pf-level-text"><b>' + tt('level.title', { n: lv.level, name: lv.info.name }) + '</b><small>' + esc(T(walker() ? 'profile.levelLinkWalk' : 'profile.levelLink')) + '</small></span>' + chevron(isRtl() ? 'left' : 'right') + '</a>' +

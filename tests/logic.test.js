@@ -459,9 +459,9 @@ test('ورود زمان از کیبورد عددی موبایل (بدون «:»)
 });
 
 // ---------- کتابخانه‌ی تمرین بر اساس هدف ----------
-function variants(p, weeks) {
+function variants(p, weeks, from) {
   var v = {};
-  for (var w = 0; w < weeks; w++) weekAt(p, w).days.forEach(function (d) { if (d.spec) v[d.spec.type] = (v[d.spec.type] || 0) + 1; if (d.type === 'long') v['long:' + d.kind] = (v['long:' + d.kind] || 0) + 1; });
+  for (var w = from || 0; w < weeks; w++) weekAt(p, w).days.forEach(function (d) { if (d.spec) v[d.spec.type] = (v[d.spec.type] || 0) + 1; if (d.type === 'long') v['long:' + d.kind] = (v['long:' + d.kind] || 0) + 1; });
   return v;
 }
 test('هدف ۵/۱۰ کیلومتر: اینتروال کوتاه و متوسط، فارتلک سرعتی، تپه‌ی کوتاه', function () {
@@ -519,10 +519,13 @@ test('اولترا ۵۰ کیلومتر: ۳۰۰۰ متر صعود در مقابل
   var vs = variants(steep, 12), vf = variants(flat, 12);
   var hillsS = (vs.longHills || 0) + (vs.downhill || 0), hillsF = (vf.longHills || 0) + (vf.downhill || 0);
   assert(hillsS > hillsF * 2, hillsS + ' vs ' + hillsF);
-  assert((vf.steady || 0) > (vs.steady || 0));
+  // از مرحله‌ی ۲ تپه (هفته‌ی ۸ به بعد): مسیر تخت جلسه‌ی استیدی بیشتری داره؛ قبلش هر دو با استیدی/تپه‌ی کوتاه شروع می‌کنن
+  var vs2 = variants(steep, 16, 8), vf2 = variants(flat, 16, 8);
+  assert((vf2.steady || 0) > (vs2.steady || 0), (vf2.steady || 0) + ' vs ' + (vs2.steady || 0));
   var vertS = 0, vertF = 0;
   for (var w = 0; w < 12; w++) { vertS += weekAt(steep, w).vert; vertF += weekAt(flat, w).vert; }
-  assert(vertS > vertF * 3, vertS + ' vs ' + vertF);
+  // صعود هفتگی پله‌پله (حداکثر ۱۰٪ در هفته) بالا می‌ره، پس در ۱۲ هفته‌ی اول اختلاف کمتر از سقف نهاییه
+  assert(vertS > vertF * 2, vertS + ' vs ' + vertF);
 });
 test('ران‌های پشت‌سرهم: فقط اولترا، سطح ۵+، با پایه‌ی کافی؛ دو روز متوالی', function () {
   var p = profileFor(7, { goal: goalOf('ultra') });
@@ -1097,8 +1100,16 @@ test('مسابقه‌ی فرعی: روز مسابقه، روزهای سبک قب
     if (was(n).type !== 'rest') assert.ok(s.km <= (was(n).km || 99), 'day ' + n + ' should not grow');
   });
   assert.ok(at(-1).km <= 4);
-  // بیرون از پنجره‌ی مسابقه، جلسه‌ها همون برنامه‌ی اصلی‌ان
-  [-5, -4, 5, 6, 10].forEach(function (n) { assert.deepStrictEqual(JSON.parse(JSON.stringify(at(n))), JSON.parse(JSON.stringify(was(n)))); });
+  // تیپر کوچک (۷ روز برای ۱۰K): حجم حدود ۱۵٪ کمتر، نوع جلسه همون (جلسه‌ی کیفی تیزکننده می‌مونه)
+  [-7, -6, -5, -4, -3].forEach(function (n) {
+    var s = at(n), b = was(n);
+    assert.strictEqual(s.type, b.type, 'day ' + n + ' type');
+    if (b.km) assert.ok(s.km <= b.km && s.km >= b.km * 0.75, 'day ' + n + ' km ' + s.km + ' vs ' + b.km);
+  });
+  // ریکاوری ۳ روز: جلسه‌ی شدید نیست
+  assert.ok(!at(3).hard || at(3).type === 'long');
+  // بیرون از پنجره، جلسه‌ها همون برنامه‌ی اصلی‌ان
+  [-10, -8, 5, 6, 10].forEach(function (n) { assert.deepStrictEqual(JSON.parse(JSON.stringify(at(n))), JSON.parse(JSON.stringify(was(n)))); });
 });
 test('مسابقه‌ی فرعی: فاز و هدف حجم هفته‌ها عوض نمی‌شن', function () {
   var x = sideSetup(), p = x.p;
@@ -1342,4 +1353,99 @@ test('پیاده‌روی، آمار: دقیقه و قدم هفتگی، قدم �
   data.steps[d1] = 11000; assert.strictEqual(C.daySteps(data, d1), 11000);
 });
 
+
+// ---------- اهداف فرعی: تیپر کوچک، دو هفته‌ی آخر، تداخل با جلسه‌ی کلیدی ----------
+test('هدف فرعی: در دو هفته‌ی آخر قبل از مسابقه‌ی اصلی اضافه و اعمال نمی‌شه', function () {
+  var x = sideSetup(), p = x.p, main = C.parseDate('2027-03-20'), now = C.parseDate(p.startDate);
+  [1, 7, 13].forEach(function (n) {
+    var c = C.sideCheck(p, { km: 5, date: C.addDays(main, -n) }, { now: now });
+    assert.ok(c.block, 'block ' + n); assert.strictEqual(c.issues[0].code, 'taperBlock');
+    assert.ok(c.suggest && C.daysBetween(C.parseDate(c.suggest), main) >= 14, 'suggest earlier ' + c.suggest);
+  });
+  assert.ok(!C.sideCheck(p, { km: 5, date: C.addDays(main, -14) }, { now: now }).block);
+  // اگه بعداً تاریخ مسابقه‌ی اصلی عوض بشه و هدف فرعی بیفته توی این دو هفته، برنامه تیپر اصلی رو نگه می‌داره
+  var d = C.dateKey(C.addDays(main, -6));
+  p.races = [{ id: 'z', km: 10, date: d }];
+  assert.notStrictEqual(C.sessionFor(p, C.parseDate(d)).type, 'race');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(C.sessionFor(p, C.parseDate(d)))), JSON.parse(JSON.stringify(C.sessionFor(x.base, C.parseDate(d)))));
+});
+test('هدف فرعی: فاصله‌ی نیمه و ماراتن تا ماراتن اصلی، تداخل با لانگ‌ران کلیدی، پیشنهاد تاریخ', function () {
+  var x = sideSetup(), p = x.p, main = C.parseDate('2027-03-20'), now = C.parseDate(p.startDate);
+  var codes = function (c) { return c.issues.map(function (i) { return i.code; }); };
+  assert.ok(codes(C.sideCheck(p, { km: 21.1, date: C.addDays(main, -21) }, { now: now })).indexOf('spacing') >= 0);
+  assert.ok(codes(C.sideCheck(p, { km: 42.2, date: C.addDays(main, -42) }, { now: now })).indexOf('spacing') >= 0);
+  var K = C.keyLongRuns(p, now);
+  assert.ok(K.length >= 1, 'key long runs');
+  K.forEach(function (k) { assert.ok(C.daysBetween(k.date, main) <= 56); });
+  var c = C.sideCheck(p, { km: 10, date: K[0].date }, { now: now });
+  assert.ok(codes(c).indexOf('keyLong') >= 0);
+  assert.ok(c.suggest, 'alternative date');
+  assert.ok(C.sideCheck(p, { km: 10, date: C.parseDate(c.suggest) }, { now: now }).ok);
+  // «به‌عنوان تمرین»: تیپر نداره، پس با لانگ‌ران کلیدی تداخل نمی‌کنه
+  assert.ok(codes(C.sideCheck(p, { km: 10, date: K[0].date, mode: 'train' }, { now: now })).indexOf('keyLong') < 0);
+  // دو هدف فرعی خیلی نزدیک به هم
+  p.races = [{ id: 'a', km: 21.1, date: '2026-11-21' }];
+  assert.ok(codes(C.sideCheck(p, { id: 'b', km: 10, date: '2026-11-24' }, { now: now })).indexOf('overlap') >= 0);
+});
+test('هدف فرعی به‌عنوان تمرین: بدون تیپر؛ تایم‌تست و نتیجه', function () {
+  var x = sideSetup(), p = x.p, d0 = C.parseDate(x.day);
+  p.races = [{ id: 't', km: 10, date: x.day, mode: 'train', kind: 'test' }];
+  var r = C.sessionFor(p, d0);
+  assert.strictEqual(r.type, 'race'); assert.ok(/تمرین/.test(r.how));
+  [-6, -5, -4, -3, 3, 4].forEach(function (n) {
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(C.sessionFor(p, C.addDays(d0, n)))), JSON.parse(JSON.stringify(C.sessionFor(x.base, C.addDays(d0, n)))), 'day ' + n);
+  });
+  assert.ok(!C.sessionFor(p, C.addDays(d0, -1)).hard && !C.sessionFor(p, C.addDays(d0, 1)).hard);
+  p.races[0].mode = 'race';
+  assert.ok(/تایم‌تست/.test(C.sessionFor(p, d0).how));
+  var mt = C.miniTaper(42.2);
+  assert.strictEqual(mt.pre, 14); assert.ok(mt.post >= 14);
+});
+
+// ---------- اولترا/تریل: تپه و ارتفاع پله‌پله از هفته‌ی اول ----------
+test('تریل: ارتفاع هفتگی حداکثر ۱۰٪ بیشتر، هیچ جلسه‌ای بیشتر از ۱۱۰٪ بیشترین جلسه‌ی ۴ هفته‌ی قبل', function () {
+  [[7, 3000, null], [5, 2500, 300], [3, 2000, null], [9, 4000, 800]].forEach(function (c) {
+    var p = profileFor(c[0], { goal: goalOf('ultra', null, Object.assign({ km: 50, gain: c[1] }, c[2] != null ? { weeklyVert: c[2] } : {})) });
+    var prevCap = null, maxes = [];
+    for (var w = 0; w < 20; w++) {
+      var wk = weekAt(p, w);
+      assert.ok(wk.vertCap > 0, 'cap');
+      var planned = wk.days.reduce(function (a, d) { return a + (d.type === 'race' ? 0 : d.vert || 0); }, 0);
+      assert.ok(planned <= wk.vertCap + 45, 'level ' + c[0] + ' w' + w + ' vert ' + planned + ' > cap ' + wk.vertCap);
+      if (prevCap && wk.phase.key !== 'deload') assert.ok(wk.vertCap <= Math.ceil(prevCap.nd * 1.1 / 10) * 10 + 10, 'growth w' + w + ' ' + wk.vertCap + ' vs ' + prevCap.nd);
+      if (wk.phase.key !== 'deload') prevCap = { nd: wk.vertCap };
+      var mx = wk.days.reduce(function (a, d) { return Math.max(a, d.vert || 0); }, 0), before = Math.max.apply(null, maxes.slice(-4).concat([0]));
+      if (w >= 1 && before) assert.ok(mx <= Math.ceil(before * 1.1) + 10, 'session w' + w + ' ' + mx + ' vs ' + before);
+      maxes.push(mx);
+    }
+  });
+});
+test('تریل: مرحله‌ی اول استراید سربالایی و سرازیری ملایم؛ تپه‌ی بلند و سرازیری بعداً؛ بدون سرازیری در هفته‌ی سبک و ۱۰ روز آخر', function () {
+  var p = profileFor(6, { goal: goalOf('ultra', '2027-04-10', { km: 50, gain: 3000, hillAccess: 'treadmill' }) });
+  var steps = function (w) { return weekAt(p, w).days.map(function (d) { return d.steps.join(' '); }).join(' '); };
+  for (var w = 0; w < 3; w++) {
+    var wk = weekAt(p, w);
+    assert.strictEqual(wk.hillStage, 0);
+    assert.ok(!wk.days.some(function (d) { return d.spec && (d.spec.type === 'longHills' || d.spec.type === 'downhill'); }), 'no long hills w' + w);
+    assert.ok(/استراید سربالایی/.test(steps(w)), 'hill strides w' + w);
+    assert.ok(/سرازیری ملایم/.test(steps(w)), 'downhill strides w' + w);
+  }
+  var seen = { longHills: 0, downhill: 0 };
+  for (var x = 3; x < 20; x++) {
+    var k = weekAt(p, x), race = C.parseDate('2027-04-10');
+    k.days.forEach(function (d) {
+      if (!d.spec) return;
+      if (d.spec.type in seen) seen[d.spec.type]++;
+      if (d.spec.type === 'downhill') {
+        assert.ok(k.phase.key !== 'deload', 'no downhill on deload w' + x);
+        assert.ok(C.daysBetween(C.parseDate(d.date), race) > 10, 'no downhill in last 10 days');
+      }
+      if (d.spec.type === 'longHills') assert.ok(/تردمیل/.test(d.how), 'treadmill note');
+      if (k.hillStage === 1 && d.spec.type === 'longHills') assert.ok(d.spec.repMax === 3, 'short climbs in stage 1');
+    });
+    // تپه کنار جلسه‌ی شدید نیست
+    k.days.forEach(function (d, i) { if (i && d.type === 'hills') assert.ok(!hardPair(k.days[i - 1], d), 'stacked w' + x); });
+  }
+  assert.ok(seen.longHills > 0 && seen.downhill > 0, JSON.stringify(seen));
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

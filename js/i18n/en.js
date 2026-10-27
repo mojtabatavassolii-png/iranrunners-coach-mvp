@@ -237,6 +237,12 @@
       double: { variant: 'double day', target: '{am} + {pm:d} {u}', am: 'Morning: {n:d} {u} easy running', pm: 'Evening: {n:d} {u} easy running', how: ' Leave at least 6 hours between the two runs.' },
       strides: 'Finish with 6 × 20 s fast, relaxed and controlled strides, full recovery between each',
       hillSprints: 'Finish with 8 × 10 s uphill sprints (steep slope), 2 min full recovery',
+      hillStrides: 'Finish with 6–8 × 10–15 s uphill strides at controlled effort (not sprints), walk back down',
+      downStrides: 'Finish with 3–4 × 30–60 s on a gentle downhill (3–5%) with short, quick steps, walk back up',
+      hillAccess: {
+        short: ' No long climb nearby: repeat your short hill back to back to fill each rep.',
+        treadmill: ' On a treadmill: 6–10% incline for the same times; most treadmills cannot go downhill, so find a gentle outdoor descent or keep that part short.'
+      },
       strength: '+ 30–40 min strength and plyometrics (squats, light deadlifts, lunges, short jumps)',
       tempo: {
         mildMain: '{a:d} {u} at tempo rhythm, 2 min jog, {b:d} {u} at tempo rhythm',
@@ -354,6 +360,10 @@
         runwalk: ' Stick to your run-walk routine; the only goal is to reach the finish healthy.'
       },
       race2: {
+        howTest: 'Time trial: full warm-up, then the whole distance at the hardest effort you can hold evenly. Log the result to update your paces and estimates.',
+        howTrain: 'As training: run at controlled effort (around your main-goal pace or a little slower), not a record attempt; the main plan continues without a taper.',
+        mini: 'Mini-taper before {race}: a little lighter, but the short fast session stays so you stay sharp.',
+        trainAround: 'Close to {race} (as training); easy today.',
         how: 'Secondary race: enjoy it and run at a controlled effort; your main goal plan stays as it is.',
         pre: 'Lighter, because the {race} race is coming up.',
         post: 'Recovery after the {race} race; easy running only.'
@@ -573,6 +583,8 @@
       ultraGain: 'Total climb (metres of ascent)',
       ultraLoss: 'Total descent (m, optional)',
       ultraLossHint: 'If different from the climb',
+      weeklyVert: 'Climbing you do per week now (m)', weeklyVertHint: 'Leave empty if unsure; it is estimated from your current volume',
+      hillAccess: 'What hills can you use?', hill: { long: 'Long climbs', short: 'Short slope only', treadmill: 'Incline treadmill' },
       terrain: 'Main terrain (optional)',
       notSelected: 'Not selected',
       altitude: 'Altitude above sea level (m, optional)',
@@ -624,7 +636,8 @@
         ultraKm: 'Enter the trail race distance ({min} to {max} {u}).',
         ultraGain: 'Enter the race\'s total climb (metres of ascent); for a flat course enter 0 or a small number.',
         ultraLoss: 'Descent must be between 0 and 20,000 m.',
-        ultraAlt: 'Altitude must be between 0 and 6,000 m.'
+        ultraAlt: 'Altitude must be between 0 and 6,000 m.',
+        weeklyVert: 'Weekly climbing must be between 0 and 10,000 m.'
       }
     },
     cycle: {
@@ -1206,7 +1219,32 @@
       noneHint: 'Your weeks, taper and volume are built around the main goal.',
       changeMain: 'Change main goal',
       others: 'Secondary goals',
-      othersHint: 'Your daily plan always follows the main goal; a dated secondary goal only lightens a few days before and after it. To make a goal the main one, drag its handle onto the green card or tap "Make main goal".',
+      othersHint: 'Your main race is the backbone of the plan. A secondary goal (race or time trial) does not replace it: normal training continues, with a mini-taper before and a short recovery after. Its result updates your paces and estimates. To make a goal the main one, drag its handle onto the main goal card or tap "Make main goal".',
+      kind: { race: 'Race', test: 'Time trial / test run' },
+      source: { self: 'My choice', coach: 'Coach suggestion' },
+      kindQ: 'Type of goal', sourceQ: 'Who chose this goal?',
+      asTraining: 'As training',
+      mini: 'Mini-taper from {d} (about {c}% less volume) · {n} recovery days after',
+      miniTrain: 'As training: no taper; only the day before and after have no hard session.',
+      issue: {
+        taperBlock: 'This date is in the last two weeks before your main race. You are tapering then, so racing or a record attempt is not appropriate; this goal will not be applied to the plan.',
+        spacing: 'Only {n} days before your main race; this distance needs about {m} weeks in between for full recovery.',
+        keyLong: 'Clashes with your key {km} km long run ({d}); this goal\'s mini-taper or recovery would shorten it.',
+        afterMain: '{n} days after your main race; you are still recovering.',
+        overlap: 'Only {n} days from "{g}"; the recovery of one overlaps the taper of the other.'
+      },
+      opt: { move: 'Move to {d}', train: 'As training', keep: 'Keep as is', keepAdd: 'Add anyway', saved: 'Secondary goal updated.' },
+      tilesTitle: 'Distance goals', tilesHint: 'For each distance, roughly how long until you are ready at your current level; tap one to see its suggested plan (optional).',
+      hills: {
+        title: 'Hills and climbing',
+        stage0: 'Stage 1 of 3: introduction — short uphill strides and gentle downhills',
+        stage1: 'Stage 2 of 3: 2–3 minute climbs and short downhills',
+        stage2: 'Stage 3 of 3: long climbs and specific vertical sessions',
+        week: 'This week: {v} m of planned climbing (cap {c} m)',
+        rules: 'Weekly climbing grows by at most 10% a week, with a lighter week every 4 weeks. No session climbs more than 110% of your biggest session in the last month. Hill sessions never sit next to another hard day, and downhill work grows separately and more slowly.',
+        start: 'Starting point: {v} m per week', startEst: 'Starting point: estimated from your current volume',
+        edit: 'Change'
+      },
       othersEmpty: 'No secondary goals yet.',
       noDateSec: 'No date; does not change your plan',
       dragAria: 'Drag "{g}" onto the main goal',
@@ -1215,8 +1253,6 @@
       toastAddedMain: 'Set as your main goal; your plan is built around it.', toastAddedSec: 'Secondary goal added.',
       past: 'Done',
       inDays: { one: 'in {n} day', other: 'in {n} days' },
-      window: '{pre} lighter days before · {post} recovery days after',
-      nearMain: 'Close to your main race; run it easy so your main goal doesn\'t suffer.',
       makeMain: 'Make main goal',
       remove: 'Remove',
       add: 'Add a goal',

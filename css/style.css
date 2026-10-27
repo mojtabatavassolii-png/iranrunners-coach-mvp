@@ -1878,3 +1878,25 @@ html.intro.intro-reveal #app .login-restore, html.intro.intro-reveal #app .login
 html.intro.intro-reveal #app .login-btn, html.intro.intro-reveal #app .login-note, html.intro.intro-reveal #app .login-restore { transition-delay: 80ms; }
 html.intro.intro-reveal #app .login-lang { transition-delay: 160ms; }
 html.intro.intro-instant #app .login * , html.intro.intro-instant #app .login-lang { transition: none !important; }
+
+/* ===========================================================
+   مسابقه و اهداف: اهداف فرعی با هشدار، اهداف مسافت، تپه و ارتفاع
+   کارت‌های منتقل‌شده از خانه (آمادگی و پیشرفت در «پیشرفت»، پیام تطبیق داخل «تمرین امروز»)
+   =========================================================== */
+.hcard-today .ht-smart { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.hcard-today .ht-smart .alert { margin: 0; }
+.prog-today { display: grid; gap: 12px; margin-bottom: 12px; }
+.prog-today .card { margin: 0; }
+.race-meta { margin: 0; color: var(--text-secondary); }
+.race-warn { margin: 8px 0 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--warning); background: var(--warning-soft); }
+.race-warn.is-block { border-color: var(--error); background: var(--error-soft); }
+.race-warn ul { margin: 0 0 8px; padding-inline-start: 18px; }
+.race-warn li { text-align: start; margin-bottom: 4px; }
+.race-warn-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.race-warn-acts .btn { min-height: 44px; }
+.race-add-warn:empty { display: none; }
+.race-tiles .goal-tiles { margin: 10px 0 14px; }
+.race-tiles .goal-tile { background: var(--surface-elevated); }
+.ultra-hills { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.ultra-hills h3 { margin: 0 0 6px; }
+.ultra-hills p { margin: 0 0 6px; text-align: start; }
