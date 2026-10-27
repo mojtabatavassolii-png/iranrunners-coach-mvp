@@ -282,12 +282,13 @@
     canvas.className = 'gp-overlay'; canvas.setAttribute('aria-hidden', 'true');
     stage.appendChild(video); stage.appendChild(canvas);
     var url = URL.createObjectURL(file), dead = false, overlay = o.overlay !== false, W = 0, H = 0, vfc = 0, raf = 0, rec = null;
+    // تصویر اول تا پخش (Safari آیفون تا قبل از پخش فریمی بار نمی‌کنه)
+    if (o.poster) video.poster = o.poster;
     video.src = url;
     function size() {
       if (!video.videoWidth) return;
       W = Math.min(720, video.videoWidth); H = Math.round(video.videoHeight * W / video.videoWidth);
       canvas.width = W; canvas.height = H;
-      stage.style.aspectRatio = video.videoWidth + ' / ' + video.videoHeight;
     }
     function paint(ctx, withVideo) {
       if (!W) return;

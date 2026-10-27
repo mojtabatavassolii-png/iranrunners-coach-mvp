@@ -1172,7 +1172,6 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .gr-high .gi-chip { color: var(--primary); }
 .gait-player { margin: var(--sp-2) 0 var(--sp-3); }
 .gait-player figcaption { font-weight: 700; margin-bottom: 6px; }
-.gait-player canvas { width: 100%; height: auto; border-radius: 12px; background: var(--bg); display: block; }
 .gp-ctrl { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
 .gp-ctrl .btn { min-height: 44px; }
 .gp-step { min-width: 44px; padding-inline: 10px; }
@@ -1239,8 +1238,9 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .gv-not { margin: var(--sp-2) 0 0; }
 /* پخش‌کننده: ویدیو با کنترل‌های خود مرورگر، اسکلت روی یک بوم شفاف که لمس رو رد نمی‌کنه */
 .gp-stage { position: relative; width: 100%; background: var(--bg); border-radius: 12px; overflow: hidden; }
-.gp-stage video { display: block; width: 100%; height: 100%; object-fit: contain; }
-.gp-stage .gp-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* اندازه‌ی پخش‌کننده از خود ویدیو (نسبت ابعاد واقعی)؛ لایه‌ی اسکلت دقیقاً روی همون و کاملاً شفاف */
+.gp-stage video { display: block; width: 100%; height: auto; }
+.gp-stage .gp-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; background: transparent; }
 .gp-ov { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; font-weight: 600; }
 .gp-ov input { width: 20px; height: 20px; accent-color: var(--primary); }
 .gp-err { color: var(--error); margin: 6px 0 0; }
