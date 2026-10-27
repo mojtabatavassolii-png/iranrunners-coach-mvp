@@ -682,16 +682,16 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=83" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
-      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=83" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=84" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=84" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
       restoreBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
-      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=83" alt="" width="28" height="28"></button>' +
-      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=83" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=84" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=84" alt="" width="28" height="28"></button>' +
       '</div></section>';
     app.querySelectorAll('[data-lang]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.lang !== I.getLang()) switchLang(b.dataset.lang); });
@@ -2635,7 +2635,7 @@
       html += '<section class="card gait-view" id="gait-view-' + view + '"><div class="gv-head"><h2>' + esc(T('gait.view.' + view)) + '</h2>' +
         (c ? '<span class="gv-tag">' + esc(T('gait.cond.' + c)) + '</span>' : '') + '</div>';
       if (slot) {
-        html += '<figure class="gait-player"><div class="gp-stage" id="gp-' + slot + '"></div>' +
+        html += '<figure class="gait-player"><canvas id="gp-' + slot + '" role="button" tabindex="0" aria-label="' + esc(T('gait.anim.tap')) + '"></canvas>' +
           '<p class="gp-err small" id="gp-err-' + slot + '" hidden></p>' +
           '<div class="gp-ctrl"><label class="gp-ov"><input type="checkbox" data-gp-ov="' + slot + '" checked> ' + esc(T('gait.anim.overlay')) + '</label>' +
           '<button type="button" class="btn btn-outline" data-gp="' + slot + '" data-act="rate">' + esc(fa(T('gait.anim.speed', { r: 1 }))) + '</button>' +
@@ -2712,24 +2712,29 @@
   var gaitLive = null, gaitPlayers = {}, gaitGen = 0;
   function destroyGaitPlayers() {
     gaitGen++;
-    Object.keys(gaitPlayers).forEach(function (k) { var x = gaitPlayers[k]; if (x.pl) x.pl.destroy(); });
+    Object.keys(gaitPlayers).forEach(function (k) {
+      var x = gaitPlayers[k];
+      if (x.pl) x.pl.destroy();
+      if (x.video) window.CoachPose.release(x.video);
+    });
     gaitPlayers = {};
   }
+  // پخش‌کننده‌ی نسخه‌ی اول: فریم ویدیو و اسکلت روی یک بوم (js/pose.js)، پخش و توقف با لمس تصویر
   function initGaitPlayers() {
     destroyGaitPlayers();
     if (!gaitLive) return;
     var rep = (state.gaitReports || [])[0];
     if (!rep || rep.id !== gaitLive.id) return;
+    var gen = gaitGen;
     var labels = { strike: T('gait.anim.strike'), pelvis: T('gait.anim.pelvis') };
     Object.keys(gaitLive.inputs).forEach(function (k) {
-      var L = gaitLive.inputs[k], stage = document.getElementById('gp-' + k);
-      if (!L || !stage || !L.res) return;
+      var L = gaitLive.inputs[k], cv = document.getElementById('gp-' + k);
+      if (!L || !cv || !L.res) return;
       var res = L.res, st = {};
       // رنگ قرمز فقط برای یافته‌های بیرون از محدوده‌ی همین نما
       (rep.findings || []).forEach(function (f) { if (gaitView(f) === res.view) st[f.id] = f.status; });
       var bad = function (id) { return st[id] === 'warn' || st[id] === 'bad'; };
-      var o = { labels: labels, digits: fa, bad: [], startAt: res.keyT, poster: res.view === 'side' ? rep.imgSide : rep.imgBack,
-        onError: function (code) { var e = document.getElementById('gp-err-' + k); if (e) { e.textContent = T('gait.anim.err.' + code); e.hidden = false; } } };
+      var o = { duration: L.data.duration, labels: labels, digits: fa, bad: [], startAt: res.keyT };
       if (res.view === 'side') {
         var n = res.near === 'l' ? 0 : 1, hip = 23 + n, knee = 25 + n, ank = 27 + n, sh = 11 + n, el = 13 + n, wr = 15 + n;
         if (bad('kneeIc') || bad('overstride')) o.bad.push(knee, ank);
@@ -2740,14 +2745,22 @@
         if (bad('pelvic')) o.bad.push(23, 24);
         if (bad('valgus')) o.bad.push(25, 26);
       }
-      var pl = window.CoachPose.player(stage, L.file, L.data, o);
-      gaitPlayers[k] = { pl: pl };
-      // عیب‌یابی روی گوشی: با ?debug=gait در آدرس، اندازه‌ها و زمان‌های پخش‌کننده زیر ویدیو نشون داده می‌شن
-      if (/[?&]debug=gait/.test(location.search)) {
-        var pre = document.createElement('pre'); pre.className = 'gp-debug'; pre.dir = 'ltr'; stage.parentNode.insertBefore(pre, stage.nextSibling);
-        var upd = function () { if (document.body.contains(pre)) pre.textContent = JSON.stringify(pl.debug()); };
-        ['loadedmetadata', 'seeked', 'pause', 'timeupdate'].forEach(function (ev) { pl.video.addEventListener(ev, upd); });
-      }
+      gaitPlayers[k] = { pl: null, video: null };
+      window.CoachPose.openVideo(L.file).then(function (video) {
+        // صفحه در این فاصله عوض شده؟ همین‌جا آزاد کن
+        if (gen !== gaitGen || !document.body.contains(cv)) { window.CoachPose.release(video); return; }
+        var pl = window.CoachPose.player(cv, video, L.data, o);
+        gaitPlayers[k] = { video: video, pl: pl };
+        // عیب‌یابی روی گوشی: با ?debug=gait در آدرس، اندازه‌ها و زمان‌های پخش‌کننده زیر ویدیو
+        if (/[?&]debug=gait/.test(location.search)) {
+          var pre = document.createElement('pre'); pre.className = 'gp-debug'; pre.dir = 'ltr'; cv.parentNode.insertBefore(pre, cv.nextSibling);
+          var upd = function () { if (document.body.contains(pre)) pre.textContent = JSON.stringify(pl.debug()); };
+          upd(); ['seeked', 'pause', 'timeupdate'].forEach(function (ev) { video.addEventListener(ev, upd); });
+        }
+      }).catch(function () {
+        var e = document.getElementById('gp-err-' + k);
+        if (e) { e.textContent = T('gait.anim.err.load'); e.hidden = false; }
+      });
     });
   }
   function gaitShown() { var el = pfPanel(); return !!el && el.dataset.tab === 'gait'; }
@@ -2755,6 +2768,12 @@
     destroyGaitPlayers();
     gaitLive = null;
   }
+  app.addEventListener('keydown', function (e) {
+    var cv = e.target.closest && e.target.closest('canvas[id^="gp-"]');
+    if (!cv || (e.key !== 'Enter' && e.key !== ' ')) return;
+    var P = gaitPlayers[cv.id.slice(3)];
+    if (P && P.pl) { e.preventDefault(); P.pl.toggle(); }
+  });
   app.addEventListener('click', function (e) {
     var b = e.target.closest('[data-gp]');
     if (!b) return;

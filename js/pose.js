@@ -7,8 +7,8 @@
 (function (root) {
   'use strict';
   var BASE = 'js/vendor/mediapipe/', MODEL = 'models/pose_landmarker_full.task';
-  // نمونه‌برداری با نرخ فریم خود فیلم، حداکثر ۶۰ در ثانیه (اگه نرخ فیلم معلوم نشد، ۳۰)
-  var MAX_SEC = 12, MAX_FPS = 60, DEF_FPS = 30;
+  // نمونه‌برداری ثابت ۳۰ فریم در ثانیه (حداکثر ۱۲ ثانیه)
+  var MAX_SEC = 12, STEP = 1 / 30;
   var landmarker = null, loading = null, clock = 0;
 
   function abs(p) { return new URL(p, document.baseURI).href; }
@@ -79,38 +79,6 @@
       return new Promise(function (res) { var done = false; v.requestVideoFrameCallback(function () { if (!done) { done = true; res(); } }); setTimeout(function () { if (!done) { done = true; res(); } }, 400); });
     }).catch(function (e) { throw fail('seek', e); });
   }
-  // نرخ فریم فیلم: چند فریم پخش بی‌صدا و فاصله‌ی زمان رسانه‌ای فریم‌ها (requestVideoFrameCallback).
-  // فریم‌های جاافتاده موقع پخش با presentedFrames جبران می‌شن. بدون پشتیبانی مرورگر: null
-  function measureFps(v) {
-    if (!v.requestVideoFrameCallback) return Promise.resolve(null);
-    return new Promise(function (res) {
-      var last = null, per = [], done = false;
-      function finish() {
-        if (done) return; done = true;
-        try { v.pause(); } catch (e) { /* */ }
-        var d = per.sort(function (a, b) { return a - b; })[Math.floor(per.length / 2)];
-        var fps = d > 0 ? 1 / d : null;
-        res(fps && fps >= 10 && fps <= 260 ? Math.round(fps) : null);
-      }
-      function cb(now, md) {
-        if (done) return;
-        if (last && md.presentedFrames > last.f && md.mediaTime > last.t) per.push((md.mediaTime - last.t) / (md.presentedFrames - last.f));
-        last = { t: md.mediaTime, f: md.presentedFrames };
-        if (per.length >= 12) finish(); else v.requestVideoFrameCallback(cb);
-      }
-      v.requestVideoFrameCallback(cb);
-      setTimeout(finish, 1500);
-      var pl = v.play();
-      if (pl && pl.catch) pl.catch(finish);
-    });
-  }
-  // گام نمونه‌برداری از نرخ فریم اندازه‌گیری‌شده. اندازه‌گیری با پخش ویدیوی پنهان انجام می‌شه و Safari آیفون
-  // همه‌ی فریم‌های ویدیوی نامرئی رو نمی‌کشه، پس عدد کمتر از واقعی درمیاد (مثلاً ۱۵ به‌جای ۳۰). عدد زیر ۲۴ قابل‌اعتماد
-  // نیست و نادیده گرفته می‌شه: نمونه‌برداری هیچ‌وقت کمتر از ۳۰ در ثانیه (رفتار پیش از نسخه‌ی ۷۸) نمی‌شه.
-  function sampleStep(measured) {
-    var ok = measured != null && measured >= 24 && measured <= 260;
-    return { step: 1 / (ok ? Math.min(measured, MAX_FPS) : DEF_FPS), fps: ok ? measured : null };
-  }
   function recreateCpu() {
     landmarker = null; loading = null;
     return import(abs(BASE + 'vision_bundle.mjs')).then(function (mp) {
@@ -122,11 +90,9 @@
   }
   // هر فریم (با نرخ فیلم تا ۶۰ در ثانیه، حداکثر ۱۲ ثانیه): جابه‌جایی روی ویدیو، کشیدن روی بوم و تشخیص بدن
   function processVideo(file, onProgress) {
-    var lmk, v, cv, g, retried = false, srcFps = null, STEP = 1 / DEF_FPS;
+    var lmk, v, cv, g, retried = false;
     return load().then(function (l) { lmk = l; return openVideo(file); }).then(function (video) {
       v = video;
-      return measureFps(v).then(function (f) { var s = sampleStep(f); srcFps = s.fps; STEP = s.step; });
-    }).then(function () {
       var dur = Math.min(v.duration || 0, MAX_SEC);
       if (!(dur > 0.5)) throw fail('short');
       // اندازه‌ی کار: ضلع بزرگ حداکثر ۹۶۰px (دقت کافی، سرعت بیشتر)
@@ -135,8 +101,7 @@
       g = cv.getContext('2d');
       var n = Math.floor(dur / STEP), frames = [], i = 0;
       function detect() {
-        // زمان‌های ارسالی به MediaPipe باید همیشه صعودی باشن (بین دو ویدیو هم)؛ گام زمانی = فاصله‌ی واقعی فریم‌ها
-        clock += Math.max(1, Math.round(STEP * 1000));
+        clock += 34; // زمان‌های ارسالی به MediaPipe باید همیشه صعودی باشن (بین دو ویدیو هم)
         try { return Promise.resolve(lmk.detectForVideo(cv, clock)); } catch (e) {
           // پردازنده‌ی گرافیکی بعضی گوشی‌ها: یک بار دیگه با CPU
           if (retried) return Promise.reject(fail('detect', e));
@@ -145,7 +110,7 @@
         }
       }
       function next() {
-        if (i >= n) return { w: v.videoWidth, h: v.videoHeight, duration: dur, frames: frames, video: v, fps: srcFps };
+        if (i >= n) return { w: v.videoWidth, h: v.videoHeight, duration: dur, frames: frames, video: v };
         var t = i * STEP + 0.001;
         return seek(v, t).then(function () {
           g.drawImage(v, 0, 0, cv.width, cv.height);
@@ -223,8 +188,8 @@
     });
   }
   // نقاط در زمان t با درون‌یابی بین دو فریم؛ dt = فاصله‌ی نمونه‌برداری همون فیلم (۳۰ یا ۶۰ در ثانیه)
-  function lmAt(S, t, dt) {
-    var x = Math.max(0, (t - 0.001) / dt), i = Math.floor(x), f = x - i, a = S[i], b = S[i + 1];
+  function lmAt(S, t) {
+    var x = Math.max(0, (t - 0.001) / STEP), i = Math.floor(x), f = x - i, a = S[i], b = S[i + 1];
     if (a && b) return a.map(function (p, k) { return [p[0] + (b[k][0] - p[0]) * f, p[1] + (b[k][1] - p[1]) * f, p[2]]; });
     return a || b || S[i - 1] || null;
   }
@@ -274,131 +239,91 @@
       tag(g, o.labels.pelvis + ' ' + o.digits(Math.abs(Math.round(tilt))) + '°', cx + hw + 6, cy - 12, W, o.pelvisBad ? COL.bad : TXT);
     }
   }
-  // پخش‌کننده: خود ویدیو با کنترل‌های استاندارد مرورگر (<video controls playsinline>) و یک لایه‌ی بوم شفاف
-  // روی اون فقط برای اسکلت (pointer-events: none، پس کنترل‌ها همیشه قابل لمس‌ان). لایه‌ی اسکلت روشن و خاموش می‌شه
-  // (نسخه‌ی اصلی / نسخه‌ی با اسکلت). stage: جای پخش‌کننده در صفحه؛ file: فایل خود کاربر (فقط در همین نشست)
-  // o: { angles, bad, back, pelvisBad, strikes (زمان‌های فرود)، labels، digits، startAt، onError(code) }
-  function player(stage, file, data, o) {
-    o = o || {};
+  function pickMime() {
+    if (!window.MediaRecorder) return null;
+    var c = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    for (var i = 0; i < c.length; i++) if (!MediaRecorder.isTypeSupported || MediaRecorder.isTypeSupported(c[i])) return c[i];
+    return null;
+  }
+  // canvas: بوم صفحه؛ video: ویدیوی تحلیل‌شده (همون که پردازش شد)؛ data.frames: نقاط هر فریم
+  // فریم ویدیو و اسکلت در هر لحظه با هم و با یک زمان روی همین بوم کشیده می‌شن، پس اسکلت همیشه روی بدنه.
+  // پخش و توقف با لمس خود تصویر؛ کنترل‌های مرورگر نداره.
+  // o: { duration, angles, bad, back, pelvisBad, strikes (زمان‌های فرود)، labels، digits }
+  function player(canvas, video, data, o) {
+    var S = smoothFrames(data.frames), g = canvas.getContext('2d');
+    var W = Math.min(720, video.videoWidth), H = Math.round(video.videoHeight * W / video.videoWidth);
+    canvas.width = W; canvas.height = H;
+    var dur = Math.min(o.duration || data.duration, video.duration || 99), playing = false, raf = 0, rate = 1, rec = null, dead = false, overlay = true, nDraw = 0;
     o.digits = o.digits || String;
-    var S = smoothFrames(data.frames), F = data.frames;
-    var dt = F.length > 1 ? (F[F.length - 1].t - F[0].t) / (F.length - 1) : 1 / 30;
-    var video = document.createElement('video'), canvas = document.createElement('canvas'), g = canvas.getContext('2d');
-    video.controls = true; video.muted = true; video.defaultMuted = true; video.playsInline = true; video.preload = 'auto';
-    ['playsinline', 'webkit-playsinline', 'muted'].forEach(function (a) { video.setAttribute(a, ''); });
-    canvas.className = 'gp-overlay'; canvas.setAttribute('aria-hidden', 'true');
-    stage.appendChild(video); stage.appendChild(canvas);
-    var url = URL.createObjectURL(file), dead = false, overlay = o.overlay !== false, W = 0, H = 0, vfc = 0, raf = 0, rec = null;
-    // تصویر اول تا پخش (Safari آیفون تا قبل از پخش فریمی بار نمی‌کنه)
-    if (o.poster) video.poster = o.poster;
-    video.src = url;
-    function size() {
-      if (!video.videoWidth) return;
-      W = Math.min(720, video.videoWidth); H = Math.round(video.videoHeight * W / video.videoWidth);
-      canvas.width = W; canvas.height = H;
-    }
-    // t: زمان رسانه‌ای فریمی که الان روی صفحه‌ست. حین پخش، currentTime از فریم کشیده‌شده جلوتره (تا چند فریم)؛
-    // برای همین در requestVideoFrameCallback از metadata.mediaTime همون فریم استفاده می‌شه
-    var lastT = null;
-    function paint(ctx, withVideo, t) {
-      if (!W) return;
-      if (withVideo) { if (video.readyState >= 2) ctx.drawImage(video, 0, 0, W, H); } else ctx.clearRect(0, 0, W, H);
-      if (!overlay && !withVideo) return;
-      if (t == null) t = video.currentTime;
-      lastT = t;
-      var lm = lmAt(S, t, dt);
-      if (lm) drawOverlay(ctx, lm, W, H, o);
-      if (o.strikes && o.strikes.some(function (s) { return Math.abs(s - t) < 0.05; })) tag(ctx, o.labels.strike, 8, 8, W, tok('--warning'));
-    }
-    function draw(t) { if (!dead) paint(g, false, t); }
-    var hasVfc = !!video.requestVideoFrameCallback;
-    // هم‌گام با فریم‌های خود ویدیو (اگه مرورگر پشتیبانی کنه)، وگرنه با هر فریم صفحه حین پخش
-    // حین پخش دو راه رسم: فراخوان فریم ویدیو (دقیق، با زمان همون فریم) و یک حلقه‌ی requestAnimationFrame که همیشه
-    // روشنه و فقط وقتی فراخوان فریم اخیراً نیومده رسم می‌کنه (بعضی مرورگرها، مثلاً روی آیفون، این فراخوان رو برای
-    // ویدیوی با کنترل‌های خود مرورگر صدا نمی‌زنن؛ بدون این حلقه اسکلت فقط چند بار در ثانیه جابه‌جا می‌شد)
-    var lastVfc = 0, nVfc = 0, nRaf = 0;
-    function onFrame(now, md) {
+    function draw() {
       if (dead) return;
-      lastVfc = performance.now(); nVfc++;
-      var t = md && md.mediaTime != null ? md.mediaTime : null;
-      draw(t); if (rec) paint(rec.g, true, t);
-      vfc = video.requestVideoFrameCallback(onFrame);
+      if (video.readyState >= 2) g.drawImage(video, 0, 0, W, H);
+      var t = video.currentTime, lm = lmAt(S, t);
+      nDraw++;
+      if (!overlay) return;
+      if (lm) drawOverlay(g, lm, W, H, o);
+      if (o.strikes && o.strikes.some(function (s) { return Math.abs(s - t) < 0.05; })) tag(g, o.labels.strike, 8, 8, W, tok('--warning'));
     }
     function loop() {
-      if (dead || video.paused || video.ended) { raf = 0; return; }
-      if (performance.now() - lastVfc > 120) { nRaf++; draw(); if (rec) paint(rec.g, true); }
-      raf = requestAnimationFrame(loop);
-    }
-    if (hasVfc) vfc = video.requestVideoFrameCallback(onFrame);
-    video.addEventListener('playing', function () { if (!raf) raf = requestAnimationFrame(loop); });
-    video.addEventListener('play', function () { if (!raf) raf = requestAnimationFrame(loop); });
-    // در حالت توقف currentTime همون فریم روی صفحه‌ست
-    ['seeked', 'pause', 'loadeddata'].forEach(function (ev) { video.addEventListener(ev, function () { draw(); }); });
-    video.addEventListener('loadedmetadata', function () {
-      size();
-      var first = o.startAt != null ? o.startAt : 0.001;
-      try { video.currentTime = Math.min(first, (video.duration || first + 1) - 0.05); } catch (e) { /* */ }
-    });
-    // فایلی که این مرورگر نمی‌تونه پخش کنه (مثلاً HEVC روی مرورگری که پشتیبانی نمی‌کنه)
-    video.addEventListener('error', function () {
-      var c = video.error ? video.error.code : 0;
-      if (o.onError) o.onError(c === 4 ? 'format' : 'load');
-    });
-    function step(n) {
-      video.pause();
-      video.currentTime = Math.max(0.001, Math.min((video.duration || 1) - dt, video.currentTime + n * dt));
-    }
-    function setOverlay(on) { overlay = !!on; draw(); }
-    // ساخت فایل ویدیو (فریم ویدیو + اسکلت) از یک بار پخش کامل، با همون سرعت انتخاب‌شده
-    function pickMime() {
-      if (!window.MediaRecorder) return null;
-      var c = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
-      for (var i = 0; i < c.length; i++) if (!MediaRecorder.isTypeSupported || MediaRecorder.isTypeSupported(c[i])) return c[i];
-      return null;
-    }
-    function record() {
-      var mime = pickMime(), off = document.createElement('canvas');
-      if (!mime || !off.captureStream || !W) return Promise.reject(new Error('noRecorder'));
-      off.width = W; off.height = H;
-      return new Promise(function (resolve, reject) {
-        var chunks = [], stream = off.captureStream(30), mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4e6 });
-        mr.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
-        mr.onstop = function () { stream.getTracks().forEach(function (tr) { tr.stop(); }); rec = null; resolve(new Blob(chunks, { type: mime.split(';')[0] })); };
-        mr.onerror = function (e) { rec = null; reject(e.error || new Error('record')); };
-        var end = function () { video.removeEventListener('ended', end); if (mr.state !== 'inactive') mr.stop(); };
-        video.pause(); video.loop = false;
+      if (dead) return;
+      draw();
+      if (video.currentTime >= dur - 0.03 || video.ended) {
+        if (rec) { finish(); return; }
         video.currentTime = 0.001;
-        video.addEventListener('seeked', function go() {
-          video.removeEventListener('seeked', go);
-          rec = { g: off.getContext('2d') }; paint(rec.g, true);
-          mr.start(250); video.addEventListener('ended', end);
-          video.play().catch(function (e) { end(); reject(e); });
-        });
+        if (playing) video.play().catch(function () {});
+      }
+      if (playing) raf = requestAnimationFrame(loop);
+    }
+    function play() { if (playing || dead) return; playing = true; video.playbackRate = rate; video.play().catch(function () {}); raf = requestAnimationFrame(loop); }
+    function pause() { playing = false; cancelAnimationFrame(raf); video.pause(); draw(); }
+    function step(n) {
+      pause();
+      return seek(video, Math.max(0.001, Math.min(dur - STEP, video.currentTime + n * STEP))).then(draw);
+    }
+    function setRate(r) { rate = r; video.playbackRate = r; }
+    function setOverlay(on) { overlay = !!on; draw(); }
+    function finish() {
+      var r = rec; rec = null; pause();
+      if (r && r.state !== 'inactive') r.stop();
+    }
+    // ساخت فایل ویدیو از همین پخش (با همون سرعت انتخاب‌شده)
+    function record() {
+      var mime = pickMime();
+      if (!mime || !canvas.captureStream) return Promise.reject(new Error('noRecorder'));
+      return new Promise(function (resolve, reject) {
+        pause();
+        var chunks = [], stream = canvas.captureStream(30), mr = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4e6 });
+        mr.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+        mr.onstop = function () { stream.getTracks().forEach(function (tr) { tr.stop(); }); resolve(new Blob(chunks, { type: mime.split(';')[0] })); };
+        mr.onerror = function (e) { reject(e.error || new Error('record')); };
+        seek(video, 0.001).then(function () { draw(); rec = mr; mr.start(250); play(); }, reject);
       });
     }
+    // لمس خود تصویر: پخش / توقف
+    function onTap(e) { if (e) e.preventDefault(); if (playing) pause(); else play(); }
+    canvas.addEventListener('click', onTap);
+    var first = o.startAt != null ? o.startAt : 0.001;
+    seek(video, first).then(draw).catch(function () {});
+    // برای عیب‌یابی (?debug=gait): اندازه‌ها و زمان‌ها
+    function debug() {
+      var cr = canvas.getBoundingClientRect(), f0 = (data.frames || []).filter(function (f) { return f && f.lm; })[0];
+      return { natural: [video.videoWidth, video.videoHeight], analysed: [data.w, data.h], canvasPx: [W, H], canvasCss: [Math.round(cr.width), Math.round(cr.height)],
+        step: Math.round(STEP * 10000) / 10000, frames: (data.frames || []).length, duration: Math.round((video.duration || 0) * 100) / 100,
+        t: Math.round(video.currentTime * 1000) / 1000, draws: nDraw, playing: playing,
+        firstHip: f0 ? [f0.t, f0.lm[23][0], f0.lm[23][1]].map(function (x) { return Math.round(x * 1000) / 1000; }) : null };
+    }
+    // توقف کامل: حلقه‌ی رسم، پخش و ضبط؛ بوم خالی می‌شه تا حافظه‌ش آزاد بشه
     function destroy() {
       if (dead) return;
-      dead = true;
-      if (vfc && video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(vfc);
-      cancelAnimationFrame(raf);
-      try { video.pause(); } catch (e) { /* */ }
-      video.removeAttribute('src'); video.load(); URL.revokeObjectURL(url);
-      canvas.width = canvas.height = 1;
-      if (video.parentNode) video.parentNode.removeChild(video);
-      if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+      if (rec && rec.state !== 'inactive') { try { rec.stop(); } catch (e) { /* */ } }
+      rec = null; playing = false; cancelAnimationFrame(raf); video.pause();
+      canvas.removeEventListener('click', onTap);
+      dead = true; canvas.width = canvas.height = 1;
     }
-    // برای عیب‌یابی (?debug=gait): اندازه‌ها، زمان‌ها و چند نقطه‌ی اول
-    function debug() {
-      var vr = video.getBoundingClientRect(), cr = canvas.getBoundingClientRect(), f0 = F.filter(function (f) { return f && f.lm; })[0];
-      return { natural: [video.videoWidth, video.videoHeight], analysed: [data.w, data.h], display: [Math.round(vr.width), Math.round(vr.height)],
-        canvasCss: [Math.round(cr.width), Math.round(cr.height)], canvasOffset: [Math.round(cr.left - vr.left), Math.round(cr.top - vr.top)], canvasPx: [W, H],
-        fps: data.fps || null, dt: Math.round(dt * 10000) / 10000, frames: F.length, duration: Math.round((video.duration || 0) * 100) / 100,
-        analysedDuration: Math.round((data.duration || 0) * 100) / 100, t: Math.round(video.currentTime * 1000) / 1000, overlayT: lastT == null ? null : Math.round(lastT * 1000) / 1000,
-        vfc: hasVfc, vfcDraws: nVfc, rafDraws: nRaf, firstHip: f0 ? [f0.t, f0.lm[23][0], f0.lm[23][1]].map(function (x) { return Math.round(x * 1000) / 1000; }) : null };
-    }
-    return { video: video, debug: debug, step: step, setRate: function (r) { video.playbackRate = r; }, rate: function () { return video.playbackRate; },
-      setOverlay: setOverlay, overlay: function () { return overlay; }, record: record, draw: draw, destroy: destroy };
+    return { video: video, play: play, pause: pause, toggle: function () { if (playing) pause(); else play(); return playing; }, step: step,
+      setRate: setRate, rate: function () { return rate; }, isPlaying: function () { return playing; }, setOverlay: setOverlay,
+      record: record, draw: draw, debug: debug, destroy: destroy };
   }
 
-  root.CoachPose = { sampleStep: sampleStep, load: load, unload: unload, processVideo: processVideo, openVideo: openVideo, keyImage: keyImage, release: release, player: player, MAX_SEC: MAX_SEC };
+  root.CoachPose = { load: load, unload: unload, processVideo: processVideo, openVideo: openVideo, keyImage: keyImage, release: release, player: player, MAX_SEC: MAX_SEC };
 })(this);
