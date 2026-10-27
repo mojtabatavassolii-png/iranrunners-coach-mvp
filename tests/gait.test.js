@@ -303,4 +303,80 @@ test('شرایط دویدن جدا برای هر فیلم؛ هر یافته ما
   var sw = G.analyze({ side: backRunner({}).video, heightCm: 175, conditions: { side: 'race', back: 'easy' } });
   assert.strictEqual(sw.conditions.back, 'race'); assert.strictEqual(sw.conditions.side, null);
 });
+
+// ---------- اسلوموشن، دوربین متحرک و نوع فرود هر گام ----------
+// فیلم اسلوموشن: k برابر کندتر پخش می‌شه (زمان فیلم = زمان واقعی × k)، با نمونه‌برداری ثابت ۳۰ فریم در ثانیه‌ی فیلم
+function slowMo(o, k) {
+  var x = sideRunner(Object.assign({}, o, { fps: 30 * k, dur: 12 / k }));
+  x.video.frames.forEach(function (f) { f.t *= k; });
+  return x;
+}
+// دوربین متحرک: جابه‌جایی افقی و عمودی، کمی لرزش و بزرگ شدن دونده (نزدیک شدن به دوربین)
+function moveCam(v) {
+  v.frames.forEach(function (f, i) {
+    var t = i / v.frames.length, z = 1 + 0.25 * t, dx = 0.15 * Math.sin(2 * Math.PI * t), dy = 0.01 * Math.sin(17 * t);
+    f.lm = f.lm.map(function (p) { return [0.5 + (p[0] - 0.5) * z + dx, 0.5 + (p[1] - 0.5) * z + dy, p[2]]; });
+  });
+  return v;
+}
+test('اسلوموشن: بدون ضریب غیرقابل‌اطمینان + پیشنهاد ضریب؛ با ضریب، آهنگ واقعی', function () {
+  var x = slowMo({ cadence: 182, fsa: 15 }, 8);
+  var r = G.analyze({ side: x.video, heightCm: 175 });
+  var m = r.side.metrics;
+  assert.ok(m.cadence < 40, 'playback cadence ' + m.cadence);
+  assert.strictEqual(m.conf.cadence, 'low'); assert.strictEqual(m.conf.gct, 'low');
+  assert.strictEqual(find(r, 'cadence').status, 'na'); assert.strictEqual(find(r, 'cadence').why, 'slow');
+  assert.strictEqual(m.slowSuggest.k, 8); near(m.slowSuggest.cadence, 182, 5, 'suggested');
+  var r8 = G.analyze({ side: x.video, heightCm: 175, timeScale: { side: 8 } }), m8 = r8.side.metrics;
+  near(m8.cadence, 182, 4, 'real cadence'); assert.strictEqual(m8.timeScale, 8);
+  assert.strictEqual(r8.side.quality.fps, 240);
+  assert.ok(!m8.slowSuggest); assert.strictEqual(find(r8, 'cadence').status, 'info');
+  // زمان تماس به زمان واقعی (۰٫۳۶ از دو گام ≈ ۲۳۷ms در ۱۸۲ گام)
+  near(m8.gctNear, 0.36 * 120 / 182 * 1000, 30, 'gct ms');
+  // نوع فرود به زمان بستگی نداره
+  assert.strictEqual(m8.strike, 'heel');
+  // فیلم عادی: پیشنهاد اسلوموشن نداره
+  assert.ok(!G.analyze({ side: sideRunner({}).video, heightCm: 175 }).side.metrics.slowSuggest);
+  // ضریب‌ها دوبرابر هم‌ان و بازه‌ی ۱۴۰ تا ۲۱۰ کمتر از دوبرابره → حداکثر یک ضریب
+  for (var c = 4; c <= 120; c++) {
+    var D = { t: [0, 60 / c, 120 / c, 180 / c], dt: 1, scale: 1 };
+    var k = [2, 4, 8, 16, 32].filter(function (q) { return c * q >= 140 && c * q <= 210; });
+    assert.ok(k.length <= 1, 'unique ' + c);
+    var o = G.cadenceOf(D, [0, 1, 2, 3]);
+    assert.strictEqual(o.suggest ? o.suggest.k : undefined, k[0], 'suggest ' + c);
+  }
+});
+test('نوع فرود: درصد هر نوع از همه‌ی گام‌ها، هر گام با زمان و زاویه', function () {
+  [[15, 'heel'], [3, 'mid'], [-8, 'fore']].forEach(function (c) {
+    // ۱۲۰ فریم: لحظه‌ی برخورد دقیق → همه‌ی گام‌ها همون نوع
+    var m = G.analyze({ side: sideRunner({ fsa: c[0], fps: 120, dur: 4 }).video, heightCm: 175 }).side.metrics;
+    assert.strictEqual(m.strike, c[1], 'fsa ' + c[0]);
+    assert.strictEqual(m.strikes[c[1]], 100);
+    assert.ok(m.strikes.n >= 10, 'steps ' + m.strikes.n);
+    m.strikes.steps.forEach(function (s) { assert.strictEqual(s.type, c[1]); assert.ok(s.t >= 0 && (s.foot === 'l' || s.foot === 'r')); near(s.fsa, c[0], 3, 'step fsa'); });
+    // ۳۰ فریم: پا در کمتر از یک فریم صاف می‌شه، پس زاویه‌ی بعضی گام‌ها کمتر دیده می‌شه؛ نوع غالب درسته و جمع درصدها ۱۰۰
+    var m30 = G.analyze({ side: sideRunner({ fsa: c[0] }).video, heightCm: 175 }).side.metrics;
+    assert.strictEqual(m30.strike, c[1], '30fps fsa ' + c[0]);
+    assert.strictEqual(m30.strikes.heel + m30.strikes.mid + m30.strikes.fore, 100);
+    assert.ok(m30.strikes[c[1]] >= 50, '30fps majority ' + m30.strikes[c[1]]);
+  });
+  // پای کوچیک در تصویر (دونده‌ی دور): نوع فرود غیرقابل‌اطمینان، با دلیل
+  var v = sideRunner({ fsa: 15 }).video;
+  v.frames.forEach(function (f) { f.lm = f.lm.map(function (p) { return [0.5 + (p[0] - 0.5) * 0.5, 0.5 + (p[1] - 0.5) * 0.5, p[2]]; }); });
+  var r = G.analyze({ side: v, heightCm: 175 });
+  assert.strictEqual(r.side.metrics.strikes.reason, 'footSmall');
+  assert.strictEqual(find(r, 'strike').status, 'na'); assert.strictEqual(find(r, 'strike').why, 'footSmall');
+  near(r.side.metrics.cadence, 175, 5, 'cadence still measured');
+});
+test('دوربین متحرک و جابه‌جا شدن برچسب چپ و راست: آهنگ گام و نوع فرود درست', function () {
+  var x = sideRunner({ cadence: 172, fsa: 15, fps: 60, dur: 6 });
+  moveCam(x.video);
+  // MediaPipe گاهی وسط گام برچسب دو پا رو عوض می‌کنه
+  var sw = [[23, 24], [25, 26], [27, 28], [29, 30], [31, 32]];
+  x.video.frames.forEach(function (f, i) { if (i % 61 < 3) sw.forEach(function (a) { var t = f.lm[a[0]]; f.lm[a[0]] = f.lm[a[1]]; f.lm[a[1]] = t; }); });
+  var m = G.analyze({ side: x.video, heightCm: 175 }).side.metrics;
+  near(m.cadence, 172, 4, 'cadence');
+  assert.strictEqual(m.strike, 'heel');
+  assert.ok(m.strikes.heel >= 80, 'heel % ' + m.strikes.heel);
+});
 console.log(passed + ' تست تحلیل دویدن موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

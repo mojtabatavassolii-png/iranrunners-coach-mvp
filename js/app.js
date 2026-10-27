@@ -682,16 +682,16 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=84" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
-      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=84" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=85" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=85" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
       restoreBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
-      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=84" alt="" width="28" height="28"></button>' +
-      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=84" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=85" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=85" alt="" width="28" height="28"></button>' +
       '</div></section>';
     app.querySelectorAll('[data-lang]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.lang !== I.getLang()) switchLang(b.dataset.lang); });
@@ -2477,22 +2477,27 @@
     switch (f.id) {
       case 'head': return T(I0, { n: n, g: f.gaze, look: T('gait.look.' + f.look) });
       case 'overstride': return T(I0, { n: n, s: f.shank });
-      case 'strike': return T(I0, { s: T('gait.strikeName.' + f.strike), n: n });
+      case 'strike': return f.pct ? gaitStrikePct(f) : T(I0, { s: T('gait.strikeName.' + f.strike), n: n });
       case 'pelvic': case 'valgus': return T(I0, { l: f.left == null ? '—' : f.left, r: f.right == null ? '—' : f.right });
       case 'armCross': return T(I0, { n: Math.round(n * 100) });
       default: return T(I0, { n: n });
     }
   }
+  // درصد هر نوع فرود از همه‌ی گام‌های بررسی‌شده، مثلاً «۷۰٪ پاشنه، ۳۰٪ میان‌پا»
+  function gaitStrikePct(f) {
+    return ['heel', 'mid', 'fore'].filter(function (k) { return f.pct[k]; }).map(function (k) { return T('gait.items.strike.pct', { p: f.pct[k], s: T('gait.strikeName.' + k) }); }).join(T('gait.items.strike.sep'));
+  }
   // متن هر مورد: «در این ویدیو دیده می‌شه که…» + چرا ممکنه مهم باشه؛ بدون دستور و بدون تشخیص
   function gaitText(f) {
     var k = 'gait.items.' + f.id + '.';
-    if (f.status === 'na') return { seen: T('gait.naText') };
+    // غیرقابل‌اطمینان: دلیل مشخص اگه معلومه (اسلوموشن، پای کوچیک در تصویر، ...)
+    if (f.status === 'na') return { seen: f.why ? T('gait.naWhy.' + f.why) : T('gait.naText') };
     var seen;
     switch (f.id) {
       case 'cadence': seen = T(k + (f.status === 'warn' ? 'low' : 'seen'), { n: f.value, c: T('gait.cond.' + (f.cond || 'easy')), f: f.floor || 160 }); break;
       case 'kneeIc': seen = T(k + (f.status === 'good' ? 'good' : f.form === 'bent' ? 'bent' : 'straight')); break;
       case 'trunk': seen = T(k + (f.lean === 'forward' ? 'forward' : f.lean === 'back' ? 'back' : 'ok')); break;
-      case 'strike': seen = T(k + 'seen', { s: T('gait.strikeName.' + f.strike) }); break;
+      case 'strike': seen = f.pct ? T(k + 'seenPct', { n: f.n, list: gaitStrikePct(f), s: T('gait.strikeName.' + f.strike) }) : T(k + 'seen', { s: T('gait.strikeName.' + f.strike) }); break;
       case 'head': seen = T(k + 'seen', { n: f.value, look: T('gait.look.' + f.look) }); break;
       case 'armCross': seen = T(k + 'seen', { n: Math.round(f.value * 100) }); break;
       case 'overstride': case 'pelvic': case 'valgus': case 'crossover': seen = T(k + (f.status === 'bad' && f.id === 'crossover' ? 'warn' : f.status)); break;
@@ -2538,6 +2543,14 @@
     return chronic > 0 ? { acute: Math.round(acute * 10) / 10, chronic: Math.round(chronic * 10) / 10 } : null;
   }
   // ---------- نسخه‌ی تخصصی: عددهای خام، اطمینان، بازه‌ی مرجع و منبع ----------
+  // آهنگ گام در نسخه‌ی تخصصی: عدد (گام در دقیقه، زمان واقعی)، تعداد برخوردها، مدت و ضریب زمان فیلم
+  function gaitCadCell(m, unit) {
+    var X = 'gait.expert.';
+    var v = m.cadence == null ? T(X + 'noData') : fa(String(m.cadence)) + ' ' + unit;
+    if (m.steps != null) v += ' · ' + fa(T(X + 'cadDetail', { n: m.steps, s: m.span == null ? '—' : m.span, k: m.timeScale || 1 }));
+    if (m.slowSuggest) v += ' · ' + fa(T(X + 'cadSlow', { k: m.slowSuggest.k, c: m.slowSuggest.cadence }));
+    return v;
+  }
   function gaitExpertHtml(r) {
     var X = 'gait.expert.', s = r.side, b = r.back, rows = [];
     var cf = function (m, k) { return m && m.conf && m.conf[k] ? T('gait.conf.' + m.conf[k]) : T(X + 'noData'); };
@@ -2549,14 +2562,15 @@
     };
     if (s) {
       var u = function (id) { return T(X + 'p.' + id + '.u'); };
-      row('cadence', 'side', num(s.cadence, u('cadence')), cf(s, 'cadence'));
+      row('cadence', 'side', gaitCadCell(s, u('cadence')), cf(s, 'cadence'));
       row('gct', 'side', s.gctNear == null ? T(X + 'noData') : fa(s.gctNear + (s.gctFar != null ? ' / ' + s.gctFar : '')) + ' ' + u('gct'), cf(s, 'gct'));
       row('vo', 'side', num(s.vo, u('vo')), cf(s, 'vo'));
       row('overstride', 'side', num(s.overstride, u('overstride')), cf(s, 'overstride'));
       row('shank', 'side', num(s.shank, u('shank')), cf(s, 'overstride'));
       row('kneeIc', 'side', num(s.kneeIc, u('kneeIc')), cf(s, 'kneeIc'));
       row('peakKnee', 'side', num(s.peakKnee, u('peakKnee')), cf(s, 'peakKnee'));
-      row('strike', 'side', s.fsa == null ? T(X + 'noData') : fa(s.fsa) + u('strike') + ' (' + T('gait.strikeName.' + s.strike) + ')', cf(s, 'strike'));
+      row('strike', 'side', s.fsa == null ? T(X + 'noData') : fa(s.fsa) + u('strike') + ' (' + T('gait.strikeName.' + s.strike) + ')' +
+        (s.strikes ? ' · ' + fa(gaitStrikePct({ pct: s.strikes }) + ' · ' + T(X + 'strikeN', { n: s.strikes.n, px: s.strikes.footPx == null ? '—' : s.strikes.footPx })) : ''), cf(s, 'strike'));
       row('trunk', 'side', num(s.trunk, u('trunk')), cf(s, 'trunk'));
       row('head', 'side', s.neck == null ? T(X + 'noData') : fa(s.neck + '° / ' + s.gaze + '°'), cf(s, 'head'));
       row('elbow', 'side', num(s.elbow, u('elbow')), cf(s, 'elbow'));
@@ -2567,7 +2581,7 @@
       row('pelvic', 'back', lr(b.pelvicL, b.pelvicR), cf(b, 'pelvic'));
       row('valgus', 'back', lr(b.valgusL, b.valgusR), cf(b, 'valgus'));
       row('crossover', 'back', num(b.crossover, '%'), cf(b, 'crossover'));
-      if (b.cadence != null || (b.conf && b.conf.cadence)) row('cadence', 'back', num(b.cadence, T(X + 'p.cadence.u')), cf(b, 'cadence'));
+      if (b.cadence != null || (b.conf && b.conf.cadence)) row('cadence', 'back', gaitCadCell(b, T(X + 'p.cadence.u')), cf(b, 'cadence'));
       if (b.trunkLat != null) row('trunkLat', 'back', num(b.trunkLat, '°'), cf(b, 'trunkLat'));
       if (b.armSym != null) row('armSym', 'back', num(b.armSym, '%'), cf(b, 'armSym'));
       row('armCross', 'back', b.armCross == null ? T(X + 'noData') : fa(Math.round(b.armCross * 100)) + ' %', cf(b, 'armCross'));
@@ -2581,7 +2595,7 @@
       if (!q[1]) return;
       var v = q[1];
       meta.push([T(X + 'video') + ' (' + T(X + 'views.' + q[0]) + ')', fa([T(X + 'fps') + ': ' + (v.fps || '—'), T(X + 'frames') + ': ' + v.frames,
-        T(X + 'valid') + ': ' + Math.round((v.valid || 0) * 100) + '%', T(X + 'steps') + ': ' + (v.steps == null ? '—' : v.steps)].join(' · ') +
+        T(X + 'valid') + ': ' + Math.round((v.valid || 0) * 100) + '%', T(X + 'steps') + ': ' + (v.steps == null ? '—' : v.steps), T(X + 'scale') + ': ×' + (v.scale || 1)].join(' · ') +
         (q[0] === 'side' && r.near ? ' · ' + T(X + 'near') + ': ' + T(X + (r.near === 'l' ? 'left' : 'right')) : ''))]);
     });
     return '<section class="card gait-expert" id="gait-expert"><details><summary><b>' + esc(T(X + 'title')) + '</b></summary>' +
@@ -2632,6 +2646,7 @@
       if (!res && !items.length) return;
       var slot = live && live.inputs ? Object.keys(live.inputs).filter(function (k) { var L = live.inputs[k]; return L.res && L.res.view === view; })[0] : null;
       var c = conds[view];
+      var met = view === 'side' ? r.side : r.back;
       html += '<section class="card gait-view" id="gait-view-' + view + '"><div class="gv-head"><h2>' + esc(T('gait.view.' + view)) + '</h2>' +
         (c ? '<span class="gv-tag">' + esc(T('gait.cond.' + c)) + '</span>' : '') + '</div>';
       if (slot) {
@@ -2646,6 +2661,10 @@
       } else if (view === 'side' ? r.imgSide : r.imgBack) {
         html += img(view === 'side' ? r.imgSide : r.imgBack, T(view === 'side' ? 'gait.keySide' : 'gait.keyBack')) + '<p class="small muted">' + esc(T('gait.anim.sessionOnly')) + '</p>';
       }
+      // زمان فیلم با دویدن واقعی نمی‌خونه (احتمالاً اسلوموشن): از کاربر پرسیده می‌شه؛ با جواب، تحلیل با زمان واقعی تکرار می‌شه
+      // (فقط در همین نشست که نقاط بدن هنوز در حافظه‌ان؛ پخش ویدیو و اسکلت دست نمی‌خوره)
+      if (met && met.slowSuggest && slot && !(r.slowNo && r.slowNo[view])) html += gaitSlowAsk(slot, view, met.slowSuggest);
+      else if (met && met.timeScale > 1) html += '<p class="small gait-slow-note">' + esc(fa(T('gait.slow.applied', { k: met.timeScale }))) + '</p>';
       // موارد دارای بازه‌ی مرجع و غیرقابل‌اطمینان باز؛ موارد فقط توصیفی در یک بخش بازشونده (صفحه کوتاه‌تر، یافته‌های مهم جلوتر)
       var shown = items.filter(function (f) { return f.status !== 'info'; }), more = items.filter(function (f) { return f.status === 'info'; });
       if (items.length) html += '<h3>' + esc(T('gait.view.measured')) + '</h3>' + (shown.length ? '<div class="gait-items">' + shown.map(gaitItem).join('') + '</div>' : '') +
@@ -2659,6 +2678,37 @@
     html += '<section class="card"><p class="small">' + esc(T('gait.disclaimer')) + '</p><details class="gait-methods"><summary>' + esc(T('gait.methodsTitle')) + '</summary><p class="small muted">' + esc(fa(T('gait.methods'))) + '</p></details></section>';
     if (r.side || r.back) html += gaitExpertHtml(r);
     return html;
+  }
+  function gaitSlowAsk(slot, view, sg) {
+    var other = [2, 4, 8, 16, 32].filter(function (k) { return k !== sg.k; });
+    return '<div class="gait-slow" role="group" aria-labelledby="gs-q-' + view + '"><p id="gs-q-' + view + '"><b>' + esc(T('gait.slow.q')) + '</b></p>' +
+      '<p class="small">' + esc(fa(T('gait.slow.why'))) + '</p>' +
+      '<button type="button" class="btn btn-primary btn-block" data-gait-slow="' + slot + '" data-view="' + view + '" data-k="' + sg.k + '">' + esc(fa(T('gait.slow.yes', { k: sg.k, c: sg.cadence }))) + '</button>' +
+      '<p class="small muted">' + esc(T('gait.slow.other')) + '</p><div class="gs-ks">' + other.map(function (k) {
+        return '<button type="button" class="btn btn-outline" data-gait-slow="' + slot + '" data-view="' + view + '" data-k="' + k + '">' + esc(fa('×' + k)) + '</button>';
+      }).join('') + '</div>' +
+      '<button type="button" class="btn btn-ghost btn-block" data-gait-slow="' + slot + '" data-view="' + view + '" data-k="1">' + esc(T('gait.slow.no')) + '</button></div>';
+  }
+  // خروجی تحلیل → فیلدهای گزارش ذخیره‌شده
+  function gaitRepFields(r) {
+    return { score: r.score, findings: r.findings, risks: r.risks, axes: r.axes, side: r.side ? r.side.metrics : null, back: r.back ? r.back.metrics : null,
+      failed: r.failed, condition: r.condition, conditions: r.conditions, load: r.load, near: r.side ? r.side.near : null,
+      qSide: r.side ? r.side.quality : null, qBack: r.back ? r.back.quality : null };
+  }
+  // جواب سؤال اسلوموشن: تحلیل دوباره با ضریب زمان همون فیلم (فقط لایه‌ی محاسبه؛ نقاط و فیلم همون‌ان)
+  function gaitRescale(slot, view, k) {
+    var L = gaitLive, rep = (state.gaitReports || [])[0];
+    if (!L || !rep || rep.id !== L.id || !L.inputs[slot]) return;
+    if (k === 1) { rep.slowNo = Object.assign({}, rep.slowNo); rep.slowNo[view] = 1; save(); renderGait(); return; }
+    L.scale = Object.assign({}, L.scale); L.scale[slot] = k;
+    var data = {};
+    Object.keys(L.inputs).forEach(function (s0) { var d = L.inputs[s0].data; data[s0] = { frames: d.frames, w: d.w, h: d.h, fps: d.fps, duration: d.duration }; });
+    var r = window.CoachGait.analyze({ side: data.side, back: data.back, heightCm: L.args.heightCm, conditions: L.args.conditions, load: L.args.load, timeScale: L.scale });
+    Object.assign(rep, gaitRepFields(r), { timeScale: Object.assign({}, L.scale) });
+    Object.keys(L.inputs).forEach(function (s0) { L.inputs[s0].res = [r.side, r.back].filter(function (x) { return x && x.src === s0; })[0] || null; });
+    save();
+    renderGait();
+    showToast(fa(T('gait.slow.done', { k: k })));
   }
   function gaitSlot(kind) {
     var f = gaitFiles[kind];
@@ -2804,6 +2854,7 @@
     gaitError = null;
     releaseGaitLive();
     var files = { side: gaitFiles.side, back: gaitFiles.back }, data = {}, failed = false, result = null;
+    var args = { heightCm: state.profile.heightCm, conditions: { side: gaitConds.side, back: gaitConds.back }, load: gaitLoad() };
     var pct = function (x) { return Math.round(x * 100); };
     gaitProgress(T('gait.stage.load'), 0.02);
     // فیلم‌ها یکی‌یکی؛ هر کدوم که هست (یکی کافیه)
@@ -2816,14 +2867,11 @@
     });
     chain.then(function () {
       gaitProgress(T('gait.stage.report'), 0.95);
-      var r = window.CoachGait.analyze({ side: data.side, back: data.back, heightCm: state.profile.heightCm, conditions: { side: gaitConds.side, back: gaitConds.back }, load: gaitLoad() });
+      var r = window.CoachGait.analyze({ side: data.side, back: data.back, heightCm: args.heightCm, conditions: args.conditions, load: args.load });
       result = r;
       // v: ۲ = گزارش با سطح اطمینان، شرایط دویدن و قاعده‌ی تازه‌ی الگوهای آسیب
       // v: ۳ = هر یافته مال یک نما، شرایط دویدن جدا برای هر فیلم
-      var rep = { id: 'g' + Date.now().toString(36), v: 3, date: C.dateKey(today()), at: new Date().toISOString(), score: r.score,
-        findings: r.findings, risks: r.risks, axes: r.axes, side: r.side ? r.side.metrics : null, back: r.back ? r.back.metrics : null,
-        failed: r.failed, condition: r.condition, conditions: r.conditions, load: r.load, near: r.side ? r.side.near : null,
-        qSide: r.side ? r.side.quality : null, qBack: r.back ? r.back.quality : null };
+      var rep = Object.assign({ id: 'g' + Date.now().toString(36), v: 3, date: C.dateKey(today()), at: new Date().toISOString() }, gaitRepFields(r));
       // تصویر فریم کلیدی از ویدیوی خود هر زاویه (هر خونه‌ای که کاربر گذاشته)
       var shots = [];
       if (r.side) {
@@ -2842,7 +2890,7 @@
       save();
       gaitFiles = { side: null, back: null }; gaitConds = { side: null, back: null };
       // برای پخش انیمیشنی فقط فایل‌ها و نقاط نگه داشته می‌شن (نه ویدیوی باز)؛ پخش‌کننده فقط وقتی این صفحه بازه ساخته می‌شه
-      var live = { id: rep.id, inputs: {} };
+      var live = { id: rep.id, inputs: {}, args: args, scale: {} };
       slots.forEach(function (k) {
         if (!data[k]) return;
         var res = [result.side, result.back].filter(function (x) { return x && x.src === k; })[0] || null;
@@ -2883,6 +2931,8 @@
   });
   app.addEventListener('click', function (e) {
     if (e.target.closest('[data-gait-run]')) { runGait(); return; }
+    var gs = e.target.closest('[data-gait-slow]');
+    if (gs) { gaitRescale(gs.dataset.gaitSlow, gs.dataset.view, +gs.dataset.k); return; }
     if (e.target.closest('[data-gait-print]')) {
       // فقط نسخه‌ی تخصصی چاپ می‌شه (با رنگ‌های روشن؛ css/theme.css)
       var ex = document.getElementById('gait-expert'), dt = ex && ex.querySelector('details');
