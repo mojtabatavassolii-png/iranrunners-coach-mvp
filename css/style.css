@@ -1245,6 +1245,7 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .gp-ov input { width: 20px; height: 20px; accent-color: var(--primary); }
 .gp-err { color: var(--error); margin: 6px 0 0; }
 .gp-steps { display: inline-flex; gap: 4px; }
+.gp-debug { font: 12px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all; text-align: left; background: var(--surface-elevated); color: var(--text); border-radius: 8px; padding: 8px; margin: 6px 0 0; }
 .gait-player figcaption { font-weight: 400; margin: 6px 0 0; }
 /* نسخه‌ی تخصصی */
 .gait-expert > details > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--primary); }

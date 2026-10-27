@@ -104,6 +104,13 @@
       if (pl && pl.catch) pl.catch(finish);
     });
   }
+  // گام نمونه‌برداری از نرخ فریم اندازه‌گیری‌شده. اندازه‌گیری با پخش ویدیوی پنهان انجام می‌شه و Safari آیفون
+  // همه‌ی فریم‌های ویدیوی نامرئی رو نمی‌کشه، پس عدد کمتر از واقعی درمیاد (مثلاً ۱۵ به‌جای ۳۰). عدد زیر ۲۴ قابل‌اعتماد
+  // نیست و نادیده گرفته می‌شه: نمونه‌برداری هیچ‌وقت کمتر از ۳۰ در ثانیه (رفتار پیش از نسخه‌ی ۷۸) نمی‌شه.
+  function sampleStep(measured) {
+    var ok = measured != null && measured >= 24 && measured <= 260;
+    return { step: 1 / (ok ? Math.min(measured, MAX_FPS) : DEF_FPS), fps: ok ? measured : null };
+  }
   function recreateCpu() {
     landmarker = null; loading = null;
     return import(abs(BASE + 'vision_bundle.mjs')).then(function (mp) {
@@ -118,7 +125,7 @@
     var lmk, v, cv, g, retried = false, srcFps = null, STEP = 1 / DEF_FPS;
     return load().then(function (l) { lmk = l; return openVideo(file); }).then(function (video) {
       v = video;
-      return measureFps(v).then(function (f) { srcFps = f; if (f) STEP = 1 / Math.min(f, MAX_FPS); });
+      return measureFps(v).then(function (f) { var s = sampleStep(f); srcFps = s.fps; STEP = s.step; });
     }).then(function () {
       var dur = Math.min(v.duration || 0, MAX_SEC);
       if (!(dur > 0.5)) throw fail('short');
@@ -290,21 +297,43 @@
       W = Math.min(720, video.videoWidth); H = Math.round(video.videoHeight * W / video.videoWidth);
       canvas.width = W; canvas.height = H;
     }
-    function paint(ctx, withVideo) {
+    // t: زمان رسانه‌ای فریمی که الان روی صفحه‌ست. حین پخش، currentTime از فریم کشیده‌شده جلوتره (تا چند فریم)؛
+    // برای همین در requestVideoFrameCallback از metadata.mediaTime همون فریم استفاده می‌شه
+    var lastT = null;
+    function paint(ctx, withVideo, t) {
       if (!W) return;
       if (withVideo) { if (video.readyState >= 2) ctx.drawImage(video, 0, 0, W, H); } else ctx.clearRect(0, 0, W, H);
       if (!overlay && !withVideo) return;
-      var t = video.currentTime, lm = lmAt(S, t, dt);
+      if (t == null) t = video.currentTime;
+      lastT = t;
+      var lm = lmAt(S, t, dt);
       if (lm) drawOverlay(ctx, lm, W, H, o);
       if (o.strikes && o.strikes.some(function (s) { return Math.abs(s - t) < 0.05; })) tag(ctx, o.labels.strike, 8, 8, W, tok('--warning'));
     }
-    function draw() { if (!dead) paint(g, false); }
+    function draw(t) { if (!dead) paint(g, false, t); }
+    var hasVfc = !!video.requestVideoFrameCallback;
     // هم‌گام با فریم‌های خود ویدیو (اگه مرورگر پشتیبانی کنه)، وگرنه با هر فریم صفحه حین پخش
-    function onFrame() { if (dead) return; draw(); if (rec) paint(rec.g, true); vfc = video.requestVideoFrameCallback(onFrame); }
-    function loop() { if (dead || video.paused) return; draw(); if (rec) paint(rec.g, true); raf = requestAnimationFrame(loop); }
-    if (video.requestVideoFrameCallback) vfc = video.requestVideoFrameCallback(onFrame);
-    video.addEventListener('play', function () { if (!video.requestVideoFrameCallback) { cancelAnimationFrame(raf); raf = requestAnimationFrame(loop); } });
-    ['seeked', 'pause', 'loadeddata', 'timeupdate'].forEach(function (ev) { video.addEventListener(ev, draw); });
+    // حین پخش دو راه رسم: فراخوان فریم ویدیو (دقیق، با زمان همون فریم) و یک حلقه‌ی requestAnimationFrame که همیشه
+    // روشنه و فقط وقتی فراخوان فریم اخیراً نیومده رسم می‌کنه (بعضی مرورگرها، مثلاً روی آیفون، این فراخوان رو برای
+    // ویدیوی با کنترل‌های خود مرورگر صدا نمی‌زنن؛ بدون این حلقه اسکلت فقط چند بار در ثانیه جابه‌جا می‌شد)
+    var lastVfc = 0, nVfc = 0, nRaf = 0;
+    function onFrame(now, md) {
+      if (dead) return;
+      lastVfc = performance.now(); nVfc++;
+      var t = md && md.mediaTime != null ? md.mediaTime : null;
+      draw(t); if (rec) paint(rec.g, true, t);
+      vfc = video.requestVideoFrameCallback(onFrame);
+    }
+    function loop() {
+      if (dead || video.paused || video.ended) { raf = 0; return; }
+      if (performance.now() - lastVfc > 120) { nRaf++; draw(); if (rec) paint(rec.g, true); }
+      raf = requestAnimationFrame(loop);
+    }
+    if (hasVfc) vfc = video.requestVideoFrameCallback(onFrame);
+    video.addEventListener('playing', function () { if (!raf) raf = requestAnimationFrame(loop); });
+    video.addEventListener('play', function () { if (!raf) raf = requestAnimationFrame(loop); });
+    // در حالت توقف currentTime همون فریم روی صفحه‌ست
+    ['seeked', 'pause', 'loadeddata'].forEach(function (ev) { video.addEventListener(ev, function () { draw(); }); });
     video.addEventListener('loadedmetadata', function () {
       size();
       var first = o.startAt != null ? o.startAt : 0.001;
@@ -358,9 +387,18 @@
       if (video.parentNode) video.parentNode.removeChild(video);
       if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
     }
-    return { video: video, step: step, setRate: function (r) { video.playbackRate = r; }, rate: function () { return video.playbackRate; },
+    // برای عیب‌یابی (?debug=gait): اندازه‌ها، زمان‌ها و چند نقطه‌ی اول
+    function debug() {
+      var vr = video.getBoundingClientRect(), cr = canvas.getBoundingClientRect(), f0 = F.filter(function (f) { return f && f.lm; })[0];
+      return { natural: [video.videoWidth, video.videoHeight], analysed: [data.w, data.h], display: [Math.round(vr.width), Math.round(vr.height)],
+        canvasCss: [Math.round(cr.width), Math.round(cr.height)], canvasOffset: [Math.round(cr.left - vr.left), Math.round(cr.top - vr.top)], canvasPx: [W, H],
+        fps: data.fps || null, dt: Math.round(dt * 10000) / 10000, frames: F.length, duration: Math.round((video.duration || 0) * 100) / 100,
+        analysedDuration: Math.round((data.duration || 0) * 100) / 100, t: Math.round(video.currentTime * 1000) / 1000, overlayT: lastT == null ? null : Math.round(lastT * 1000) / 1000,
+        vfc: hasVfc, vfcDraws: nVfc, rafDraws: nRaf, firstHip: f0 ? [f0.t, f0.lm[23][0], f0.lm[23][1]].map(function (x) { return Math.round(x * 1000) / 1000; }) : null };
+    }
+    return { video: video, debug: debug, step: step, setRate: function (r) { video.playbackRate = r; }, rate: function () { return video.playbackRate; },
       setOverlay: setOverlay, overlay: function () { return overlay; }, record: record, draw: draw, destroy: destroy };
   }
 
-  root.CoachPose = { load: load, unload: unload, processVideo: processVideo, openVideo: openVideo, keyImage: keyImage, release: release, player: player, MAX_SEC: MAX_SEC };
+  root.CoachPose = { sampleStep: sampleStep, load: load, unload: unload, processVideo: processVideo, openVideo: openVideo, keyImage: keyImage, release: release, player: player, MAX_SEC: MAX_SEC };
 })(this);
