@@ -22,6 +22,14 @@
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
+/* وزیرمتن (Saber Rastikerdar، مجوز OFL: public/fonts/OFL.txt)؛ نسخه‌ی متغیر، وزن ۱۰۰ تا ۹۰۰ در یک فایل */
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("../public/fonts/vazirmatn-variable.woff2") format("woff2-variations"), url("../public/fonts/vazirmatn-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 body {
   margin: 0;
   background: var(--bg);

@@ -2,10 +2,10 @@
  * سرویس‌ورکر «گام»: کش پوسته‌ی اپ برای باز شدن سریع و کار بدون اینترنت.
  * - صفحه (ناوبری): اول شبکه، اگه نشد (آفلاین) نسخه‌ی کش‌شده.
  * - فایل‌های نسخه‌دار (?v=…): اول کش؛ با هر انتشار آدرس عوض می‌شه، پس فایل قدیمی هیچ‌وقت با صفحه‌ی جدید قاطی نمی‌شه.
- * - بقیه (آیکون‌ها، فونت): کش و به‌روزرسانی در پس‌زمینه.
+ * - بقیه (آیکون‌ها، فونت وزیرمتن روی خود سایت): کش و به‌روزرسانی در پس‌زمینه.
  * با هر انتشار، VERSION و نسخه‌ی فایل‌ها در index.html با هم بالا می‌رن (تست این هماهنگی رو بررسی می‌کنه).
  */
-var VERSION = '79';
+var VERSION = '80';
 var CACHE = 'coach-v' + VERSION;
 // صبر حداکثر برای شبکه موقع باز کردن صفحه، قبل از نشون دادن نسخه‌ی کش‌شده
 var NAV_WAIT = 1500;
@@ -37,6 +37,7 @@ var SHELL = [
   'public/assets/flag-ir.svg?v=' + VERSION,
   'public/assets/flag-gb.svg?v=' + VERSION,
   'public/assets/gaam-splash.svg',
+  'public/fonts/vazirmatn-variable.woff2',
   'public/assets/favicon.svg',
   'public/assets/favicon-32.png',
   'public/assets/apple-touch-icon.png',
@@ -75,8 +76,7 @@ self.addEventListener('fetch', function (e) {
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
   var sameOrigin = url.origin === self.location.origin;
-  var fonts = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
-  if (!sameOrigin && !fonts) return;
+  if (!sameOrigin) return;
 
   // صفحه: اول شبکه (تا نسخه‌ی تازه برسه)، ولی اگه شبکه کند بود (بیشتر از NAV_WAIT) یا قطع بود، نسخه‌ی کش‌شده
   // تا صفحه سفید نمونه؛ درخواست شبکه در پس‌زمینه ادامه پیدا می‌کنه و کش رو تازه می‌کنه (پارامترهایی مثل ?source=pwa نادیده)
