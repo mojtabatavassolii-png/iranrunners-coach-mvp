@@ -37,6 +37,11 @@ async function asWalker(p, goal) {
 }
 // [کلید، مسیر، آماده‌سازی]؛ فرم با پروفایل موجود باز می‌شه (حالت ویرایش) تا همه‌ی مرحله‌ها در دسترس باشن
 const SCREENS = [
+  // صفحه‌ی ورود (بدون نشست فعال)
+  ['login', '#home', async (p) => {
+    await p.evaluate(() => { sessionStorage.removeItem('iranrunners-coach-session'); sessionStorage.setItem('gaam-intro', '1'); });
+    await p.reload(); await p.waitForTimeout(500);
+  }],
   ['onb-1', '#onboarding', async () => {}],
   ['onb-2', '#onboarding', async (p) => gotoStep(p, 2)],
   ['onb-3', '#onboarding', async (p) => gotoStep(p, 3)],
@@ -74,7 +79,7 @@ const SCREENS = [
   }],
   ['plans', '#plans', async () => {}],
   ['gait', '#gait', async () => {}],
-  // گزارش تحلیل دویدن نمونه (از دونده‌ی مصنوعی با چند مشکل؛ gait-report.json)
+  // گزارش تحلیل دویدن نمونه (از دونده‌ی مصنوعی با چند مشکل، نسخه‌ی ۳: دو بخش کنار/پشت؛ gait-report.json)
   ['gait-report', '#gait', async (p) => {
     await p.evaluate(([K, reps]) => {
       const s = JSON.parse(localStorage.getItem(K)); s.gaitReports = reps; localStorage.setItem(K, JSON.stringify(s));

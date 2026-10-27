@@ -1191,7 +1191,7 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
   .gait-item, .gait-risk { padding: 10px; border-inline-start-width: 4px; }
   .gi-fix { padding: 6px 8px; }
 }
-@media (max-width: 380px) { .gait-axes { grid-template-columns: repeat(3, 1fr); } .gait-axis b { font-size: var(--fs-base); } }
+@media (max-width: 380px) { .gait-axes { grid-template-columns: repeat(3, minmax(0, 1fr)); } .gait-axis b { font-size: var(--fs-base); } }
 /* عدد اندازه‌گیری‌شده و معیار در دو خط */
 .gi-val { text-align: start; }
 .gi-val > span { display: block; font-weight: 400; margin-top: 2px; }
@@ -1215,7 +1215,26 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 /* نتایج به تفکیک نما: ویدیو و زیرش یافته‌های همون نما */
 .gv-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .gv-head h2 { margin: 0; }
-.gv-tag { font-size: var(--fs-xs); font-weight: 700; background: var(--primary-soft); color: var(--primary); border-radius: 999px; padding: 3px 12px; white-space: nowrap; }
+.gv-tag { font-size: var(--fs-xs); font-weight: 700; background: var(--primary-soft); color: var(--primary); border-radius: 999px; padding: 4px 12px; white-space: nowrap; }
+/* UX8-08: موارد توصیفی هر نما در یک بخش بازشونده */
+.gv-more { margin-top: var(--sp-2); }
+.gv-more > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--primary); font-weight: 700; }
+.gv-more > .gait-items { margin-top: var(--sp-1); }
+/* UX8-01: سه کارت خلاصه همیشه هم‌عرض، حتی با کلمه‌ی بلند */
+.gait-axes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.gait-axis { min-width: 0; }
+.gait-axis span, .gait-axis b, .gait-axis em { overflow-wrap: break-word; }
+/* UX8-02: روی گوشی برچسب وضعیت زیر عنوان، تا عنوان یک خط کامل داشته باشه */
+@media (max-width: 599px) {
+  .gi-head { flex-wrap: wrap; justify-content: flex-start; gap: 4px 8px; }
+  .gi-head b { flex: 1 1 100%; }
+  .gi-chip { white-space: normal; }
+}
+/* UX8-03: نوار هفته؛ جای تاریخ همیشه دوخطی (نقطه و عدد همه‌ی روزها هم‌تراز)، تیک «انجام شد» گوشه‌ی پایین */
+@media (max-width: 759px) { .day-date { min-height: 2.8em; display: flex; align-items: center; justify-content: center; } }
+.done-mark { top: auto; bottom: 4px; inset-inline-start: 4px; font-size: var(--fs-xs); line-height: 1; }
+/* UX8-04: خط‌های تعریفی و داده‌ای با کلمه‌ی لاتین بلند: راست‌چین (تراز دوطرفه فاصله‌های خیلی بزرگ می‌ساخت) */
+.learn-body li, .sess-how, #p-pmc > p.small, .gait-how li { text-align: start; }
 .gait-view h3 { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-base); }
 .gv-not { margin: var(--sp-2) 0 0; }
 /* پخش‌کننده: ویدیو با کنترل‌های خود مرورگر، اسکلت روی یک بوم شفاف که لمس رو رد نمی‌کنه */

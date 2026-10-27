@@ -682,16 +682,16 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=80" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
-      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=80" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=81" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=81" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
       restoreBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
-      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=80" alt="" width="28" height="28"></button>' +
-      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=80" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=81" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=81" alt="" width="28" height="28"></button>' +
       '</div></section>';
     app.querySelectorAll('[data-lang]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.lang !== I.getLang()) switchLang(b.dataset.lang); });
@@ -976,7 +976,7 @@
       '<button type="button" class="btn btn-ghost onb-back" id="onb-back">' + chevron(isRtl() ? 'right' : 'left') + '<span>' + esc(T('onb.back')) + '</span></button>' +
       (editing && !needsMigration() ? '<a class="btn btn-ghost onb-cancel" id="onb-cancel" href="#profile">' + esc(T('app.cancel')) + '</a>' : '') +
       '<button type="submit" class="btn btn-primary onb-next" id="onb-next"><span id="onb-next-lbl">' + esc(T('onb.next')) + '</span>' + chevron(isRtl() ? 'left' : 'right') + '</button>' +
-      '</div></form>' + (editing && !needsMigration() ? signOutBlock() : '') + '</section>';
+      '</div></form></section>';
 
     var form = document.getElementById('onb');
     window.CoachTimePicker.init(form);
@@ -2607,7 +2607,7 @@
       return j.length ? fa(T('gait.inRangeShort', { a: j.filter(function (f) { return f.status === 'good'; }).length, b: j.length })) : '—';
     };
     var img = function (src, cap) { return src ? '<figure class="gait-key"><img src="' + src + '" alt="' + esc(cap) + '"><figcaption>' + esc(cap) + '</figcaption></figure>' : ''; };
-    var card = function (k, val, sub, cls, note) { return '<div class="gait-axis ' + (cls || '') + '"><span>' + esc(T('gait.axes.' + k)) + '</span><b>' + esc(val) + '</b>' + (note ? '<em>' + esc(note) + '</em>' : '') + '<small>' + esc(T('gait.axes.' + sub)) + '</small></div>'; };
+    var card = function (k, val, sub, cls, note) { return '<div class="gait-axis ' + (cls || '') + '"><span>' + esc(T('gait.axesCard.' + k)) + '</span><b>' + esc(val) + '</b>' + (note ? '<em>' + esc(note) + '</em>' : '') + '<small>' + esc(T('gait.axes.' + sub)) + '</small></div>'; };
     var html = '<section class="card gait-report" id="gait-report"><h2>' + esc(T('gait.report')) + '</h2><p class="small muted">' + esc(faDate(r.date)) + '</p>';
     // سه محور: سهم موارد در محدوده‌ی معمول (فقط پارامترهای دارای بازه‌ی مرجع) و الگوهای مرتبط با آسیب
     if (F.length) html += '<div class="gait-axes">' +
@@ -2646,7 +2646,10 @@
       } else if (view === 'side' ? r.imgSide : r.imgBack) {
         html += img(view === 'side' ? r.imgSide : r.imgBack, T(view === 'side' ? 'gait.keySide' : 'gait.keyBack')) + '<p class="small muted">' + esc(T('gait.anim.sessionOnly')) + '</p>';
       }
-      if (items.length) html += '<h3>' + esc(T('gait.view.measured')) + '</h3><div class="gait-items">' + items.map(gaitItem).join('') + '</div>';
+      // موارد دارای بازه‌ی مرجع و غیرقابل‌اطمینان باز؛ موارد فقط توصیفی در یک بخش بازشونده (صفحه کوتاه‌تر، یافته‌های مهم جلوتر)
+      var shown = items.filter(function (f) { return f.status !== 'info'; }), more = items.filter(function (f) { return f.status === 'info'; });
+      if (items.length) html += '<h3>' + esc(T('gait.view.measured')) + '</h3>' + (shown.length ? '<div class="gait-items">' + shown.map(gaitItem).join('') + '</div>' : '') +
+        (more.length ? '<details class="gv-more"' + (shown.length ? '' : ' open') + '><summary>' + esc(fa(T('gait.view.more', { n: more.length }))) + '</summary><div class="gait-items">' + more.map(gaitItem).join('') + '</div></details>' : '');
       html += '<p class="small muted gv-not">' + esc(T('gait.view.notFrom', { list: GAIT_NOT_FROM[view].map(function (k) { return T('gait.items.' + k + '.t'); }).join(T('progress.sep')), other: T('gait.view.' + (view === 'side' ? 'back' : 'side')) })) + '</p></section>';
     });
     if (R.length || r.load) {
@@ -4323,7 +4326,7 @@
       periodCard(p, now, race) +
       listGroup(T('profile.groups.mine'), walker() ? [['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgressWalk')],
         ['#walkgoals', 'flag', T('wgoal.pageTitle'), C.walkGoalInfo(p).kind !== 'none' ? T('wgoal.' + C.walkGoalInfo(p).kind + '.t') : T('profile.goalSetShort')],
-        ['#settings', 'cal', T('remind.title'), remindSub(), 'remind']] : [
+        ['#settings', 'bell', T('remind.title'), remindSub(), 'remind']] : [
         ['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgress')],
         ['#race', 'flag', T('race.pageTitle'), g.type !== 'none' ? C.goalLabel(g) + (race && race.date >= now ? T('progress.sep') + T('profile.goalIn', { n: Math.round(C.daysBetween(now, race.date)) }) : '') : T('profile.goalSetShort')],
         ['#plans', 'plans', T('plans.title'), T('plans.linkSub')],
@@ -4424,6 +4427,7 @@
   var SET_ICONS = {
     lang: '<path d="M4 5h8M8 3v2M5.5 5c.8 3.5 3.3 6.2 6.5 7.5M11 5c-.8 4-3.4 7.2-7 8.5"/><path d="M13 21l4-9 4 9M14.5 18h5"/>',
     cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    bell: '<path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 8 2.5 8h-17S6 15 6 9z"/><path d="M10.3 20a1.9 1.9 0 0 0 3.4 0"/>',
     health: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
     person: '<circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/>',
     install: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v8M8.8 11.8 12 15l3.2-3.2"/>',
@@ -4479,7 +4483,7 @@
         ['km', 'mi'].map(function (u) { return '<button type="button" data-setunits="' + u + '" aria-pressed="' + (I.getUnits() === u) + '">' + esc(T('units.opt.' + u)) + '</button>'; }).join('') +
         '</div><small class="muted">' + esc(T('settings.unitsNote')) + '</small></div>') +
       // یادآوری جلسه‌ها
-      setSection('remind', 'cal', T('remind.title'), esc(remindSub()), remindSection()) +
+      setSection('remind', 'bell', T('remind.title'), esc(remindSub()), remindSection()) +
       // نصب اپلیکیشن
       setSection('install', 'install', T('install.title'), esc(T('install.short.' + installMode())), installSectionBody()) +
       // ۲. تقویم
