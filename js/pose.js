@@ -7,7 +7,8 @@
 (function (root) {
   'use strict';
   var BASE = 'js/vendor/mediapipe/', MODEL = 'models/pose_landmarker_full.task';
-  var MAX_SEC = 12, STEP = 1 / 30;
+  // نمونه‌برداری با نرخ فریم خود فیلم، حداکثر ۶۰ در ثانیه (اگه نرخ فیلم معلوم نشد، ۳۰)
+  var MAX_SEC = 12, MAX_FPS = 60, DEF_FPS = 30;
   var landmarker = null, loading = null, clock = 0;
 
   function abs(p) { return new URL(p, document.baseURI).href; }
@@ -78,6 +79,31 @@
       return new Promise(function (res) { var done = false; v.requestVideoFrameCallback(function () { if (!done) { done = true; res(); } }); setTimeout(function () { if (!done) { done = true; res(); } }, 400); });
     }).catch(function (e) { throw fail('seek', e); });
   }
+  // نرخ فریم فیلم: چند فریم پخش بی‌صدا و فاصله‌ی زمان رسانه‌ای فریم‌ها (requestVideoFrameCallback).
+  // فریم‌های جاافتاده موقع پخش با presentedFrames جبران می‌شن. بدون پشتیبانی مرورگر: null
+  function measureFps(v) {
+    if (!v.requestVideoFrameCallback) return Promise.resolve(null);
+    return new Promise(function (res) {
+      var last = null, per = [], done = false;
+      function finish() {
+        if (done) return; done = true;
+        try { v.pause(); } catch (e) { /* */ }
+        var d = per.sort(function (a, b) { return a - b; })[Math.floor(per.length / 2)];
+        var fps = d > 0 ? 1 / d : null;
+        res(fps && fps >= 10 && fps <= 260 ? Math.round(fps) : null);
+      }
+      function cb(now, md) {
+        if (done) return;
+        if (last && md.presentedFrames > last.f && md.mediaTime > last.t) per.push((md.mediaTime - last.t) / (md.presentedFrames - last.f));
+        last = { t: md.mediaTime, f: md.presentedFrames };
+        if (per.length >= 12) finish(); else v.requestVideoFrameCallback(cb);
+      }
+      v.requestVideoFrameCallback(cb);
+      setTimeout(finish, 1500);
+      var pl = v.play();
+      if (pl && pl.catch) pl.catch(finish);
+    });
+  }
   function recreateCpu() {
     landmarker = null; loading = null;
     return import(abs(BASE + 'vision_bundle.mjs')).then(function (mp) {
@@ -87,11 +113,13 @@
       });
     }).then(function (l) { landmarker = l; return l; });
   }
-  // هر فریم (۳۰ در ثانیه، حداکثر ۱۲ ثانیه): جابه‌جایی روی ویدیو، کشیدن روی بوم و تشخیص بدن
+  // هر فریم (با نرخ فیلم تا ۶۰ در ثانیه، حداکثر ۱۲ ثانیه): جابه‌جایی روی ویدیو، کشیدن روی بوم و تشخیص بدن
   function processVideo(file, onProgress) {
-    var lmk, v, cv, g, retried = false;
+    var lmk, v, cv, g, retried = false, srcFps = null, STEP = 1 / DEF_FPS;
     return load().then(function (l) { lmk = l; return openVideo(file); }).then(function (video) {
       v = video;
+      return measureFps(v).then(function (f) { srcFps = f; if (f) STEP = 1 / Math.min(f, MAX_FPS); });
+    }).then(function () {
       var dur = Math.min(v.duration || 0, MAX_SEC);
       if (!(dur > 0.5)) throw fail('short');
       // اندازه‌ی کار: ضلع بزرگ حداکثر ۹۶۰px (دقت کافی، سرعت بیشتر)
@@ -100,7 +128,8 @@
       g = cv.getContext('2d');
       var n = Math.floor(dur / STEP), frames = [], i = 0;
       function detect() {
-        clock += 34; // زمان‌های ارسالی به MediaPipe باید همیشه صعودی باشن (بین دو ویدیو هم)
+        // زمان‌های ارسالی به MediaPipe باید همیشه صعودی باشن (بین دو ویدیو هم)؛ گام زمانی = فاصله‌ی واقعی فریم‌ها
+        clock += Math.max(1, Math.round(STEP * 1000));
         try { return Promise.resolve(lmk.detectForVideo(cv, clock)); } catch (e) {
           // پردازنده‌ی گرافیکی بعضی گوشی‌ها: یک بار دیگه با CPU
           if (retried) return Promise.reject(fail('detect', e));
@@ -109,7 +138,7 @@
         }
       }
       function next() {
-        if (i >= n) return { w: v.videoWidth, h: v.videoHeight, duration: dur, frames: frames, video: v };
+        if (i >= n) return { w: v.videoWidth, h: v.videoHeight, duration: dur, frames: frames, video: v, fps: srcFps };
         var t = i * STEP + 0.001;
         return seek(v, t).then(function () {
           g.drawImage(v, 0, 0, cv.width, cv.height);

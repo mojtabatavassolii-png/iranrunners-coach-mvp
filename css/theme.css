@@ -112,3 +112,34 @@
   --logo-on-light: inline-block;
 }
 :root[data-theme="dark"] { color-scheme: dark; }
+
+/* چاپ (مثلاً نسخه‌ی تخصصی گزارش فرم دویدن): همیشه رنگ‌های حالت روشن، تا متن روی کاغذ سفید خوانا بمونه */
+@media print {
+  :root:root {
+  color-scheme: light;
+  --bg: #F5F2EC;
+  --surface: #FFFDF9;
+  --surface-elevated: #ECE7DE;
+  --border: #DAD3C7;
+  --text: #121214;
+  --text-secondary: #5C5C64;
+  --text-disabled: #9A9AA2;
+  /* شنیِ روشن روی زمینه‌ی روشن خونا نیست؛ همون رنگ با تُن تیره‌تر (برنزی) برای متن و دکمه */
+  --primary: #7A5E2C;
+  --primary-pressed: #634B21;
+  --primary-soft: #EFE5D3;
+  --on-primary: #FFFFFF;
+  --success: #356C34;
+  --warning: #8A5E0E;
+  --error: #A63D30;
+  --info: #345A8A;
+  --zone-1: #56616E;
+  --zone-2: #2F6F5C;
+  --zone-3: #7A5E2C;
+  --zone-4: #8F5212;
+  --zone-5: #A33A2C;
+  --scrim: color-mix(in srgb, #121214 42%, transparent);
+  --logo-on-dark: none;
+  --logo-on-light: inline-block;
+}
+}

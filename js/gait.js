@@ -3,14 +3,16 @@
  * ورودی هر فیلم: { w, h, frames: [{ t: ثانیه, lm: [[x, y, visibility] × ۳۳] (نرمال‌شده ۰ تا ۱) یا null }] }
  * خروجی: عددها (زاویه‌ها، آهنگ گام، ...) و یافته‌ها با وضعیت good / warn / bad؛ متن‌ها در دیکشنری‌ها (gait.*).
  *
- * مرجع آستانه‌ها:
- *  - آهنگ گام و بیش‌گامی: Heiderscheit و همکاران ۲۰۱۱ (افزایش ۵ تا ۱۰٪ آهنگ گام → زاویه‌ی زانو و بار مفصل کمتر)
- *  - زاویه‌ی برخورد پا: Altman & Davis ۲۰۱۲ (بیشتر از ۸° پاشنه، ۸ تا ۱٫۶- وسط پا، کمتر از ۱٫۶- پنجه)
- *  - افت لگن و زانوی رو به داخل: Noehren ۲۰۰۷، Souza ۲۰۱۶ (تحلیل بالینی دویدن)
- *  - نوسان عمودی، زاویه‌ی ساق در برخورد و خم شدن تنه: Folland ۲۰۱۷، Souza ۲۰۱۶
- *  - ریسک آسیب: Bramah ۲۰۱۸ (بیش‌گامی، افت لگن و ساق در دونده‌های آسیب‌دیده)، Noehren ۲۰۰۷ و ۲۰۱۳ (ITBS و زانوی دونده)،
- *    Meardon ۲۰۱۲ (عرض گام باریک و استرس ساق)، Milner ۲۰۰۶ (ضربه‌ی ساق)، Almonroeder ۲۰۱۳ (فرود پنجه و بار آشیل)،
- *    Willems ۲۰۰۶ و Becker ۲۰۱۷ (پرونیشن و آشیل/ساق)، Zifchock ۲۰۰۸ (عدم تقارن)
+ * مرجع‌ها (جزئیات، قدرت شواهد و نحوه‌ی بیان در گزارش تخصصی؛ gait.expert.* در دیکشنری‌ها):
+ *  - روش دوبعدی و زاویه‌ی ساق/زانو در برخورد: Souza 2016 (PM&R Clin N Am)
+ *  - الگوهای دونده‌های آسیب‌دیده (افت لگن، تنه، زانوی صاف و ساق جلو در برخورد): Bramah 2018 (AJSM، مقطعی)
+ *  - آهنگ گام: Heiderscheit 2011 (افزایش ۵ تا ۱۰٪ → بار زانو کمتر)؛ اثر سرعت: Cavanagh & Kram 1989
+ *  - زاویه‌ی برخورد پا: Altman & Davis 2012؛ نوع فرود و آسیب: Anderson 2020 (شواهد محدود)
+ *  - نوسان عمودی، زاویه‌ی ساق و duty factor: Folland 2017 (اقتصاد و عملکرد)
+ *  - شیب تنه: Teng & Powers 2014 (بده‌بستان زانو و لگن)؛ تاب بازو: Arellano & Kram 2014
+ *  - عرض گام: Meardon 2012 (نوار ایلیوتیبیال) و 2014 (فشار ساق)، هر دو مدل‌سازی
+ *  - شواهد آینده‌نگر کلی: Ceyssens 2019 (کم و ناهمسو)؛ پرونیشن: Nielsen 2014 (ارتباط نداشت؛ از گزارش حذف شده)
+ * آستانه‌هایی که از مقاله‌ی مشخصی نیومدن، در REF با «تخمین» مشخص شدن.
  */
 (function (root) {
   'use strict';
@@ -24,7 +26,8 @@
 
   // آستانه‌ها: [حد «خوب»، حد «قابل توجه»]؛ بیرون از اون‌ها «نیاز به اصلاح»
   var REF = {
-    cadence: { good: 170, warn: 160 },                 // گام در دقیقه (کمتر = بدتر)
+    // آهنگ گام: حد پایین «معمول» بر اساس شرایط دویدن (با سرعت بالا می‌ره)؛ فقط «کمتر از معمول» علامت می‌خوره (تخمین)
+    cadence: { easy: 160, tempo: 165, interval: 170, race: 170 },
     overstride: { good: 0.22, warn: 0.32 },            // فاصله‌ی افقی مچ پا جلوتر از لگن در برخورد ÷ طول پا
     shank: { good: 7, warn: 12 },                      // زاویه‌ی ساق با خط عمود در برخورد (درجه، مچ جلوتر از زانو)
     kneeIc: { lo: 10, hi: 30, warnLo: 5, warnHi: 40 }, // خم شدن زانو در لحظه‌ی برخورد (درجه)
@@ -33,13 +36,20 @@
     gaze: { lo: -10, hi: 20, warnHi: 30 },             // زاویه‌ی نگاه (مثبت = پایین)
     trunk: { lo: 2, hi: 12, warnLo: -2, warnHi: 18 },  // خم شدن تنه به جلو
     elbow: { lo: 70, hi: 110, warnLo: 55, warnHi: 130 }, // زاویه‌ی داخلی آرنج
-    vo: { good: 10, warn: 12 },                        // نوسان عمودی (سانتی‌متر)
     pelvic: { good: 5, warn: 8 },                      // افت لگن سمت مقابل (درجه)
     valgus: { good: 8, warn: 14 },                     // زاویه‌ی زانوی رو به داخل در صفحه‌ی جلو (درجه)
-    cross: { good: 0.15, warn: 0.35 },                 // سهم فریم‌هایی که دست از خط وسط بدن رد می‌شه
-    sym: { good: 8, warn: 15 },                        // اختلاف چپ و راست (درصد)
-    pron: { good: 10, warn: 15 }                       // چرخش پاشنه به بیرون در وسط تماس (پرونیشن، تقریبی از پشت)
+    crossover: 30                                      // درصد برخوردهایی که پا از خط وسط بدن رد می‌شه (تخمین)
   };
+  var CONDITIONS = ['easy', 'tempo', 'interval', 'race'];
+
+  // ---------- سطح اطمینان هر اندازه‌گیری ----------
+  // sure = اندازه‌گیری مطمئن، est = تخمینی، low = غیرقابل‌اطمینان (عدد نشون داده نمی‌شه)
+  // v: میانگین «دیده‌شدن» مفاصل لازم (۰ تا ۱)، n: تعداد نمونه (برخورد یا فریم)، cap: بالاترین سطح ممکن برای این پارامتر
+  var CONF = { sure: 2, est: 1, low: 0 };
+  function conf(v, n, nSure, nEst, cap) {
+    var c = v != null && v >= 0.8 && n >= nSure ? 'sure' : v != null && v >= 0.6 && n >= nEst ? 'est' : 'low';
+    return cap && CONF[cap] < CONF[c] ? cap : c;
+  }
 
   // ---------- کمکی‌ها ----------
   function median(a) {
@@ -85,9 +95,16 @@
       out.push(pts);
     }
     var dt = F.length > 1 ? (F[F.length - 1].t - F[0].t) / (F.length - 1) : 1 / 30;
-    return { pts: out, raw: raw, t: F.map(function (f) { return f ? f.t : null; }), dt: dt, w: W, h: H, n: n };
+    // نرخ فریم مؤثر: نمونه‌برداری، ولی نه بیشتر از نرخ فریم خود فیلم (فریم‌های تکراری دقت زمانی نمی‌دن)
+    var fps = Math.round(Math.min(1 / dt, video.fps || Infinity));
+    return { pts: out, raw: raw, t: F.map(function (f) { return f ? f.t : null; }), dt: dt, fps: fps, w: W, h: H, n: n };
   }
   function vis(p, ids) { return mean(ids.map(function (k) { return p[k].v; })); }
+  // میانگین دیده‌شدن مفاصل در فریم‌های مشخص (یا همه‌ی فریم‌ها)
+  function visAt(D, ids, idx) {
+    var list = idx ? idx.map(function (i) { return D.raw[i]; }) : D.raw;
+    return mean(list.map(function (p) { return p ? vis(p, ids) : null; }));
+  }
 
   // برخورد پا با زمین: پایین‌ترین نقطه‌ی پا (پاشنه یا پنجه) نزدیک سطح زمین
   function contacts(D, s, L) {
@@ -129,7 +146,7 @@
 
   // ---------- فیلم از کنار ----------
   function analyzeSide(video, heightCm) {
-    var D = prepare(video), q = { frames: D.n, valid: validRate(D) };
+    var D = prepare(video), q = { frames: D.n, valid: validRate(D), fps: D.fps };
     if (q.valid < 0.5) return { ok: false, reason: 'noPerson', quality: q };
     var view = viewRatio(D);
     if (view != null && view > 0.55) return { ok: false, reason: 'notSide', quality: q };
@@ -161,6 +178,13 @@
     m.overstride = Math.round(median(over) * 100) / 100;
     m.fsa = round1(median(fsa));
     m.strike = m.fsa > REF.fsaHeel ? 'heel' : m.fsa < REF.fsaFore ? 'fore' : 'mid';
+    // حداکثر خم شدن زانو در فاز تماس پای نزدیک
+    var peak = cN.stance.map(function (st) {
+      var mx = null;
+      for (var f = st[0]; f <= st[1]; f++) { var p = D.pts[f]; if (p) { var a = 180 - angle3(p[near.hip], p[near.knee], p[near.ank]); if (mx == null || a > mx) mx = a; } }
+      return mx;
+    });
+    m.peakKnee = round1(median(peak));
     // آهنگ گام از برخوردهای هر دو پا
     var all = cN.ic.concat(cF.ic).sort(function (a, b) { return a - b; });
     var tt = all.map(function (i) { return D.t[i]; });
@@ -206,6 +230,28 @@
     }
     var ampPx = median(amp);
     m.vo = heightCm && ampPx != null ? round1(ampPx / L * LEG_RATIO * heightCm) : null;
+    // سطح اطمینان هر عدد: دیده‌شدن مفاصل لازم، تعداد برخوردها، نرخ فریم و محدودیت ذاتی خود پارامتر
+    var legIds = [near.hip, near.knee, near.ank, near.heel, near.toe], far = SIDES[nearK === 'l' ? 'r' : 'l'];
+    var icVis = visAt(D, legIds, cN.ic), nIC = cN.ic.length, fps = D.fps;
+    var minFr = function (sec) { return Math.round(sec * fps); };
+    var fv = visAt(D, [far.hip, far.knee, far.ank, far.heel, far.toe], cF.ic);
+    // لحظه‌ی برخورد در فیلم کمتر از ۶۰ فریم تا ۱ فریم (۱۷ تا ۳۳ میلی‌ثانیه) جابه‌جا می‌شه → حداکثر «تخمینی»
+    var icCap = fps >= 60 ? 'sure' : 'est';
+    m.conf = {
+      kneeIc: conf(icVis, nIC, 6, 3, icCap), overstride: conf(icVis, nIC, 6, 3, icCap), strike: conf(icVis, nIC, 6, 3, icCap),
+      // زاویه‌های حداکثری در MediaPipe خطای بیشتری دارن
+      peakKnee: conf(visAt(D, legIds), nIC, 6, 3, 'est'),
+      cadence: conf(icVis, all.length, 8, 4),
+      // زمان تماس: دقت زمانی ±۱ فریم؛ زیر ۱۰۰ فریم در ثانیه حداکثر «تخمینی»، زیر ۲۵ غیرقابل‌اطمینان
+      gct: fps < 25 ? 'low' : conf(icVis, nIC, 6, 3, fps >= 100 ? 'sure' : 'est'),
+      // نوسان عمودی: به قد واردشده و ثابت بودن دوربین بستگی داره → حداکثر «تخمینی»
+      vo: m.vo == null ? 'low' : conf(visAt(D, [P.lHip, P.rHip]), all.length, 8, 4, 'est'),
+      // پای دور معمولاً کمتر دیده می‌شه؛ برای زمان برخوردش فقط جای پا لازمه، پس حد دیده‌شدنش پایین‌تره
+      timing: cF.ic.length >= 3 && fv >= 0.5 ? conf(icVis, Math.min(nIC, cF.ic.length), 6, 3, 'est') : 'low',
+      head: conf(visAt(D, [near.ear, near.sh, P.nose]), D.pts.filter(Boolean).length, minFr(2), minFr(0.7)),
+      trunk: conf(visAt(D, [near.sh, near.hip]), D.pts.filter(Boolean).length, minFr(2), minFr(0.7)),
+      elbow: conf(visAt(D, [near.sh, near.el, near.wr]), D.pts.filter(Boolean).length, minFr(2), minFr(0.7))
+    };
     // فریم نمونه برای نمایش: برخورد پای نزدیک وسط فیلم
     var key = cN.ic[Math.floor(cN.ic.length / 2)];
     return { ok: true, view: 'side', near: nearK, dir: dir, metrics: m, quality: q, keyFrame: key, keyT: D.t[key], ic: cN.ic };
@@ -213,7 +259,7 @@
 
   // ---------- فیلم از پشت ----------
   function analyzeBack(video) {
-    var D = prepare(video), q = { frames: D.n, valid: validRate(D) };
+    var D = prepare(video), q = { frames: D.n, valid: validRate(D), fps: D.fps };
     if (q.valid < 0.5) return { ok: false, reason: 'noPerson', quality: q };
     var view = viewRatio(D);
     if (view != null && view < 0.4) return { ok: false, reason: 'notBack', quality: q };
@@ -225,7 +271,7 @@
     // وسط فاز تماس هر پا: افت لگن سمت مقابل و زاویه‌ی زانو در صفحه‌ی جلو
     function midStance(c) { return c.stance.map(function (s) { return Math.round((s[0] + s[1]) / 2); }); }
     function stanceMetrics(c, s, o) {
-      var drop = [], valg = [], cross = [], pron = [];
+      var drop = [], valg = [], cross = [];
       midStance(c).forEach(function (i) {
         var p = D.pts[i];
         if (!p) return;
@@ -238,20 +284,15 @@
         valg.push((k.x - lineX) * medial > 0 ? ang : -ang);
         // پا از خط وسط بدن رد شده؟ (فرود ضربدری)
         cross.push(Math.sign(a.x - mid) !== Math.sign(h.x - mid) ? 1 : 0);
-        // پرونیشن (تقریبی): پاشنه نسبت به ادامه‌ی خط ساق به سمت بیرون → چرخش پاشنه به بیرون (اورژن)
-        var he = p[s.heel], dy = he.y - a.y;
-        if (dy > 1) {
-          var expX = a.x + (a.x - k.x) * dy / ((a.y - k.y) || 1);
-          pron.push(Math.atan2((he.x - expX) * -medial, dy) * DEG);
-        }
       });
-      return { drop: median(drop), valgus: median(valg), crossover: mean(cross), pron: median(pron) };
+      // پرونیشن عمداً سنجیده نمی‌شه: نقطه‌ی پاشنه‌ی MediaPipe معادل خط وسط پاشنه نیست و
+      // پرونیشن در مطالعه‌ی آینده‌نگر (Nielsen 2014) با آسیب مرتبط نبود
+      return { drop: median(drop), valgus: median(valg), crossover: mean(cross) };
     }
     var sl = stanceMetrics(cL, SIDES.l, SIDES.r), sr = stanceMetrics(cR, SIDES.r, SIDES.l);
     m.pelvicL = round1(sl.drop); m.pelvicR = round1(sr.drop);
     m.valgusL = round1(sl.valgus); m.valgusR = round1(sr.valgus);
     m.crossover = round1(((sl.crossover || 0) + (sr.crossover || 0)) / 2 * 100);
-    m.pronL = round1(sl.pron); m.pronR = round1(sr.pron);
     // دست از خط وسط بدن رد می‌شه؟
     var armX = [];
     D.pts.forEach(function (p) {
@@ -267,87 +308,97 @@
     m.gctSym = round1(symIndex(m.gctL, m.gctR, D.dt * 1000));
     m.pelvicSym = round1(Math.abs((m.pelvicL || 0) - (m.pelvicR || 0)));
     m.valgusSym = round1(Math.abs((m.valgusL || 0) - (m.valgusR || 0)));
+    var msL = midStance(cL), msR = midStance(cR), nSt = Math.min(msL.length, msR.length), all = msL.concat(msR);
+    var minFr = Math.round(2 * D.fps);
+    m.conf = {
+      pelvic: conf(visAt(D, [P.lHip, P.rHip], all), nSt, 6, 3),
+      valgus: conf(visAt(D, [P.lHip, P.rHip, P.lKnee, P.rKnee, P.lAnk, P.rAnk], all), nSt, 6, 3),
+      crossover: conf(visAt(D, [P.lHip, P.rHip, P.lAnk, P.rAnk], all), nSt, 6, 3),
+      armCross: conf(visAt(D, [P.lSh, P.rSh, P.lWr, P.rWr]), D.pts.filter(Boolean).length, minFr, Math.round(minFr / 3)),
+      sides: conf(visAt(D, [P.lHip, P.rHip, P.lKnee, P.rKnee, P.lAnk, P.rAnk], all), nSt, 6, 3, 'est')
+    };
     var key = midStance(cR)[0];
     return { ok: true, view: 'back', metrics: m, quality: q, keyFrame: key, keyT: D.t[key] };
   }
 
   // ---------- قواعد: عدد → وضعیت ----------
+  // وضعیت‌ها: good = در محدوده‌ی معمول، warn = کمی بیرون، bad = بیرون از محدوده‌ی معمول (فقط برای پارامترهایی که
+  // بازه‌ی مرجع قابل دفاع دارن)؛ info = فقط توصیفی (بازه‌ی معتبر یا شواهد کافی نداره)؛ na = غیرقابل‌اطمینان (عدد داده نمی‌شه)
   function band(v, r) { return v == null ? null : v <= r.good ? 'good' : v <= r.warn ? 'warn' : 'bad'; }
   function range(v, r) { return v == null ? null : v >= r.lo && v <= r.hi ? 'good' : v >= r.warnLo && v <= r.warnHi ? 'warn' : 'bad'; }
   function worst(a, b) { var o = { good: 0, warn: 1, bad: 2 }; return a == null ? b : b == null ? a : o[a] >= o[b] ? a : b; }
-  function findings(side, back) {
+  // شرایط دویدن روی برداشت از بعضی عددها اثر داره (کادنس، زمان تماس، شیب تنه، نوع فرود)
+  function findings(side, back, cond) {
+    cond = CONDITIONS.indexOf(cond) >= 0 ? cond : 'easy';
     var F = [];
-    var add = function (id, area, status, value, extra) { if (status) F.push(Object.assign({ id: id, area: area, status: status, value: value }, extra || {})); };
+    var add = function (id, area, status, value, c, extra) {
+      if (!status) return;
+      // غیرقابل‌اطمینان: یافته می‌مونه (تا کاربر بدونه سنجیده نشد) ولی بدون عدد و بدون وضعیت
+      if (c === 'low') F.push({ id: id, area: area, status: 'na', value: null, conf: 'low' });
+      else F.push(Object.assign({ id: id, area: area, status: status, value: value, conf: c || 'est' }, extra || {}));
+    };
     if (side && side.ok) {
-      var m = side.metrics;
-      add('head', 'head', worst(band(m.neck, REF.neck), m.gaze == null ? null : m.gaze > REF.gaze.warnHi ? 'bad' : m.gaze > REF.gaze.hi ? 'warn' : m.gaze < REF.gaze.lo ? 'warn' : 'good'),
-        m.neck, { gaze: m.gaze, look: m.gaze > REF.gaze.hi ? 'down' : m.gaze < REF.gaze.lo ? 'up' : 'ahead' });
-      add('trunk', 'trunk', range(m.trunk, REF.trunk), m.trunk, { lean: m.trunk < REF.trunk.lo ? 'back' : m.trunk > REF.trunk.hi ? 'forward' : 'ok' });
-      add('elbow', 'arms', range(m.elbow, REF.elbow), m.elbow, { bend: m.elbow > REF.elbow.hi ? 'straight' : m.elbow < REF.elbow.lo ? 'tight' : 'ok' });
-      add('kneeIc', 'knee', range(m.kneeIc, REF.kneeIc), m.kneeIc, { form: m.kneeIc < REF.kneeIc.lo ? 'straight' : m.kneeIc > REF.kneeIc.hi ? 'bent' : 'ok' });
-      add('overstride', 'knee', worst(band(m.overstride, REF.overstride), band(m.shank, REF.shank)), m.overstride, { shank: m.shank });
-      // نوع فرود پا خودش «اشتباه» نیست؛ فرود پاشنه فقط همراه بیش‌گامی مسئله‌ست
-      var os = worst(band(m.overstride, REF.overstride), band(m.shank, REF.shank));
-      add('strike', 'foot', m.strike === 'heel' && os !== 'good' ? 'warn' : 'good', m.fsa, { strike: m.strike });
-      add('cadence', 'cadence', m.cadence == null ? null : m.cadence >= REF.cadence.good ? 'good' : m.cadence >= REF.cadence.warn ? 'warn' : 'bad', m.cadence);
-      add('vo', 'bounce', band(m.vo, REF.vo), m.vo);
-      var ss = Math.max(m.stepSym || 0, m.gctSym || 0);
-      if (m.stepSym != null || m.gctSym != null) add('timing', 'symmetry', band(ss, REF.sym), round1(ss));
+      var m = side.metrics, C = m.conf || {};
+      add('overstride', 'knee', worst(band(m.overstride, REF.overstride), band(m.shank, REF.shank)), m.overstride, C.overstride, { shank: m.shank });
+      add('kneeIc', 'knee', range(m.kneeIc, REF.kneeIc), m.kneeIc, C.kneeIc, { form: m.kneeIc < REF.kneeIc.lo ? 'straight' : m.kneeIc > REF.kneeIc.hi ? 'bent' : 'ok' });
+      if (m.cadence != null) add('cadence', 'cadence', m.cadence < REF.cadence[cond] ? 'warn' : 'info', m.cadence, C.cadence, { floor: REF.cadence[cond], cond: cond });
+      if (m.peakKnee != null) add('peakKnee', 'knee', 'info', m.peakKnee, C.peakKnee);
+      add('strike', 'foot', 'info', m.fsa, C.strike, { strike: m.strike });
+      if (m.gctNear != null) add('gct', 'timing', 'info', m.gctNear, C.gct, { far: m.gctFar });
+      if (m.vo != null || C.vo) add('vo', 'bounce', 'info', m.vo, m.vo == null ? 'low' : C.vo);
+      add('trunk', 'trunk', 'info', m.trunk, C.trunk, { lean: m.trunk < REF.trunk.lo ? 'back' : m.trunk > REF.trunk.hi ? 'forward' : 'ok' });
+      add('head', 'head', 'info', m.neck, C.head, { gaze: m.gaze, look: m.gaze > REF.gaze.hi ? 'down' : m.gaze < REF.gaze.lo ? 'up' : 'ahead' });
+      add('elbow', 'arms', 'info', m.elbow, C.elbow, { bend: m.elbow > REF.elbow.hi ? 'straight' : m.elbow < REF.elbow.lo ? 'tight' : 'ok' });
+      if (m.stepSym != null || m.gctSym != null) add('timing', 'symmetry', 'info', round1(Math.max(m.stepSym || 0, m.gctSym || 0)), C.timing);
     }
     if (back && back.ok) {
-      var b = back.metrics;
+      var b = back.metrics, B = b.conf || {};
       var pd = Math.max(b.pelvicL || 0, b.pelvicR || 0);
-      add('pelvic', 'pelvis', band(pd, REF.pelvic), round1(pd), { left: b.pelvicL, right: b.pelvicR });
+      add('pelvic', 'pelvis', band(pd, REF.pelvic), round1(pd), B.pelvic, { left: b.pelvicL, right: b.pelvicR });
       var vg = Math.max(b.valgusL || 0, b.valgusR || 0);
-      add('valgus', 'kneeIn', band(vg, REF.valgus), round1(vg), { left: b.valgusL, right: b.valgusR });
-      add('armCross', 'arms', band(b.armCross, REF.cross), b.armCross);
-      add('crossover', 'foot', b.crossover > 30 ? 'warn' : 'good', b.crossover);
-      if (b.pronL != null || b.pronR != null) {
-        var pr = Math.max(b.pronL || 0, b.pronR || 0);
-        add('pronation', 'foot', band(pr, REF.pron), round1(pr), { left: b.pronL, right: b.pronR });
-      }
-      var bs = Math.max(b.gctSym || 0, (b.pelvicSym || 0) / REF.pelvic.good * REF.sym.good, (b.valgusSym || 0) / REF.valgus.good * REF.sym.good);
-      add('sides', 'symmetry', band(bs, REF.sym), round1(b.gctSym), { pelvicSym: b.pelvicSym, valgusSym: b.valgusSym });
+      add('valgus', 'kneeIn', band(vg, REF.valgus), round1(vg), B.valgus, { left: b.valgusL, right: b.valgusR });
+      add('crossover', 'foot', b.crossover > REF.crossover ? 'warn' : 'good', b.crossover, B.crossover);
+      add('armCross', 'arms', 'info', b.armCross, B.armCross);
+      add('sides', 'symmetry', 'info', round1(b.gctSym), B.sides, { pelvicSym: b.pelvicSym, valgusSym: b.valgusSym });
     }
-    // اولویت: «نیاز به اصلاح» قبل از «قابل توجه»؛ در هر گروه، موارد پرتأثیرتر روی آسیب جلوتر
-    var ORDER = ['overstride', 'cadence', 'pelvic', 'valgus', 'kneeIc', 'pronation', 'vo', 'trunk', 'timing', 'sides', 'head', 'elbow', 'armCross', 'crossover', 'strike'];
-    var S = { bad: 0, warn: 1, good: 2 };
+    // ترتیب: بیرون از محدوده‌ی معمول → کمی بیرون → معمول → توصیفی → غیرقابل‌اطمینان؛ در هر گروه به ترتیب اهمیت
+    var ORDER = ['pelvic', 'overstride', 'kneeIc', 'cadence', 'valgus', 'crossover', 'strike', 'peakKnee', 'gct', 'vo', 'trunk', 'timing', 'sides', 'armCross', 'elbow', 'head'];
+    var S = { bad: 0, warn: 1, good: 2, info: 3, na: 4 };
     F.sort(function (a, b) { return S[a.status] - S[b.status] || ORDER.indexOf(a.id) - ORDER.indexOf(b.id); });
     return F;
   }
-  // ---------- سه محور گزارش ----------
-  // کارایی: چقدر انرژی صرف جلو رفتن می‌شه (ترمز، بالا و پایین رفتن، چرخش اضافه)؛ فرم: درستی الگوی حرکت مفاصل
+  function judged(f) { return f.status === 'good' || f.status === 'warn' || f.status === 'bad'; }
+  // ---------- محورهای گزارش ----------
+  // کارایی: ترمز و بالا و پایین رفتن؛ فرم: الگوی حرکت مفاصل. امتیاز فقط از پارامترهایی که بازه‌ی مرجع دارن
   var AXIS = {
-    performance: ['cadence', 'overstride', 'vo', 'trunk', 'armCross', 'timing'],
-    form: ['kneeIc', 'strike', 'pelvic', 'valgus', 'pronation', 'crossover', 'head', 'elbow', 'sides']
+    performance: ['cadence', 'overstride', 'vo', 'gct', 'trunk', 'armCross', 'timing'],
+    form: ['kneeIc', 'peakKnee', 'strike', 'pelvic', 'valgus', 'crossover', 'head', 'elbow', 'sides']
   };
   function axisScore(F, ids) {
-    var f = F.filter(function (x) { return ids.indexOf(x.id) >= 0; });
+    var f = F.filter(function (x) { return ids.indexOf(x.id) >= 0 && judged(x); });
     return f.length ? Math.round(f.reduce(function (s, x) { return s + (x.status === 'good' ? 1 : x.status === 'warn' ? 0.5 : 0); }, 0) / f.length * 100) : null;
   }
-  // ---------- ریسک آسیب ----------
-  // هر آسیب: عامل‌های حرکتی مرتبط در پژوهش‌ها؛ وزن عامل = ۲ برای «نیاز به اصلاح»، ۱ برای «قابل توجه»
-  // ریسک = جمع وزن‌ها: ۰ کم، ۱ تا ۲ متوسط، ۳ و بیشتر بالا. این احتماله، نه تشخیص.
+  // ---------- الگوهای مرتبط با آسیب ----------
+  // هر ناحیه: پارامترهایی که در پژوهش‌ها با فشار بیشتر روی اون ناحیه مرتبط شدن. یک یافته‌ی تنها هیچ‌وقت کافی نیست:
+  // ناحیه فقط وقتی «الگوی مرتبط» داره که حداقل ۲ عامل بیرون از محدوده‌ی معمول (و قابل‌اطمینان) دیده بشه.
+  // وزن عامل: ۲ برای «بیرون از محدوده»، ۱ برای «کمی بیرون»؛ جمع ۴ یا ۳ عامل و بیشتر = «واضح». این پیش‌بینی آسیب نیست.
   var INJURIES = {
-    runnersKnee: ['overstride', 'kneeIc', 'valgus', 'pelvic', 'cadence'],      // درد کشکک-رانی: Heiderscheit ۲۰۱۱، Noehren ۲۰۱۳، Bramah ۲۰۱۸
-    itbs: ['pelvic', 'crossover', 'valgus'],                                   // سندرم نوار ایلیوتیبیال: Noehren ۲۰۰۷، Meardon ۲۰۱۲
-    shin: ['overstride', 'cadence', 'vo', 'crossover', 'pronation'],           // درد ساق و استرس ساق: Milner ۲۰۰۶، Meardon ۲۰۱۲، Becker ۲۰۱۷
-    achilles: ['pronation', 'strikeFore', 'timing'],                           // تاندون آشیل: Almonroeder ۲۰۱۳، Willems ۲۰۰۶
-    hip: ['pelvic', 'trunk', 'sides'],                                         // درد لگن و کمر (همسترینگ/گلوتئال): Bramah ۲۰۱۸
-    oneSided: ['timing', 'sides']                                              // اضافه‌بار یک‌طرفه: Zifchock ۲۰۰۸
+    runnersKnee: ['pelvic', 'overstride', 'kneeIc', 'valgus', 'cadence'],  // جلوی زانو: Bramah 2018، Heiderscheit 2011، Ceyssens 2019 (ادداکشن ران در زنان)
+    itbs: ['pelvic', 'valgus', 'crossover'],                               // بیرون زانو (نوار ایلیوتیبیال): Bramah 2018، Noehren 2007، Meardon 2012
+    shin: ['pelvic', 'overstride', 'cadence', 'crossover'],                // ساق: Bramah 2018 (MTSS)، Meardon 2014
+    achilles: ['pelvic', 'overstride', 'kneeIc']                           // آشیل: Bramah 2018
   };
-  function risks(F, side) {
+  function risks(F) {
     var by = {};
-    F.forEach(function (f) { by[f.id] = f; });
-    // فرود پنجه خودش «خطا» نیست ولی بار تاندون آشیل رو بیشتر می‌کنه
-    if (side && side.ok && side.metrics.strike === 'fore') by.strikeFore = { id: 'strikeFore', status: 'warn' };
+    F.forEach(function (f) { if (judged(f)) by[f.id] = f; });
     var out = [];
     Object.keys(INJURIES).forEach(function (k) {
       var seen = INJURIES[k].filter(function (id) { return by[id]; });
-      if (!seen.length) return; // داده‌ای برای سنجیدنش نیست (مثلاً فیلم از پشت نداریم)
+      if (seen.length < 2) return; // برای قضاوت ترکیبی، حداقل دو پارامتر قابل‌اطمینان لازمه
       var factors = seen.filter(function (id) { return by[id].status !== 'good'; });
       var w = factors.reduce(function (s, id) { return s + (by[id].status === 'bad' ? 2 : 1); }, 0);
-      out.push({ id: k, level: w >= 3 ? 'high' : w >= 1 ? 'moderate' : 'low', weight: w, factors: factors, checked: seen.length, of: INJURIES[k].length });
+      var level = factors.length < 2 ? 'low' : w >= 4 || factors.length >= 3 ? 'high' : 'moderate';
+      out.push({ id: k, level: level, weight: w, factors: factors, checked: seen.length, of: INJURIES[k].length });
     });
     var L = { high: 0, moderate: 1, low: 2 };
     out.sort(function (a, b) { return L[a.level] - L[b.level] || b.weight - a.weight; });
@@ -363,6 +414,7 @@
     }
     return a;
   }
+  // input: { side, back: خروجی js/pose.js، heightCm، condition: easy|tempo|interval|race، load: { acute, chronic } کیلومتر در هفته }
   function analyze(input) {
     var A = input.side ? classify(input.side, input.heightCm, 'side') : null;
     var B = input.back ? classify(input.back, input.heightCm, 'back') : null;
@@ -380,15 +432,21 @@
     var failed = [A, B].filter(function (r) { return r && (!r.ok || r.dup); }).map(function (r) {
       return { src: r.src, reason: r.dup ? 'sameView' : r.reason };
     });
-    var F = findings(side, back);
-    var R = risks(F, side);
-    return { side: side, back: back, failed: failed, findings: F, risks: R,
+    var cond = CONDITIONS.indexOf(input.condition) >= 0 ? input.condition : 'easy';
+    var F = findings(side, back, cond);
+    var R = risks(F);
+    // بار تمرینی فقط «زمینه»ست (شواهد نسبت بار حاد به مزمن خودش محل بحثه) و سطح الگوها رو عوض نمی‌کنه
+    var ld = input.load, load = ld && ld.chronic > 0 ? { acute: ld.acute, chronic: ld.chronic, ratio: Math.round(ld.acute / ld.chronic * 100) / 100 } : null;
+    if (load) load.high = load.ratio >= 1.5;
+    var J = F.filter(judged);
+    return { side: side, back: back, failed: failed, findings: F, risks: R, condition: cond, load: load,
       axes: { performance: axisScore(F, AXIS.performance), form: axisScore(F, AXIS.form),
         risk: R.length ? R[0].level : null },
-      score: F.length ? Math.round(F.reduce(function (s, f) { return s + (f.status === 'good' ? 1 : f.status === 'warn' ? 0.5 : 0); }, 0) / F.length * 100) : null };
+      score: J.length ? Math.round(J.reduce(function (s, f) { return s + (f.status === 'good' ? 1 : f.status === 'warn' ? 0.5 : 0); }, 0) / J.length * 100) : null };
   }
 
-  var api = { analyze: analyze, analyzeSide: analyzeSide, analyzeBack: analyzeBack, findings: findings, risks: risks, axisScore: axisScore, AXIS: AXIS, INJURIES: INJURIES, REF: REF, P: P, angle3: angle3 };
+  var api = { analyze: analyze, analyzeSide: analyzeSide, analyzeBack: analyzeBack, findings: findings, risks: risks, axisScore: axisScore, judged: judged,
+    AXIS: AXIS, INJURIES: INJURIES, REF: REF, CONDITIONS: CONDITIONS, P: P, angle3: angle3 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CoachGait = api;
 })(this);
