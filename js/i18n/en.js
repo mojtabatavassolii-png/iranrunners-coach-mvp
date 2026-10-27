@@ -918,7 +918,8 @@
         sameView: 'Same angle as the other video; for a full analysis, film one from the side and one from behind.'
       },
       report: 'Running form report',
-      cond: { label: 'What kind of run is this video from?', hint: 'Some numbers (like cadence and ground contact time) change with speed.', easy: 'Easy run', tempo: 'Tempo', interval: 'Intervals', race: 'Race', in: 'Run type: {c}' },
+      cond: { label: 'What kind of run is this video from?', hint: 'Each video has its own run type, and the two can differ; some numbers (like cadence) change with speed.', need: 'Choose the run type for each video.', easy: 'Easy run', tempo: 'Tempo', interval: 'Intervals or high speed', race: 'Race pace', in: 'Run type: {c}' },
+      view: { side: 'Side view analysis', back: 'Back view analysis', measured: 'Measured from this view', notFrom: 'Cannot be measured reliably from this view: {list} (these need the {other}).' },
       scoreOf: '{n} / 100',
       inRangeShort: '{a} of {b}',
       inRangeNote: 'within the usual range',
@@ -974,6 +975,10 @@
           why: 'In modelling studies, a narrower step went with more strain on the outer-thigh band and more stress on the shin bone; a direct link with injury has not been tested.' },
         armCross: { t: 'Arm movement (back view)', v: 'hands cross the midline {n}% of the time', ref: 'no evidence for a clear limit',
           seen: 'In this video the hands cross the body’s midline about {n}% of the time.', why: 'Arm swing balances upper-body rotation; there is no evidence that one particular pattern is “right”.' },
+        trunkLat: { t: 'Trunk and pelvis alignment (side lean)', v: '{n}° side lean', ref: 'no valid reference range used',
+          seen: 'In this video the trunk leans about {n}° to the side relative to the pelvis during stance.', why: 'Some clinical running assessments look at side lean together with pelvic drop; no direct evidence for a clear limit was found.' },
+        armSym: { t: 'Arm swing symmetry', v: 'left/right difference {n}%', ref: 'some difference is normal',
+          seen: 'In this video the swing range of the two arms differs by about {n}%.', why: 'Arm swing balances upper-body rotation; research has not set a clear limit for its symmetry.' },
         sides: { t: 'Left/right symmetry (back view)', v: 'contact time difference {n}%', ref: 'some difference is normal',
           seen: 'In this video the contact time difference between the legs was about {n}%.', why: 'Some asymmetry is common in healthy runners too; its link with injury is unclear.' }
       },
@@ -992,7 +997,7 @@
       factorName: { overstride: 'landing ahead of the body', kneeIc: 'knee at landing', valgus: 'knee moving inward', pelvic: 'pelvic drop', cadence: 'cadence lower than usual', crossover: 'narrow step' },
       seeExpert: 'If you have pain or discomfort in this area, an assessment by a professional (physiotherapist or sports doctor) can help.',
       load: { high: 'Context: your running volume in the last 7 days ({a} km) was about {r}× your weekly average of the previous 4 weeks ({c} km). Rapid increases in volume have also been linked with injury in research, though that evidence is debated.', ok: 'Context: your running volume in the last 7 days ({a} km) was close to your weekly average of the previous 4 weeks ({c} km).' },
-      anim: { title: 'Analysis video', hint: 'Your body points and lines, in sync with your running; red points = joints seen outside the usual range.', play: 'Play', pause: 'Pause', speed: 'Speed {r}×', prev: 'Previous frame', next: 'Next frame', save: 'Save video', saving: 'Building video…', strike: 'Strike', knee: 'Knee', elbow: 'Elbow', pelvis: 'Pelvis', noRecord: 'Building a video is not supported in this browser.', sessionOnly: 'The analysis video is only available right after the analysis (the video is not saved); tap “Save video” to keep it.' },
+      anim: { title: 'Analysis video', overlay: 'Show skeleton', err: { format: 'This browser cannot play this video format (for example HEVC). Your analysis results are unaffected; to play it, record in a more compatible format (H.264) or open it in Safari.', load: 'This video could not be played. Your analysis results are unaffected.' }, hint: 'Your body points and lines, in sync with your running; red points = joints seen outside the usual range. Use “Show skeleton” to switch between the original and the skeleton version.', play: 'Play', pause: 'Pause', speed: 'Speed {r}×', prev: 'Previous frame', next: 'Next frame', save: 'Save video', saving: 'Building video…', strike: 'Strike', knee: 'Knee', elbow: 'Elbow', pelvis: 'Pelvis', noRecord: 'Building a video is not supported in this browser.', sessionOnly: 'The analysis video is only available right after the analysis (the video is not saved); tap “Save video” to keep it.' },
       riskIntro: 'These are not injury predictions. An area only shows “related patterns” when several related findings appear together; a single number is never enough.',
       disclaimer: 'This analysis is an educational tool and not a substitute for an assessment by a professional. It comes from a 2D phone video, and its accuracy depends on camera angle, light and video quality; none of these findings is an injury diagnosis.',
       methodsTitle: 'How are these numbers calculated?',
@@ -1053,6 +1058,8 @@
           valgus: { n: 'Knee frontal plane angle', en: 'Knee frontal plane projection angle', u: '°', ref: 'Usual ≤ 8°; slightly outside ≤ 14° (estimate)', src: 'Ceyssens 2019; Souza 2016', ev: 'weak' },
           crossover: { n: 'Crossover contacts', en: 'Crossover / narrow step width', u: '%', ref: 'Usual ≤ 30% (estimate)', src: 'Meardon 2012; Meardon 2014', ev: 'weak' },
           armCross: { n: 'Arm crossing midline', en: 'Arm crossing midline', u: '%', ref: 'Descriptive only', src: 'Arellano & Kram 2014', ev: 'none' },
+          trunkLat: { n: 'Lateral trunk lean', en: 'Lateral trunk lean (mid-stance)', u: '°', ref: 'Descriptive only', src: 'Dingenen 2018', ev: 'none' },
+          armSym: { n: 'Arm swing asymmetry', en: 'Arm swing asymmetry', u: '%', ref: 'Descriptive only', src: '—', ev: 'none' },
           sides: { n: 'L/R asymmetry', en: 'L/R asymmetry (GCT, pelvic drop, knee)', u: '% / °', ref: 'Descriptive only', src: '—', ev: 'weak' }
         }
       },

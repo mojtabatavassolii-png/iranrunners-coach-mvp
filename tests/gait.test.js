@@ -286,4 +286,21 @@ test('بار تمرینی فقط زمینه‌ست', function () {
   assert.strictEqual(G.analyze({ side: sideRunner({}).video, heightCm: 175, load: { acute: 5, chronic: 0 } }).load, null);
 });
 
+test('شرایط دویدن جدا برای هر فیلم؛ هر یافته مال یک نماست', function () {
+  // ۱۶۳ گام: برای ایزی معمول، برای اینتروال کمتر از معمول
+  var r = G.analyze({ side: sideRunner({ cadence: 163 }).video, back: backRunner({ cadence: 163 }).video, heightCm: 175, conditions: { side: 'easy', back: 'interval' } });
+  assert.deepStrictEqual(r.conditions, { side: 'easy', back: 'interval' });
+  var cs = r.findings.filter(function (f) { return f.id === 'cadence'; });
+  var sc = cs.filter(function (f) { return f.view === 'side'; })[0], bc = cs.filter(function (f) { return f.view === 'back'; })[0];
+  near(bc.value, 163, 8, 'back cadence');
+  assert.strictEqual(sc.status, 'info'); assert.strictEqual(bc.status, 'warn'); assert.strictEqual(bc.cond, 'interval');
+  r.findings.forEach(function (f) { assert.ok(f.view === 'side' || f.view === 'back', f.id); });
+  ['pelvic', 'valgus', 'crossover', 'trunkLat', 'armCross', 'sides'].forEach(function (id) {
+    assert.ok(r.findings.some(function (f) { return f.id === id && f.view === 'back'; }), id); });
+  ['overstride', 'kneeIc', 'elbow', 'head', 'trunk', 'strike'].forEach(function (id) {
+    assert.ok(r.findings.some(function (f) { return f.id === id && f.view === 'side'; }), id); });
+  // برچسب با خود فیلم می‌ره: فیلم از پشت در خونه‌ی «کنار»
+  var sw = G.analyze({ side: backRunner({}).video, heightCm: 175, conditions: { side: 'race', back: 'easy' } });
+  assert.strictEqual(sw.conditions.back, 'race'); assert.strictEqual(sw.conditions.side, null);
+});
 console.log(passed + ' تست تحلیل دویدن موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

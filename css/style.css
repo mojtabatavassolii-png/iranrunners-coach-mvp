@@ -1199,6 +1199,26 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .gi-conf { margin-top: 2px; }
 .gait-edu { margin: var(--sp-2) 0 0; color: var(--text-secondary); }
 .gait-load { background: var(--surface-elevated); border-radius: 8px; padding: 8px 10px; }
+/* شرایط دویدن هر فیلم، زیر همون خونه */
+.gait-slot { flex-wrap: wrap; }
+.gait-slot > .gait-cond { flex: 1 1 100%; display: block; margin-top: 4px; }
+.gait-cond .sub-legend { margin: 0 0 6px; font-size: var(--fs-sm); }
+.gait-cond .req { color: var(--error); }
+/* نتایج به تفکیک نما: ویدیو و زیرش یافته‌های همون نما */
+.gv-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.gv-head h2 { margin: 0; }
+.gv-tag { font-size: var(--fs-xs); font-weight: 700; background: var(--primary-soft); color: var(--primary); border-radius: 999px; padding: 3px 12px; white-space: nowrap; }
+.gait-view h3 { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-base); }
+.gv-not { margin: var(--sp-2) 0 0; }
+/* پخش‌کننده: ویدیو با کنترل‌های خود مرورگر، اسکلت روی یک بوم شفاف که لمس رو رد نمی‌کنه */
+.gp-stage { position: relative; width: 100%; background: var(--bg); border-radius: 12px; overflow: hidden; }
+.gp-stage video { display: block; width: 100%; height: 100%; object-fit: contain; }
+.gp-stage .gp-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.gp-ov { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; font-weight: 600; }
+.gp-ov input { width: 20px; height: 20px; accent-color: var(--primary); }
+.gp-err { color: var(--error); margin: 6px 0 0; }
+.gp-steps { display: inline-flex; gap: 4px; }
+.gait-player figcaption { font-weight: 400; margin: 6px 0 0; }
 /* نسخه‌ی تخصصی */
 .gait-expert > details > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--primary); }
 .gait-expert h3 { margin: var(--sp-3) 0 var(--sp-1); font-size: var(--fs-base); }

@@ -310,11 +310,29 @@
     m.valgusSym = round1(Math.abs((m.valgusL || 0) - (m.valgusR || 0)));
     var msL = midStance(cL), msR = midStance(cR), nSt = Math.min(msL.length, msR.length), all = msL.concat(msR);
     var minFr = Math.round(2 * D.fps);
+    // آهنگ گام از نمای پشت (برخوردهای هر دو پا)
+    var ics = cL.ic.concat(cR.ic).sort(function (a, b) { return a - b; }), gaps = [];
+    for (var gi = 1; gi < ics.length; gi++) if (ics[gi] > ics[gi - 1]) gaps.push((ics[gi] - ics[gi - 1]) * D.dt);
+    m.cadence = gaps.length >= 2 ? Math.round(60 / median(gaps)) : null;
+    // شیب جانبی تنه در وسط فاز تماس: خط وسط لگن تا وسط شونه نسبت به عمود (درجه، بدون جهت)
+    m.trunkLat = round1(median(all.map(function (i) {
+      var p = D.pts[i]; if (!p) return null;
+      var hx = (p[P.lHip].x + p[P.rHip].x) / 2, hy = (p[P.lHip].y + p[P.rHip].y) / 2, sx = (p[P.lSh].x + p[P.rSh].x) / 2, sy = (p[P.lSh].y + p[P.rSh].y) / 2;
+      return Math.abs(Math.atan2(sx - hx, hy - sy) * DEG);
+    })));
+    // تقارن تاب دست‌ها: دامنه‌ی بالا و پایین رفتن مچ دست هر سمت نسبت به شونه‌ی همون سمت
+    var swingL = [], swingR = [];
+    D.pts.forEach(function (p) { if (p) { swingL.push(p[P.lWr].y - p[P.lSh].y); swingR.push(p[P.rWr].y - p[P.rSh].y); } });
+    var ampL = (pct(swingL, 0.95) || 0) - (pct(swingL, 0.05) || 0), ampR = (pct(swingR, 0.95) || 0) - (pct(swingR, 0.05) || 0);
+    m.armSym = round1(symIndex(ampL, ampR));
     m.conf = {
       pelvic: conf(visAt(D, [P.lHip, P.rHip], all), nSt, 6, 3),
       valgus: conf(visAt(D, [P.lHip, P.rHip, P.lKnee, P.rKnee, P.lAnk, P.rAnk], all), nSt, 6, 3),
       crossover: conf(visAt(D, [P.lHip, P.rHip, P.lAnk, P.rAnk], all), nSt, 6, 3),
       armCross: conf(visAt(D, [P.lSh, P.rSh, P.lWr, P.rWr]), D.pts.filter(Boolean).length, minFr, Math.round(minFr / 3)),
+      armSym: conf(visAt(D, [P.lSh, P.rSh, P.lWr, P.rWr]), D.pts.filter(Boolean).length, minFr, Math.round(minFr / 3), 'est'),
+      trunkLat: conf(visAt(D, [P.lSh, P.rSh, P.lHip, P.rHip], all), nSt, 6, 3),
+      cadence: conf(visAt(D, [P.lHeel, P.rHeel, P.lToe, P.rToe], ics), ics.length, 8, 4),
       sides: conf(visAt(D, [P.lHip, P.rHip, P.lKnee, P.rKnee, P.lAnk, P.rAnk], all), nSt, 6, 3, 'est')
     };
     var key = midStance(cR)[0];
@@ -328,20 +346,23 @@
   function range(v, r) { return v == null ? null : v >= r.lo && v <= r.hi ? 'good' : v >= r.warnLo && v <= r.warnHi ? 'warn' : 'bad'; }
   function worst(a, b) { var o = { good: 0, warn: 1, bad: 2 }; return a == null ? b : b == null ? a : o[a] >= o[b] ? a : b; }
   // شرایط دویدن روی برداشت از بعضی عددها اثر داره (کادنس، زمان تماس، شیب تنه، نوع فرود)
-  function findings(side, back, cond) {
-    cond = CONDITIONS.indexOf(cond) >= 0 ? cond : 'easy';
-    var F = [];
+  // هر یافته مال یک نما (view) ـه و با شرایط دویدنِ همون فیلم سنجیده می‌شه
+  function findings(side, back, cond, condBack) {
+    var ok = function (c) { return CONDITIONS.indexOf(c) >= 0 ? c : 'easy'; };
+    var cS = ok(cond), cB = ok(condBack || cond);
+    var F = [], view = 'side';
     var add = function (id, area, status, value, c, extra) {
       if (!status) return;
       // غیرقابل‌اطمینان: یافته می‌مونه (تا کاربر بدونه سنجیده نشد) ولی بدون عدد و بدون وضعیت
-      if (c === 'low') F.push({ id: id, area: area, status: 'na', value: null, conf: 'low' });
-      else F.push(Object.assign({ id: id, area: area, status: status, value: value, conf: c || 'est' }, extra || {}));
+      if (c === 'low') F.push({ id: id, view: view, area: area, status: 'na', value: null, conf: 'low' });
+      else F.push(Object.assign({ id: id, view: view, area: area, status: status, value: value, conf: c || 'est' }, extra || {}));
     };
+    var cadence = function (v, c, cond) { if (v != null) add('cadence', 'cadence', v < REF.cadence[cond] ? 'warn' : 'info', v, c, { floor: REF.cadence[cond], cond: cond }); };
     if (side && side.ok) {
-      var m = side.metrics, C = m.conf || {};
+      var m = side.metrics, C = m.conf || {}, cond = cS;
       add('overstride', 'knee', worst(band(m.overstride, REF.overstride), band(m.shank, REF.shank)), m.overstride, C.overstride, { shank: m.shank });
       add('kneeIc', 'knee', range(m.kneeIc, REF.kneeIc), m.kneeIc, C.kneeIc, { form: m.kneeIc < REF.kneeIc.lo ? 'straight' : m.kneeIc > REF.kneeIc.hi ? 'bent' : 'ok' });
-      if (m.cadence != null) add('cadence', 'cadence', m.cadence < REF.cadence[cond] ? 'warn' : 'info', m.cadence, C.cadence, { floor: REF.cadence[cond], cond: cond });
+      cadence(m.cadence, C.cadence, cond);
       if (m.peakKnee != null) add('peakKnee', 'knee', 'info', m.peakKnee, C.peakKnee);
       add('strike', 'foot', 'info', m.fsa, C.strike, { strike: m.strike });
       if (m.gctNear != null) add('gct', 'timing', 'info', m.gctNear, C.gct, { far: m.gctFar });
@@ -352,17 +373,21 @@
       if (m.stepSym != null || m.gctSym != null) add('timing', 'symmetry', 'info', round1(Math.max(m.stepSym || 0, m.gctSym || 0)), C.timing);
     }
     if (back && back.ok) {
+      view = 'back';
       var b = back.metrics, B = b.conf || {};
+      cadence(b.cadence, B.cadence, cB);
+      if (b.trunkLat != null) add('trunkLat', 'trunk', 'info', b.trunkLat, B.trunkLat);
       var pd = Math.max(b.pelvicL || 0, b.pelvicR || 0);
       add('pelvic', 'pelvis', band(pd, REF.pelvic), round1(pd), B.pelvic, { left: b.pelvicL, right: b.pelvicR });
       var vg = Math.max(b.valgusL || 0, b.valgusR || 0);
       add('valgus', 'kneeIn', band(vg, REF.valgus), round1(vg), B.valgus, { left: b.valgusL, right: b.valgusR });
       add('crossover', 'foot', b.crossover > REF.crossover ? 'warn' : 'good', b.crossover, B.crossover);
       add('armCross', 'arms', 'info', b.armCross, B.armCross);
+      if (b.armSym != null) add('armSym', 'arms', 'info', b.armSym, B.armSym);
       add('sides', 'symmetry', 'info', round1(b.gctSym), B.sides, { pelvicSym: b.pelvicSym, valgusSym: b.valgusSym });
     }
     // ترتیب: بیرون از محدوده‌ی معمول → کمی بیرون → معمول → توصیفی → غیرقابل‌اطمینان؛ در هر گروه به ترتیب اهمیت
-    var ORDER = ['pelvic', 'overstride', 'kneeIc', 'cadence', 'valgus', 'crossover', 'strike', 'peakKnee', 'gct', 'vo', 'trunk', 'timing', 'sides', 'armCross', 'elbow', 'head'];
+    var ORDER = ['pelvic', 'overstride', 'kneeIc', 'cadence', 'valgus', 'crossover', 'strike', 'peakKnee', 'gct', 'vo', 'trunk', 'trunkLat', 'timing', 'sides', 'armCross', 'armSym', 'elbow', 'head'];
     var S = { bad: 0, warn: 1, good: 2, info: 3, na: 4 };
     F.sort(function (a, b) { return S[a.status] - S[b.status] || ORDER.indexOf(a.id) - ORDER.indexOf(b.id); });
     return F;
@@ -372,7 +397,7 @@
   // کارایی: ترمز و بالا و پایین رفتن؛ فرم: الگوی حرکت مفاصل. امتیاز فقط از پارامترهایی که بازه‌ی مرجع دارن
   var AXIS = {
     performance: ['cadence', 'overstride', 'vo', 'gct', 'trunk', 'armCross', 'timing'],
-    form: ['kneeIc', 'peakKnee', 'strike', 'pelvic', 'valgus', 'crossover', 'head', 'elbow', 'sides']
+    form: ['kneeIc', 'peakKnee', 'strike', 'pelvic', 'valgus', 'crossover', 'head', 'elbow', 'sides', 'trunkLat', 'armSym']
   };
   function axisScore(F, ids) {
     var f = F.filter(function (x) { return ids.indexOf(x.id) >= 0 && judged(x); });
@@ -390,7 +415,9 @@
   };
   function risks(F) {
     var by = {};
-    F.forEach(function (f) { if (judged(f)) by[f.id] = f; });
+    var S = { good: 0, warn: 1, bad: 2 };
+    // یک پارامتر از دو نما (مثلاً آهنگ گام): بیرون‌ترین حساب می‌شه
+    F.forEach(function (f) { if (judged(f) && (!by[f.id] || S[f.status] > S[by[f.id].status])) by[f.id] = f; });
     var out = [];
     Object.keys(INJURIES).forEach(function (k) {
       var seen = INJURIES[k].filter(function (id) { return by[id]; });
@@ -414,7 +441,8 @@
     }
     return a;
   }
-  // input: { side, back: خروجی js/pose.js، heightCm، condition: easy|tempo|interval|race، load: { acute, chronic } کیلومتر در هفته }
+  // input: { side, back: خروجی js/pose.js، heightCm، conditions: { side, back } شرایط دویدنِ هر فیلم (کلید = خونه‌ای که فیلم توش گذاشته شده)
+  //   (یا condition برای هر دو)، load: { acute, chronic } کیلومتر در هفته }
   function analyze(input) {
     var A = input.side ? classify(input.side, input.heightCm, 'side') : null;
     var B = input.back ? classify(input.back, input.heightCm, 'back') : null;
@@ -432,14 +460,18 @@
     var failed = [A, B].filter(function (r) { return r && (!r.ok || r.dup); }).map(function (r) {
       return { src: r.src, reason: r.dup ? 'sameView' : r.reason };
     });
-    var cond = CONDITIONS.indexOf(input.condition) >= 0 ? input.condition : 'easy';
-    var F = findings(side, back, cond);
+    var okc = function (c) { return CONDITIONS.indexOf(c) >= 0 ? c : null; };
+    var cs = input.conditions || {};
+    // شرایط هر نما از فیلمی که اون نما رو داده (اگه فیلم «کنار» در واقع از پشت بود، برچسبش با خودش می‌ره)
+    var conds = { side: side ? okc(cs[side.src]) || okc(input.condition) || 'easy' : null, back: back ? okc(cs[back.src]) || okc(input.condition) || 'easy' : null };
+    var cond = conds.side || conds.back || 'easy';
+    var F = findings(side, back, conds.side || cond, conds.back || cond);
     var R = risks(F);
     // بار تمرینی فقط «زمینه»ست (شواهد نسبت بار حاد به مزمن خودش محل بحثه) و سطح الگوها رو عوض نمی‌کنه
     var ld = input.load, load = ld && ld.chronic > 0 ? { acute: ld.acute, chronic: ld.chronic, ratio: Math.round(ld.acute / ld.chronic * 100) / 100 } : null;
     if (load) load.high = load.ratio >= 1.5;
     var J = F.filter(judged);
-    return { side: side, back: back, failed: failed, findings: F, risks: R, condition: cond, load: load,
+    return { side: side, back: back, failed: failed, findings: F, risks: R, condition: cond, conditions: conds, load: load,
       axes: { performance: axisScore(F, AXIS.performance), form: axisScore(F, AXIS.form),
         risk: R.length ? R[0].level : null },
       score: J.length ? Math.round(J.reduce(function (s, f) { return s + (f.status === 'good' ? 1 : f.status === 'warn' ? 0.5 : 0); }, 0) / J.length * 100) : null };
