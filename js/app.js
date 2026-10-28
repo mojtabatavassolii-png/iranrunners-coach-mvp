@@ -682,16 +682,16 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=86" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
-      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=86" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=87" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=87" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
       restoreBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
-      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=86" alt="" width="28" height="28"></button>' +
-      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=86" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=87" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=87" alt="" width="28" height="28"></button>' +
       '</div></section>';
     app.querySelectorAll('[data-lang]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.lang !== I.getLang()) switchLang(b.dataset.lang); });
@@ -3073,12 +3073,13 @@
     var p = state.profile, now = today(), key = C.dateKey(now);
     var base = C.sessionFor(p, now), ci = state.checkins[key];
     var r = ci ? effectiveSession(base) : withCycle({ session: base, adaptation: null });
-    // خانه فقط «تمرین امروز» (با پیام تطبیق امروز) و «چک‌این امروز»؛ بقیه‌ی کارت‌ها در صفحه‌ی مربوط به خودشون:
-    // آمادگی، پیشرفت هفته و نکته‌های فیتنس/قدم‌ها → پیشرفت؛ چرخه → برنامه؛ چک‌لیست شروع و نصب → پروفایل؛ اهداف و مسیر → مسابقه و اهداف
+    // خانه: «تمرین امروز» (با پیام تطبیق امروز) و «چک‌این امروز»، و برای کاربر تازه چک‌لیست «شروع کار» زیرش؛ بقیه‌ی کارت‌ها در صفحه‌ی خودشون:
+    // آمادگی، پیشرفت هفته و نکته‌های فیتنس/قدم‌ها → پیشرفت؛ چرخه → برنامه؛ نصب → پروفایل؛ اهداف و مسیر → مسابقه و اهداف
     void p;
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
-      '<h1>' + esc(T(greetKey())) + '</h1></header>' + homeToday(base, r.session, ci, key, r);
+      '<h1>' + esc(T(greetKey())) + '</h1></header>' + homeToday(base, r.session, ci, key, r) + homeChecklist(now);
     app.innerHTML = '<div class="home">' + html + '</div>';
+    collapseChecklist();
   }
   // تمرین امروز با تطبیق و چک‌این امروز (برای صفحه‌های دیگه که کارت‌های قبلی خانه رو نشون می‌دن)
   function todayState() {
@@ -3475,7 +3476,7 @@
     var g = C.goalInfo(p);
     return [
       { done: true, title: T('start.plan') },
-      C.isWalk(p) ? { done: C.walkGoalInfo(p).kind !== 'none', title: C.walkGoalInfo(p).kind !== 'none' ? T('start.goalDone', { g: T('wgoal.' + C.walkGoalInfo(p).kind + '.t') }) : T('start.goal'), sub: C.walkGoalInfo(p).kind !== 'none' ? '' : T('start.goalSubWalk'), href: '#walkgoals' } : { done: g.type !== 'none', title: g.type !== 'none' ? T('start.goalDone', { g: C.goalLabel(g) }) : T('start.goal'), sub: g.type !== 'none' ? (g.date ? faDate(g.date) : '') : T('start.goalSub'), href: '#plans' },
+      C.isWalk(p) ? { done: C.walkGoalInfo(p).kind !== 'none', title: C.walkGoalInfo(p).kind !== 'none' ? T('start.goalDone', { g: T('wgoal.' + C.walkGoalInfo(p).kind + '.t') }) : T('start.goal'), sub: C.walkGoalInfo(p).kind !== 'none' ? '' : T('start.goalSubWalk'), href: '#walkgoals' } : { done: g.type !== 'none', title: g.type !== 'none' ? T('start.goalDone', { g: C.goalLabel(g) }) : T('start.goal'), sub: g.type !== 'none' ? (g.date ? faDate(g.date) : '') : T('start.goalSub'), href: '#race' },
       { done: Object.keys(state.checkins).length > 0, title: T('start.checkin'), sub: T('start.checkinSub'), href: '#checkin' },
       { done: Object.keys(state.done).length > 0, title: T('start.run'), sub: T('start.runSub'), href: '#plan', attr: ' data-goto-today="1"' },
       { done: !!(p.name || '').trim(), title: T('start.name'), sub: T('start.nameSub'), href: '#settings', attr: ' data-set-open="person"' }
@@ -3489,8 +3490,9 @@
     var head = '<div class="hcard-top"><span class="hcard-label">' + esc(T('start.title')) + '</span><span class="ob-count">' + tt('start.count', { a: n, b: steps.length }) + '</span>' + close + '</div>' +
       '<div class="ob-bar" aria-hidden="true"><i style="width:' + Math.round(n / steps.length * 100) + '%"></i></div>';
     if (n === steps.length) {
-      if (!c.completedAt) { c.completedAt = key; save(); }
-      if (c.completedAt !== key) return '';
+      // فقط همون باری که آخرین مورد کامل شد دیده می‌شه، بعد خودش جمع می‌شه (collapseChecklist) و دیگه برنمی‌گرده
+      if (c.completedAt) return '';
+      c.completedAt = key; save();
       return '<section class="card hcard ob-check ob-complete" aria-live="polite">' + head +
         '<div class="ob-done"><span class="ob-tick" aria-hidden="true">✓</span><span><b>' + esc(T('start.allDone')) + '</b><small>' + esc(T('start.allDoneSub')) + '</small></span></div></section>';
     }
@@ -3502,6 +3504,21 @@
       return '<li class="' + cls.trim() + '">' + (x.done || !x.href ? '<div class="ob-row">' + inner + sr + '</div>'
         : '<a class="ob-row" href="' + x.href + '"' + (x.attr || '') + '>' + inner + sr + chevron(isRtl() ? 'left' : 'right') + '</a>') + '</li>';
     }).join('') + '</ul></section>';
+  }
+  // کارت «همه انجام شد»: حدود ۳ ثانیه دیده می‌شه، بعد آروم جمع و محو می‌شه (با «کاهش حرکت»: بدون انیمیشن حذف می‌شه)
+  function collapseChecklist() {
+    var card = app.querySelector('.ob-complete');
+    if (!card) return;
+    setTimeout(function () {
+      if (!card.isConnected) return;
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { card.remove(); return; }
+      card.style.maxHeight = card.offsetHeight + 'px';
+      void card.offsetHeight;
+      card.classList.add('ob-collapse');
+      var gone = function () { if (card.parentNode) card.remove(); };
+      card.addEventListener('transitionend', function (ev) { if (ev.propertyName === 'max-height') gone(); });
+      setTimeout(gone, 900);
+    }, 3000);
   }
   app.addEventListener('click', function (e) {
     var b = e.target.closest('[data-ob-close]');
@@ -4506,8 +4523,8 @@
       (joined ? '<p class="pf-joined">' + esc(T('profile.joined', { d: joined })) + '</p>' : '') +
       (name ? '' : '<p class="small muted">' + esc(T('profile.noNameHint')).replace('{link}', '<a href="#onboarding">' + esc(T('profile.noNameLink')) + '</a>') + '</p>') +
       '<a class="btn btn-ink pf-edit" href="#onboarding">' + esc(T('profile.edit')) + '</a></section>' +
-      // از خانه: نصب برنامه و چک‌لیست شروع
-      '<div data-install-slot="home">' + installBanner() + '</div>' + homeChecklist(now) +
+      // از خانه: نصب برنامه
+      '<div data-install-slot="home">' + installBanner() + '</div>' +
       (walker() ? walkGoalCard(p, now) : profileGoalCard(p, g, race, now)) +
       '<a class="card pf-level" href="' + (walker() ? '#plan' : '#plans') + '"><span class="pf-level-badge" aria-hidden="true"><b>' + fa(lv.level) + '</b><small>' + esc(T('level.of10')) + '</small></span>' +
       '<span class="pf-level-text"><b>' + tt('level.title', { n: lv.level, name: lv.info.name }) + '</b><small>' + esc(T(walker() ? 'profile.levelLinkWalk' : 'profile.levelLink')) + '</small></span>' + chevron(isRtl() ? 'left' : 'right') + '</a>' +

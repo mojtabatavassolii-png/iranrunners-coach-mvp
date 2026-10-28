@@ -1181,7 +1181,7 @@
       run: 'Mark your first run as done', runSub: 'After your run, from today\'s plan',
       name: 'Add your name', nameSub: 'Makes the plan more personal; you can add a photo too',
       srDone: '(done)', srTodo: '(not done)',
-      allDone: 'All steps done!', allDoneSub: 'Now just keep going; this card disappears from tomorrow.'
+      allDone: 'All steps done!', allDoneSub: 'Now just keep going; this card will now fold away.'
     },
     cele: {
       title: 'Well done, you took the first step!',

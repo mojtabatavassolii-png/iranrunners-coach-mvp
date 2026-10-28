@@ -1524,6 +1524,9 @@ a.ob-row:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px;
 .ob-done small { color: var(--text-secondary); font-size: var(--fs-sm); }
 .ob-complete { animation: obGlow 1.6s ease-out; }
 .ob-leaving { animation: obOut .3s ease-in forwards; }
+/* جمع شدن کارت «همه انجام شد» در خانه: ارتفاع، شفافیت و فاصله‌ی گرید با هم صفر می‌شن تا پرشی نباشه */
+.ob-collapse { overflow: hidden; opacity: 0; max-height: 0 !important; padding-block: 0; border-width: 0; margin-bottom: calc(-1 * var(--sp-4));
+  transition: max-height .5s ease, opacity .35s ease, padding .5s ease, margin .5s ease, border-width .5s ease; }
 @keyframes obTick { from { transform: scale(.4); } 70% { transform: scale(1.15); } to { transform: scale(1); } }
 @keyframes obGlow { from { box-shadow: 0 0 0 0 var(--focus-ring); } to { box-shadow: 0 0 0 16px transparent; } }
 @keyframes obOut { to { opacity: 0; transform: translateY(-8px) scale(.98); } }
