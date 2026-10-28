@@ -112,6 +112,23 @@ const SCREENS = [
     }, [KEY]);
     await p.reload(); await p.waitForTimeout(500);
   }],
+  // درد، آسیب و چرخه: کارت رضایت (کاربر بدون رضایت)
+  ['health-consent', '#health', async () => {}],
+  // همون صفحه با رضایت، درد خفیف ثبت‌شده، آسیب در دوره‌ی توقف و چرخه‌ی فعال
+  ['health', '#health', async (p) => {
+    await p.evaluate(([K, today]) => {
+      const s = JSON.parse(localStorage.getItem(K));
+      s.healthConsent = { at: today }; s.pains = { [today]: { area: 'knee', level: 3, when: ['after'], flags: [] } };
+      s.profile.sex = 'female';
+      s.profile.cycle = { enabled: true, lastStart: '2026-12-02', starts: ['2026-09-08', '2026-10-07', '2026-11-04', '2026-12-02'], cycleLen: 28, periodLen: 5, periodMode: 'easy', periodOverrides: {} };
+      s.profile.injuries = [{ id: 'i1', area: 'shin', label: 'شین اسپلینت', start: '2026-12-15', stopUntil: '2027-01-05', setbacks: [] }];
+      localStorage.setItem(K, JSON.stringify(s));
+    }, [KEY, TODAY]);
+    await p.reload(); await p.waitForTimeout(500);
+    for (const k of ['pain', 'injury']) { const d = p.locator('[data-hopen="' + k + '"] > summary'); if (await d.count()) { await d.click(); await p.waitForTimeout(150); } }
+  }],
+  // چک‌این با «بله» به درد (فرم جزئیات باز)
+  ['checkin-pain', '#checkin', async (p) => { await p.click('input[name=pain][value=yes]', { force: true }); await p.waitForTimeout(250); }],
   // مسیر پیاده‌روی
   ['walk-home', '#home', async (p) => asWalker(p)],
   ['walk-plan', '#plan', async (p) => { await asWalker(p); await setPlanView(p, 'week'); }],

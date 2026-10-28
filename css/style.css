@@ -1894,7 +1894,7 @@ html.intro.intro-instant #app .login * , html.intro.intro-instant #app .login-la
 .race-warn { margin: 8px 0 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--warning); background: var(--warning-soft); }
 .race-warn.is-block { border-color: var(--error); background: var(--error-soft); }
 .race-warn ul { margin: 0 0 8px; padding-inline-start: 18px; }
-.race-warn li { text-align: start; margin-bottom: 4px; }
+.race-warn li { margin-bottom: 4px; text-align: start; }
 .race-warn-acts { display: flex; flex-wrap: wrap; gap: 8px; }
 .race-warn-acts .btn { min-height: 44px; }
 .race-add-warn:empty { display: none; }
@@ -1908,9 +1908,9 @@ html.intro.intro-instant #app .login * , html.intro.intro-instant #app .login-la
    درد، آسیب و چرخه (صفحه‌ی #health، چک‌این، پیام تطبیق)
    =========================================================== */
 .pain-box strong { display: block; margin-bottom: 4px; }
-.pain-box p { margin: 0 0 6px; text-align: start; }
+.pain-box p { margin: 0 0 6px; }
 .pain-warn { margin: 4px 0 6px; padding-inline-start: 18px; }
-.pain-warn li { text-align: start; margin-bottom: 2px; }
+.pain-warn li { margin-bottom: 2px; }
 .pain-fields { margin-top: 10px; }
 .pain-consent { margin-bottom: 8px; }
 .chips-scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
@@ -1927,7 +1927,17 @@ html.intro.intro-instant #app .login * , html.intro.intro-instant #app .login-la
 .pill-moderate { background: var(--warning-soft); color: var(--warning); }
 .pill-severe { background: var(--error-soft); color: var(--error); }
 .inj-cur { padding: 10px 12px; border-radius: 12px; background: var(--surface-elevated); margin-bottom: 8px; }
-.inj-cur p { margin: 0 0 4px; text-align: start; }
+.inj-cur p { margin: 0 0 4px; }
 .impact-card .impact-acts { display: grid; gap: 8px; }
 .impact-tight, .impact-unlikely { border: 1px solid var(--warning); }
 .cyc-log { margin-top: 10px; }
+
+/* بازبینی UX دور ۹ */
+/* UX9-01: کادر هشدار اهداف فرعی تا زیر دستگیره پهن می‌شه؛ دکمه‌ها با حاشیه‌ی رنگ هشدار (کنتراست مرز ≥ ۳:۱) و تمام‌عرض */
+.race-item.has-grip .race-warn { margin-inline-start: -46px; }
+.race-warn .btn { background: var(--surface); border-color: var(--warning); color: var(--text); width: 100%; justify-content: center; text-align: center; }
+.race-warn-acts { display: grid; grid-template-columns: 1fr; }
+/* UX9-02: ناحیه‌ی لمس ۴۴ پیکسل برای لینک‌های کوچیک درد و آسیب */
+.pain-box .linklike, .inj-cur .linklike { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; }
+/* UX9-04: خط‌های کوتاه تاریخ‌دار (استثنای تراز دوطرفه، مثل بقیه‌ی خط‌های اطلاعات) */
+.impact-card > p, .race-item-body > p.small, .inj-cur p.small, .race-warn li { text-align: start; }

@@ -1393,7 +1393,7 @@
     for (var k in RACE_DISTANCES) if (Math.abs(RACE_DISTANCES[k] - km) < 0.15) return RACE_LABELS[k];
     return T('s.km', { n: km });
   }
-  function sideRaceLabel(r) { return (r.name ? r.name + ' · ' : '') + raceDistLabel(r.km); }
+  function sideRaceLabel(r) { return (r.name ? r.name + T('progress.sep') : '') + raceDistLabel(r.km); }
   function makeSideRace(profile, r, level) {
     var fit = currentFitness(profile), h = T(r.mode === 'train' ? 's.race2.howTrain' : r.kind === 'test' ? 's.race2.howTest' : 's.race2.how');
     if (fit) h += T('s.race.pred', { time: formatDuration(riegel(fit.entry.timeSec, fit.entry.distanceKm, r.km)) });

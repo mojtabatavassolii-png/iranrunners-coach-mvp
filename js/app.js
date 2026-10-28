@@ -712,16 +712,16 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=88" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
-      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=88" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=89" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=89" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
       restoreBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
-      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=88" alt="" width="28" height="28"></button>' +
-      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=88" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=89" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=89" alt="" width="28" height="28"></button>' +
       '</div></section>';
     app.querySelectorAll('[data-lang]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.lang !== I.getLang()) switchLang(b.dataset.lang); });
@@ -855,7 +855,7 @@
     }
     var dots = '<ol class="onb-dots" aria-label="' + esc(T('onb.progressAria')) + '">' +
       [1, 2, 3, 4, 5].map(function (n) {
-        return '<li><button type="button" class="onb-dot" data-goto-step="' + n + '" aria-label="' + esc(T('onb.stepOf', { n: n, total: ONB_STEPS }) + ' · ' + T('onb.steps.' + n + '.t')) + '"><span></span></button></li>';
+        return '<li><button type="button" class="onb-dot" data-goto-step="' + n + '" aria-label="' + esc(T('onb.stepOf', { n: n, total: ONB_STEPS }) + T('progress.sep') + T('onb.steps.' + n + '.t')) + '"><span></span></button></li>';
       }).join('') + '</ol>';
 
     app.innerHTML =
@@ -1688,7 +1688,7 @@
       var rest = ['rest', 'none'].indexOf(s.type) >= 0;
       var amount = s.km ? fa(dKm(s.km)) : (s.minutes ? fa(s.minutes) + "'" : '');
       html += '<button type="button" class="mday day-' + s.type + (rest ? ' mday-rest' : '') + (d === todayKey ? ' is-today' : '') + (d < todayKey ? ' is-past' : '') +
-        (d === selectedDay ? ' is-selected' : '') + cycleMarkClass(d) + '" data-mday="' + d + '" aria-pressed="' + (d === selectedDay) + '" aria-label="' + esc(faDate(d) + ' · ' + s.label) + '">' +
+        (d === selectedDay ? ' is-selected' : '') + cycleMarkClass(d) + '" data-mday="' + d + '" aria-pressed="' + (d === selectedDay) + '" aria-label="' + esc(faDate(d) + T('progress.sep') + s.label) + '">' +
         '<span class="mday-num">' + fa(dayOfMonth(date)) + '</span>' +
         (rest ? '' : '<span class="mday-dot" aria-hidden="true"></span><span class="mday-amt">' + amount + '</span>') +
         (state.done[d] ? '<span class="mday-done" aria-hidden="true">✓</span>' : '') + '</button>';
@@ -2019,10 +2019,11 @@
       html += '<section class="card health-consent"><h2>' + esc(T('health.consentTitle')) + '</h2><p>' + esc(T('health.consentText')) + '</p>' +
         '<ul class="small">' + T('health.consentList').map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' +
         '<label class="check-row"><input type="checkbox" id="hc-ok"> <span>' + esc(T('health.consentShort')) + '</span></label>' +
-        '<button type="button" class="btn btn-primary" data-health-consent="1" disabled>' + esc(T('health.consentBtn')) + '</button></section>';
+        '<button type="button" class="btn btn-primary" data-health-consent="1" disabled aria-describedby="hc-hint">' + esc(T('health.consentBtn')) + '</button>' +
+        '<p class="small muted" id="hc-hint">' + esc(T('health.consentHint')) + '</p></section>';
       app.innerHTML = html;
       var ok = document.getElementById('hc-ok'), b = app.querySelector('[data-health-consent]');
-      ok.addEventListener('change', function () { b.disabled = !ok.checked; });
+      ok.addEventListener('change', function () { b.disabled = !ok.checked; document.getElementById('hc-hint').hidden = ok.checked; });
       return;
     }
     // وضعیت فعلی
@@ -2549,7 +2550,7 @@
     if (race && race.date <= today()) return '';
     var cur = g.targetSec;
     return '<details class="race-target"' + (targetOpen ? ' open' : '') + '><summary>' + (cur
-      ? tt('race.targetLine', { t: C.formatDuration(cur) }) + ' · ' + tt('race.targetPace', { p: C.formatDuration(Math.round(I.pace(cur / g.km))) })
+      ? tt('race.targetLine', { t: C.formatDuration(cur) }) + T('progress.sep') + tt('race.targetPace', { p: C.formatDuration(Math.round(I.pace(cur / g.km))) })
       : esc(T('race.targetSet'))) + '</summary>' +
       '<form data-race-target-form="1" novalidate><p class="small muted">' + esc(T('race.targetHow')) + '</p>' +
       '<div class="field"><label for="rt-time">' + esc(T('race.target')) + '</label>' + tpo({ id: 'rt-time', name: 'target', sec: cur || (g.km ? Math.round(g.km * 330) : 3000), touched: !!cur, aria: T('race.target') }) + '</div>' +
@@ -2589,7 +2590,7 @@
   function renderPlans() {
     var p = state.profile, a = C.assessLevel(p), pace = a.level >= C.PACE_LEVEL;
     var html = '<header class="page-head"><h1>' + esc(T('plans.title')) + '</h1></header><p class="page-intro">' + esc(T('plans.intro')) + '</p>' +
-      '<section class="card plan-me"><p><b>' + tt('profile.levelNum', { n: a.level }) + '</b> · ' + esc(a.info.name) + ' · ' + tt('plans.volNow', { n: C.planSuggestion(p, '5').startKm }) + '</p>' +
+      '<section class="card plan-me"><p><b>' + tt('profile.levelNum', { n: a.level }) + '</b>' + esc(T('progress.sep')) + esc(a.info.name) + esc(T('progress.sep')) + tt('plans.volNow', { n: C.planSuggestion(p, '5').startKm }) + '</p>' +
       '<p class="small muted">' + esc(T(pace ? 'plans.modePace' : 'plans.modeVolume')) + '</p>' +
       (C.ageFactor(p.age) > 1 ? '<p class="small muted">' + esc(T('plans.ageNote')) + '</p>' : '') + '</section>';
     html += PLAN_KEYS.map(function (k) { return planCard(p, k); }).join('');
@@ -2947,8 +2948,8 @@
   function gaitCadCell(m, unit) {
     var X = 'gait.expert.';
     var v = m.cadence == null ? T(X + 'noData') : fa(String(m.cadence)) + ' ' + unit;
-    if (m.steps != null) v += ' · ' + fa(T(X + 'cadDetail', { n: m.steps, s: m.span == null ? '—' : m.span, k: m.timeScale || 1 }));
-    if (m.slowSuggest) v += ' · ' + fa(T(X + 'cadSlow', { k: m.slowSuggest.k, c: m.slowSuggest.cadence }));
+    if (m.steps != null) v += T('progress.sep') + fa(T(X + 'cadDetail', { n: m.steps, s: m.span == null ? '—' : m.span, k: m.timeScale || 1 }));
+    if (m.slowSuggest) v += T('progress.sep') + fa(T(X + 'cadSlow', { k: m.slowSuggest.k, c: m.slowSuggest.cadence }));
     return v;
   }
   function gaitExpertHtml(r) {
@@ -2970,7 +2971,7 @@
       row('kneeIc', 'side', num(s.kneeIc, u('kneeIc')), cf(s, 'kneeIc'));
       row('peakKnee', 'side', num(s.peakKnee, u('peakKnee')), cf(s, 'peakKnee'));
       row('strike', 'side', s.fsa == null ? T(X + 'noData') : fa(s.fsa) + u('strike') + ' (' + T('gait.strikeName.' + s.strike) + ')' +
-        (s.strikes ? ' · ' + fa(gaitStrikePct({ pct: s.strikes }) + ' · ' + T(X + 'strikeN', { n: s.strikes.n, px: s.strikes.footPx == null ? '—' : s.strikes.footPx })) : ''), cf(s, 'strike'));
+        (s.strikes ? T('progress.sep') + fa(gaitStrikePct({ pct: s.strikes }) + T('progress.sep') + T(X + 'strikeN', { n: s.strikes.n, px: s.strikes.footPx == null ? '—' : s.strikes.footPx })) : ''), cf(s, 'strike'));
       row('trunk', 'side', num(s.trunk, u('trunk')), cf(s, 'trunk'));
       row('head', 'side', s.neck == null ? T(X + 'noData') : fa(s.neck + '° / ' + s.gaze + '°'), cf(s, 'head'));
       row('elbow', 'side', num(s.elbow, u('elbow')), cf(s, 'elbow'));
@@ -2989,19 +2990,19 @@
     }
     var cd = gaitConditions(r);
     var meta = [[T(X + 'date'), faDate(r.date)],
-      [T(X + 'condition'), ['side', 'back'].filter(function (v) { return cd[v]; }).map(function (v) { return T(X + 'views.' + v) + ': ' + T('gait.cond.' + cd[v]); }).join(' · ') || T(X + 'noData')],
+      [T(X + 'condition'), ['side', 'back'].filter(function (v) { return cd[v]; }).map(function (v) { return T(X + 'views.' + v) + ': ' + T('gait.cond.' + cd[v]); }).join(T('progress.sep')) || T(X + 'noData')],
       [T(X + 'height'), state.profile && state.profile.heightCm ? fa(state.profile.heightCm + ' ' + T(X + 'cm')) : T(X + 'noData')]];
     [['side', r.qSide], ['back', r.qBack]].forEach(function (q) {
       if (!q[1]) return;
       var v = q[1];
       meta.push([T(X + 'video') + ' (' + T(X + 'views.' + q[0]) + ')', fa([T(X + 'fps') + ': ' + (v.fps || '—'), T(X + 'frames') + ': ' + v.frames,
-        T(X + 'valid') + ': ' + Math.round((v.valid || 0) * 100) + '%', T(X + 'steps') + ': ' + (v.steps == null ? '—' : v.steps), T(X + 'scale') + ': ×' + (v.scale || 1)].join(' · ') +
-        (q[0] === 'side' && r.near ? ' · ' + T(X + 'near') + ': ' + T(X + (r.near === 'l' ? 'left' : 'right')) : ''))]);
+        T(X + 'valid') + ': ' + Math.round((v.valid || 0) * 100) + '%', T(X + 'steps') + ': ' + (v.steps == null ? '—' : v.steps), T(X + 'scale') + ': ×' + (v.scale || 1)].join(T('progress.sep')) +
+        (q[0] === 'side' && r.near ? T('progress.sep') + T(X + 'near') + ': ' + T(X + (r.near === 'l' ? 'left' : 'right')) : ''))]);
     });
     return '<section class="card gait-expert" id="gait-expert"><details><summary><b>' + esc(T(X + 'title')) + '</b></summary>' +
       '<p class="small muted">' + esc(T(X + 'sub')) + '</p>' +
       '<button type="button" class="btn btn-outline gait-print" data-gait-print="1">' + esc(T(X + 'print')) + '</button>' +
-      '<h3>' + esc(T('gait.report')) + ' · ' + esc(T(X + 'meta')) + '</h3><dl class="gx-meta">' +
+      '<h3>' + esc(T('gait.report')) + esc(T('progress.sep')) + esc(T(X + 'meta')) + '</h3><dl class="gx-meta">' +
       meta.map(function (m) { return '<dt>' + esc(m[0]) + '</dt><dd>' + esc(m[1]) + '</dd>'; }).join('') + '</dl>' +
       '<div class="gx-table"><table><thead><tr>' + ['param', 'view', 'value', 'conf', 'ref', 'src', 'ev'].map(function (c) { return '<th>' + esc(T(X + 'cols.' + c)) + '</th>'; }).join('') +
       '</tr></thead><tbody>' + rows.join('') + '</tbody></table></div>' +
@@ -3028,7 +3029,7 @@
       card('performance', inRange('performance'), 'perfSub', '', T('gait.inRangeNote')) + card('form', inRange('form'), 'formSub', '', T('gait.inRangeNote')) +
       card('risk', ax.risk ? T('gait.levelShort.' + ax.risk) : '—', 'riskSub', ax.risk ? 'risk-' + ax.risk : '') + '</div>';
     if (pri.length) html += '<h3>' + esc(T('gait.priorities')) + '</h3><ol class="gait-pri">' + pri.map(function (f) {
-      return '<li><b>' + esc(T('gait.items.' + f.id + '.t')) + '</b> <span class="muted small">' + esc(T('gait.' + gaitView(f) + 'Title')) + ' · ' + esc(T('gait.status.' + f.status)) + '</span></li>';
+      return '<li><b>' + esc(T('gait.items.' + f.id + '.t')) + '</b> <span class="muted small">' + esc(T('gait.' + gaitView(f) + 'Title')) + esc(T('progress.sep')) + esc(T('gait.status.' + f.status)) + '</span></li>';
     }).join('') + '</ol>';
     else if (J.length) html += '<p>' + esc(T('gait.noIssues')) + '</p>';
     // فیلم‌هایی که تحلیل نشدن (گزارش‌های قدیمی: sideReason / backReason)
@@ -3697,7 +3698,7 @@
       if (['rest', 'none'].indexOf(s.type) >= 0) continue;
       var k = C.dateKey(d).replace(/-/g, '');
       lines.push('BEGIN:VEVENT', 'UID:coach-' + k + '@coach-mvp', 'DTSTAMP:' + k + 'T000000Z', 'DTSTART:' + k + 'T' + hm,
-        'DURATION:PT' + (s.minutes || 45) + 'M', 'SUMMARY:' + esc2(s.label + (s.minutes ? ' · ' + T('s.min', { n: s.minutes }) : '')),
+        'DURATION:PT' + (s.minutes || 45) + 'M', 'SUMMARY:' + esc2(s.label + (s.minutes ? T('progress.sep') + T('s.min', { n: s.minutes }) : '')),
         'DESCRIPTION:' + esc2((s.steps || []).join(' / ')), 'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + esc2(s.label), 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT');
     }
     lines.push('END:VCALENDAR');
