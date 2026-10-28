@@ -1448,4 +1448,136 @@ test('تریل: مرحله‌ی اول استراید سربالایی و سرا
   }
   assert.ok(seen.longHills > 0 && seen.downhill > 0, JSON.stringify(seen));
 });
+
+// ---------- درد: سطح، تشدید، رفع و تطبیق ----------
+test('درد: سطح از شدت، زمان و نشانه‌های هشدار', function () {
+  assert.strictEqual(C.painTier({ level: 0 }), 'none');
+  assert.strictEqual(C.painTier({ level: 2, when: ['after'] }), 'mild');
+  assert.strictEqual(C.painTier({ level: 5, when: ['during'] }), 'moderate');
+  assert.strictEqual(C.painTier({ level: 7 }), 'severe');
+  assert.strictEqual(C.painTier({ level: 2, when: ['night'] }), 'severe');
+  assert.strictEqual(C.painTier({ level: 2, when: ['rest'] }), 'severe');
+  ['swelling', 'limp', 'weight', 'worse'].forEach(function (f) { assert.strictEqual(C.painTier({ level: 1, flags: [f] }), 'severe', f); });
+});
+test('درد: ادامه یا بدتر شدن یک سطح بالا می‌بره؛ «بدون درد» رفعش می‌کنه، با ۳ روز برگشت سبک بعد از درد متوسط', function () {
+  var d = function (k) { return C.parseDate(k); };
+  var P = { '2026-11-02': { area: 'knee', level: 2, when: ['after'] } };
+  assert.strictEqual(C.painEpisode(P, {}, d('2026-11-02')).tier, 'mild');
+  assert.strictEqual(C.painEpisode(P, {}, d('2026-11-01')), null);
+  // سه روز درد در یک هفته → متوسط
+  P['2026-11-04'] = { area: 'knee', level: 2, when: ['after'] }; P['2026-11-06'] = { area: 'knee', level: 2, when: ['after'] };
+  var e = C.painEpisode(P, {}, d('2026-11-06'));
+  assert.strictEqual(e.tier, 'moderate'); assert.ok(e.persistent); assert.strictEqual(e.start, '2026-11-02');
+  // بدتر شدن → یک سطح بالاتر
+  var W = { '2026-11-02': { area: 'shin', level: 4 }, '2026-11-03': { area: 'shin', level: 5 } };
+  var w = C.painEpisode(W, {}, d('2026-11-03'));
+  assert.ok(w.worse); assert.strictEqual(w.tier, 'severe');
+  // چک‌این بدون درد بعدش: رفع، ولی بعد از درد متوسط ۳ روز برگشت سبک
+  var M = { '2026-11-02': { area: 'foot', level: 5 } }, ck = { '2026-11-04': { fatigue: 2, sleep: 3, pain: false } };
+  var r = C.painEpisode(M, ck, d('2026-11-05'));
+  assert.ok(r.recovering); assert.strictEqual(r.tier, 'mild');
+  assert.strictEqual(C.painEpisode(M, ck, d('2026-11-07')), null);
+  // «بدون درد» همون روزِ درد شدید: ثبت می‌مونه، برگشت سبک ۳ روز
+  var Sd = { '2026-11-02': { area: 'knee', level: 8, freeAt: 'x' } };
+  assert.ok(C.painEpisode(Sd, {}, d('2026-11-02')).recovering);
+  assert.ok(C.painEpisode(Sd, {}, d('2026-11-04')).recovering);
+  assert.strictEqual(C.painEpisode(Sd, {}, d('2026-11-05')), null);
+  // ثبت قدیمی (فقط بله در چک‌این) = توقف، مثل قبل
+  var L = C.painEpisode({}, { '2026-11-02': { pain: true, painWhere: 'زانو' } }, d('2026-11-02'));
+  assert.strictEqual(L.tier, 'severe'); assert.ok(L.legacy);
+  // درد طولانی (۱۰ روز یا بیشتر) → پیشنهاد مراجعه
+  var Lg = { '2026-11-01': { level: 2 }, '2026-11-10': { level: 2 } };
+  assert.ok(C.painEpisode(Lg, {}, d('2026-11-10')).longDays);
+});
+test('درد: تطبیق جلسه — خفیف سبک‌تر و بدون شدید، متوسط جایگزین کم‌فشار، شدید توقف', function () {
+  var p = profileFor(6, { goal: goalOf('10') }), wk = weekAt(p, 3);
+  var hard = wk.days.filter(function (x) { return x.hard && x.type !== 'race'; })[0], easy = wk.days.filter(function (x) { return x.type === 'easy'; })[0];
+  var ep = function (t) { return { tier: t, entry: { area: 'knee', level: 3 }, date: hard.date }; };
+  var m = C.painAdjust(hard, ep('mild'), C.paceZones(p));
+  assert.strictEqual(m.session.type, 'easy'); assert.ok(!m.session.hard); assert.ok(m.session.km <= hard.km);
+  assert.ok(/سبک‌تر/.test(m.adaptation.message));
+  var me = C.painAdjust(easy, ep('mild'), C.paceZones(p));
+  assert.ok(me.session.km < easy.km);
+  var mo = C.painAdjust(hard, ep('moderate'), C.paceZones(p));
+  assert.strictEqual(mo.session.type, 'rest'); assert.ok(mo.session.cross);
+  var sv = C.painAdjust(easy, ep('severe'), C.paceZones(p));
+  assert.strictEqual(sv.session.type, 'cancelled'); assert.ok(/پزشک|فیزیوتراپ/.test(sv.adaptation.message));
+  var race = Object.assign({}, hard, { type: 'race', km: 10 });
+  assert.strictEqual(C.painAdjust(race, ep('mild'), null).session.type, 'race');
+  assert.notStrictEqual(C.painAdjust(race, ep('moderate'), null).session.type, 'race');
+});
+
+// ---------- آسیب تأییدشده و بازگشت ----------
+function injP(start, stop, extra) {
+  var p = profileFor(6, Object.assign({ goal: goalOf('10') }, extra || {}));
+  p.injuries = [{ id: 'i1', area: 'shin', label: 'شین اسپلینت', start: start, stopUntil: stop, setbacks: [] }];
+  return p;
+}
+test('آسیب: دوره‌ی توقف بدون دویدن؛ بازگشت با دویدن و پیاده‌روی، حداکثر ۳ روز غیرپشت‌سرهم', function () {
+  var p = injP('2026-10-26', '2026-11-30');
+  var off = C.buildWeek(p, C.parseDate('2026-11-10'));
+  assert.strictEqual(off.phase.key, 'injury');
+  off.days.forEach(function (d) { assert.ok(!d.km && ['rest', 'none'].indexOf(d.type) >= 0, d.type); });
+  // ۵ هفته توقف → شروع از مرحله‌ی ۱
+  assert.strictEqual(C.injuryPhase(p, C.parseDate('2026-11-30')).stage, 0);
+  var ret = C.buildWeek(p, C.parseDate('2026-12-01'));
+  assert.strictEqual(ret.phase.key, 'injuryReturn');
+  var runIdx = ret.days.map(function (d, i) { return d.type === 'runwalk' ? i : -1; }).filter(function (i) { return i >= 0; });
+  assert.ok(runIdx.length >= 1 && runIdx.length <= 3);
+  for (var k = 1; k < runIdx.length; k++) assert.ok(runIdx[k] - runIdx[k - 1] > 1, 'not consecutive');
+  ret.days.forEach(function (d) { assert.ok(!d.hard, 'no hard'); });
+  // هر هفته‌ی بدون درد یک مرحله جلو
+  var st = function (k) { var x = C.injuryPhase(p, C.parseDate(k)); return x && x.phase === 'return' ? x.stage : x ? x.phase : null; };
+  assert.strictEqual(st('2026-12-08'), 1); assert.strictEqual(st('2026-12-15'), 2);
+});
+test('آسیب: درد حین بازگشت یک مرحله عقب؛ توقف کوتاه از مرحله‌ی بالاتر؛ برگشت حجم ۱۰٪ در هفته بدون شدید در دو هفته‌ی اول', function () {
+  var p = injP('2026-10-26', '2026-11-30');
+  p.injuries[0].setbacks = ['2026-12-10'];
+  assert.strictEqual(C.injuryPhase(p, C.parseDate('2026-12-08')).stage, 1);
+  assert.strictEqual(C.injuryPhase(p, C.parseDate('2026-12-15')).stage, 0);
+  var shortP = injP('2026-11-20', '2026-11-25');
+  assert.strictEqual(C.injuryPhase(shortP, C.parseDate('2026-11-25')).stage, 5);
+  // مرحله‌های کامل → برگشت حجم
+  var q = injP('2026-10-26', '2026-11-02'), prev = null, base = null;
+  var seen = 0;
+  for (var w = 0; w < 14; w++) {
+    var day = C.addDays(C.parseDate('2026-11-02'), w * 7), ip = C.injuryPhase(q, day);
+    if (!ip || ip.phase !== 'ramp') continue;
+    seen++;
+    var wk = C.buildWeek(q, day), plain = C.buildWeek(Object.assign({}, q, { injuries: [] }), day);
+    assert.ok(wk.volumeTarget <= plain.volumeTarget, 'not above plan');
+    if (prev) assert.ok(wk.volumeTarget <= prev * 1.1 + 0.5, 'ramp ≤10%: ' + wk.volumeTarget + ' vs ' + prev);
+    if (ip.noQuality) wk.days.forEach(function (d) { assert.ok(!d.spec, 'no quality in first ramp weeks'); });
+    prev = wk.volumeTarget; base = plain;
+  }
+  assert.ok(seen >= 2, 'ramp weeks ' + seen);
+});
+test('آسیب: ارزیابی هدف — زمان کافی، فشرده، یا غیرواقع‌بینانه', function () {
+  var far = injP('2026-10-26', '2026-11-09', { goal: goalOf('10', '2027-06-01') });
+  assert.strictEqual(C.injuryImpact(far, C.parseDate('2026-11-01')).status, 'ok');
+  var near = injP('2026-10-26', '2026-12-20', { goal: goalOf('10', '2027-01-20') });
+  assert.notStrictEqual(C.injuryImpact(near, C.parseDate('2026-11-01')).status, 'ok');
+  var none = injP('2026-10-26', '2026-11-09');
+  var x = C.injuryImpact(none, C.parseDate('2026-11-01'));
+  assert.strictEqual(x.status, null); assert.ok(x.fullDate > '2026-11-09');
+});
+
+// ---------- چرخه: طول واقعی از تاریخچه، بی‌نظمی ----------
+test('چرخه: طول از شروع‌های ثبت‌شده، به‌روز شدن فازها، تشخیص بی‌نظمی (فقط برای پیام)', function () {
+  var p = profileFor(4, { sex: 'female', cycle: { enabled: true, lastStart: '2026-07-01', cycleLen: 28, periodLen: 5 } });
+  assert.strictEqual(C.cycleStats(p).length, 28); assert.ok(!C.cycleStats(p).computed);
+  ['2026-07-31', '2026-08-31', '2026-09-30'].forEach(function (k) { C.logPeriodStart(p, k); });
+  var st = C.cycleStats(p, C.parseDate('2026-10-10'));
+  assert.ok(st.computed); assert.strictEqual(st.length, 30);
+  assert.strictEqual(C.cycleInfo(p, C.parseDate('2026-10-30')).day, 31 % 30);
+  // شروع تا ۷ روز نزدیک = همون دوره (جایگزین)
+  C.logPeriodStart(p, '2026-10-02');
+  assert.strictEqual(C.cycleStarts(p).length, 4); assert.strictEqual(p.cycle.lastStart, '2026-10-02');
+  // پیش‌بینی با شروع زودتر از انتظار جابه‌جا می‌شه
+  C.logPeriodStart(p, '2026-10-26');
+  assert.strictEqual(C.cycleInfo(p, C.parseDate('2026-10-26')).day, 1);
+  var irr = profileFor(4, { sex: 'female', cycle: { enabled: true, starts: ['2026-04-01', '2026-04-24', '2026-06-03', '2026-06-27'], lastStart: '2026-06-27' } });
+  assert.ok(C.cycleStats(irr, C.parseDate('2026-07-10')).flags.indexOf('variable') >= 0);
+  assert.ok(C.cycleStats(irr, C.parseDate('2026-10-10')).flags.indexOf('absent') >= 0);
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

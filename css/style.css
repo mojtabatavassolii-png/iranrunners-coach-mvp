@@ -1903,3 +1903,31 @@ html.intro.intro-instant #app .login * , html.intro.intro-instant #app .login-la
 .ultra-hills { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .ultra-hills h3 { margin: 0 0 6px; }
 .ultra-hills p { margin: 0 0 6px; text-align: start; }
+
+/* ===========================================================
+   درد، آسیب و چرخه (صفحه‌ی #health، چک‌این، پیام تطبیق)
+   =========================================================== */
+.pain-box strong { display: block; margin-bottom: 4px; }
+.pain-box p { margin: 0 0 6px; text-align: start; }
+.pain-warn { margin: 4px 0 6px; padding-inline-start: 18px; }
+.pain-warn li { text-align: start; margin-bottom: 2px; }
+.pain-fields { margin-top: 10px; }
+.pain-consent { margin-bottom: 8px; }
+.chips-scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.chips-scale .chip span { justify-content: center; min-width: 0; width: 100%; }
+.health-disc { margin: 0 0 12px; }
+.health-status .actions { margin-top: 10px; }
+.health-form { margin-top: 8px; }
+.health-form > summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--primary); cursor: pointer; }
+.pain-hist, .cyc-hist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.pain-hist li, .cyc-hist li { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.pain-hist li:last-child, .cyc-hist li:last-child { border-bottom: 0; }
+.pill-none { background: var(--success-soft); color: var(--success); }
+.pill-mild { background: var(--info-soft); color: var(--info); }
+.pill-moderate { background: var(--warning-soft); color: var(--warning); }
+.pill-severe { background: var(--error-soft); color: var(--error); }
+.inj-cur { padding: 10px 12px; border-radius: 12px; background: var(--surface-elevated); margin-bottom: 8px; }
+.inj-cur p { margin: 0 0 4px; text-align: start; }
+.impact-card .impact-acts { display: grid; gap: 8px; }
+.impact-tight, .impact-unlikely { border: 1px solid var(--warning); }
+.cyc-log { margin-top: 10px; }

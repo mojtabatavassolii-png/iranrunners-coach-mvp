@@ -104,7 +104,8 @@
     periods: { base: 'Base phase', build: 'Build phase', peak: 'Peak phase' },
     phase: {
       intro: 'Starter week', before: 'Before the plan starts', race: 'Race week', recovery: 'Post-race recovery',
-      return: 'Post-race return', taper: 'Taper', deload: 'Easy week', first: 'First week', maintain: 'Holding volume', build: 'Building volume'
+      return: 'Post-race return', taper: 'Taper', deload: 'Easy week', first: 'First week', maintain: 'Holding volume', build: 'Building volume',
+      injury: 'No running (injury)', injuryReturn: 'Gradual return after injury'
     },
 
     pace: { range: '{a}–{b} {pu}' },
@@ -379,6 +380,26 @@
     },
 
     painMessage: 'This could be a sign of injury. The coach can\'t diagnose this. Please see a doctor.',
+    painPlan: {
+      msg: {
+        mild: 'Because of the pain you logged, we made today lighter: less volume and no intervals, hills or fast parts. If the pain gets worse while running, stop.',
+        moderate: 'Because of the pain you logged, today we suggest a low-impact activity instead of running, or rest. Running returns once you log "no pain".',
+        severe: 'With the pain you logged, stop running and see a doctor or physiotherapist. Gaam does not diagnose; it only pauses your plan.',
+        recovering: 'A few days after pain: easing back in with lighter sessions and no hard training.'
+      },
+      severeStep: 'Do not run today.', severeStep2: 'If the pain is there at rest or at night, there is swelling or you cannot put weight on it, see a doctor or physiotherapist soon.',
+      crossTarget: 'Low-impact activity or rest', crossStep: '20–40 min cycling, swimming or easy walking, only if pain-free while doing it', crossStep2: 'If it hurts, rest completely',
+      raceNo: 'With this pain, racing is not recommended.', mildRw: 'If the pain gets worse during the session, just walk.'
+    },
+    inj: {
+      crossTarget: 'Alternative training (no running)', offNote: 'As advised by your specialist, no running until {d}. Only activities they allowed (for example cycling, swimming or strength work), pain-free.',
+      raceNo: 'This race falls in your no-running period.'
+    },
+    rtr: {
+      main: '{reps} × ({run} min easy running + {walk} min walking)', cont: '{min} min continuous easy running',
+      warm: '5 min brisk walking', restNote: 'Return after injury: a rest or low-impact day between running days.',
+      how: 'Gradual return, stage {a} of {b}. If pain is 2/10 or less during the run and the next morning, you move up a stage next week; if you log pain, you go back a stage.'
+    },
     adapt: {
       noTrain: 'Don\'t train today',
       race: '{why}. It\'s race day; make your goal "finish feeling good", not a PB. If you don\'t feel well, skipping it is also the right call.',
@@ -669,10 +690,12 @@
       chosen: {
         adapt: 'As you chose, this session was changed to a lighter easy run.',
         rest: 'As you chose, this day is now active rest.',
-        keep: 'As you chose, the original plan is kept. If you don\'t feel good while running, cut it short.'
+        keep: 'As you chose, the original plan is kept. If you don\'t feel good while running, cut it short.',
+        move: 'As you chose, this session moved to {d} and today is a light easy run.'
       },
+      btnMove: 'Move to {d}', movedHere: 'As you chose, this session was moved here from {d}.',
       undo: 'Change my choice',
-      follicularNote: 'These days (after your period until around ovulation) often bring more energy; a good time for hard sessions.',
+      follicularNote: 'Some people feel more energetic these days (after the period until around ovulation); the evidence is limited and varies between people.',
       altNote: 'Lighter because of your period; if you feel good, you can run a little more.',
       altNoteLuteal: 'Lighter, as you chose; listen to your body.',
       activeRestTarget: '20–30 min',
@@ -1212,6 +1235,75 @@
       use: 'Add to my goals',
       useHint: 'Opens the add-goal form with the suggested date {d} (the date is optional); if you have no main goal, this becomes it.',
       foot: 'Times are approximate and come from the 10% mileage rule, an easy week every fourth week, the minimum preparation for each level and the Jack Daniels method. Injury, illness or breaks make them longer.'
+    },
+    health: {
+      title: 'Pain, injury and cycle',
+      rowSub: 'Log pain, confirmed injury, gradual return',
+      disclaimer: 'Gaam does not give a medical diagnosis or prescribe treatment; it only adapts your training load to what you log. For anything serious, see a doctor or physiotherapist.',
+      privacy: 'Pain, injury and cycle data are stored only with your consent and only on this device, never sent anywhere, and can be deleted at any time.',
+      consentTitle: 'Consent for health data',
+      consentText: 'Pain, injuries and your menstrual cycle are sensitive health data. Gaam keeps them only with your explicit consent.',
+      consentList: ['Stored only on this device (browser storage); there is no server.', 'Never used in aggregate statistics or shared with anyone.', 'Used only to adapt your own training plan.', 'You can delete all of it from this page at any time.'],
+      consentShort: 'I agree that my health data (pain, injury and cycle) is stored only on this device',
+      consentBtn: 'Continue',
+      statusTitle: 'Current status', noIssue: 'No active pain or injury logged.',
+      painFree: 'No pain today',
+      logTitle: 'Log pain', logHint: 'Whenever you feel pain (even outside the check-in), log it here so your plan can adapt.',
+      logNew: 'Log today\'s pain', logEdit: 'Update today\'s pain', logSave: 'Save',
+      history: 'Last 3 weeks', noPain: 'No pain', histRow: '{a} · {n}/10',
+      areaQ: 'Where does it hurt?', levelQ: 'Pain level (0 = none, 10 = worst)', levelLow: 'Mild', levelHigh: 'Very severe',
+      whenQ: 'When does it hurt? (all that apply)', flagsQ: 'Do you have any of these?',
+      area: { knee: 'Knee', shin: 'Shin (front)', achilles: 'Achilles', calf: 'Calf', foot: 'Sole of the foot', ankle: 'Ankle', hip: 'Hip and buttock', thigh: 'Thigh', back: 'Lower back', other: 'Somewhere else' },
+      when: { during: 'While running', after: 'After running', rest: 'Also at rest', night: 'At night' },
+      flags: { swelling: 'Swelling', limp: 'Limping or changed stride', weight: 'Can\'t put weight on it', worse: 'Worse with every step' },
+      tier: { none: 'No pain', mild: 'Mild', moderate: 'Moderate', severe: 'Severe' },
+      tierTitle: { mild: 'Lighter training because of pain', moderate: 'No running today', severe: 'Running paused; see a specialist', recovering: 'Easing back after pain' },
+      reported: 'Logged: {w} · pain {n}/10',
+      warn: {
+        worse: 'The pain is worse than last time; the plan is now one step more cautious.',
+        persistent: 'The pain has continued for several days; the plan is now one step more cautious.',
+        long: 'This pain has lasted 10 days or more; it is best to have a doctor or physiotherapist look at it.',
+        stale: 'You have not updated your pain for over a week; if it is gone, tap "No pain today".'
+      },
+      raceMild: 'Your race stays; it is your call. If the pain gets worse during the race, stop.',
+      update: 'Update pain and injury',
+      checkinDone: 'Today\'s check-in was logged with pain. To update the level or log "no pain", go to the pain and injury page.',
+      toast: { mild: 'Today\'s session was made lighter because of pain.', moderate: 'Today: low-impact activity or rest instead of running.', free: 'Logged: no pain.' },
+      err: { area: 'Choose where it hurts.', level: 'Choose the pain level.', consent: 'To save pain details, tick the consent box (or leave the details empty and just write the location).', consentCycle: 'To track your cycle, tick the health data consent box.' },
+      painGoal: 'You have logged moderate or severe pain for {n} days. If a doctor or physiotherapist confirmed an injury, log it so we can check whether your goal is still realistic.',
+      inj: {
+        title: 'Confirmed injury', hint: 'If a doctor or physiotherapist confirmed an injury and told you how long to stop running, log it here. You will not run during that time, then a gradual return starts.',
+        add: 'Log an injury', label: 'Type of injury (as your specialist said, optional)', labelPh: 'e.g. shin splints',
+        start: 'Start date', stop: 'No running until', stopHint: 'As advised by your doctor or physiotherapist', retQ: 'Approximate full return date (optional)',
+        save: 'Save injury', saved: 'Injury saved; your plan has been adjusted.',
+        dates: 'From {a} · no running until {b}', ret: 'approximate full return {d}', setbacks: 'Pain {n} time(s) during the return (one stage back)',
+        cleared: 'My specialist cleared me to run', clearedToast: 'Gradual return starts today.', remove: 'Remove',
+        phase: { off: 'No running', return: 'Gradual return', ramp: 'Rebuilding volume' },
+        offUntil: 'until {d}', stage: 'stage {a} of {b}', ramp: 'this week about {n}% of your pre-injury volume',
+        err: { start: 'Enter a valid start date (today or earlier).', stop: 'The end of the no-running period must be after the start.', ret: 'The full return date cannot be before the end of the no-running period.' }
+      },
+      impact: {
+        title: 'Your goal and race after the injury',
+        ok: 'Estimated full return: {d}. There is still time before your race ({r}); the plan continues more lightly.',
+        tight: 'Estimated full return: {d}, close to your race ({r}). There is not enough time to fully prepare; probably only to finish, not for a target time.',
+        unlikely: 'Estimated full return: {d}, after your race ({r}). Taking part in this race does not look realistic.',
+        note: 'The estimate assumes pain-free return stages; it may be sooner or later. The decision is yours.',
+        opt: { lighter: 'Continue with a lighter plan (no target time)', date: 'Move the date', secondary: 'Make it a secondary goal', new: 'New goal' },
+        done: { lighter: 'Target time removed; the plan continues more lightly.', secondary: 'Previous goal is now secondary; choose a new main goal.' }
+      },
+      cyc: {
+        title: 'Menstrual cycle', off: 'Cycle tracking is off.', enable: 'Turn on cycle tracking',
+        lenComputed: 'Your cycle length from your data: about {n} days (from your last {k} cycles).', lenManual: 'Cycle length: {n} days (the number you entered; once you log each start it is calculated from your own data).',
+        gap: '{n} days', logQ: 'Start of your period', logBtn: 'Log start', logged: 'Logged; predictions updated.',
+        flag: {
+          variable: 'The gaps between your periods have varied a lot recently. This is not a diagnosis; if it is new for you, it is worth talking to a doctor.',
+          late: 'Your next period is later than predicted. If you forgot to log the start, add it; if it continues, a doctor can help.',
+          absent: 'No period start has been logged for over 3 months. If you really have not had a period, it is worth seeing a doctor; in athletes it is sometimes related to nutrition and energy intake.'
+        },
+        evidence: 'How the cycle affects training differs from person to person, and the evidence is limited and mixed; that is why Gaam only suggests (lightening or moving a hard session) and the decision is yours.'
+      },
+      wipeTitle: 'Delete health data', wipeText: 'All pain logs, injuries, cycle history and your consent are deleted. The rest of your plan and training stays.',
+      wipeBtn: 'Delete all health data', wipeConfirm: 'Are you sure? This cannot be undone.', wipeYes: 'Yes, delete', wiped: 'Health data deleted.'
     },
     race: {
       pageTitle: 'Races and goals',

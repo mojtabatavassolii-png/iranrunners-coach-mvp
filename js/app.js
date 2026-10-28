@@ -19,7 +19,7 @@
 
   // ---------- وضعیت و ذخیره‌سازی ----------
   var memoryFallback = null;
-  function emptyState() { return { profile: null, checkins: {}, done: {}, ackPain: {}, postRuns: {}, cycleChoices: {}, doneLog: {} }; }
+  function emptyState() { return { profile: null, checkins: {}, done: {}, ackPain: {}, postRuns: {}, cycleChoices: {}, doneLog: {}, pains: {} }; }
   function load() {
     try {
       var raw = localStorage.getItem(STORE_KEY);
@@ -343,6 +343,9 @@
   }
   function effectiveSession(base) {
     var ci = state.checkins[base.date];
+    // درد: آخرین ثبت درد تا این روز (تا وقتی «بدون درد» ثبت نشده) جلوتر از تطبیق خستگی و خواب
+    var ep = C.painEpisode(state.pains, state.checkins, C.parseDate(base.date));
+    if (ep) return withCycle(C.painAdjust(base, ep, C.paceZones(state.profile)));
     return withCycle(C.adaptSession(base, ci, prevCheckin(base.date), C.paceZones(state.profile), { profile: state.profile, checkins: state.checkins }));
   }
   // آمار «انجام‌شده» از داده‌ی واقعی: جلسه‌هایی که کاربر «انجام دادم» زده، با حجمی که همون لحظه ثبت شده
@@ -389,17 +392,42 @@
       if (ps) r.session = dressAlt(ps, s);
       return r;
     }
+    // جلسه‌ی سختی که کاربر از یکی از ۴ روز قبل به امروز جابه‌جا کرده
+    for (var back = 1; back <= 4; back++) {
+      var pk = C.dateKey(C.addDays(C.parseDate(s.date), -back));
+      if ((state.cycleChoices || {})[pk] === 'move' && cycleMoveTarget(pk) === s.date) {
+        var mv = dressAlt(C.sessionFor(state.profile, C.parseDate(pk)), s);
+        mv.hard = true; mv.movedFrom = pk;
+        r.session = mv; r.cycle.moved = pk;
+        return r;
+      }
+    }
     var sug = C.cycleSuggestion(s, info, C.paceZones(state.profile));
     if (!sug) { if (info.phase === 'follicular' && s.hard && s.type !== 'race') r.cycle.note = 'follicular'; return r; }
     var ch = (state.cycleChoices || {})[s.date];
-    r.cycle.sug = sug; r.cycle.choice = ch; r.cycle.label = s.label;
-    var alt = ch === 'adapt' ? sug.alt : (ch === 'rest' ? sug.rest : null);
+    r.cycle.sug = sug; r.cycle.choice = ch; r.cycle.label = s.label; r.cycle.moveTo = cycleMoveTarget(s.date);
+    var alt = ch === 'adapt' || ch === 'move' ? sug.alt : (ch === 'rest' ? sug.rest : null);
+    if (ch === 'move' && !r.cycle.moveTo) alt = null;
     if (alt) r.session = dressAlt(alt, s);
     return r;
+  }
+  // پیشنهاد جابه‌جایی جلسه‌ی سخت: اولین روز ایزی در ۴ روز بعد که روز قبل و بعدش جلسه‌ی سخت نیست (و قبل از مسابقه)
+  function cycleMoveTarget(key) {
+    var d0 = C.parseDate(key), p = state.profile;
+    for (var i = 1; i <= 4; i++) {
+      var d = C.addDays(d0, i), s = C.sessionFor(p, d);
+      if (s.type === 'race') return null;
+      if (s.type !== 'easy') continue;
+      var nx = C.sessionFor(p, C.addDays(d, 1)), pv = i > 1 ? C.sessionFor(p, C.addDays(d, -1)) : null;
+      if (nx.hard || (pv && pv.hard)) continue;
+      return C.dateKey(d);
+    }
+    return null;
   }
   function cycleBox(r, key, todayKey) {
     var c = r && r.cycle;
     if (!c || key < todayKey) return '';
+    if (c.moved) return '<p class="cycle-note small">' + esc(T('cycle.movedHere', { d: faDate(c.moved) })) + '</p>';
     if (c.note === 'follicular') return '<p class="cycle-note small">' + esc(T('cycle.follicularNote')) + '</p>';
     if (c.period) {
       var pd = c.period;
@@ -410,7 +438,7 @@
     if (!c.sug) return '';
     var when = key === todayKey ? T('cycle.when.today') : T('cycle.when.date', { d: faDate(key) });
     if (c.choice) {
-      return '<div class="alert cycle-box" role="status"><p>' + esc(T('cycle.chosen.' + c.choice)) + '</p>' +
+      return '<div class="alert cycle-box" role="status"><p>' + esc(T('cycle.chosen.' + c.choice, { d: c.moveTo ? faDate(c.moveTo) : '' })) + '</p>' +
         '<button type="button" class="linklike" data-cycle-undo="' + key + '">' + esc(T('cycle.undo')) + '</button></div>';
     }
     var msg = c.sug.phase === 'period' ? T('cycle.promptPeriod', { when: when, day: c.sug.day, label: c.label }) + (c.sug.heavy ? ' ' + T('cycle.promptHeavy') : '')
@@ -418,6 +446,7 @@
     return '<div class="alert cycle-box" role="group"><p>' + t(msg) + '</p><p class="small muted">' + esc(T('cycle.decide')) + '</p><div class="actions">' +
       '<button type="button" class="btn btn-primary" data-cycle-choice="adapt" data-date="' + key + '">' + esc(T('cycle.btnAdapt')) + '</button>' +
       (c.sug.rest ? '<button type="button" class="btn btn-outline" data-cycle-choice="rest" data-date="' + key + '">' + esc(T('cycle.btnRest')) + '</button>' : '') +
+      (c.moveTo ? '<button type="button" class="btn btn-outline" data-cycle-choice="move" data-date="' + key + '">' + esc(T('cycle.btnMove', { d: faDate(c.moveTo) })) + '</button>' : '') +
       '<button type="button" class="btn btn-ghost" data-cycle-choice="keep" data-date="' + key + '">' + esc(T('cycle.btnKeep')) + '</button></div></div>';
   }
   // نشانگر ملایم فاز روی خونه‌های تقویم (قابل خاموش شدن)
@@ -450,16 +479,17 @@
       '<div class="actions"><button type="button" class="btn btn-ghost" data-period-started="1">' + esc(T('cycle.started')) + '</button></div>' +
       '<p class="small muted">' + esc(T('cycle.estimate')) + '</p>' + (extra || '') + learnMore(['cycle']) + '</section>';
   }
+  // پیام اجباری فقط برای درد شدید (یا ثبت قدیمی بدون جزئیات)
   function unackedPainToday() {
     var k = C.dateKey(today());
-    var ci = state.checkins[k];
-    return ci && ci.pain && !state.ackPain[k] ? k : null;
+    var ci = state.checkins[k], ep = ci && ci.pain ? C.painEpisode(state.pains, state.checkins, today()) : null;
+    return ep && ep.tier === 'severe' && !state.ackPain[k] ? k : null;
   }
 
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, settings: renderSettings, plans: renderPlans, walkgoals: renderWalkGoals, progress: renderProgressPage, gait: renderGaitPage, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
+  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, health: renderHealth, settings: renderSettings, plans: renderPlans, walkgoals: renderWalkGoals, progress: renderProgressPage, gait: renderGaitPage, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
   function route() {
     var loginMode = !isEntered();
     document.body.classList.toggle('login-mode', loginMode);
@@ -538,7 +568,7 @@
     if (e.target.closest && e.target.closest('[data-focus-period]')) pendingFocus = 'period-card';
   }, true);
   // صفحه‌های فرعی: نوار برگشت بالای صفحه (برگشت واقعی تاریخچه، وگرنه تب مادر)
-  var SUB_PAGES = { checkin: '#home', race: '#profile', plans: '#race', walkgoals: '#profile', progress: '#profile', gait: '#profile', fitness: '#progress', guide: '#learn', settings: '#profile' };
+  var SUB_PAGES = { checkin: '#home', health: '#profile', race: '#profile', plans: '#race', walkgoals: '#profile', progress: '#profile', gait: '#profile', fitness: '#progress', guide: '#learn', settings: '#profile' };
   function backBar(v) {
     var s = navState(), from = s && s.depth > 0 ? s.from : null;
     return '<nav class="back-bar"><a class="learn-back" href="' + SUB_PAGES[v] + '"' + (from ? ' data-nav-back="1"' : '') + '>' +
@@ -546,7 +576,7 @@
   }
   // تب مادر هر صفحه
   var TABS = ['home', 'plan', 'learn', 'profile'];
-  var TAB_OF = { home: 'home', checkin: 'home', race: 'profile', plans: 'profile', walkgoals: 'profile', progress: 'profile', gait: 'profile', plan: 'plan', fitness: 'profile',
+  var TAB_OF = { home: 'home', checkin: 'home', health: 'profile', race: 'profile', plans: 'profile', walkgoals: 'profile', progress: 'profile', gait: 'profile', plan: 'plan', fitness: 'profile',
     learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile' };
   // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
   var lastView = null, lastTab = null;
@@ -682,16 +712,16 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=87" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
-      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=87" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=88" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=88" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
       restoreBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
-      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=87" alt="" width="28" height="28"></button>' +
-      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=87" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=88" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=88" alt="" width="28" height="28"></button>' +
       '</div></section>';
     app.querySelectorAll('[data-lang]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.lang !== I.getLang()) switchLang(b.dataset.lang); });
@@ -867,7 +897,9 @@
         '<fieldset id="cycle-fieldset" class="onb-sub" hidden><legend>' + esc(T('cycle.title')) + '</legend>' +
         '<p class="small">' + esc(T('cycle.intro')) + '</p>' +
         '<label class="check-row"><input type="checkbox" id="cyon" name="cycleOn"' + (cyc.enabled ? ' checked' : '') + '> <span>' + esc(T('cycle.enable')) + '</span></label>' +
-        '<div id="cycle-fields" hidden><div class="row3">' +
+        '<div id="cycle-fields" hidden>' +
+        (state.healthConsent ? '' : '<div class="alert alert-note small"><p>' + esc(T('health.consentText')) + '</p><label class="check-row"><input type="checkbox" name="cycleConsent"> <span>' + esc(T('health.consentShort')) + '</span></label></div>') +
+        '<div class="row3">' +
         '<div class="field"><label for="cystart">' + esc(T('cycle.lastStart')) + '</label><input id="cystart" name="cycleStart" type="date" max="' + todayKey + '" value="' + esc(cyc.lastStart || '') + '">' +
         '<small class="muted" id="cystart-fa"></small></div>' +
         '<div class="field"><label for="cylen">' + esc(T('cycle.cycleLen')) + '</label><input id="cylen" name="cycleLen" type="number" inputmode="numeric" min="21" max="45" value="' + esc(cyc.cycleLen || 28) + '">' +
@@ -1196,12 +1228,16 @@
         var cs = String(fd.get('cycleStart') || ''), cl = Number(fd.get('cycleLen')), cp = Number(fd.get('periodLen'));
         var ago = cs ? C.daysBetween(C.parseDate(cs), today()) : -1;
         if (!cs || ago < 0 || ago > 120) E(2, T('cycle.err.lastStart'));
+        if (!state.healthConsent && !fd.get('cycleConsent')) E(2, T('health.err.consentCycle'));
+        else if (!state.healthConsent) state.healthConsent = { at: new Date().toISOString() };
         if (!(cl >= 21 && cl <= 45)) E(2, T('cycle.err.cycleLen'));
         if (!(cp >= 2 && cp <= 10)) E(2, T('cycle.err.periodLen'));
         var pm = fd.get('periodMode');
         if (C.PERIOD_MODES.indexOf(pm) < 0) E(2, T('cycle.err.periodMode'));
         // تغییرهای دستی دوره‌ها با ویرایش پروفایل حفظ می‌شن
-        cycleObj = { enabled: true, lastStart: cs, cycleLen: cl, periodLen: cp, periodMode: pm, periodOverrides: (p.cycle && p.cycle.periodOverrides) || {} };
+        // تاریخچه‌ی شروع‌ها نگه داشته می‌شه (طول چرخه‌ی واقعی از همین حساب می‌شه)؛ شروع واردشده هم بهش اضافه می‌شه
+        cycleObj = { enabled: true, lastStart: cs, cycleLen: cl, periodLen: cp, periodMode: pm, periodOverrides: (p.cycle && p.cycle.periodOverrides) || {}, starts: (p.cycle && p.cycle.starts) || [] };
+        C.logPeriodStart({ cycle: cycleObj }, cs);
       }
       var walkAct = fd.get('activity') === 'walk', walkIn = walkAct ? readWalk() : null;
       if (walkAct) {
@@ -1440,13 +1476,7 @@
 
   function adaptationBox(ad, key, compact) {
     if (!ad) return '';
-    if (ad.kind === 'pain') {
-      var ci = state.checkins[key];
-      return '<div class="alert alert-pain" role="alert"><strong>' + esc(T('pain.cancelled')) + '</strong>' +
-        '<p class="pain-msg">' + esc(C.PAIN_MESSAGE) + '</p>' +
-        (ci && ci.painWhere ? '<p class="small">' + esc(T('pain.whereReported', { w: ci.painWhere })) + '</p>' : '') +
-        '<p class="small">' + esc(T('pain.noRun')) + '</p></div>';
-    }
+    if (ad.kind === 'pain') return painBox(ad);
     var cls = ad.kind === 'downgrade' ? 'alert-adapt' : 'alert-note';
     if (!ad.tier || !ad.action) return '<div class="alert ' + cls + '" role="status"><p>' + t(ad.message) + '</p></div>';
     // تطبیق درجه‌بندی‌شده: چرا → تصمیم → اثر روی هفته و هدف → خلاصه‌ی هفته
@@ -1469,6 +1499,22 @@
       (ad.kind === 'downgrade' ? '<p class="adapt-sum">' + t(sum.text) + '</p>' : '') + '</div>';
   }
 
+  // پیام تطبیق با درد: ساده و محتاط، بدون تشخیص؛ سطح، ناحیه، هشدار ادامه/بدتر شدن و لینک به صفحه‌ی درد و آسیب
+  function painBox(ad, inHealth) {
+    var t0 = ad.recovering ? 'recovering' : ad.tier, cls = ad.tier === 'severe' ? 'alert-pain' : ad.tier === 'moderate' ? 'alert-adapt' : 'alert-note';
+    var where = ad.area ? T('health.area.' + ad.area) + (ad.where ? ' (' + ad.where + ')' : '') : ad.where;
+    var warn = [];
+    if (ad.worse) warn.push(T('health.warn.worse'));
+    if (ad.persistent) warn.push(T('health.warn.persistent'));
+    if (ad.longDays) warn.push(T('health.warn.long'));
+    if (ad.stale) warn.push(T('health.warn.stale'));
+    return '<div class="alert ' + cls + ' pain-box" role="' + (ad.tier === 'severe' ? 'alert' : 'status') + '"><strong>' + esc(T('health.tierTitle.' + t0)) + '</strong>' +
+      '<p class="pain-msg">' + esc(ad.message) + '</p>' +
+      (where ? '<p class="small">' + esc(fa(T('health.reported', { w: where, n: ad.level == null ? '—' : ad.level }))) + '</p>' : '') +
+      (warn.length ? '<ul class="small pain-warn">' + warn.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') +
+      (ad.raceKept ? '<p class="small">' + esc(T('health.raceMild')) + '</p>' : '') +
+      (inHealth ? '' : '<p class="small muted">' + esc(T('health.disclaimer')) + '</p><a class="linklike small" href="#health">' + esc(T('health.update')) + '</a>') + '</div>';
+  }
   function painYesterdayBox() {
     return '<div class="alert alert-pain-soft" role="note"><strong>' + esc(T('pain.yesterdayStrong')) + '</strong> ' +
       esc(T('pain.yesterdayText')) + '</div>';
@@ -1765,7 +1811,7 @@
     var cu = e.target.closest('[data-cycle-undo]');
     if (cu) { delete (state.cycleChoices || {})[cu.dataset.cycleUndo]; save(); route(); return; }
     if (e.target.closest('[data-period-started]')) {
-      state.profile.cycle.lastStart = C.dateKey(today());
+      C.logPeriodStart(state.profile, C.dateKey(today()));
       save(); showToast(T('cycle.startedToast')); route();
       return;
     }
@@ -1911,6 +1957,247 @@
   // =====================================================================
   // ۳. چک‌این روزانه
   // =====================================================================
+  // ---------- درد: فرم سریع (ناحیه، شدت ۰ تا ۱۰، زمان، نشانه‌های هشدار) ----------
+  // جزئیات فقط با رضایت صریح ذخیره می‌شن؛ بدون رضایت، مثل قبل فقط «درد دارم» و محل (متن) و امروز تمرین لغو
+  function painFields(px, e) {
+    e = e || {};
+    var chips = function (name, keys, type, label, cur) {
+      return '<div class="chips' + (type === 'radio' && name === 'level' ? ' chips-scale' : '') + '" role="' + (type === 'radio' ? 'radiogroup' : 'group') + '" aria-label="' + esc(label) + '">' + keys.map(function (k) {
+        var on = type === 'radio' ? String(cur) === String(k) : (cur || []).indexOf(k) >= 0;
+        return '<label class="chip"><input type="' + type + '" name="' + name + '" value="' + k + '"' + (on ? ' checked' : '') + '><span>' + esc(name === 'level' ? fa(k) : T('health.' + name + '.' + k)) + '</span></label>';
+      }).join('') + '</div>';
+    };
+    var consent = state.healthConsent ? '' : '<label class="check-row pain-consent"><input type="checkbox" name="healthConsent"> <span>' + esc(T('health.consentShort')) + '</span></label>';
+    return '<div class="pain-fields" id="' + px + '-pain">' + consent +
+      '<p class="sub-legend">' + esc(T('health.areaQ')) + '</p>' + chips('area', C.PAIN_AREAS, 'radio', T('health.areaQ'), e.area) +
+      '<div class="field"><label for="' + px + '-pw">' + esc(T('checkin.where')) + '</label><input id="' + px + '-pw" name="painWhere" maxlength="120" placeholder="' + esc(T('checkin.wherePh')) + '" value="' + esc(e.where || '') + '"></div>' +
+      '<p class="sub-legend">' + esc(T('health.levelQ')) + '</p>' + chips('level', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'radio', T('health.levelQ'), e.level) +
+      '<div class="scale-ends"><span>' + esc(T('health.levelLow')) + '</span><span>' + esc(T('health.levelHigh')) + '</span></div>' +
+      '<p class="sub-legend">' + esc(T('health.whenQ')) + '</p>' + chips('when', C.PAIN_WHEN, 'checkbox', T('health.whenQ'), e.when) +
+      '<p class="sub-legend">' + esc(T('health.flagsQ')) + '</p>' + chips('flags', C.PAIN_FLAGS, 'checkbox', T('health.flagsQ'), e.flags) + '</div>';
+  }
+  function readPain(form) {
+    var all = function (n) { return [].slice.call(form.querySelectorAll('input[name=' + n + ']:checked')).map(function (x) { return x.value; }); };
+    var consent = !!state.healthConsent || !!(form.healthConsent && form.healthConsent.checked);
+    var where = String((form.painWhere && form.painWhere.value) || '').trim().slice(0, 120);
+    if (!consent) {
+      // جزئیات بدون رضایت ذخیره نمی‌شن؛ بی‌صدا هم دور ریخته نمی‌شن
+      if (all('area').length || all('level').length || all('when').length || all('flags').length) return { errors: [T('health.err.consent')], entry: null, consent: false };
+      return { errors: where ? [] : [T('checkin.err.where')], entry: null, consent: false };
+    }
+    var area = all('area')[0], level = Number(all('level')[0]) || 0, errs = [];
+    if (!area) errs.push(T('health.err.area'));
+    if (!level) errs.push(T('health.err.level'));
+    return { errors: errs, consent: true, entry: { area: area, where: where, level: level, when: all('when'), flags: all('flags'), at: new Date().toISOString() } };
+  }
+  // ثبت درد: رضایت، ثبت روز، و اگه در بازگشت بعد از آسیب هستی، یک مرحله برگشت (هر هفته حداکثر یک بار)
+  function savePain(key, entry, consent) {
+    if (consent && !state.healthConsent) state.healthConsent = { at: new Date().toISOString() };
+    state.pains = state.pains || {};
+    state.pains[key] = entry;
+    var ip = C.injuryPhase(state.profile, C.parseDate(key));
+    if (ip && (ip.phase === 'return' || ip.phase === 'ramp') && C.painTier(entry) !== 'none') {
+      var sb = ip.inj.setbacks = ip.inj.setbacks || [], ws = C.dateKey(C.weekStart(C.parseDate(key)));
+      if (!sb.some(function (d) { return C.dateKey(C.weekStart(C.parseDate(d))) === ws; })) sb.push(key);
+    }
+  }
+  function afterPain(key) {
+    var ep = C.painEpisode(state.pains, state.checkins, C.parseDate(key));
+    notify({ key: 'pain-' + key, k: ep && ep.tier === 'severe' ? 'error' : 'warning', m: 'pain', href: '#plan', today: true, flash: false });
+    if (!ep || ep.tier === 'severe') { openPainModal(key); return; }
+    showToast(T('health.toast.' + ep.tier));
+    if (location.hash === '#home') route(); else location.hash = '#home';
+  }
+
+  // ---------- صفحه‌ی درد، آسیب و چرخه ----------
+  var healthOpen = { pain: false, injury: false, wipe: false };
+  function renderHealth() {
+    var p = state.profile, now = today(), key = C.dateKey(now);
+    var html = '<header class="page-head"><h1>' + esc(T('health.title')) + '</h1></header>' +
+      '<p class="alert alert-note health-disc" role="note">' + esc(T('health.disclaimer')) + '</p>';
+    if (!state.healthConsent) {
+      html += '<section class="card health-consent"><h2>' + esc(T('health.consentTitle')) + '</h2><p>' + esc(T('health.consentText')) + '</p>' +
+        '<ul class="small">' + T('health.consentList').map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' +
+        '<label class="check-row"><input type="checkbox" id="hc-ok"> <span>' + esc(T('health.consentShort')) + '</span></label>' +
+        '<button type="button" class="btn btn-primary" data-health-consent="1" disabled>' + esc(T('health.consentBtn')) + '</button></section>';
+      app.innerHTML = html;
+      var ok = document.getElementById('hc-ok'), b = app.querySelector('[data-health-consent]');
+      ok.addEventListener('change', function () { b.disabled = !ok.checked; });
+      return;
+    }
+    // وضعیت فعلی
+    var ep = C.painEpisode(state.pains, state.checkins, now), ip = C.injuryPhase(p, now);
+    html += '<section class="card health-status"><h2>' + esc(T('health.statusTitle')) + '</h2>';
+    if (ip) html += '<p><b>' + esc(T('health.inj.phase.' + ip.phase)) + '</b> ' + esc(fa(ip.phase === 'off' ? T('health.inj.offUntil', { d: faDate(ip.until) })
+      : ip.phase === 'return' ? T('health.inj.stage', { a: ip.stage + 1, b: ip.of }) : T('health.inj.ramp', { n: Math.round(ip.factor * 100) }))) + '</p>';
+    if (ep) {
+      var ad = C.painAdjust({ type: 'easy', km: 5, date: key, dayName: '', dayShort: '' }, ep, null).adaptation;
+      html += painBox(ad, true);
+      if (!ep.recovering) html += '<div class="actions"><button type="button" class="btn btn-outline" data-pain-free="1">' + esc(T('health.painFree')) + '</button></div>';
+    }
+    if (!ip && !ep) html += '<p class="muted">' + esc(T('health.noIssue')) + '</p>';
+    html += '</section>';
+    // هدف و مسابقه بعد از آسیب
+    html += impactCard(now);
+    // ثبت درد
+    var today0 = (state.pains || {})[key];
+    html += '<section class="card"><h2>' + esc(T('health.logTitle')) + '</h2><p class="small muted">' + esc(T('health.logHint')) + '</p>' +
+      '<details class="health-form"' + (healthOpen.pain ? ' open' : '') + ' data-hopen="pain"><summary>' + esc(T(today0 ? 'health.logEdit' : 'health.logNew')) + '</summary>' +
+      '<form id="pain-form" novalidate>' + painFields('hp', today0) + '<p class="form-errors" hidden></p><button type="submit" class="btn btn-primary">' + esc(T('health.logSave')) + '</button></form></details>' +
+      painHistory(now) + '</section>';
+    // آسیب تأییدشده
+    html += injuryCard(p, now);
+    // چرخه
+    if (p.sex === 'female') html += cycleHealthCard(p, now);
+    // حذف داده‌ها
+    html += '<section class="card danger-zone"><b>' + esc(T('health.wipeTitle')) + '</b><p class="small">' + esc(T('health.wipeText')) + '</p>' +
+      (healthOpen.wipe ? '<div class="alert confirm-box confirm-danger" role="alertdialog"><p>' + esc(T('health.wipeConfirm')) + '</p><div class="actions">' +
+        '<button type="button" class="btn btn-danger-outline" data-health-wipe="yes">' + esc(T('health.wipeYes')) + '</button><button type="button" class="btn btn-ghost" data-health-wipe="no">' + esc(T('app.cancel')) + '</button></div></div>'
+        : '<button type="button" class="btn btn-danger-outline" data-health-wipe="ask">' + esc(T('health.wipeBtn')) + '</button>') + '</section>';
+    app.innerHTML = html;
+  }
+  function painHistory(now) {
+    var P = state.pains || {}, ks = Object.keys(P).filter(function (k) { return C.daysBetween(C.parseDate(k), now) <= 21 && C.daysBetween(C.parseDate(k), now) >= 0; }).sort().reverse();
+    if (!ks.length) return '';
+    return '<h3>' + esc(T('health.history')) + '</h3><ul class="pain-hist">' + ks.map(function (k) {
+      var e = P[k], tier = C.painTier(e);
+      return '<li><span>' + esc(faDate(k)) + '</span><b>' + esc(tier === 'none' ? T('health.noPain') : fa(T('health.histRow', { a: T('health.area.' + (e.area || 'other')), n: e.level }))) + '</b>' +
+        '<span class="pill pill-' + tier + '">' + esc(T('health.tier.' + tier)) + '</span></li>';
+    }).join('') + '</ul>';
+  }
+  function injuryCard(p, now) {
+    var cur = (p.injuries || []).filter(function (j) { return C.injuryPhase(p, now) && C.injuryPhase(p, now).inj === j; })[0];
+    var html = '<section class="card"><h2>' + esc(T('health.inj.title')) + '</h2><p class="small muted">' + esc(T('health.inj.hint')) + '</p>';
+    if (cur) {
+      html += '<div class="inj-cur"><p><b>' + esc(cur.label || T('health.area.' + (cur.area || 'other'))) + '</b> · ' + esc(T('health.area.' + (cur.area || 'other'))) + '</p>' +
+        '<p class="small">' + esc(fa(T('health.inj.dates', { a: faDate(cur.start), b: faDate(cur.stopUntil) }))) + (cur.returnDate ? T('progress.sep') + esc(fa(T('health.inj.ret', { d: faDate(cur.returnDate) }))) : '') + '</p>' +
+        ((cur.setbacks || []).length ? '<p class="small muted">' + esc(fa(T('health.inj.setbacks', { n: cur.setbacks.length }))) + '</p>' : '') +
+        '<div class="actions">' + (C.injuryPhase(p, now).phase === 'off' ? '<button type="button" class="btn btn-outline" data-inj-clear="' + esc(cur.id) + '">' + esc(T('health.inj.cleared')) + '</button>' : '') +
+        '<button type="button" class="linklike small" data-inj-del="' + esc(cur.id) + '">' + esc(T('health.inj.remove')) + '</button></div></div>';
+    }
+    var key = C.dateKey(now);
+    html += '<details class="health-form"' + (healthOpen.injury ? ' open' : '') + ' data-hopen="injury"><summary>' + esc(T('health.inj.add')) + '</summary><form id="inj-form" novalidate>' +
+      '<p class="sub-legend">' + esc(T('health.areaQ')) + '</p><div class="chips" role="radiogroup">' + C.PAIN_AREAS.map(function (k) { return '<label class="chip"><input type="radio" name="area" value="' + k + '"><span>' + esc(T('health.area.' + k)) + '</span></label>'; }).join('') + '</div>' +
+      '<div class="field"><label for="inj-label">' + esc(T('health.inj.label')) + '</label><input id="inj-label" name="label" maxlength="60" placeholder="' + esc(T('health.inj.labelPh')) + '"></div>' +
+      '<div class="row2"><div class="field"><label for="inj-start">' + esc(T('health.inj.start')) + '</label><input id="inj-start" name="start" type="date" max="' + key + '" value="' + key + '"></div>' +
+      '<div class="field"><label for="inj-stop">' + esc(T('health.inj.stop')) + '</label><input id="inj-stop" name="stop" type="date" min="' + key + '"><small class="muted">' + esc(T('health.inj.stopHint')) + '</small></div></div>' +
+      '<div class="field"><label for="inj-ret">' + esc(T('health.inj.retQ')) + '</label><input id="inj-ret" name="ret" type="date" min="' + key + '"></div>' +
+      '<p class="form-errors" hidden></p><button type="submit" class="btn btn-primary">' + esc(T('health.inj.save')) + '</button></form></details></section>';
+    return html;
+  }
+  // ارزیابی هدف بعد از آسیب: گزینه‌ها، تصمیم با خود دونده
+  function impactCard(now) {
+    var p = state.profile, im = C.injuryImpact(p, now);
+    if (!im || !im.status) return '';
+    var ack = im.inj.impactAck === im.status;
+    var html = '<section class="card impact-card impact-' + im.status + '"><h2>' + esc(T('health.impact.title')) + '</h2>' +
+      '<p>' + esc(fa(T('health.impact.' + im.status, { d: faDate(im.fullDate), r: faDate(im.race) }))) + '</p>' +
+      '<p class="small muted">' + esc(T('health.impact.note')) + '</p>';
+    if (im.status !== 'ok' && !ack) html += '<div class="actions impact-acts">' +
+      '<button type="button" class="btn btn-outline" data-impact="lighter">' + esc(T('health.impact.opt.lighter')) + '</button>' +
+      '<a class="btn btn-outline" href="#onboarding" data-onb-focus="goal">' + esc(T('health.impact.opt.date')) + '</a>' +
+      '<button type="button" class="btn btn-outline" data-impact="secondary">' + esc(T('health.impact.opt.secondary')) + '</button>' +
+      '<a class="btn btn-outline" href="#race">' + esc(T('health.impact.opt.new')) + '</a></div>';
+    return html + '</section>';
+  }
+  function cycleHealthCard(p, now) {
+    var c = p.cycle || {};
+    var html = '<section class="card"><h2>' + esc(T('health.cyc.title')) + '</h2>';
+    if (!c.enabled) return html + '<p class="small">' + esc(T('health.cyc.off')) + '</p><a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('health.cyc.enable')) + '</a></section>';
+    var st = C.cycleStats(p, now), key = C.dateKey(now);
+    html += '<p>' + esc(fa(T(st.computed ? 'health.cyc.lenComputed' : 'health.cyc.lenManual', { n: st.length, k: st.gaps.length }))) + '</p>';
+    if (st.starts.length) html += '<ul class="cyc-hist small">' + st.starts.slice(-7).reverse().map(function (k, i, a) {
+      var g = i < a.length - 1 ? C.daysBetween(C.parseDate(a[i + 1]), C.parseDate(k)) : null;
+      return '<li><span>' + esc(faDate(k)) + '</span>' + (g != null ? '<span class="muted">' + esc(fa(T('health.cyc.gap', { n: g }))) + '</span>' : '') + '</li>';
+    }).join('') + '</ul>';
+    if (st.flags.length) html += '<p class="alert alert-note small" role="note">' + esc(T('health.cyc.flag.' + (st.flags.indexOf('absent') >= 0 ? 'absent' : st.flags.indexOf('late') >= 0 ? 'late' : 'variable'))) + '</p>';
+    html += '<form id="cyc-form" class="cyc-log" novalidate><div class="field"><label for="cyc-date">' + esc(T('health.cyc.logQ')) + '</label>' +
+      '<input id="cyc-date" name="date" type="date" max="' + key + '" min="' + C.dateKey(C.addDays(now, -120)) + '" value="' + key + '"></div>' +
+      '<p class="form-errors" hidden></p><button type="submit" class="btn btn-outline">' + esc(T('health.cyc.logBtn')) + '</button></form>' +
+      '<p class="small muted">' + esc(T('health.cyc.evidence')) + '</p></section>';
+    return html;
+  }
+  app.addEventListener('toggle', function (e) { var d = e.target; if (d.dataset && d.dataset.hopen) healthOpen[d.dataset.hopen] = d.open; }, true);
+  app.addEventListener('click', function (e) {
+    if (location.hash !== '#health') return;
+    var p = state.profile, key = C.dateKey(today());
+    if (e.target.closest('[data-health-consent]')) { state.healthConsent = { at: new Date().toISOString() }; save(); renderHealth(); return; }
+    if (e.target.closest('[data-pain-free]')) {
+      state.pains = state.pains || {};
+      // ثبت امروز نگه داشته می‌شه (برای ۳ روز برگشت سبک بعد از درد متوسط یا شدید)؛ فقط زمان رفع اضافه می‌شه
+      if (state.pains[key] && C.painTier(state.pains[key]) !== 'none') state.pains[key].freeAt = new Date().toISOString();
+      else state.pains[key] = { level: 0, at: new Date().toISOString() };
+      if (state.checkins[key]) state.checkins[key].painFree = true;
+      save(); showToast(T('health.toast.free')); renderHealth(); return;
+    }
+    var w = e.target.closest('[data-health-wipe]');
+    if (w) {
+      if (w.dataset.healthWipe === 'ask') healthOpen.wipe = true;
+      else if (w.dataset.healthWipe === 'no') healthOpen.wipe = false;
+      else { wipeHealth(); healthOpen.wipe = false; showToast(T('health.wiped')); }
+      renderHealth(); return;
+    }
+    var ic = e.target.closest('[data-inj-clear]');
+    if (ic) { var j = (p.injuries || []).filter(function (x) { return x.id === ic.dataset.injClear; })[0]; if (j) { j.stopUntil = key; save(); showToast(T('health.inj.clearedToast')); renderHealth(); } return; }
+    var idel = e.target.closest('[data-inj-del]');
+    if (idel) { p.injuries = (p.injuries || []).filter(function (x) { return x.id !== idel.dataset.injDel; }); save(); renderHealth(); return; }
+    var im = e.target.closest('[data-impact]');
+    if (im) impactChoose(im.dataset.impact);
+  });
+  function impactChoose(opt) {
+    var p = state.profile, im = C.injuryImpact(p, today());
+    if (!im) return;
+    if (opt === 'lighter') { if (p.goal) delete p.goal.targetSec; im.inj.impactAck = im.status; save(); showToast(T('health.impact.done.lighter')); }
+    if (opt === 'secondary') {
+      // هدف اصلی → هدف فرعی (همون تاریخ، به‌عنوان تمرین)؛ هدف اصلی خالی می‌شه تا هدف تازه انتخاب بشه
+      var g = C.goalInfo(p);
+      p.races = (p.races || []).concat([{ id: 'r' + Date.now().toString(36), name: '', km: g.km, date: g.date || null, goal: p.goal, mode: 'train' }]);
+      p.goal = { type: 'none' }; im.inj.impactAck = im.status;
+      save(); showToast(T('health.impact.done.secondary'));
+    }
+    route();
+  }
+  app.addEventListener('click', function (e) {
+    var im = e.target.closest('[data-impact]');
+    if (!im || location.hash !== '#race') return;
+    impactChoose(im.dataset.impact);
+  });
+  function wipeHealth() {
+    var p = state.profile;
+    state.pains = {}; state.ackPain = {}; state.cycleChoices = {}; state.healthConsent = null;
+    Object.keys(state.checkins).forEach(function (k) { delete state.checkins[k].pain; delete state.checkins[k].painWhere; });
+    if (p) { p.injuries = []; p.injury = ''; p.cycle = { enabled: false }; }
+    save();
+  }
+  app.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!f.matches || !f.matches('#pain-form, #inj-form, #cyc-form')) return;
+    e.preventDefault();
+    var err = f.querySelector('.form-errors'), key = C.dateKey(today()), p = state.profile;
+    var fail = function (m) { err.hidden = false; err.textContent = Array.isArray(m) ? m.join(' ') : m; };
+    if (f.id === 'pain-form') {
+      var pe = readPain(f);
+      if (pe.errors.length) return fail(pe.errors);
+      savePain(key, pe.entry, true);
+      healthOpen.pain = false; save(); afterPain(key);
+      if (location.hash === '#health') renderHealth();
+      return;
+    }
+    if (f.id === 'inj-form') {
+      var area = (f.querySelector('input[name=area]:checked') || {}).value, st = f.start.value, sp = f.stop.value, rt = f.ret.value;
+      if (!area) return fail(T('health.err.area'));
+      if (!st || st > key) return fail(T('health.inj.err.start'));
+      if (!sp || sp < st) return fail(T('health.inj.err.stop'));
+      if (rt && rt < sp) return fail(T('health.inj.err.ret'));
+      p.injuries = (p.injuries || []).concat([{ id: 'i' + Date.now().toString(36), area: area, label: f.label.value.trim().slice(0, 60), start: st, stopUntil: sp, returnDate: rt || null, setbacks: [] }]);
+      healthOpen.injury = false; save(); showToast(T('health.inj.saved')); renderHealth();
+      return;
+    }
+    var d = f.date.value;
+    if (!d || d > key || C.daysBetween(C.parseDate(d), today()) > 120) return fail(T('cycle.err.lastStart'));
+    C.logPeriodStart(p, d);
+    save(); showToast(T('health.cyc.logged')); renderHealth();
+  });
   function scale(name, aria, labelLow, labelHigh, value) {
     var h = '<div class="scale" role="radiogroup" aria-label="' + esc(aria) + '">';
     for (var i = 1; i <= 5; i++) {
@@ -1925,11 +2212,12 @@
     var base = C.sessionFor(state.profile, now);
 
     if (ci && ci.pain) {
+      var ep0 = C.painEpisode(state.pains, state.checkins, now), ad0 = ep0 ? C.painAdjust(base, ep0, C.paceZones(state.profile)).adaptation : null;
       app.innerHTML = '<section class="card"><h1>' + esc(T('checkin.title')) + '</h1>' +
-        '<div class="alert alert-pain" role="alert"><strong>' + esc(T('checkin.painLocked')) + '</strong>' +
-        '<p class="pain-msg">' + esc(C.PAIN_MESSAGE) + '</p>' +
-        '<p class="small">' + esc(T('checkin.lockedText')) + '</p></div>' +
-        '<a class="btn btn-ghost" href="#home">' + esc(T('checkin.back')) + '</a></section>';
+        (ad0 ? painBox(ad0) : '') +
+        '<p class="small">' + esc(T('health.checkinDone')) + '</p>' +
+        '<div class="actions"><a class="btn btn-primary" href="#health">' + esc(T('health.update')) + '</a>' +
+        '<a class="btn btn-ghost" href="#home">' + esc(T('checkin.back')) + '</a></div></section>';
       return;
     }
 
@@ -1945,8 +2233,7 @@
       '<fieldset><legend>' + esc(T('checkin.painQ')) + '</legend><div class="chips">' +
       '<label class="chip"><input type="radio" name="pain" value="no"' + (ci.pain === false ? ' checked' : '') + '><span>' + esc(T('app.no')) + '</span></label>' +
       '<label class="chip chip-danger"><input type="radio" name="pain" value="yes"><span>' + esc(T('app.yes')) + '</span></label></div>' +
-      '<div class="field" id="pain-where" hidden><label for="pw">' + esc(T('checkin.where')) + '</label>' +
-      '<input id="pw" name="painWhere" maxlength="120" placeholder="' + esc(T('checkin.wherePh')) + '"></div>' +
+      '<div id="pain-where" hidden>' + painFields('ci') + '</div>' +
       '<small class="muted">' + esc(T('checkin.painNote')) + '</small>' +
       '</fieldset>' +
       '<div id="ci-errors" class="form-errors" role="alert" hidden></div>' +
@@ -1967,8 +2254,8 @@
       if (!fatigue) errs.push(T('checkin.err.fatigue'));
       if (!sleep) errs.push(T('checkin.err.sleep'));
       if (!pain) errs.push(T('checkin.err.pain'));
-      var where = String(fd.get('painWhere') || '').trim();
-      if (pain === 'yes' && !where) errs.push(T('checkin.err.where'));
+      var where = String(fd.get('painWhere') || '').trim(), pe = pain === 'yes' ? readPain(form) : null;
+      if (pe) errs = errs.concat(pe.errors);
       var box = document.getElementById('ci-errors');
       if (errs.length) {
         box.hidden = false;
@@ -1978,11 +2265,10 @@
       var hours = parseFloat(String(fd.get('hours') || '').replace(/[۰-۹]/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }).replace('٫', '.'));
       state.checkins[key] = { fatigue: fatigue, sleep: sleep, pain: pain === 'yes', painWhere: pain === 'yes' ? where : '', at: new Date().toISOString() };
       if (hours > 0 && hours <= 14) state.checkins[key].hours = Math.round(hours * 2) / 2;
+      if (pe && pe.entry) savePain(key, pe.entry, pe.consent);
+      else if (pain === 'no') delete (state.pains || {})[key];
       save();
-      if (pain === 'yes') {
-        notify({ key: 'pain-' + key, k: 'error', m: 'pain', href: '#plan', today: true, flash: false });
-        openPainModal(key); return;
-      }
+      if (pain === 'yes') { afterPain(key); return; }
       var r = effectiveSession(base);
       if (r.adaptation && r.adaptation.kind === 'downgrade') notify({ key: 'adapt-' + key, k: 'warning', m: 'adapt', p: { s: r.session.label }, href: '#plan', today: true, flash: false });
       showToast(T(r.adaptation && r.adaptation.kind === 'downgrade' ? 'checkin.toastDown' : 'checkin.toastOk'));
@@ -2167,7 +2453,7 @@
   function renderRace() {
     var p = state.profile, g = C.goalInfo(p), now = today(), nowKey = C.dateKey(now), main = C.raceInfo(p);
     var mainParts = mainRaceHtml(p, g);
-    var html = '<header class="page-head"><h1>' + esc(T('race.pageTitle')) + '</h1></header>' + mainParts[0] + (g.type !== 'none' ? homePath(now, true) : '');
+    var html = '<header class="page-head"><h1>' + esc(T('race.pageTitle')) + '</h1></header>' + mainParts[0] + impactCard(now) + racePainNote(now) + (g.type !== 'none' ? homePath(now, true) : '');
     // اهداف فرعی
     var list = goalList(p), K = null;
     html += '<section class="card races-card" id="races-card"><h2>' + esc(T('race.others')) + '</h2><p class="small muted">' + esc(T('race.othersHint')) + '</p>';
@@ -2235,6 +2521,12 @@
     });
   }
   var raceAddPending = null;
+  // درد متوسط یا شدید طولانی با هدف تاریخ‌دار: پیشنهاد ثبت آسیب تا ارزیابی هدف انجام بشه (تصمیم با کاربر)
+  function racePainNote(now) {
+    var ep = C.painEpisode(state.pains, state.checkins, now), race = C.raceInfo(state.profile);
+    if (!ep || !race || race.date < now || ['moderate', 'severe'].indexOf(ep.tier) < 0 || ep.days < 7 || C.injuryPhase(state.profile, now)) return '';
+    return '<section class="card alert-adapt impact-card"><p>' + esc(fa(T('health.painGoal', { n: ep.days }))) + '</p><a class="btn btn-outline" href="#health">' + esc(T('health.title')) + '</a></section>';
+  }
   var raceAddOpen = false, raceDraft = null;
   function goalList(p) {
     var main = C.raceInfo(p), mk = main ? C.dateKey(main.date) : null;
@@ -4511,6 +4803,12 @@
   }
 
   // ---------- پروفایل: فقط عکس، نام، سطح، هدف و ورود به تنظیمات ----------
+  function healthRowSub() {
+    var now = today(), ip = C.injuryPhase(state.profile, now), ep = C.painEpisode(state.pains, state.checkins, now);
+    if (ip) return T('health.inj.phase.' + ip.phase);
+    if (ep) return T('health.tierTitle.' + (ep.recovering ? 'recovering' : ep.tier));
+    return T('health.rowSub');
+  }
   function renderProfile() {
     var p = state.profile, lv = C.assessLevel(p), g = C.goalInfo(p), race = C.raceInfo(p), now = today();
     // نام کامل (نام خانوادگی از مرحله‌ی ۱ فرم)
@@ -4533,6 +4831,7 @@
         ['#walkgoals', 'flag', T('wgoal.pageTitle'), C.walkGoalInfo(p).kind !== 'none' ? T('wgoal.' + C.walkGoalInfo(p).kind + '.t') : T('profile.goalSetShort')],
         ['#settings', 'bell', T('remind.title'), remindSub(), 'remind']] : [
         ['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgress')],
+        ['#health', 'health', T('health.title'), healthRowSub()],
         ['#race', 'flag', T('race.pageTitle'), g.type !== 'none' ? C.goalLabel(g) + (race && race.date >= now ? T('progress.sep') + T('profile.goalIn', { n: Math.round(C.daysBetween(now, race.date)) }) : '') : T('profile.goalSetShort')],
         ['#plans', 'plans', T('plans.title'), T('plans.linkSub')],
         ['#fitness', 'watch', T('profile.linkFitness'), fit ? 'VDOT ' + fit.vdot.toFixed(1) : T('profile.registerTest')],
@@ -4704,7 +5003,8 @@
         (p.sex === 'female' ? cycleSettings() +
           (c.lastStart ? '<p class="small muted">' + tt('cycle.profileOn', { len: c.cycleLen, p: c.periodLen }) + T('progress.sep') + esc(T('profile.cycleLast', { d: faDate(c.lastStart) })) + '</p>' : '') +
           '<a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.cycleEdit')) + '</a>'
-          : '<p class="small muted">' + esc(T('settingsPage.cycleHint')) + '</p><a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.editOnb')) + '</a>')) +
+          : '<p class="small muted">' + esc(T('settingsPage.cycleHint')) + '</p><a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.editOnb')) + '</a>') +
+        '<p class="small muted">' + esc(T('health.privacy')) + '</p><a class="btn btn-outline" href="#health">' + esc(T('health.title')) + '</a>') +
       '</div><p class="group-label" role="heading" aria-level="2">' + esc(T('settingsPage.account')) + '</p><div class="set-list">' +
       // ۴. اطلاعات شخصی
       setSection('person', 'person', T('settingsPage.person'), tt('settingsPage.personSub', { age: p.age, n: lv.level }),

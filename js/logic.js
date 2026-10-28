@@ -1451,12 +1451,78 @@
     return s;
   }
 
+  // ---------- آسیب تأییدشده (با نظر پزشک یا فیزیوتراپ) و بازگشت تدریجی ----------
+  // profile.injuries: [{ id, area, label, start, stopUntil (پایان توقف دویدن طبق نظر متخصص), returnDate (تقریبی، اختیاری), setbacks: [تاریخ] }]
+  // دوره‌ی توقف: هیچ دویدنی؛ روزهای تمرین = جایگزین کم‌فشار طبق نظر متخصص.
+  // بازگشت: مرحله‌های دویدن و پیاده‌روی متناوب، یک روز در میون و حداکثر ۳ جلسه در هفته؛ هر هفته‌ی بدون درد یک مرحله جلو، هر هفته با درد
+  // یک مرحله عقب (پیشرفت بر اساس معیار درد، نه زمان ثابت؛ مثل پروتکل‌های بازگشت بعد از آسیب استرسی استخوان: Warden 2014، Tenforde 2023).
+  // بعد از دویدن پیوسته‌ی ۳۰ دقیقه: حجم هفتگی از ۵۰ تا ۷۰٪ حجم قبلی (بسته به طول توقف) و هر هفته حداکثر ۱۰٪ بیشتر؛ دو هفته‌ی اول بدون تمرین شدید.
+  // توقف کوتاه‌تر = شروع از مرحله‌ی بالاتر (افت آمادگی بعد از ۲ تا ۴ هفته توقف قابل توجه می‌شه: Mujika & Padilla 2000).
+  var RTR = [[1, 2, 8], [2, 2, 6], [3, 1.5, 5], [5, 1, 4], [8, 1, 3], [20, 0, 1], [30, 0, 1]];
+  var RTR_LAST = RTR.length - 1;
+  function injuryAt(profile, date) {
+    var dk = dateKey(date), best = null;
+    (profile.injuries || []).forEach(function (j) { if (j && j.start && j.stopUntil && j.start <= dk && (!best || j.start > best.start)) best = j; });
+    return best;
+  }
+  function rtrStart(inj) {
+    var lay = daysBetween(parseDate(inj.start), parseDate(inj.stopUntil));
+    return lay <= 7 ? { p: 5, f: 0.7 } : lay <= 21 ? { p: 3, f: 0.6 } : { p: 0, f: 0.5 };
+  }
+  function rampWeeks(f0) { return Math.ceil(Math.log(1 / f0) / Math.log(1.1) - 1e-9); }
+  // مرحله‌ی هر روز: off (توقف) | return (مرحله‌ی p از RTR) | ramp (هفته‌ی k برگشت حجم) | null
+  function injuryPhase(profile, date) {
+    var inj = injuryAt(profile, date);
+    if (!inj) return null;
+    var stop = parseDate(inj.stopUntil);
+    if (date < stop) return { phase: 'off', inj: inj, until: inj.stopUntil };
+    var st = rtrStart(inj), p = st.p, wk0 = weekStart(stop), W = Math.floor(daysBetween(wk0, weekStart(date)) / 7);
+    var sb = (inj.setbacks || []).map(parseDate);
+    for (var j = 0; j < W; j++) {
+      var a = addDays(wk0, j * 7), b = addDays(a, 6);
+      p = sb.some(function (d) { return d >= a && d <= b; }) ? Math.max(0, p - 1) : p + 1;
+    }
+    if (p <= RTR_LAST) return { phase: 'return', inj: inj, stage: p, of: RTR_LAST + 1 };
+    var k = p - RTR_LAST - 1, factor = Math.min(1, st.f * Math.pow(1.1, k));
+    if (factor >= 1) return null;
+    return { phase: 'ramp', inj: inj, k: k, factor: factor, noQuality: k < 2 };
+  }
+  function makeReturnRun(p) {
+    var R = RTR[p], run = R[0], walk = R[1], reps = R[2];
+    return { type: 'runwalk', minutes: Math.round(10 + reps * (run + walk)), km: null, hardKm: 0, rtrStage: p,
+      target: T('s.min', { n: Math.round(10 + reps * (run + walk)) }),
+      steps: [walk ? T('rtr.main', { reps: reps, run: run, walk: walk }) : T('rtr.cont', { min: run })],
+      warmup: { lines: [T('rtr.warm')], min: 5 }, cooldown: { lines: [T('s.runwalk.cool')] },
+      how: T('rtr.how', { a: p + 1, b: RTR_LAST + 1 }), talk: talkTest(), easyEffort: true };
+  }
+  // تا کامل شدن بازگشت؛ و اینکه هدف اصلی هنوز واقع‌بینانه‌ست یا نه (تصمیم با خود دونده)
+  function injuryImpact(profile, now) {
+    var ip = injuryPhase(profile, now);
+    if (!ip) return null;
+    var st = rtrStart(ip.inj), kN = rampWeeks(st.f), from, left;
+    if (ip.phase === 'off') { from = weekStart(parseDate(ip.until)); left = (RTR_LAST + 1 - st.p) + kN; }
+    else if (ip.phase === 'return') { from = weekStart(now); left = (RTR_LAST + 1 - ip.stage) + kN; }
+    else { from = weekStart(now); left = kN - ip.k; }
+    var full = addDays(from, left * 7), race = raceInfo(profile), out = { phase: ip.phase, fullDate: dateKey(full), inj: ip.inj, status: null };
+    if (!race || race.date < now) return out;
+    var gap = daysBetween(full, race.date), taper = taperWeeks(race.key) * 7;
+    out.race = dateKey(race.date); out.gapDays = gap;
+    out.status = gap >= taper + 28 ? 'ok' : gap >= 0 ? 'tight' : 'unlikely';
+    return out;
+  }
+
   // ---------- ساخت هفته ----------
   // هفته‌ی اول برنامه = اولین هفته‌ی کامل (شنبه تا جمعه). اگه کاربر وسط هفته شروع کنه،
   // روزهای باقی‌مونده‌ی همون هفته «هفته‌ی شروع» (index = -1) هستن.
   function planStart(profile) {
     var s = parseDate(profile.startDate);
     return persianDayIndex(s) === 0 ? s : addDays(weekStart(s), 7);
+  }
+  // روزهای دویدن بازگشت: از روزهای تمرین، حداکثر ۳ روز غیرپشت‌سرهم
+  function pickRtrDays(days) {
+    var out = [];
+    days.slice().sort(function (a, b) { return a - b; }).forEach(function (d) { if (out.length < 3 && out.every(function (x) { return Math.abs(x - d) > 1; })) out.push(d); });
+    return out;
   }
   function weekIndexFor(profile, date) { return Math.floor(daysBetween(planStart(profile), weekStart(date)) / 7); }
 
@@ -1543,6 +1609,14 @@
       workouts = weekWorkouts(tier, level, W, pr.deload, goal, period);
       // اولین هفته‌ی برگشت بعد از مسابقه: فقط دویدن آسون
       if (rfWeek < 0.75) workouts = { quality: [], long: { kind: ultra ? 'ultra' : 'plain', share: 0 }, strides: false, vertFactor: 0.3 };
+      // برگشت حجم بعد از آسیب: درصدی از حجم برنامه، هر هفته حداکثر ۱۰٪ بیشتر؛ دو هفته‌ی اول فقط دویدن آسون
+      var ipw = injuryPhase(profile, ws);
+      if (ipw && ipw.phase === 'ramp') {
+        // مبنا: حجم هفته‌ی شروع آسیب (بدون هفته‌ی سبک)، تا رشد هر هفته فقط از خود برگشت باشه و از ۱۰٪ بیشتر نشه
+        var preKm = weeklyVolume(profile, Math.max(0, weekIndexFor(profile, parseDate(ipw.inj.start))), true, a).km;
+        weeklyKm = Math.max(5, Math.min(weeklyVolume(profile, W, true, a).km, floor05(preKm * ipw.factor)));
+        if (ipw.noQuality) workouts = { quality: [], long: { kind: ultra ? 'ultra' : 'plain', share: 0 }, strides: ipw.k >= 1, vertFactor: 0.3 };
+      }
 
       // ران‌های پشت‌سرهم (اولترا): سطح ۵+، پایه‌ی کافی (۵۰+ کیلومتر، بعد از ۴ هفته)، نه در هفته‌ی ریکاوری، دوره‌ی پایه یا نزدیک مسابقه
       var nearRace = race && race.date >= ws && daysBetween(ws, race.date) <= 20;
@@ -1642,7 +1716,7 @@
       });
     }
 
-    var side = otherRaces(profile);
+    var side = otherRaces(profile), rtrDays = null;
     for (var i = 0; i < 7; i++) {
       var date = addDays(ws, i);
       var s;
@@ -1653,6 +1727,18 @@
       else s = makeRest();
       if (race && s.type !== 'none') s = applyRace(profile, s, date, race, ctx, template._rw, level);
       if (side.length) s = applySideRaces(profile, s, date, side, ctx, template._rw, level);
+      // آسیب: دوره‌ی توقف = بدون دویدن؛ مرحله‌های بازگشت = حداکثر ۳ جلسه‌ی دویدن و پیاده‌روی، یک روز در میون
+      var ipd = profile.injuries && profile.injuries.length ? injuryPhase(profile, date) : null;
+      if (ipd && s.type !== 'none') {
+        if (ipd.phase === 'off' && s.type !== 'rest') {
+          var cx = makeCross(T('inj.offNote', { d: ipd.until }), true);
+          if (s.type === 'race') cx.steps.unshift(T('inj.raceNo'));
+          s = cx;
+        } else if (ipd.phase === 'return') {
+          if (rtrDays === null) rtrDays = pickRtrDays(sessionDays);
+          s = rtrDays.indexOf(i) >= 0 && s.type !== 'rest' ? makeReturnRun(ipd.stage) : (s.type === 'rest' ? s : makeRest(T('rtr.restNote')));
+        }
+      }
       s.date = dateKey(date);
       s.dayName = T('days')[(date.getDay() + 1) % 7];
       s.dayShort = T('daysShort')[(date.getDay() + 1) % 7];
@@ -1670,7 +1756,7 @@
     return {
       weekIndex: w, start: dateKey(ws), days: days, level: level, tier: tier, goal: goal,
       period: period, periodLabel: period ? PERIOD_LABELS[period] : null,
-      phase: weekPhase(profile, ws, pr, w, vol),
+      phase: injuryWeekPhase(profile, ws) || weekPhase(profile, ws, pr, w, vol),
       volumeTarget: weeklyKm, b2b: b2bDay !== null, vertCap: hp ? hp.cap : null, hillStage: hp ? hp.stage : null,
       zeroStage: level === 0 ? template._zero : null, zeroFinal: ZERO_FINAL,
       totalKm: round05(totalKm), totalMin: totalMin, vert: vert,
@@ -1678,6 +1764,12 @@
     };
   }
 
+  function injuryWeekPhase(profile, ws) {
+    if (!profile.injuries || !profile.injuries.length) return null;
+    var ip = injuryPhase(profile, addDays(ws, 3));
+    if (!ip) return null;
+    return { key: ip.phase === 'off' ? 'injury' : 'injuryReturn', label: T(ip.phase === 'off' ? 'phase.injury' : 'phase.injuryReturn') };
+  }
   function weekPhase(profile, ws, pr, w, vol) {
     var race = raceInfo(profile);
     if (w === -1 && addDays(ws, 6) >= parseDate(profile.startDate)) return { key: 'intro', label: T('phase.intro') };
@@ -1735,6 +1827,107 @@
 
   function sessionFor(profile, date) {
     return buildWeek(profile, date).days[persianDayIndex(date)];
+  }
+
+  // ---------- درد: سطح، الگو، تشدید و تطبیق بار تمرین ----------
+  // گام تشخیص نمی‌ده؛ فقط بار تمرین رو کم می‌کنه و در موارد جدی به متخصص ارجاع می‌ده.
+  // مبنا: مدل پایش درد (Thomeé 1997؛ Silbernagel 2007): درد خفیف (حدود ۳ از ۱۰ یا کمتر) که تا صبح بعد آروم می‌شه با فعالیت
+  // سبک‌تر قابل قبوله؛ درد بیشتر، درد در استراحت یا شب، ورم، لنگیدن یا نتونستن وزن انداختن = توقف دویدن و ارجاع.
+  // دسته‌بندی محتاطانه‌تر از پروتکل‌های تحت نظر فیزیوتراپه، چون کاربر غیرحرفه‌ای و بدون معاینه‌ست (قاعده‌ی طراحی).
+  var PAIN_AREAS = ['knee', 'shin', 'achilles', 'calf', 'foot', 'ankle', 'hip', 'thigh', 'back', 'other'];
+  var PAIN_WHEN = ['during', 'after', 'rest', 'night'];
+  var PAIN_FLAGS = ['swelling', 'limp', 'weight', 'worse'];   // ورم، لنگیدن، نتونستن وزن انداختن، بدتر شدن با هر قدم
+  var TIER_ORDER = ['none', 'mild', 'moderate', 'severe'];
+  function painTier(e) {
+    if (!e) return 'none';
+    var lv = Number(e.level) || 0, when = e.when || [], flags = e.flags || [];
+    if (lv >= 7 || flags.length || when.indexOf('rest') >= 0 || when.indexOf('night') >= 0) return 'severe';
+    if (lv >= 4) return 'moderate';
+    return lv >= 1 ? 'mild' : 'none';
+  }
+  function tierUp(t) { return TIER_ORDER[Math.min(3, TIER_ORDER.indexOf(t) + 1)]; }
+  // وضعیت درد در یک روز: آخرین ثبت درد تا اون روز، اگه بعدش «بدون درد» ثبت نشده
+  // pains: { yyyy-mm-dd: { area, level, when, flags } }، checkins: چک‌این‌ها (pain: false = بدون درد؛ pain: true بدون جزئیات = ثبت قدیمی)
+  function painEpisode(pains, checkins, date) {
+    pains = pains || {}; checkins = checkins || {};
+    var dk = dateKey(date), keys = {};
+    Object.keys(pains).forEach(function (k) { keys[k] = 1; });
+    Object.keys(checkins).forEach(function (k) { keys[k] = 1; });
+    var list = Object.keys(keys).filter(function (k) { return k <= dk && daysBetween(parseDate(k), date) <= 28; }).sort();
+    var stateOf = function (k) {
+      var pe = pains[k], ci = checkins[k];
+      if (pe) return painTier(pe) === 'none' ? 'free' : 'pain';
+      if (ci && ci.pain === true) return 'legacy';
+      if (ci && ci.pain === false) return 'free';
+      return null;
+    };
+    var last = null, freeAfter = null;
+    for (var i = list.length - 1; i >= 0; i--) {
+      // «امروز دیگه درد ندارم» در همون روزِ ثبت درد: درد ثبت‌شده می‌مونه و همون روز رفع‌شده حساب می‌شه
+      var pf = pains[list[i]];
+      var cf = checkins[list[i]];
+      if ((pf && pf.freeAt && painTier(pf) !== 'none') || (!pf && cf && cf.pain === true && cf.painFree)) { if (!freeAfter) freeAfter = list[i]; last = list[i]; break; }
+      var st = stateOf(list[i]);
+      if (!st) continue;
+      if (st === 'free') { if (!freeAfter) freeAfter = list[i]; continue; }
+      last = list[i]; break;
+    }
+    if (!last) return null;
+    var lastEntry = pains[last] || { level: null, legacy: true, area: null, where: (checkins[last] || {}).painWhere || '' };
+    var baseTier = pains[last] ? painTier(pains[last]) : 'severe';
+    // بعد از ثبت «بدون درد»: اگه دوره‌ی درد متوسط یا شدید بوده، ۳ روز برگشت سبک
+    if (freeAfter) {
+      var since = daysBetween(parseDate(freeAfter), date);
+      if (TIER_ORDER.indexOf(baseTier) >= 2 && since < 3) return { tier: 'mild', recovering: true, date: last, entry: lastEntry, base: baseTier, freeOn: freeAfter };
+      return null;
+    }
+    // شروع این دوره (ثبت‌های درد پشت سر هم، بدون «بدون درد» بینشون)
+    var startK = last, prevLevel = null, count7 = 0;
+    for (var j = list.indexOf(last); j >= 0; j--) {
+      var sj = stateOf(list[j]);
+      if (sj === 'free') break;
+      if (sj === 'pain' || sj === 'legacy') {
+        startK = list[j];
+        if (daysBetween(parseDate(list[j]), date) <= 6) count7++;
+        if (list[j] !== last && prevLevel === null && pains[list[j]]) prevLevel = Number(pains[list[j]].level) || 0;
+      }
+    }
+    var worse = prevLevel !== null && Number(lastEntry.level) > prevLevel;
+    var persistent = count7 >= 3;
+    var tier = baseTier;
+    if (pains[last] && (worse || persistent)) tier = tierUp(tier);
+    var days = daysBetween(parseDate(startK), date) + 1;
+    return { tier: tier, base: baseTier, date: last, start: startK, days: days, entry: lastEntry, worse: worse, persistent: persistent,
+      longDays: days >= 10, stale: daysBetween(parseDate(last), date) > 7, legacy: !pains[last] };
+  }
+  // جایگزین کم‌فشار (روز درد متوسط یا دوره‌ی توقف آسیب)
+  function makeCross(note, injury) {
+    return { type: 'rest', km: null, hardKm: 0, target: T(injury ? 'inj.crossTarget' : 'painPlan.crossTarget'), cross: true,
+      steps: [T('painPlan.crossStep'), T('painPlan.crossStep2')], how: note || '' };
+  }
+  // تطبیق جلسه با وضعیت درد. خروجی { session, adaptation } مثل adaptSession
+  function painAdjust(s, ep, zones) {
+    if (!ep || !s) return null;
+    var t = ep.tier, off = s.type === 'rest' || s.type === 'none' || s.type === 'cancelled';
+    var ad = { kind: 'pain', tier: t, area: ep.entry.area || null, where: ep.entry.where || '', level: ep.entry.level, persistent: ep.persistent, worse: ep.worse,
+      longDays: ep.longDays, recovering: !!ep.recovering, legacy: !!ep.legacy, stale: !!ep.stale, since: ep.start || ep.date };
+    var msg = T('painPlan.msg.' + (ep.recovering ? 'recovering' : t));
+    ad.message = msg;
+    if (off) return { session: s, adaptation: ad };
+    var n;
+    if (t === 'severe') {
+      n = { type: 'cancelled', km: null, hardKm: 0, target: '—', steps: [T('painPlan.severeStep'), T('painPlan.severeStep2')], how: msg };
+    } else if (t === 'moderate') {
+      n = makeCross(msg);
+      if (s.type === 'race') n.steps.unshift(T('painPlan.raceNo'));
+    } else {
+      // خفیف: حجم کمتر، بدون اینتروال، تپه، تمپو و بخش تند؛ مسابقه با تصمیم خود دونده می‌مونه
+      if (s.type === 'race') { ad.raceKept = true; return { session: s, adaptation: ad }; }
+      if (s.type === 'runwalk' || s.type === 'walkrun') { n = JSON.parse(JSON.stringify(s)); n.how = msg + ' ' + (n.how || ''); n.steps = n.steps.concat([T('painPlan.mildRw')]); }
+      else if (s.km) n = makeEasy(Math.max(3, s.km * (isHard(s.type) ? 0.7 : 0.8)), zones, msg);
+      else return { session: s, adaptation: ad };
+    }
+    return { session: withDay(n, s), adaptation: ad };
   }
 
   // ---------- تطبیق هوشمند با چک‌این روزانه ----------
@@ -1995,11 +2188,46 @@
   // فاز تخمینی هر روز از تاریخ شروع آخرین پریود، طول چرخه و طول پریود:
   //  period (روز ۱ تا P؛ روز ۱ و ۲ = heavy) → follicular → ovulation (حدود ۱۴ روز قبل از پریود بعدی، ±۲ روز)
   //  → luteal → lateLuteal (۵ روز آخر). برنامه هیچ‌وقت خودکار عوض نمی‌شه؛ فقط پیشنهاد می‌ده.
+  // شروع‌های ثبت‌شده (cycle.starts) + آخرین شروع؛ مرتب و بدون تکرار
+  function cycleStarts(profile) {
+    var c = (profile && profile.cycle) || {}, set = {};
+    (c.starts || []).concat(c.lastStart ? [c.lastStart] : []).forEach(function (k) { if (/^\d{4}-\d{2}-\d{2}$/.test(k)) set[k] = 1; });
+    return Object.keys(set).sort();
+  }
+  // طول چرخه‌ی واقعی از شروع‌های ثبت‌شده (میانه‌ی حداکثر ۶ فاصله‌ی اخیر بین ۲۱ و ۴۵ روز؛ حداقل ۲ فاصله)، وگرنه عدد واردشده.
+  // بی‌نظمی (برای پیام ملایم مشورت با پزشک، نه تشخیص): اختلاف کوتاه‌ترین و بلندترین فاصله‌ی اخیر بیشتر از ۹ روز،
+  // فاصله‌ی خارج از ۲۱ تا ۴۵ روز، یا بیش از ۹۰ روز بدون شروع تازه (حدودهای رایج بالینی؛ ACOG 2015).
+  function cycleStats(profile, now) {
+    var c = (profile && profile.cycle) || {}, st = cycleStarts(profile), gaps = [];
+    for (var i = 1; i < st.length; i++) gaps.push(daysBetween(parseDate(st[i - 1]), parseDate(st[i])));
+    var recent = gaps.slice(-6), ok = recent.filter(function (g) { return g >= 21 && g <= 45; });
+    var manual = clamp(Number(c.cycleLen) || 28, 21, 45), computed = ok.length >= 2 ? Math.round(median(ok)) : null;
+    var out = { starts: st, gaps: recent, length: computed || manual, computed: !!computed, manual: manual, flags: [] };
+    if (recent.length >= 3 && Math.max.apply(null, recent) - Math.min.apply(null, recent) > 9) out.flags.push('variable');
+    if (recent.some(function (g) { return g < 21 || g > 45; })) out.flags.push('outOfRange');
+    if (now && st.length) {
+      var since = daysBetween(parseDate(st[st.length - 1]), now);
+      out.since = since;
+      if (since > 90) out.flags.push('absent');
+      else if (since > out.length + 10) out.flags.push('late');
+    }
+    return out;
+  }
+  function median(a) { var v = a.slice().sort(function (x, y) { return x - y; }), m = Math.floor(v.length / 2); return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; }
+  // شروع تازه ثبت می‌شه؛ شروعی که تا ۷ روز با یکی از قبلی‌ها فاصله داره همون دوره‌ست (جایگزین می‌شه)
+  function logPeriodStart(profile, key) {
+    var c = profile.cycle = profile.cycle || {};
+    var st = cycleStarts(profile).filter(function (k) { return Math.abs(daysBetween(parseDate(k), parseDate(key))) > 7; });
+    st.push(key); st.sort();
+    c.starts = st.slice(-24);
+    c.lastStart = st[st.length - 1];
+    return c;
+  }
   function cycleSettings(profile) {
     var c = profile && profile.cycle;
     if (!c || !c.enabled || !c.lastStart || profile.sex !== 'female') return null;
-    var L = clamp(Number(c.cycleLen) || 28, 21, 45), P = clamp(Number(c.periodLen) || 5, 2, 10);
-    return { start: parseDate(c.lastStart), L: L, P: Math.min(P, L - 10) };
+    var st = cycleStarts(profile), L = cycleStats(profile).length, P = clamp(Number(c.periodLen) || 5, 2, 10);
+    return { start: parseDate(st[st.length - 1]), L: L, P: Math.min(P, L - 10) };
   }
   function cycleInfo(profile, date) {
     var c = cycleSettings(profile);
@@ -2776,6 +3004,8 @@
     dateKey: dateKey, parseDate: parseDate, addDays: addDays, weekStart: weekStart, daysBetween: daysBetween, weekIndexFor: weekIndexFor,
     persianDayIndex: persianDayIndex, dayIndex: persianDayIndex, setWeekStart: setWeekStart, getWeekStart: getWeekStart, satToRel: satToRel, parseTime: parseTime, formatDuration: formatDuration, describeDuration: describeDuration,
     otherRaces: otherRaces, sideRaceWindow: sideRaceWindow, raceDistLabel: raceDistLabel, MAX_RACES: MAX_RACES,
+    PAIN_AREAS: PAIN_AREAS, PAIN_WHEN: PAIN_WHEN, PAIN_FLAGS: PAIN_FLAGS, painTier: painTier, painEpisode: painEpisode, painAdjust: painAdjust,
+    injuryPhase: injuryPhase, injuryImpact: injuryImpact, RTR: RTR, cycleStats: cycleStats, cycleStarts: cycleStarts, logPeriodStart: logPeriodStart,
     miniTaper: miniTaper, sideCheck: sideCheck, sideBlocked: sideBlocked, keyLongRuns: keyLongRuns, SIDE_BLOCK_DAYS: SIDE_BLOCK_DAYS,
     riegel: riegel, vdotFromRace: vdotFromRace, raceTimeFromVdot: raceTimeFromVdot,
     levelFromKm: levelFromKm, levelFromVdot: levelFromVdot, assessLevel: assessLevel,
