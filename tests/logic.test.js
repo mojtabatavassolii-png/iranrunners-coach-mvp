@@ -1580,4 +1580,27 @@ test('چرخه: طول از شروع‌های ثبت‌شده، به‌روز ش
   assert.ok(C.cycleStats(irr, C.parseDate('2026-07-10')).flags.indexOf('variable') >= 0);
   assert.ok(C.cycleStats(irr, C.parseDate('2026-10-10')).flags.indexOf('absent') >= 0);
 });
+test('پیس تکرارها: زمان هر تکرار برای ۱۰ کیلومتر ۴۰ دقیقه، و برچسب تخمینی بدون رکورد', function () {
+  var t10 = [{ date: '2026-09-20', distanceKm: 10, timeSec: hms(0, 40), kind: 'test' }];
+  var P = C.paceSet(profileFor(6, { fitnessTests: t10 }), 6);
+  assert.ok(P.known && P.show);
+  // I: ۳:۴۳ تا ۳:۵۱ ← ۴۰۰ متر ۸۹ تا ۹۲ ثانیه؛ R: ۳:۲۹ تا ۳:۳۵ ← ۲۰۰ متر ۴۲ تا ۴۳ ثانیه
+  assert.deepStrictEqual([Math.round(P.I[0] * 0.4), Math.round(P.I[1] * 0.4)], [89, 92]);
+  assert.deepStrictEqual([Math.round(P.R[0] * 0.2), Math.round(P.R[1] * 0.2)], [42, 43]);
+  var found = { short: 0, long: 0 };
+  allDays(profileFor(6, { fitnessTests: t10 }), 12).forEach(function (d) {
+    var s = d.session || d;
+    if (!s || s.type !== 'interval' || !s.rep) return;
+    if (s.rep <= 400 && s.spec && s.spec.type === 'shortInt') { found.short++; assert.ok(/91 تا 94 ثانیه/.test(s.steps[0]), s.steps[0]); }
+    if (s.rep >= 800) { found.long++; assert.ok(/هر دور پیست/.test(s.steps[0]), s.steps[0]); }
+    assert.ok(s.steps[0].indexOf('تخمینی') < 0);
+  });
+  assert.ok(found.short && found.long, JSON.stringify(found));
+  // بدون رکورد، سطح ۴: پیس از سطح و برچسب تخمینی
+  var est = allDays(profileFor(4), 8).filter(function (d) { var s = d.session || d; return s && (s.type === 'interval' || s.type === 'tempo'); });
+  assert.ok(est.length);
+  est.forEach(function (d) { var s = d.session || d; assert.ok(/تخمینی/.test(s.steps[0]), s.steps[0]); });
+  // سطح ۲ بدون رکورد: پیسی نشون داده نمی‌شه
+  assert.ok(!C.paceSet(profileFor(2), 2).show);
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

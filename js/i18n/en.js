@@ -216,7 +216,18 @@
       reps: 'Effort: fast and relaxed (RPE 8 out of 10), full recovery.'
     },
     guideLine: { pace: ' Pace: {p}.', hr: ' Heart rate: {a}–{b}.' },
-    paceHint: { one: ' {label}: {a} {pu}.', two: ' {label}: {a}–{b} {pu}.' },
+    paceHint: { one: ' {label}: {a} {pu}{est}.', two: ' {label}: {a}–{b} {pu}{est}.' },
+    rg: {
+      secs: '{a}–{b} s', clock: '{a}–{b}', sec: '{n} s', min: '{t} min',
+      timeFirst: ', {t} each ({pa}–{pb} {pu}{est})',
+      paceFirst: ' ({pa}–{pb} {pu}, {t} each{lap}{est})',
+      pace: ' ({pa}–{pb} {pu}{est})',
+      lap: ', {a}–{b} s per 400 m lap',
+      est: ', estimated',
+      restJog: 'about {t} easy jog (as long as the rep)',
+      basisTest: ' Paces come from your latest race or time trial (Daniels method).',
+      basisEst: ' Paces are estimated from your level; log a race or time trial to make them exact.'
+    },
     lbl: {
       pace: 'Pace', paceT: 'T pace', paceI: 'I pace', paceReps: 'Rep pace', paceR: 'R pace', paceFast: 'Pace for the fast parts',
       pace5k: '5 km pace', paceFastParts: 'Pace for the fast sections', paceMarathon: 'Marathon pace', paceTempoPart: 'Tempo section pace'
@@ -246,12 +257,12 @@
       },
       strength: '+ 30–40 min strength and plyometrics (squats, light deadlifts, lunges, short jumps)',
       tempo: {
-        mildMain: '{a:d} {u} at tempo rhythm, 2 min jog, {b:d} {u} at tempo rhythm',
-        main: '{km:d} {u} continuous at threshold pace (T)',
+        mildMain: '{a:d} {u} at tempo rhythm, 2 min jog, {b:d} {u} at tempo rhythm{g}',
+        main: '{km:d} {u} continuous at threshold pace{g}',
         mildHow: 'Effort: a little slower than a full tempo (RPE 6–7 out of 10).',
         vMild: 'gentle', vT: 'threshold, T'
       },
-      cruise: { variant: 'cruise intervals, T', main: '{reps} × {rk:d} {u} at threshold pace (T), 1 min rest between reps' },
+      cruise: { variant: 'cruise intervals, T', main: '{reps} × {rk:d} {u} at threshold pace{g}, 1 min rest between reps' },
       interval: {
         restShort: '2–3 min walking or very easy jogging',
         restDaniels: 'easy jog for as long as the rep',
@@ -261,18 +272,18 @@
         warmKm: '{km:d} {u} warm-up + ',
         warmMin: '10 min easy running + ',
         strides4: '4 short 20-second accelerations',
-        main: '{reps} × {rep} m, {rest} between reps',
+        main: '{reps} × {rep} m{g}, {rest} between reps',
         shortHow: 'Effort: fast but controlled (RPE 7–8 out of 10), not all-out.',
         vShort: 'short', vI: 'VO2max, I'
       },
       reps: {
         variant: 'R pace',
         warm: '{km:d} {u} warm-up + 4 short accelerations',
-        main: '{reps} × {rep} m at R pace, {rep} m easy jog between reps (full recovery)'
+        main: '{reps} × {rep} m at R pace{g}, {rep} m easy jog between reps (full recovery)'
       },
       fartlek: { main: '{reps} times: 2 min fast (10 km rhythm) + 2 min easy running', how: 'Effort in the fast parts: RPE 7–8 out of 10.' },
-      shortInt: { variant: 'short, 5 km pace', main: '{reps} × {rep} m at 5 km pace; rest: easy jog as long as the rep or a bit longer' },
-      midInt: { variant: 'medium, 5–10 km pace', main: '{reps} × {rep} m at a pace between 5 km and 10 km; 2–3 min easy jog between reps' },
+      shortInt: { variant: 'short, 5 km pace', main: '{reps} × {rep} m at 5 km pace{g}; rest: {rest}', rest: 'easy jog as long as the rep or a bit longer' },
+      midInt: { variant: 'medium, 5–10 km pace', main: '{reps} × {rep} m at a pace between 5 km and 10 km{g}; 2–3 min easy jog between reps' },
       speedFartlek: {
         pyramid: 'Pyramid: 1-2-3-4-3-2-1 min fast, 1 min easy between each',
         pyramidShort: 'Short pyramid: 1-2-3-2-1 min fast, 1 min easy between each',
@@ -291,11 +302,11 @@
       fartlekVsInterval: ' A fartlek is continuous: you never stop between the fast bits, and recovery is easy running; intervals have fuller rests and a stricter structure.',
       intervalVsFartlek: ' Intervals have a precise structure and fuller rests between reps so each rep is high quality; a fartlek, by contrast, is continuous.',
       shortHills: { variant: 'short hills', main: '{reps} × about 100 m fast up a short hill (6–10% grade); walk back down', how: 'Effort: fast and powerful (RPE 8–9 out of 10).' },
-      thresholdInt: { variant: 'threshold intervals', main: '{reps} × {min} min at threshold pace; 90 s to 2 min easy jog between reps' },
-      longInt: { variant: 'long', main: '{reps} × {rep} m at a pace between 10 km and half marathon; 2–3 min jog between reps', how: 'Effort: hard but sustainable (RPE 7–8 out of 10).' },
-      tempoRun: { variant: 'continuous', main: '{min} min continuous at threshold pace (a pace you could hold for about an hour)' },
-      longTempo: { variant: 'long continuous', main: '{min} min continuous at threshold pace or slightly slower', how: 'Effort: RPE 6–7 out of 10, no fading to the end.' },
-      mpInt: { variant: 'marathon-pace intervals', main: '{reps} × {km:d} {u} at exact marathon pace; {j:d} {u} easy running between reps', how: 'Effort: RPE 6–7 out of 10; exactly race rhythm.' },
+      thresholdInt: { variant: 'threshold intervals', main: '{reps} × {min} min at threshold pace{g}; 90 s to 2 min easy jog between reps' },
+      longInt: { variant: 'long', main: '{reps} × {rep} m at a pace between 10 km and half marathon{g}; 2–3 min jog between reps', how: 'Effort: hard but sustainable (RPE 7–8 out of 10).' },
+      tempoRun: { variant: 'continuous', main: '{min} min continuous at threshold pace{g}; a pace you could hold for about an hour' },
+      longTempo: { variant: 'long continuous', main: '{min} min continuous at threshold pace or slightly slower{g}', how: 'Effort: RPE 6–7 out of 10, no fading to the end.' },
+      mpInt: { variant: 'marathon-pace intervals', main: '{reps} × {km:d} {u} at exact marathon pace{g}; {j:d} {u} easy running between reps', how: 'Effort: RPE 6–7 out of 10; exactly race rhythm.' },
       longFartlek: {
         variant: 'long',
         main: '{dur} min run including {n} 10-minute sections at marathon pace or slightly faster',

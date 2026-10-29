@@ -923,16 +923,17 @@
     return s;
   }
 
-  function makeTempo(mainKm, wuKm, zones, mild) {
+  function makeTempo(mainKm, wuKm, zones, mild, ctx) {
     mainKm = Math.min(mild ? 6 : 12, Math.max(1.5, floor05(mainKm)));
     var half = wuKm / 2;
+    var g = ctx ? repGuide(ctx, 0, mild ? [ctx.P.tRange[1], ctx.P.tRange[1] + 10] : ctx.P.tRange) : '';
     var main = mild && mainKm >= 3
-      ? [T('s.tempo.mildMain', { a: floor05(mainKm / 2), b: round05(mainKm - floor05(mainKm / 2)) })]
-      : [T('s.tempo.main', { km: mainKm })];
+      ? [T('s.tempo.mildMain', { a: floor05(mainKm / 2), b: round05(mainKm - floor05(mainKm / 2)), g: g })]
+      : [T('s.tempo.main', { km: mainKm, g: g })];
     var s = {
       type: 'tempo', km: round05(mainKm + wuKm), hardKm: mainKm, target: T('s.km', { n: round05(mainKm + wuKm) }), mild: !!mild,
       steps: main,
-      how: (mild ? T('s.tempo.mildHow') : rpeLine('tempo')) + paceNote(T('lbl.pace'), zones && zones.tempo)
+      how: (mild ? T('s.tempo.mildHow') : rpeLine('tempo')) + (ctx ? paceBasis(ctx) : paceNote(T('lbl.pace'), zones && zones.tempo))
     };
     s.variant = mild ? T('s.tempo.vMild') : T('s.tempo.vT');
     return s;
@@ -945,40 +946,41 @@
     return {
       type: 'tempo', km: round05(hardKm + wuKm + reps * 0.2), hardKm: hardKm, cruise: true, variant: T('s.cruise.variant'),
       target: T('s.km', { n: round05(hardKm + wuKm + reps * 0.2) }),
-      steps: [T('s.cruise.main', { reps: reps, rk: 1.6 })],
+      steps: [T('s.cruise.main', { reps: reps, rk: 1.6, g: '' })],
       how: rpeLine('tempo') + paceNote(T('lbl.paceT'), zones && zones.tempo)
     };
   }
 
   // اینتروال. kind: short (سطح ۳-۴: کوتاه با استراحت طولانی) | struct (سطح ۵-۶) | daniels (VO2max، سطح ۷+)
-  function makeInterval(mainKm, wuKm, rep, zones, kind) {
+  function makeInterval(mainKm, wuKm, rep, zones, kind, ctx) {
     var maxReps = { 200: 12, 400: kind === 'short' ? 8 : 16, 800: 10, 1000: 8, 1200: 6 }[rep] || 10;
     var minReps = kind === 'short' ? 4 : 3;
     var reps = Math.min(maxReps, Math.max(minReps, Math.floor(mainKm * 1000 / rep + 1e-9)));
     var hardKm = reps * rep / 1000, half = wuKm / 2;
+    var rI = ctx && ctx.P.I;
     var rest = kind === 'short' ? T('s.interval.restShort') :
-      kind === 'daniels' ? T('s.interval.restDaniels') :
+      kind === 'daniels' ? ((ctx && restLike(ctx, rep, rI)) || T('s.interval.restDaniels')) :
       (rep <= 400 ? T('s.interval.rest90') : (rep === 800 ? T('s.interval.rest23') : T('s.interval.rest3')));
     var total = round05(hardKm + wuKm + reps * (rep >= 800 ? 0.3 : 0.2));
     var s = {
       type: 'interval', km: total, hardKm: hardKm, rep: rep, kind: kind || 'struct', target: T('s.km', { n: total }),
-      steps: [T('s.interval.main', { reps: reps, rep: rep, rest: rest })],
+      steps: [T('s.interval.main', { reps: reps, rep: rep, rest: rest, g: ctx ? repGuide(ctx, rep, rI) : '' })],
       how: (kind === 'short' ? T('s.interval.shortHow') : rpeLine('interval')) +
-        paceNote(kind === 'daniels' ? T('lbl.paceI') : T('lbl.paceReps'), zones && zones.interval)
+        (ctx ? paceBasis(ctx) : paceNote(kind === 'daniels' ? T('lbl.paceI') : T('lbl.paceReps'), zones && zones.interval))
     };
     s.variant = kind === 'short' ? T('s.interval.vShort') : (kind === 'daniels' ? T('s.interval.vI') : null);
     return s;
   }
 
   // تکرار سرعتی دنیلز (R): ۲۰۰/۴۰۰ متر با ریکاوری کامل
-  function makeReps(mainKm, wuKm, rep, zones) {
+  function makeReps(mainKm, wuKm, rep, zones, ctx) {
     var reps = Math.min(rep === 200 ? 12 : 8, Math.max(6, Math.floor(mainKm * 1000 / rep + 1e-9)));
     var hardKm = reps * rep / 1000, half = wuKm / 2;
     var total = round05(hardKm * 2 + wuKm);
     return {
       type: 'reps', km: total, hardKm: hardKm, rep: rep, variant: T('s.reps.variant'), target: T('s.km', { n: total }),
-      steps: [T('s.reps.main', { reps: reps, rep: rep })],
-      how: rpeLine('reps') + paceNote(T('lbl.paceR'), zones && zones.reps)
+      steps: [T('s.reps.main', { reps: reps, rep: rep, g: ctx ? repGuide(ctx, rep, ctx.P.R) : '' })],
+      how: rpeLine('reps') + (ctx ? paceBasis(ctx) : paceNote(T('lbl.paceR'), zones && zones.reps))
     };
   }
 
@@ -1009,7 +1011,10 @@
     var P = { vdot: v, known: !!currentFitness(profile), p5: race(5), p10: race(10), pHM: race(21.0975), pM: race(42.195),
       pT: paceAtPct(v, 0.88), pE: paceAtPct(v, 0.70) + adj,
       // همون بازه‌ای که صفحه‌ی فیتنس برای آستانه نشون می‌ده
-      tRange: [paceAtPct(v, 0.90), paceAtPct(v, 0.86)] };
+      tRange: [paceAtPct(v, 0.90), paceAtPct(v, 0.86)],
+      I: [paceAtPct(v, 1.0), paceAtPct(v, 0.96)], R: [paceAtPct(v, 0.98) - 18, paceAtPct(v, 0.98) - 12],
+      // بدون رکورد، از سطح ۳ به بعد پیس‌ها از VDOT مرجع سطح «تخمینی» نشون داده می‌شن
+      show: !!currentFitness(profile) || level >= PACE_LEVEL };
     // زمان هدف مسابقه‌ی اصلی (دنیلز): پیس‌های تمرینی از آمادگی فعلی می‌مونن؛ فقط پیس مسابقه‌ی همون مسافت
     // به سمت هدف می‌ره و حداکثر ۲ واحد VDOT جلوتر از آمادگی فعلی (هدف خیلی دور تمرین رو بیش از حد سخت نکنه)
     var tg = goalTarget(profile, level);
@@ -1034,12 +1039,41 @@
     var h = Math.floor(min / 60), m = min % 60;
     return (h ? T('dur.h', { n: h }) : '') + (h && m ? T('dur.join') : '') + (m ? T('dur.m', { n: m }) : '');
   }
-  // پیس فقط وقتی نشون داده می‌شه که از تایم‌تست واقعی باشه، و نه در تمرین‌های تریل (اون‌جا RPE و زمان ملاکه)
+  // پیس از تایم‌تست واقعی، یا بدون اون «تخمینی» از سطح؛ نه در تمرین‌های تریل (اون‌جا RPE و زمان ملاکه)
+  function showPace(ctx) { return ctx && ctx.P && ctx.P.show && !ctx.rpeOnly; }
+  function estTag(ctx) { return ctx.P.known ? '' : T('rg.est'); }
   function paceHint(ctx, label, a, b) {
-    if (!ctx.P.known || ctx.rpeOnly) return '';
-    var P = I18N.pace;
-    return b ? T('paceHint.two', { label: label, a: formatDuration(P(a)), b: formatDuration(P(b)) }) : T('paceHint.one', { label: label, a: formatDuration(P(a)) });
+    if (!showPace(ctx)) return '';
+    var P = I18N.pace, est = estTag(ctx);
+    return b ? T('paceHint.two', { label: label, a: formatDuration(P(a)), b: formatDuration(P(b)), est: est }) : T('paceHint.one', { label: label, a: formatDuration(P(a)), est: est });
   }
+  // زمان هدف هر تکرار از بازه‌ی پیس (ثانیه بر کیلومتر). ۲۰۰ تا ۴۰۰ متر: زمان عدد اصلیه و پیس مرجع؛
+  // ۸۰۰ متر و بیشتر: پیس اصلیه، زمان کل تکرار و زمان هر دور پیست ۴۰۰ متری کنارش
+  function repSec(m, pace) { return Math.round(pace * m / 1000); }
+  function secRange(a, b) {
+    return b < 100 ? T('rg.secs', { a: a, b: b }) : T('rg.clock', { a: formatDuration(a), b: formatDuration(b) });
+  }
+  function repGuide(ctx, m, r) {
+    if (!showPace(ctx)) return '';
+    var P = I18N.pace, pa = formatDuration(P(r[0])), pb = formatDuration(P(r[1])), est = estTag(ctx);
+    if (!m) return T('rg.pace', { pa: pa, pb: pb, est: est });
+    var t = secRange(repSec(m, r[0]), repSec(m, r[1]));
+    if (m <= 400) return T('rg.timeFirst', { t: t, pa: pa, pb: pb, est: est });
+    var lap = m >= 800 && m <= 2000 ? T('rg.lap', { a: repSec(400, r[0]), b: repSec(400, r[1]) }) : '';
+    return T('rg.paceFirst', { t: t, pa: pa, pb: pb, lap: lap, est: est });
+  }
+  // استراحت هم‌اندازه‌ی تکرار، به عدد (گرد به ۵ ثانیه)
+  function restLike(ctx, m, r) {
+    if (!showPace(ctx)) return null;
+    var sec = Math.round(repSec(m, (r[0] + r[1]) / 2) / 5) * 5;
+    return T('rg.restJog', { t: sec < 100 ? T('rg.sec', { n: sec }) : T('rg.min', { t: formatDuration(sec) }) });
+  }
+  // خط مبنای پیس در جزئیات جلسه
+  function paceBasis(ctx) {
+    if (!showPace(ctx)) return '';
+    return ctx.P.known ? T('rg.basisTest') : T('rg.basisEst');
+  }
+  function band(p) { return [p - 3, p + 3]; }
   function sess(type, variant, hardKm, totalKm, steps, how, extra) {
     var km = Math.max(round05(totalKm), round05(hardKm));
     var s = { type: type, variant: variant, km: km, hardKm: r1(hardKm), target: T('s.km', { n: km }), steps: steps, how: how };
@@ -1053,8 +1087,8 @@
     var reps = clamp(Math.floor(main * 1000 / rep + 1e-9), 4, { 400: 16, 600: 12, 800: 10 }[rep] || 10);
     var hard = reps * rep / 1000, jog = hard * ctx.P.p5 / ctx.P.pE * 1.1;
     return sess('interval', T('s.shortInt.variant'), hard, hard + ctx.wu + jog,
-      [T('s.shortInt.main', { reps: reps, rep: rep })],
-      rpeLine('interval') + paceHint(ctx, T('lbl.pace5k'), ctx.P.p5),
+      [T('s.shortInt.main', { reps: reps, rep: rep, g: repGuide(ctx, rep, band(ctx.P.p5)), rest: restLike(ctx, rep, band(ctx.P.p5)) || T('s.shortInt.rest') })],
+      rpeLine('interval') + paceBasis(ctx),
       { rep: rep, kind: 'short5k' });
   }
   // اینتروال متوسط: ۱۰۰۰ تا ۱۶۰۰ متر با پیس بین ۵ تا ۱۰ کیلومتر، استراحت ۲ تا ۳ دقیقه
@@ -1063,8 +1097,8 @@
     var reps = clamp(Math.floor(main * 1000 / rep + 1e-9), 3, { 1000: 8, 1200: 6, 1600: 5 }[rep] || 6);
     var hard = reps * rep / 1000;
     return sess('interval', T('s.midInt.variant'), hard, hard + ctx.wu + reps * 0.4,
-      [T('s.midInt.main', { reps: reps, rep: rep })],
-      rpeLine('interval') + paceHint(ctx, T('lbl.pace'), ctx.P.p5, ctx.P.p10),
+      [T('s.midInt.main', { reps: reps, rep: rep, g: repGuide(ctx, rep, [ctx.P.p5, ctx.P.p10]) })],
+      rpeLine('interval') + paceBasis(ctx),
       { rep: rep, kind: 'mid' });
   }
   // فارتلک: پیوسته و بدون توقف (ریکاوری = دویدن آروم). فرم‌ها:
@@ -1119,37 +1153,37 @@
     var mm = main * ctx.P.pT / 60, reps = mm >= 32 ? 4 : 3, repMin = clamp(Math.round(mm / reps), 8, 10);
     var hard = reps * repMin * 60 / ctx.P.pT;
     return sess('tempo', T('s.thresholdInt.variant'), hard, hard + ctx.wu + reps * 0.3,
-      [T('s.thresholdInt.main', { reps: reps, min: repMin })],
-      rpeLine('tempo') + paceHint(ctx, T('lbl.pace'), ctx.P.tRange[0], ctx.P.tRange[1]), { thresholdInt: true });
+      [T('s.thresholdInt.main', { reps: reps, min: repMin, g: repGuide(ctx, 0, ctx.P.tRange) })],
+      rpeLine('tempo') + paceBasis(ctx), { thresholdInt: true });
   }
   // اینتروال بلند: ۱۶۰۰ تا ۲۰۰۰ متر با پیس بین ۱۰ کیلومتر و نیمه‌ماراتن
   function makeLongInt(main, ctx, rep) {
     rep = rep || 1600;
     var reps = clamp(Math.floor(main * 1000 / rep + 1e-9), 3, rep >= 2000 ? 5 : 6), hard = reps * rep / 1000;
     return sess('interval', T('s.longInt.variant'), hard, hard + ctx.wu + reps * 0.4,
-      [T('s.longInt.main', { reps: reps, rep: rep })],
-      T('s.longInt.how') + paceHint(ctx, T('lbl.pace'), ctx.P.p10, ctx.P.pHM), { rep: rep, kind: 'long' });
+      [T('s.longInt.main', { reps: reps, rep: rep, g: repGuide(ctx, rep, [ctx.P.p10, ctx.P.pHM]) })],
+      T('s.longInt.how') + paceBasis(ctx), { rep: rep, kind: 'long' });
   }
   // تمپوی پیوسته: ۲۰ تا ۴۰ دقیقه با پیس آستانه
   function makeTempoRun(main, ctx, maxMin) {
     var min = clamp(Math.round(main * ctx.P.pT / 60), 20, maxMin || 40), hard = min * 60 / ctx.P.pT;
     return sess('tempo', T('s.tempoRun.variant'), hard, hard + ctx.wu,
-      [T('s.tempoRun.main', { min: min })],
-      rpeLine('tempo') + paceHint(ctx, T('lbl.pace'), ctx.P.tRange[0], ctx.P.tRange[1]));
+      [T('s.tempoRun.main', { min: min, g: repGuide(ctx, 0, ctx.P.tRange) })],
+      rpeLine('tempo') + paceBasis(ctx));
   }
   // ماراتن — تمپوی پیوسته‌ی بلند: ۳۰ تا ۵۰ دقیقه با پیس آستانه یا کمی کندتر
   function makeLongTempo(main, ctx) {
     var p = ctx.P.pT + 8, min = clamp(Math.round(main * p / 60), 30, 50), hard = min * 60 / p;
     return sess('tempo', T('s.longTempo.variant'), hard, hard + ctx.wu,
-      [T('s.longTempo.main', { min: min })],
-      T('s.longTempo.how') + paceHint(ctx, T('lbl.pace'), ctx.P.tRange[0], ctx.P.tRange[1] + 10));
+      [T('s.longTempo.main', { min: min, g: repGuide(ctx, 0, [ctx.P.tRange[0], ctx.P.tRange[1] + 10]) })],
+      T('s.longTempo.how') + paceBasis(ctx));
   }
   // اینتروال پیس ماراتن: ۳ تا ۵ کیلومتر با پیس دقیق ماراتن، استراحت کوتاه
   function makeMpInt(main, ctx) {
     var repKm = main >= 13 ? 5 : (main >= 10 ? 4 : 3), reps = clamp(Math.floor(main / repKm + 1e-9), 2, 4), hard = reps * repKm;
     return sess('tempo', T('s.mpInt.variant'), hard, hard + ctx.wu + (reps - 1),
-      [T('s.mpInt.main', { reps: reps, km: repKm, j: 1 })],
-      T('s.mpInt.how') + paceHint(ctx, T('lbl.pace'), ctx.P.pM - 3, ctx.P.pM + 3));
+      [T('s.mpInt.main', { reps: reps, km: repKm, j: 1, g: repGuide(ctx, repKm * 1000, band(ctx.P.pM)) })],
+      T('s.mpInt.how') + paceBasis(ctx));
   }
   // فارتلک درازمدت: یک ران ۶۰ تا ۹۰ دقیقه‌ای با چند بخش ۱۰ دقیقه‌ای پیس ماراتن یا کمی سریع‌تر
   function makeLongFartlek(main, ctx, weeklyKm) {
@@ -1213,9 +1247,9 @@
       case 'downhill': s = makeDownhill(main, ctx, spec.maxReps); break;
       case 'steady': s = makeSteady(main, ctx); break;
       case 'hillsB': s = makeHillsB(main, ctx); break;
-      case 'tempoMild': s = makeTempo(main, ctx.wu, ctx.zones, true); break;
-      case 'shortint': s = makeInterval(main, ctx.wu, spec.rep, ctx.zones, 'short'); break;
-      case 'reps': s = makeReps(main, ctx.wu, spec.rep, ctx.zones); break;
+      case 'tempoMild': s = makeTempo(main, ctx.wu, ctx.zones, true, ctx); break;
+      case 'shortint': s = makeInterval(main, ctx.wu, spec.rep, ctx.zones, 'short', ctx); break;
+      case 'reps': s = makeReps(main, ctx.wu, spec.rep, ctx.zones, ctx); break;
       default: s = makeTempoRun(main, ctx);
     }
     s.spec = spec; s.specWeekly = weeklyKm;
