@@ -182,3 +182,44 @@ test('بیومکانیک: آپلود فیلم و پایان تحلیل با نت
   await expect(page.locator('#gait-report, #app .form-errors').first()).toBeVisible({ timeout: 5 * 60 * 1000 });
   await expect(page.locator('#gait-stage')).toHaveCount(0);
 });
+
+// ---------- ۱۰. پشتیبان، حذف همه‌ی داده‌ها و بازگردانی ----------
+test('پشتیبان: گرفتن فایل، حذف همه‌چیز و بازگردانی از صفحه‌ی ورود', async ({ page }, info) => {
+  // منوی اشتراک گوشی در مرورگر بی‌سر باز نمی‌شه؛ مسیر دانلود فایل تست می‌شه
+  await page.addInitScript(() => { try { navigator.canShare = () => false; } catch (e) { /* */ } });
+  await onboard(page);
+  await page.evaluate(() => { location.hash = '#checkin'; });
+  await chip(page, 'fatigue', '2'); await chip(page, 'sleep', '4'); await chip(page, 'pain', 'no');
+  await page.locator('#ci-form button[type=submit]').click();
+  await expect(page).toHaveURL(/#home/);
+  // گرفتن فایل پشتیبان
+  await page.evaluate(() => { location.hash = '#settings'; });
+  await page.locator('#set-data > summary').click();
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('[data-backup-export]').click()]);
+  const file = info.outputPath('backup.json');
+  await dl.saveAs(file);
+  const b = JSON.parse(require('fs').readFileSync(file, 'utf8'));
+  expect(b.app).toBe('gaam');
+  expect(b.data.state.profile.name).toBe('تست');
+  expect(Object.keys(b.data.state.checkins).length).toBe(1);
+  // حذف همه‌ی داده‌ها → صفحه‌ی ورود، بدون هیچ داده‌ای
+  await page.locator('#wipe').click();
+  await page.locator('#confirm-ack').check();
+  await page.locator('#confirm-yes').click();
+  await expect(page.locator('#login-btn')).toBeVisible({ timeout: 15000 });
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.indexOf('iranrunners-coach-') === 0).length)).toBe(0);
+  // بازگردانی از صفحه‌ی ورود
+  // مسیر پوشه‌ی خروجی تست حروف فارسی داره و Chromium فایل با مسیر غیرلاتین رو انتخاب نمی‌کنه؛ محتوای فایل مستقیم داده می‌شه
+  await page.locator('input[data-backup-file="login"]').setInputFiles({ name: 'gaam-backup.json', mimeType: 'application/json', buffer: require('fs').readFileSync(file) });
+  await expect(page.locator('.login-import-box')).toBeVisible();
+  await expect(page.locator('.login-import-text')).toContainText('تست');
+  await page.locator('[data-backup-apply="login"]').click();
+  await expect(page).toHaveURL(/#home/, { timeout: 15000 });
+  await expect(page.locator('.ht-checkin .pill-done')).toBeVisible();
+  // فایل نامعتبر: پیام خطا، بدون تغییر داده
+  await page.evaluate(() => { location.hash = '#settings'; });
+  await page.locator('#set-data > summary').click();
+  await page.locator('input[data-backup-file="settings"]').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"hello":1}') });
+  await expect(page.locator('#set-data .backup-err')).toBeVisible();
+  await expect(page.locator('#set-data .backup-confirm')).toBeHidden();
+});

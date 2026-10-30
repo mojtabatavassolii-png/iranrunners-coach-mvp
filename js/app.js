@@ -790,7 +790,7 @@
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
-      restoreBlock() +
+      restoreBlock() + loginImportBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
       '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=' + ASSET_V + '" alt="" width="28" height="28"></button>' +
@@ -870,6 +870,122 @@
     if (t0.dataset.signout && c) { c.hidden = false; c.querySelector('[data-signout-yes]').focus(); return; }
     if (t0.dataset.signoutNo && c) { c.hidden = true; box.querySelector('[data-signout]').focus(); return; }
     if (t0.dataset.signoutYes) signOut();
+  });
+
+  // ---------- پشتیبان و انتقال داده‌ها ----------
+  // همه‌ی داده‌های کاربر در یک فایل JSON، برای انتقال به گوشی یا مرورگر دیگه (یا نسخه‌ی نیتیو بعدی اپ) و بازگردانی.
+  // نشست، پرچم‌های معرفی و نصب و پروفایل کنارگذاشته (خروج آزمایشی) جزو پشتیبان نیستن.
+  var BACKUP_FORMAT = 1, BACKUP_MAX_BYTES = 30 * 1024 * 1024;
+  function backupData() {
+    var av = null, st = null, lg = null;
+    try { av = localStorage.getItem(AVATAR_KEY); st = localStorage.getItem(SETTINGS_KEY); lg = localStorage.getItem(I.LANG_KEY); } catch (e) { /* */ }
+    return { app: 'gaam', kind: 'backup', format: BACKUP_FORMAT, appVersion: ASSET_V, exportedAt: new Date().toISOString(),
+      data: { state: state, avatar: av, settings: st ? JSON.parse(st) : null, lang: lg } };
+  }
+  function exportBackup() {
+    var name = 'gaam-backup-' + C.dateKey(new Date()) + '.json';
+    var blob = new Blob([JSON.stringify(backupData())], { type: 'application/json' });
+    var file = typeof File === 'function' ? new File([blob], name, { type: 'application/json' }) : null;
+    // گوشی: منوی اشتراک (ذخیره در Files، درایو، پیام‌رسان)؛ وگرنه دانلود
+    var touch = (navigator.maxTouchPoints || 0) > 0;
+    if (touch && file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: name }).then(function () { showToast(T('backup.exported')); }, function () { /* لغو */ });
+      return;
+    }
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    showToast(T('backup.exported'));
+  }
+  // خوندن و بررسی فایل؛ نتیجه: { ok, backup, summary } یا { ok: false, error }
+  function readBackupFile(file) {
+    return new Promise(function (resolve) {
+      if (!file) return resolve({ ok: false, error: T('backup.bad') });
+      if (file.size > BACKUP_MAX_BYTES) return resolve({ ok: false, error: T('backup.big') });
+      var fr = new FileReader();
+      fr.onerror = function () { resolve({ ok: false, error: T('backup.bad') }); };
+      fr.onload = function () {
+        var b = null;
+        try { b = JSON.parse(fr.result); } catch (e) { /* */ }
+        var d = b && b.data;
+        if (!b || b.app !== 'gaam' || b.kind !== 'backup' || !d || !d.state || typeof d.state !== 'object' || !d.state.profile) return resolve({ ok: false, error: T('backup.bad') });
+        if (!(b.format <= BACKUP_FORMAT)) return resolve({ ok: false, error: T('backup.newer') });
+        var p = d.state.profile, name = [p.name, p.lastName].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' ') || T('profile.noName');
+        resolve({ ok: true, backup: b, summary: fa(T('backup.summary', { n: name, d: b.exportedAt ? faDate(C.dateKey(new Date(b.exportedAt))) : '—',
+          c: Object.keys(d.state.checkins || {}).length, s: Object.keys(d.state.done || {}).length })) });
+      };
+      fr.readAsText(file);
+    });
+  }
+  // جایگزینی داده‌های این دستگاه با فایل، بعد بارگذاری دوباره‌ی اپ روی خانه
+  function applyBackup(b) {
+    var d = b.data;
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(d.state));
+      if (d.avatar) localStorage.setItem(AVATAR_KEY, d.avatar); else localStorage.removeItem(AVATAR_KEY);
+      if (d.settings && typeof d.settings === 'object') localStorage.setItem(SETTINGS_KEY, JSON.stringify(d.settings));
+      if (d.lang === 'fa' || d.lang === 'en') localStorage.setItem(I.LANG_KEY, d.lang);
+    } catch (e) { showToast(T('backup.saveFailed')); return; }
+    setEntered(true);
+    try { sessionStorage.setItem('gaam-imported', '1'); } catch (e) { /* */ }
+    location.hash = '#home';
+    location.reload();
+  }
+  // پاک کردن همه‌ی داده‌های اپ روی این دستگاه (شامل پروفایل کنارگذاشته و تنظیمات)؛ کش فایل‌های اپ می‌مونه
+  function wipeAll() {
+    try {
+      Object.keys(localStorage).filter(function (k) { return k.indexOf('iranrunners-coach-') === 0 || k.indexOf('gaam-') === 0; })
+        .forEach(function (k) { localStorage.removeItem(k); });
+      Object.keys(sessionStorage).filter(function (k) { return k.indexOf('iranrunners-coach-') === 0 || k.indexOf('gaam-') === 0; })
+        .forEach(function (k) { sessionStorage.removeItem(k); });
+    } catch (e) { /* */ }
+    state = emptyState(); memoryFallback = null;
+    setEntered(false);
+    try { history.replaceState(null, '', location.pathname); } catch (e) { /* */ }
+    location.reload();
+  }
+  // صفحه‌ی ورود: بازگردانی پشتیبان روی دستگاهی که هنوز پروفایلی نداره
+  function loginImportBlock() {
+    if (state.profile) return '';
+    return '<div class="login-import"><label class="linklike login-import-link">' + esc(T('backup.loginLink')) +
+      '<input type="file" accept="application/json,.json" class="sr-only" data-backup-file="login"></label>' +
+      '<div class="login-import-box" hidden><p class="login-import-text"></p><div class="actions">' +
+      '<button type="button" class="btn login-btn" data-backup-apply="login">' + esc(T('backup.importYes')) + '</button></div></div>' +
+      '<p class="login-import-err" role="alert" hidden></p></div>';
+  }
+  var pendingBackup = null;
+  document.addEventListener('change', function (e) {
+    var w = e.target.dataset && e.target.dataset.backupFile;
+    if (!w) return;
+    var f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    readBackupFile(f).then(function (r) {
+      var root = w === 'login' ? document.querySelector('.login-import') : document.getElementById('set-data');
+      if (!root) return;
+      var err = root.querySelector(w === 'login' ? '.login-import-err' : '.backup-err');
+      var box = root.querySelector(w === 'login' ? '.login-import-box' : '.backup-confirm');
+      err.hidden = r.ok; box.hidden = !r.ok;
+      if (!r.ok) { err.textContent = r.error; pendingBackup = null; return; }
+      pendingBackup = r.backup;
+      root.querySelector(w === 'login' ? '.login-import-text' : '.backup-confirm-text').textContent =
+        w === 'login' ? r.summary : T('backup.importQ', { s: r.summary });
+      var yes = box.querySelector('[data-backup-apply]');
+      var ack = box.querySelector('[data-backup-ack]');
+      if (ack) { ack.checked = false; yes.disabled = true; }
+      (ack || yes).focus();
+    });
+  });
+  document.addEventListener('change', function (e) {
+    if (!e.target.dataset || !e.target.dataset.backupAck) return;
+    var yes = e.target.closest('.backup-confirm').querySelector('[data-backup-apply]');
+    yes.disabled = !e.target.checked;
+  });
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-backup-export]')) { exportBackup(); return; }
+    var no = e.target.closest && e.target.closest('[data-backup-cancel]');
+    if (no) { pendingBackup = null; no.closest('.backup-confirm').hidden = true; return; }
+    var yes = e.target.closest && e.target.closest('[data-backup-apply]');
+    if (yes && pendingBackup) applyBackup(pendingBackup);
   });
 
   // =====================================================================
@@ -5194,6 +5310,14 @@
         '<div class="actions">' +
         '<button type="button" class="btn btn-outline" id="restart">' + esc(T('profile.restart')) + '</button>' +
         '<button type="button" class="btn btn-ghost" id="logout">' + esc(T('login.logout')) + '</button></div>' +
+        '<div class="backup-zone"><b>' + esc(T('backup.title')) + '</b><p class="small">' + esc(T('backup.hint')) + '</p>' +
+        '<div class="actions"><button type="button" class="btn btn-primary" data-backup-export="1">' + esc(T('backup.export')) + '</button>' +
+        '<label class="btn btn-outline">' + esc(T('backup.import')) + '<input type="file" accept="application/json,.json" class="sr-only" data-backup-file="settings"></label></div>' +
+        '<p class="form-errors backup-err" role="alert" hidden></p>' +
+        '<div class="alert confirm-box confirm-danger backup-confirm" role="alertdialog" aria-live="polite" hidden><p class="backup-confirm-text"></p>' +
+        '<label class="check-row"><input type="checkbox" data-backup-ack="1"> <span>' + esc(T('backup.importAck')) + '</span></label>' +
+        '<div class="actions"><button type="button" class="btn btn-primary" data-backup-apply="settings" disabled>' + esc(T('backup.importYes')) + '</button>' +
+        '<button type="button" class="btn btn-ghost" data-backup-cancel="1">' + esc(T('app.cancel')) + '</button></div></div></div>' +
         '<div class="danger-zone"><b>' + esc(T('settingsPage.dangerTitle')) + '</b><p class="small">' + esc(T('settingsPage.dangerText')) + '</p>' +
         '<button type="button" class="btn btn-danger-outline" id="wipe">' + esc(T('profile.wipe')) + '</button></div>' +
         '<div id="confirm-box" class="alert confirm-box confirm-danger" role="alertdialog" aria-live="polite" hidden>' +
@@ -5236,13 +5360,7 @@
       window.scrollTo(0, 0);
     });
     document.getElementById('wipe').addEventListener('click', function () {
-      ask(T('profile.wipeQ'), function () {
-        state = emptyState();
-        try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(AVATAR_KEY); } catch (e) { /* */ }
-        memoryFallback = null;
-        location.hash = '#onboarding';
-        route();
-      }, true);
+      ask(T('profile.wipeQ'), wipeAll, true);
     });
   }
   // نام و نام خانوادگی (اختیاری)
@@ -5373,4 +5491,6 @@
   // بارگذاری دوباره‌ی صفحه: وضعیت ذخیره‌شده‌ی همین ورودی تاریخچه برمی‌گرده
   var initNav = navState();
   if (initNav) { navDepth = initNav.depth; restore(initNav); } else { setNav({ depth: 0, from: null }); route(); }
+  // بعد از بازگردانی پشتیبان (که صفحه رو دوباره بار می‌کنه)
+  try { if (sessionStorage.getItem('gaam-imported')) { sessionStorage.removeItem('gaam-imported'); setTimeout(function () { showToast(T('backup.imported')); }, 300); } } catch (e) { /* */ }
 })();

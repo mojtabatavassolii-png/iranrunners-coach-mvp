@@ -1546,7 +1546,7 @@
       confirmYes: 'Yes, do it',
       restartQ: 'Restart the plan from week 1 (at your base volume)? Your check-ins are kept.',
       restartToast: 'The plan has restarted from today.',
-      wipeQ: 'Delete all data (profile, check-ins, history) from this browser? This can\'t be undone.'
+      wipeQ: 'Delete all Gaam data on this device? Profile, plan, check-ins, workouts, health data, running form reports, photo, the set-aside profile and settings. This can\'t be undone; if you may need them later, save a backup first.'
     },
 
     tpick: { h: 'hours', m: 'min', s: 'sec', ih: '{n}h', im: '{n}m', is: '{n}s', choose: 'Choose time', done: 'Done' },
@@ -1583,11 +1583,25 @@
       cycleOn: 'Cycle adaptation is on', cycleOff: 'Cycle adaptation is off', cycleNA: 'Only for female users',
       cycleHint: 'Menstrual cycle settings become available when "female" is selected as sex in the setup form.',
       personSub: '{age} years old, level {n}',
-      dangerTitle: 'Delete all data', dangerText: 'Your profile, check-ins, completed sessions, results and profile photo will be removed from this browser. This can\'t be undone.',
+      dangerTitle: 'Delete all data', dangerText: 'Everything is removed from this device: profile, plan, check-ins, workouts and results, health data (pain, injury, cycle), running form reports, profile photo, the set-aside profile and settings. Gaam has no server, so no other copy remains. This can\'t be undone.',
       wipeAck: 'I understand this can\'t be undone.'
     },
 
     // ---------- Bottom navigation and home page ----------
+    backup: {
+      title: 'Backup and transfer',
+      hint: 'All your data (profile, plan, check-ins, workouts, health data, running form reports, photo and settings) in one file. Use it to move your data to another phone or browser, or to the next version of the app. The file contains health data; keep it somewhere safe and don\'t send it to anyone.',
+      export: 'Save a backup file', import: 'Restore from file',
+      exported: 'Backup file created.',
+      summary: '{n}, backup of {d}: {c} check-ins and {s} completed sessions',
+      importQ: 'The data on this device will be replaced with this file: {s}.',
+      importAck: 'I understand the current data on this device will be replaced.',
+      importYes: 'Restore', imported: 'Your data was restored from the backup file.',
+      bad: 'This isn\'t a Gaam backup file, or it\'s damaged.', big: 'This file is too large for a Gaam backup.',
+      newer: 'This file was made by a newer version of Gaam; update the app first.',
+      saveFailed: 'This browser doesn\'t have enough storage for this file.',
+      loginLink: 'Already have data? Restore from a backup file'
+    },
     jdate: { day: 'Day', month: 'Month', year: 'Year' },
     tabs: { aria: 'Main sections', home: 'Today', plan: 'Plan', progress: 'Progress', learn: 'Learn', profile: 'Profile' },
     home: {
@@ -1828,7 +1842,7 @@
         data: {
           title: 'Data and privacy',
           body: '<ul><li>All your information is stored only in this browser and is never sent to any server.</li>' +
-            '<li>If you clear your browser data or switch devices, the information is lost.</li>' +
+            '<li>If you clear your browser data or switch devices, the information is lost, unless you save a backup file in “Profile → Settings → Data” and restore it on the new device.</li>' +
             '<li>Change the language any time with the button at the top of the page; your choice is remembered in this browser.</li>' +
             '<li>Change the calendar (Solar Hijri or Gregorian) and the first day of the week in Profile → Calendar settings, independently of the language.</li>' +
             '<li>This plan is built from fixed training rules, not AI, and doesn\'t replace a doctor or a coach.</li></ul>'

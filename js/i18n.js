@@ -112,7 +112,7 @@
     return f ? f.format(d) : num(d.getFullYear() + '-' + (d.getMonth() + 1));
   }
 
-  var api = { register: register, extend: extend, t: t, has: has, getLang: getLang, setLang: setLang, savedLang: savedLang, dir: dir, num: num, date: date,
+  var api = { LANG_KEY: LANG_KEY, register: register, extend: extend, t: t, has: has, getLang: getLang, setLang: setLang, savedLang: savedLang, dir: dir, num: num, date: date,
     monthTitle: monthTitle, setCalendar: setCalendar, getCalendar: getCalendar, LANGS: LANGS,
     setUnits: setUnits, getUnits: getUnits, dist: dist, toKm: toKm, pace: pace, KM_PER_MI: KM_PER_MI };
 

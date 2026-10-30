@@ -1965,3 +1965,16 @@ html.intro.intro-instant #app .login * , html.intro.intro-instant #app .login-la
     border: 1px solid var(--border); border-radius: 20px; padding: 8px 0; }
   .tabbar-inner { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* ---------- پشتیبان و انتقال داده‌ها ---------- */
+#set-data .backup-zone { border: 1.5px solid var(--border); background: var(--surface-elevated); border-radius: 14px; padding: 12px 14px; display: grid; gap: 6px; margin-bottom: 12px; }
+.backup-zone .actions { flex-wrap: wrap; }
+.backup-zone label.btn { cursor: pointer; }
+.backup-zone .backup-confirm { margin-top: 6px; }
+.login-import { display: grid; gap: 8px; justify-items: center; margin-top: 14px; width: 100%; max-width: 360px; text-align: center; }
+.login-import-link { color: inherit; opacity: .85; text-decoration: underline; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; }
+.login-import-box p, .login-import-err { margin: 0; font-size: var(--fs-md); }
+.login-import-err { color: var(--error); }
+html.intro #app .login-import { opacity: 0; }
+.login-import-box { display: grid; gap: 10px; justify-items: center; width: 100%; }
+.login-import-box .actions { justify-content: center; width: 100%; }
