@@ -8,7 +8,8 @@ const { execSync } = require('child_process');
 const { _android } = require('playwright-core');
 
 const OUT = path.join(__dirname, '..', 'smoke');
-const CLIP = path.join(__dirname, '..', '..', 'tests', 'e2e', 'synthetic-clip.mp4');
+const WEBM = path.join(OUT, 'clip.webm');
+const CLIP = fs.existsSync(WEBM) ? WEBM : path.join(__dirname, '..', '..', 'tests', 'e2e', 'synthetic-clip.mp4');
 const STORE_KEY = 'iranrunners-coach-mvp-v1';   // همون STORE_KEY در js/app.js
 const results = [];
 let page, shot = 0;
@@ -34,8 +35,9 @@ async function hash() { return page.evaluate(() => location.hash); }
   page.setDefaultTimeout(30000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e && e.message || e)));
-  // «Share canceled»: پل Capacitor رد شدن هر فراخوانی رو در کنسول می‌نویسه؛ اپ لغو اشتراک رو عادی در نظر می‌گیره
-  page.on('console', (m) => { if (m.type() === 'error' && !/Share canceled/.test(m.text())) errors.push('console: ' + m.text()); });
+  // «Share canceled»: پل Capacitor رد شدن هر فراخوانی رو در کنسول می‌نویسه؛ اپ لغو اشتراک رو عادی در نظر می‌گیره.
+  // «Error injecting safe area CSS»: کد خود Capacitor که موقع reload پیش از ساخته شدن صفحه اجرا می‌شه؛ اپ از env(safe-area-inset-*) استفاده می‌کنه
+  page.on('console', (m) => { if (m.type() === 'error' && !/Share canceled|Error injecting safe area CSS/.test(m.text())) errors.push('console: ' + m.text()); });
 
   await step('اجرای نیتیو و افزونه‌ها', async () => {
     const info = await page.evaluate(() => ({
@@ -101,10 +103,12 @@ async function hash() { return page.evaluate(() => location.hash); }
   await step('دکمه‌ی برگشت اندروید', async () => {
     await page.evaluate(() => { location.hash = '#settings'; });
     await page.waitForURL(/#settings/);
+    await wait(1000);
     adb('shell input keyevent KEYCODE_BACK');
-    await wait(1500);
-    const h = await hash();
-    must(h !== '#settings', 'still on ' + h);
+    // تا ۵ ثانیه برای رسیدن رویداد برگشت از سیستم به اپ
+    let h = await hash();
+    for (let i = 0; i < 10 && h === '#settings'; i++) { await wait(500); h = await hash(); }
+    must(h !== '#settings', 'still on ' + h + ' · canGoBack=' + (await page.evaluate(() => history.length)));
     return 'به ' + h;
   });
 
@@ -123,7 +127,7 @@ async function hash() { return page.evaluate(() => location.hash); }
   try { fs.writeFileSync(path.join(OUT, 'meminfo-before-gait.txt'), adb('shell cat /proc/meminfo')); } catch (e) { /* */ }
   await step('بیومکانیک: MediaPipe در WebView و پایان تحلیل', async () => {
     await page.evaluate(() => { location.hash = '#gait'; });
-    await page.locator('input[type=file][data-gait-file="side"]').setInputFiles({ name: 'clip.mp4', mimeType: 'video/mp4', buffer: fs.readFileSync(CLIP) });
+    await page.locator('input[type=file][data-gait-file="side"]').setInputFiles({ name: path.basename(CLIP), mimeType: CLIP.endsWith('.webm') ? 'video/webm' : 'video/mp4', buffer: fs.readFileSync(CLIP) });
     await page.locator('label:has(> input[data-gait-cond="side"][value="easy"])').click();
     await page.locator('[data-gait-run]').click();
     await page.locator('#gait-report, #app .form-errors').first().waitFor({ timeout: 8 * 60 * 1000 });

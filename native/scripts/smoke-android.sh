@@ -11,6 +11,9 @@ adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS || true
 adb logcat -c
 adb shell am start -W -n $PKG/.MainActivity
 sleep 10
+# کلیپ آزمایشی به VP8: کدک H.264 شبیه‌ساز روی میزبان رمزگشایی می‌شه و وسط تحلیل خود شبیه‌ساز رو از کار انداخت
+# (پیام‌های h264 و cuvid و بعد device offline)؛ VP8 داخل خود Chrome اندروید رمزگشایی می‌شه
+ffmpeg -loglevel error -y -i ../tests/e2e/synthetic-clip.mp4 -c:v libvpx -b:v 1M -an smoke/clip.webm || echo "ffmpeg failed; using mp4"
 npm i --no-save --no-audit --no-fund playwright-core@1.63.0 >/dev/null
 node scripts/smoke-android.js
 status=$?
