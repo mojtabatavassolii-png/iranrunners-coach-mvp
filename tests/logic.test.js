@@ -71,7 +71,7 @@ test('حجم کم ولی رکورد سریع → سطح از رکورد + پیا
   var a = C.assessLevel(p);
   assert(a.level >= 7, 'level ' + a.level);
   assert(a.cautious);
-  assert(a.notes.indexOf('برنامه‌ات را با احتیاط حجم رو افزایش می‌دیم چون حجم فعلیت با سرعتت هم‌خوانی نداره.') >= 0);
+  assert(a.notes.indexOf('حجم برنامه‌ات رو با احتیاط بالا می‌بریم، چون حجم فعلیت از سرعتت عقب‌تره.') >= 0);
   assert(C.volumeCeiling(p) <= 30 * 1.3);
   assert.strictEqual(weekAt(p, 0).totalKm, 30);
   assert(weekAt(p, 1).totalKm <= 30 * 1.05 + 0.5, 'cautious growth ' + weekAt(p, 1).totalKm);
@@ -1602,5 +1602,28 @@ test('پیس تکرارها: زمان هر تکرار برای ۱۰ کیلومت
   est.forEach(function (d) { var s = d.session || d; assert.ok(/تخمینی/.test(s.steps[0]), s.steps[0]); });
   // سطح ۲ بدون رکورد: پیسی نشون داده نمی‌شه
   assert.ok(!C.paceSet(profileFor(2), 2).show);
+});
+test('اولین جلسه‌ی برنامه آسونه و لانگ‌ران حداقل ۱۵٪ از روز آسون بلندتره', function () {
+  var hm = profileFor(7, { days: [0, 1, 2, 4, 5, 6], startDate: '2026-10-30', pb: { distanceKm: 10, timeSec: hms(0, 40), date: '2026-10-01' }, goal: { type: '21', date: '2027-03-05' } });
+  var first = C.sessionFor(hm, C.parseDate('2026-10-30'));
+  assert.strictEqual(first.type, 'easy');
+  assert.ok(first.firstSession && /اولین جلسه/.test(first.how));
+  // هفته‌ی بعد دست نخورده: لانگ‌ران سر جاشه
+  var w1 = C.buildWeek(hm, C.parseDate('2026-11-06'));
+  assert.ok(w1.days.some(function (d) { return d.type === 'long'; }));
+  // حجم کم با ۳ روز: لانگ‌ران ≥ ۱٫۱۵ × بیشترین روز آسون
+  for (var n = 2; n <= 4; n++) {
+    var p = profileFor(n, { days: [1, 3, 5] });
+    for (var w = 1; w < 6; w++) {
+      var wk = weekAt(p, w), lg = wk.days.filter(function (d) { return d.type === 'long'; })[0];
+      var ez = wk.days.filter(function (d) { return d.type === 'easy'; }).map(function (d) { return d.km; });
+      if (lg && ez.length) assert.ok(lg.km >= Math.max.apply(null, ez) * 1.15 - 0.5, 'L' + n + ' w' + w + ' long ' + lg.km + ' easy ' + ez);
+    }
+  }
+});
+test('سطح پیاده‌روی: یک توضیح با نتیجه‌ی نهایی، بدون سطح‌های میانی متناقض', function () {
+  var a = C.assessLevel({ activity: 'walk', walkExp: 'lt3m', walkMin: 90, walk30: 'yes', age: 63, days: [0, 2, 4, 6] });
+  assert.strictEqual(a.notes.length, 1);
+  assert.ok(a.notes[0].indexOf('از سطح ' + a.level) >= 0, a.notes[0]);
 });
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

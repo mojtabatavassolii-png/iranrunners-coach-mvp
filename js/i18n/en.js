@@ -19,9 +19,10 @@
       10: { name: 'Expert', desc: 'Over 400 minutes; ready for long-distance walks and hiking' }
     },
     walkNote: {
-      expCap: 'Given your history, we start at level {to} (your volume matches level {from}) so your body adapts to the increase.',
-      no30: 'Since you can\'t walk 30 minutes non-stop yet, we start at level 4 (instead of {from}).',
-      age: 'For better recovery, we start one level lower ({to} instead of {from}) and add at most 5% a week.'
+      start: 'Your volume matches level {from}, but we start at level {to} because {why}.',
+      why: { exp: 'your regular walking history is still short', no30: 'you can\'t walk 30 minutes non-stop yet', age: 'recovery takes a little longer at your age' },
+      and: ' and ',
+      slow: ' We also add at most 5% a week.'
     },
     walk: {
       easyMain: '{n} minutes of easy, continuous walking',
@@ -351,7 +352,7 @@
       },
       long: {
         plain: '{km:d} {u} steady running',
-        water: 'For more than 60 minutes, carry water',
+        water: ' This session takes more than 60 minutes; carry water.',
         easyKm: '{km:d} {u} easy',
         mpEnd: 'Final {km:d} {u} at marathon pace (simulating late-race fatigue)',
         mpFuel: 'Practise your in-run fuelling as on race day',
@@ -362,6 +363,7 @@
       },
       rest: 'Full rest, or a light walk / stretching',
       notStarted: 'Your plan starts on the start date you chose.',
+      firstEasy: 'The first session of the plan is easy on purpose, so you and your body get used to the plan; long runs and hard sessions start from the next sessions.',
       race: {
         ultraHow: 'Race day! Don\'t try anything new (shoes, food, clothing). Pace by effort (RPE), not by pace; the first half should feel easy.',
         ultraEst: ' Very rough estimated time: about {time} (equivalent to {km:d} {u} of flat running).',
@@ -625,7 +627,7 @@
       stepOf: 'Step {n} of {total}',
       progressAria: 'Form steps',
       steps: {
-        1: { t: 'About you', sub: 'Tell us your name to make the plan feel like yours; all of this is optional.' },
+        1: { t: 'About you', sub: 'Choose running or walking; name, photo and gender are optional.' },
         2: { t: 'Body', sub: 'Age, height and weight help set training intensity and volume.' },
         3: { t: 'Your running right now', sub: 'Your experience and current volume decide where the plan starts.' , tw: 'Your walking now', subw: 'So the plan starts where you are.' },
         4: { t: 'Recent best time', sub: 'A real result lets us calculate your training paces accurately.' , tw: 'Walking level', subw: 'Based on your answers.' },
@@ -867,6 +869,7 @@
       phaseHelp: 'Plan phases',
       sessions: 'Sessions',
       nSessions: { one: '{n} session', other: '{n} sessions' },
+      emptyStart: 'No sessions left this week. Your first session: {day} {date}.', emptyStartNone: 'No sessions left this week.',
       totalTime: 'Total time',
       nMin: '{n} min',
       volume: 'Total volume',
@@ -923,8 +926,9 @@
       where: 'Where?',
       wherePh: 'e.g. left knee, shin, lower back',
       painNote: 'This means real pain (sharp, localised, or pain that gets worse when running), not general muscle soreness after training.',
+      painNoteWalk: 'This means real pain (sharp, localised, or pain that gets worse when walking), not general muscle soreness after training.',
       submit: 'Save check-in',
-      err: { fatigue: 'Choose your fatigue level.', sleep: 'Choose your sleep quality.', pain: 'Answer the pain question.', where: 'Tell us where it hurts.' },
+      err: { fatigue: 'Choose your fatigue level.', sleep: 'Choose your sleep quality.', pain: 'Answer the pain question.', where: 'Tell us where it hurts, or tick the consent box to choose the area and level.' },
       toastDown: 'Today\'s session was adjusted to your check-in; see why.',
       toastOk: 'Check-in saved.'
     },
@@ -952,6 +956,7 @@
       oneEnough: 'One video is enough; with both the analysis is more complete. Each video\'s angle is detected automatically.',
       firstLoad: 'The first time, about 35 MB of analysis files are downloaded; after that it works offline too.',
       stage: { load: 'Preparing the analyser…', side: 'Analysing the side video… {p}%', back: 'Analysing the back video… {p}%', report: 'Building the report…' },
+      etaMin: ' (about {n} min left)', etaSec: ' (less than a minute left)',
       busyHint: 'Keep this page open until the analysis finishes.',
       err: {
         load: 'The analyser could not be loaded. The first time needs internet; please try again.',
@@ -966,10 +971,13 @@
       },
       report: 'Running form report',
       cond: { label: 'What kind of run is this video from?', hint: 'Each video has its own run type, and the two can differ; some numbers (like cadence) change with speed.', need: 'Choose the run type for each video.', easy: 'Easy run', tempo: 'Tempo', interval: 'Intervals or high speed', race: 'Race pace', in: 'Run type: {c}' },
+      speedQ: 'Video speed (optional)', speed: { 1: 'Normal', 4: 'Slow motion ×4 (120 fps)', 8: 'Slow motion ×8 (240 fps)' }, speedHint: 'If you filmed in your phone\'s slow-motion mode, pick its factor so cadence is computed in real time. If unsure, keep “Normal”; you can change it after the analysis too.',
       view: { more: 'Other descriptive measurements ({n})', side: 'Side view analysis', back: 'Back view analysis', measured: 'Measured from this view', notFrom: 'Cannot be measured reliably from this view: {list} (these need the {other}).' },
       scoreOf: '{n} / 100',
       inRangeShort: '{a} of {b}',
       inRangeNote: 'within the usual range',
+      noneTitle: 'Your form can\'t be assessed from this video',
+      noneText: 'None of the measurements were accurate enough, so we draw no conclusion about your form. The most common reason is that your body is small in the frame: film from closer so you fill at least half the frame height from head to toe, keep the phone steady at hip height, and get several full strides in view.',
       status: { good: 'Within the usual range', warn: 'Slightly outside the usual range', bad: 'Outside the usual range', info: 'Descriptive', na: 'Not reliable' },
       conf: { label: 'Confidence: ', sure: 'Reliable measurement', est: 'Estimate', low: 'Not reliable' },
       priorities: 'What stood out most',
@@ -1133,6 +1141,7 @@
       },
       history: 'Previous analyses',
       histRow: '{s}% within the usual range',
+      histNone: 'Could not be assessed',
       histRowOld: 'earlier analysis version',
       again: 'New analysis',
       remove: 'Remove',
@@ -1213,6 +1222,7 @@
       goal: 'Pick your first goal', goalSub: 'From the suggested plans for your level', goalSubWalk: '150 minutes a week, daily steps or an event', goalDone: 'First goal: {g}',
       checkin: 'Your first check-in', checkinSub: 'Under a minute; tunes today\'s session to how you feel',
       run: 'Mark your first run as done', runSub: 'After your run, from today\'s plan',
+      walk: 'Mark your first walk as done', walkSub: 'After your walk, from today\'s plan',
       name: 'Add your name', nameSub: 'Makes the plan more personal; you can add a photo too',
       srDone: '(done)', srTodo: '(not done)',
       allDone: 'All steps done!', allDoneSub: 'Now just keep going; this card will now fold away.'
@@ -1256,6 +1266,7 @@
       consentText: 'Pain, injuries and your menstrual cycle are sensitive health data. Gaam keeps them only with your explicit consent.',
       consentList: ['Stored only on this device (browser storage); there is no server.', 'Never used in aggregate statistics or shared with anyone.', 'Used only to adapt your own training plan.', 'You can delete all of it from this page at any time.'],
       consentShort: 'I agree that my health data (pain, injury and cycle) is stored only on this device',
+      consentAsk: 'To adjust your plan to where and how much it hurts, we need your consent first. Without it, you can still just write where it hurts.',
       consentBtn: 'Continue', consentHint: 'Tick the box above to continue.',
       statusTitle: 'Current status', noIssue: 'No active pain or injury logged.',
       painFree: 'No pain today',
@@ -1281,7 +1292,7 @@
       update: 'Update pain and injury',
       checkinDone: 'Today\'s check-in was logged with pain. To update the level or log "no pain", go to the pain and injury page.',
       toast: { mild: 'Today\'s session was made lighter because of pain.', moderate: 'Today: low-impact activity or rest instead of running.', free: 'Logged: no pain.' },
-      err: { area: 'Choose where it hurts.', level: 'Choose the pain level.', consent: 'To save pain details, tick the consent box (or leave the details empty and just write the location).', consentCycle: 'To track your cycle, tick the health data consent box.' },
+      err: { area: 'Choose where it hurts.', level: 'Choose the pain level.', consent: 'To save pain details, tick the consent box at the top of this section.', consentCycle: 'To track your cycle, tick the health data consent box.' },
       painGoal: 'You have logged moderate or severe pain for {n} days. If a doctor or physiotherapist confirmed an injury, log it so we can check whether your goal is still realistic.',
       inj: {
         title: 'Confirmed injury', hint: 'If a doctor or physiotherapist confirmed an injury and told you how long to stop running, log it here. You will not run during that time, then a gradual return starts.',
@@ -1577,10 +1588,12 @@
     },
 
     // ---------- Bottom navigation and home page ----------
+    jdate: { day: 'Day', month: 'Month', year: 'Year' },
     tabs: { aria: 'Main sections', home: 'Today', plan: 'Plan', progress: 'Progress', learn: 'Learn', profile: 'Profile' },
     home: {
       date: '{day} {date}',
       startsOn: 'Your plan starts on {d}.',
+      nextSession: 'Next session: {day} {date}, {s}, {t}',
       greet: { morning: 'Good morning', day: 'Good afternoon', evening: 'Good evening' },
       todayTitle: 'Today\'s session', done: 'Done', adjusted: 'Adjusted',
       cancelled: 'Don\'t train today because of pain.',
@@ -1595,7 +1608,7 @@
       ready: {
         title: 'Readiness',
         fresh: 'You\'re ready today', ok: 'Well balanced; go ahead as planned', tired: 'Fatigue has built up; take today easy',
-        recover: 'Your body needs recovery', pain: 'You reported pain; rest today and see a doctor',
+        recover: 'Your body needs recovery', pain: { _: 'You reported pain; today\'s plan was adjusted', mild: 'Mild pain; lighter today, no hard training', moderate: 'Moderate pain; no running today', severe: 'Severe pain; don\'t train today and see a doctor or physio' },
         fromCheckin: 'Based on today\'s check-in and the days before.',
         noData: 'As you log sessions and daily check-ins, your readiness will show up here.'
       },
@@ -1624,7 +1637,7 @@
       steps: {
         title: 'Daily steps', desc: 'Steps you logged each day (or a walk session\'s steps), with your step target line.',
         bars: 'Steps per day', unit: 'thousand steps', val: '{n} steps', avg: 'Daily average', target: 'Step target',
-        hit: 'Target hit on {n} of {d} days', empty: 'Log your steps from the home screen'
+        hit: 'Target hit on {n} of {d} days', empty: 'Log steps in the box at the top'
       },
       vol: {
         title: 'Weekly volume', desc: 'Distance from completed sessions each week, with a 4-week moving average.',

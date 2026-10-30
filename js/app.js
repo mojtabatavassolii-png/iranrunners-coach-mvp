@@ -12,6 +12,10 @@
   // نسخه ۳: سطح ۱ تا ۱۰ از حجم، سابقه، رکورد و تجربه‌ی تمرین ساختاریافته محاسبه می‌شه
   var SCHEMA_VERSION = 3;
   var app = document.getElementById('app');
+  // نسخه‌ی فایل‌ها از نشانی خود app.js (همونی که index.html و sw.js با هم بالا می‌برن)؛ برای تصویرهایی که از کد ساخته می‌شن
+  var ASSET_V = (function () { var sc = document.querySelector('script[src*="js/app.js"]'), m = sc && /[?&]v=([\w.]+)/.exec(sc.getAttribute('src')); return m ? m[1] : ''; })();
+  // فیلدهای تاریخ هر صفحه‌ای که ساخته می‌شه، در تقویم شمسی به انتخاب روز/ماه/سال شمسی تبدیل می‌شن
+  if (window.MutationObserver) new MutationObserver(function () { if (app.querySelector('input[type=date]:not([data-jd])')) jdEnhance(app); }).observe(app, { childList: true, subtree: true });
   var modalRoot = document.getElementById('modal-root');
 
   // زبان ذخیره‌شده (پیش‌فرض فارسی)
@@ -129,6 +133,74 @@
       item: { h: T('tpick.ih'), m: T('tpick.im'), s: T('tpick.is') }, choose: T('tpick.choose'), done: T('tpick.done'), cancel: T('app.cancel') } }, o));
   }
   function faDate(key, short) { return I.date(C.parseDate(key), short); }
+
+  // ---------- تاریخ شمسی ----------
+  // در تقویم شمسی، هر <input type=date> به سه انتخاب «روز / ماه / سال» شمسی تبدیل می‌شه. خود input (مخفی) مقدار
+  // میلادی YYYY-MM-DD رو نگه می‌داره تا خوندن فرم‌ها و رویدادهای input/change دست نخوره؛ min و max هم رعایت می‌شن.
+  var jdMonthFmt = {};
+  function jdMonthName(m) {
+    var loc = I.getLang() === 'fa' ? 'fa-IR-u-ca-persian' : 'en-US-u-ca-persian';
+    if (!jdMonthFmt[loc]) jdMonthFmt[loc] = new Intl.DateTimeFormat(loc, { month: 'long' });
+    var g = window.jalaali.toGregorian(1403, m, 10);
+    return jdMonthFmt[loc].format(new Date(g.gy, g.gm - 1, g.gd));
+  }
+  function jdOf(key) { if (!key) return null; var d = C.parseDate(key); return window.jalaali.toJalaali(d.getFullYear(), d.getMonth() + 1, d.getDate()); }
+  function jdKey(jy, jm, jd) { var g = window.jalaali.toGregorian(jy, jm, jd); return C.dateKey(new Date(g.gy, g.gm - 1, g.gd)); }
+  function jdEnhance(root) {
+    if (I.getCalendar() !== 'jalali' || !window.jalaali) return;
+    (root || document).querySelectorAll('input[type=date]:not([data-jd])').forEach(function (inp) {
+      inp.dataset.jd = '1';
+      var proto = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+      var tj = jdOf(C.dateKey(today())), lo = jdOf(inp.min), hi = jdOf(inp.max);
+      var y0 = lo ? lo.jy : tj.jy - 2, y1 = hi ? hi.jy : tj.jy + 2;
+      var id = inp.id || ('jd' + Math.random().toString(36).slice(2, 8));
+      var box = document.createElement('div');
+      box.className = 'jdate';
+      var opt = function (v, label, sel) { return '<option value="' + v + '"' + (sel ? ' selected' : '') + '>' + esc(label) + '</option>'; };
+      box.innerHTML = '<select id="' + id + '-jd" data-jd-part="d" aria-label="' + esc(T('jdate.day')) + '"></select>' +
+        '<select data-jd-part="m" aria-label="' + esc(T('jdate.month')) + '">' + opt('', T('jdate.month')) +
+          [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(function (m) { return opt(m, jdMonthName(m)); }).join('') + '</select>' +
+        '<select data-jd-part="y" aria-label="' + esc(T('jdate.year')) + '">' + opt('', T('jdate.year')) +
+          (function () { var o = ''; for (var y = y1; y >= y0; y--) o += opt(y, fa(y)); return o; })() + '</select>';
+      inp.parentNode.insertBefore(box, inp.nextSibling);
+      var lbl = inp.id && document.querySelector('label[for="' + inp.id + '"]');
+      if (lbl) lbl.htmlFor = id + '-jd';
+      // معادل شمسی زیر فیلد دیگه لازم نیست
+      var echo = inp.id && document.getElementById(inp.id + '-fa');
+      if (echo) echo.hidden = true;
+      inp.type = 'hidden';
+      var sd = box.querySelector('[data-jd-part=d]'), sm = box.querySelector('[data-jd-part=m]'), sy = box.querySelector('[data-jd-part=y]');
+      function fillDays(keep) {
+        var len = sm.value && sy.value ? window.jalaali.jalaaliMonthLength(+sy.value, +sm.value) : 31;
+        var o = opt('', T('jdate.day'));
+        for (var d = 1; d <= len; d++) o += opt(d, fa(d), String(d) === String(keep));
+        sd.innerHTML = o;
+      }
+      function paint(key) {
+        var j = jdOf(key);
+        sy.value = j ? String(j.jy) : ''; sm.value = j ? String(j.jm) : '';
+        fillDays(j ? j.jd : '');
+      }
+      Object.defineProperty(inp, 'value', { configurable: true,
+        get: function () { return proto.get.call(inp); },
+        set: function (v) { proto.set.call(inp, v); paint(v); } });
+      paint(proto.get.call(inp));
+      box.addEventListener('change', function (e) {
+        if (e.target !== sd) fillDays(sd.value);
+        var v = '';
+        if (sd.value && sm.value && sy.value) {
+          v = jdKey(+sy.value, +sm.value, Math.min(+sd.value, window.jalaali.jalaaliMonthLength(+sy.value, +sm.value)));
+          if (inp.min && v < inp.min) v = inp.min;
+          if (inp.max && v > inp.max) v = inp.max;
+          paint(v);
+        }
+        e.stopPropagation();
+        proto.set.call(inp, v);
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+  }
   function isRtl() { return I.dir() === 'rtl'; }
   function chevron(dir) {
     return '<svg class="chev" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="' +
@@ -424,11 +496,12 @@
     }
     return null;
   }
-  function cycleBox(r, key, todayKey) {
+  // inPanel: جزئیات روز در صفحه‌ی برنامه؛ یادداشت فاز امروز همون بالای صفحه در کارت چرخه هست و تکرار نمی‌شه
+  function cycleBox(r, key, todayKey, inPanel) {
     var c = r && r.cycle;
     if (!c || key < todayKey) return '';
     if (c.moved) return '<p class="cycle-note small">' + esc(T('cycle.movedHere', { d: faDate(c.moved) })) + '</p>';
-    if (c.note === 'follicular') return '<p class="cycle-note small">' + esc(T('cycle.follicularNote')) + '</p>';
+    if (c.note === 'follicular') return inPanel && key === todayKey ? '' : '<p class="cycle-note small">' + esc(T('cycle.follicularNote')) + '</p>';
     if (c.period) {
       var pd = c.period;
       return '<div class="alert cycle-box" role="status"><p>' + t(T('cycle.periodBox', { day: pd.info.day, mode: T('cycle.modeShort.' + pd.mode), src: T('cycle.src.' + (pd.overridden ? 'override' : 'def')) })) +
@@ -712,16 +785,16 @@
     var lang = I.getLang();
     app.innerHTML = '<section class="login" aria-labelledby="login-title">' +
       '<div class="login-top">' +
-      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=89" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
-      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=89" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-dark" src="public/assets/gaam-logo-transparent.svg?v=' + ASSET_V + '" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
+      '<img class="login-logo logo-on-light" src="public/assets/gaam-logo-transparent-light.svg?v=' + ASSET_V + '" alt="' + esc(T('app.name')) + '" width="217" height="100">' +
       '<h1 id="login-title">' + esc(T('login.welcome')) + '</h1>' +
       '<p class="login-sub">' + esc(T('login.subtitle')) + '</p>' +
       '<button type="button" class="btn login-btn" id="login-btn">' + esc(T('login.button')) + '</button>' +
       restoreBlock() +
       '</div>' +
       '<div class="login-lang" role="group" aria-label="' + esc(T('login.langLabel')) + '">' +
-      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=89" alt="" width="28" height="28"></button>' +
-      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=89" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="fa" lang="fa" aria-pressed="' + (lang === 'fa') + '" aria-label="فارسی" title="فارسی"><img src="public/assets/flag-ir.svg?v=' + ASSET_V + '" alt="" width="28" height="28"></button>' +
+      '<button type="button" class="lang-flag" data-lang="en" lang="en" aria-pressed="' + (lang === 'en') + '" aria-label="English" title="English"><img src="public/assets/flag-gb.svg?v=' + ASSET_V + '" alt="" width="28" height="28"></button>' +
       '</div></section>';
     app.querySelectorAll('[data-lang]').forEach(function (b) {
       b.addEventListener('click', function () { if (b.dataset.lang !== I.getLang()) switchLang(b.dataset.lang); });
@@ -1583,7 +1656,11 @@
     var runDays = ws.n, effKm = ws.km, effMin = ws.min;
     var kmChanged = Math.abs(effKm - week.totalKm) > 0.05, minChanged = effMin !== week.totalMin;
     var zero = lv.level === 0;
-    html += '<div class="week-stats' + (zero ? ' week-stats-zero' : '') + '">' +
+    // هفته‌ی شروع بدون هیچ جلسه (تاریخ شروع بعد از آخرین روز تمرین این هفته): به‌جای «۰ جلسه، ۰ دقیقه»، اولین جلسه
+    var emptyStart = !runDays && week.start <= p.startDate && week.days[6].date >= p.startDate;
+    var firstS = emptyStart ? nextSession(week.days[6].date) : null;
+    if (emptyStart) html += '<p class="week-empty">' + (firstS ? tt('week.emptyStart', { day: firstS.dayName, date: faDate(firstS.date, true) }) : esc(T('week.emptyStartNone'))) + '</p>';
+    else html += '<div class="week-stats' + (zero ? ' week-stats-zero' : '') + '">' +
       (zero ? '<div class="stat"><span>' + esc(T('zero.stageLabel')) + '</span><b>' + tt('zero.stage', { n: (week.zeroStage || 0) + 1, total: week.zeroFinal + 1 }) + '</b></div>'
         : '<div class="stat"><span>' + esc(T('week.phase')) + ' ' + helpLink('week', T('week.phaseHelp')) + '</span><b>' + t(week.phase.label) + '</b>' +
       (week.periodLabel ? '<small class="period-tag">' + esc(week.periodLabel) + '</small>' : '') + '</div>') +
@@ -1637,7 +1714,7 @@
       '</div>' +
       (d === todayKey && !state.checkins[todayKey] && ['rest', 'none'].indexOf(ss.type) < 0 ?
         '<div class="checkin-cta"><p>' + esc(T('today.cta')) + '</p><a class="btn btn-primary" href="#checkin">' + esc(T('home.startCheckin')) + '</a></div>' : '') +
-      (rs.adaptation ? adaptationBox(rs.adaptation, d) : '') + cycleBox(rs, d, todayKey) +
+      (rs.adaptation ? adaptationBox(rs.adaptation, d) : '') + cycleBox(rs, d, todayKey, true) +
       (ss.type !== 'cancelled' ? sessionBody(ss, canLog && ls === ss ? { key: d, prefix: 'panel' } : {}) : '') +
       (canLog && ls !== ss ? postRunBlock(d, ls, 'panel') : '') +
       '</div>';
@@ -1969,14 +2046,22 @@
         return '<label class="chip"><input type="' + type + '" name="' + name + '" value="' + k + '"' + (on ? ' checked' : '') + '><span>' + esc(name === 'level' ? fa(k) : T('health.' + name + '.' + k)) + '</span></label>';
       }).join('') + '</div>';
     };
-    var consent = state.healthConsent ? '' : '<label class="check-row pain-consent"><input type="checkbox" name="healthConsent"> <span>' + esc(T('health.consentShort')) + '</span></label>';
-    return '<div class="pain-fields" id="' + px + '-pain">' + consent +
-      '<p class="sub-legend">' + esc(T('health.areaQ')) + '</p>' + chips('area', C.PAIN_AREAS, 'radio', T('health.areaQ'), e.area) +
-      '<div class="field"><label for="' + px + '-pw">' + esc(T('checkin.where')) + '</label><input id="' + px + '-pw" name="painWhere" maxlength="120" placeholder="' + esc(T('checkin.wherePh')) + '" value="' + esc(e.where || '') + '"></div>' +
-      '<p class="sub-legend">' + esc(T('health.levelQ')) + '</p>' + chips('level', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'radio', T('health.levelQ'), e.level) +
+    var where = '<div class="field"><label for="' + px + '-pw">' + esc(T('checkin.where')) + '</label><input id="' + px + '-pw" name="painWhere" maxlength="120" placeholder="' + esc(T('checkin.wherePh')) + '" value="' + esc(e.where || '') + '"></div>';
+    var area = '<p class="sub-legend">' + esc(T('health.areaQ')) + '</p>' + chips('area', C.PAIN_AREAS, 'radio', T('health.areaQ'), e.area);
+    // بدون رضایت: اول کادر رضایت و فقط «کجا؟»؛ جزئیات (محل، شدت، زمان، علائم) بعد از تیک رضایت باز می‌شن
+    if (!state.healthConsent) {
+      return '<div class="pain-fields" id="' + px + '-pain">' +
+        '<div class="pain-consent-box"><p class="small">' + esc(T('health.consentAsk')) + '</p>' +
+        '<label class="check-row pain-consent"><input type="checkbox" name="healthConsent" data-pain-consent="1"> <span>' + esc(T('health.consentShort')) + '</span></label></div>' +
+        where + '<div class="pain-details" hidden>' + area + painDetailRest(chips, e) + '</div></div>';
+    }
+    return '<div class="pain-fields" id="' + px + '-pain">' + area + where + painDetailRest(chips, e) + '</div>';
+  }
+  function painDetailRest(chips, e) {
+    return '<p class="sub-legend">' + esc(T('health.levelQ')) + '</p>' + chips('level', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'radio', T('health.levelQ'), e.level) +
       '<div class="scale-ends"><span>' + esc(T('health.levelLow')) + '</span><span>' + esc(T('health.levelHigh')) + '</span></div>' +
       '<p class="sub-legend">' + esc(T('health.whenQ')) + '</p>' + chips('when', C.PAIN_WHEN, 'checkbox', T('health.whenQ'), e.when) +
-      '<p class="sub-legend">' + esc(T('health.flagsQ')) + '</p>' + chips('flags', C.PAIN_FLAGS, 'checkbox', T('health.flagsQ'), e.flags) + '</div>';
+      '<p class="sub-legend">' + esc(T('health.flagsQ')) + '</p>' + chips('flags', C.PAIN_FLAGS, 'checkbox', T('health.flagsQ'), e.flags);
   }
   function readPain(form) {
     var all = function (n) { return [].slice.call(form.querySelectorAll('input[name=' + n + ']:checked')).map(function (x) { return x.value; }); };
@@ -2005,7 +2090,8 @@
   }
   function afterPain(key) {
     var ep = C.painEpisode(state.pains, state.checkins, C.parseDate(key));
-    notify({ key: 'pain-' + key, k: ep && ep.tier === 'severe' ? 'error' : 'warning', m: 'pain', href: '#plan', today: true, flash: false });
+    // پیام مربی روی خانه همین رو می‌گه؛ اعلان جدا فقط برای درد شدید (یا ثبت قدیمی بدون سطح)
+    if (!ep || ep.tier === 'severe') notify({ key: 'pain-' + key, k: 'error', m: 'pain', href: '#plan', today: true, flash: false });
     if (!ep || ep.tier === 'severe') { openPainModal(key); return; }
     showToast(T('health.toast.' + ep.tier));
     if (location.hash === '#home') route(); else location.hash = '#home';
@@ -2237,7 +2323,7 @@
       '<label class="chip"><input type="radio" name="pain" value="no"' + (ci.pain === false ? ' checked' : '') + '><span>' + esc(T('app.no')) + '</span></label>' +
       '<label class="chip chip-danger"><input type="radio" name="pain" value="yes"><span>' + esc(T('app.yes')) + '</span></label></div>' +
       '<div id="pain-where" hidden>' + painFields('ci') + '</div>' +
-      '<small class="muted">' + esc(T('checkin.painNote')) + '</small>' +
+      '<small class="muted">' + esc(T(C.isWalk(state.profile) ? 'checkin.painNoteWalk' : 'checkin.painNote')) + '</small>' +
       '</fieldset>' +
       '<div id="ci-errors" class="form-errors" role="alert" hidden></div>' +
       '<div class="actions"><button type="submit" class="btn btn-primary">' + esc(T('checkin.submit')) + '</button>' +
@@ -2248,6 +2334,8 @@
     form.addEventListener('change', function () {
       var pv = form.querySelector('input[name=pain]:checked');
       document.getElementById('pain-where').hidden = !(pv && pv.value === 'yes');
+      // خطای قبلی با هر تغییر پاک می‌شه (مثلاً بعد از زدن تیک رضایت)
+      document.getElementById('ci-errors').hidden = true;
     });
     form.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -2853,9 +2941,11 @@
   // تحلیل فرم دویدن: MediaPipe Pose داخل گوشی (js/pose.js) → قواعد اختصاصی (js/gait.js) → گزارش
   // ویدیو فقط در حافظه‌ی همین صفحه می‌مونه؛ فقط عددها و دو تصویر کوچک ذخیره می‌شن.
   // =====================================================================
-  var gaitFiles = { side: null, back: null }, gaitBusy = null, gaitError = null, GAIT_KEEP = 5;
+  var gaitFiles = { side: null, back: null }, gaitBusy = null, gaitError = null, GAIT_KEEP = 5, gaitJustDone = false;
   // شرایط دویدنِ هر فیلم (الزامی، جدا برای هر خونه)؛ با عوض شدن فیلم پاک می‌شه
   var gaitConds = { side: null, back: null };
+  // سرعت فیلم (اختیاری، قبل از تحلیل): ۱ = عادی، ۴ یا ۸ = اسلوموشن
+  var gaitSpeeds = { side: 1, back: 1 };
   // یافته‌های هر نما (گزارش‌های قبل از v3 فیلد view نداشتن)
   var GAIT_BACK_IDS = ['pelvic', 'valgus', 'crossover', 'armCross', 'sides', 'trunkLat', 'armSym'];
   function gaitView(f) { return f.view || (GAIT_BACK_IDS.indexOf(f.id) >= 0 ? 'back' : 'side'); }
@@ -3027,8 +3117,11 @@
     var card = function (k, val, sub, cls, note) { return '<div class="gait-axis ' + (cls || '') + '"><span>' + esc(T('gait.axesCard.' + k)) + '</span><b>' + esc(val) + '</b>' + (note ? '<em>' + esc(note) + '</em>' : '') + '<small>' + esc(T('gait.axes.' + sub)) + '</small></div>'; };
     var html = '<section class="card gait-report" id="gait-report"><h2>' + esc(T('gait.report')) + '</h2><p class="small muted">' + esc(faDate(r.date)) + '</p>';
     // سه محور: سهم موارد در محدوده‌ی معمول (فقط پارامترهای دارای بازه‌ی مرجع) و الگوهای مرتبط با آسیب
-    if (F.length) html += '<div class="gait-axes">' +
-      card('performance', inRange('performance'), 'perfSub', '', T('gait.inRangeNote')) + card('form', inRange('form'), 'formSub', '', T('gait.inRangeNote')) +
+    // هیچ اندازه‌گیری قابل‌اطمینانی نبود: به‌جای کارت‌های خالی، صریح بگو قابل ارزیابی نیست و چطور فیلم بهتری بگیره
+    if (F.length && !J.length) html += '<div class="alert alert-adapt gait-none"><strong>' + esc(T('gait.noneTitle')) + '</strong><p>' + esc(T('gait.noneText')) + '</p></div>';
+    else if (F.length) html += '<div class="gait-axes">' +
+      card('performance', inRange('performance'), 'perfSub', '', inRange('performance') === '—' ? '' : T('gait.inRangeNote')) +
+      card('form', inRange('form'), 'formSub', '', inRange('form') === '—' ? '' : T('gait.inRangeNote')) +
       card('risk', ax.risk ? T('gait.levelShort.' + ax.risk) : '—', 'riskSub', ax.risk ? 'risk-' + ax.risk : '') + '</div>';
     if (pri.length) html += '<h3>' + esc(T('gait.priorities')) + '</h3><ol class="gait-pri">' + pri.map(function (f) {
       return '<li><b>' + esc(T('gait.items.' + f.id + '.t')) + '</b> <span class="muted small">' + esc(T('gait.' + gaitView(f) + 'Title')) + esc(T('progress.sep')) + esc(T('gait.status.' + f.status)) + '</span></li>';
@@ -3120,7 +3213,10 @@
       '<label class="btn btn-outline gait-pick">' + esc(T(f ? 'gait.change' : 'gait.pick')) + '<input type="file" accept="video/*" class="sr-only" data-gait-file="' + kind + '"></label>' +
       // شرایط دویدن همین فیلم (الزامی وقتی فیلم انتخاب شده)
       (f ? '<div class="gait-cond"><p class="sub-legend" id="gc-' + kind + '">' + esc(T('gait.cond.label')) + ' <span class="req">*</span></p><div class="chips" role="radiogroup" aria-labelledby="gc-' + kind + '">' +
-        ['easy', 'tempo', 'interval', 'race'].map(function (k) { return '<label class="chip"><input type="radio" name="gaitCond-' + kind + '" data-gait-cond="' + kind + '" value="' + k + '"' + (gaitConds[kind] === k ? ' checked' : '') + ' required><span>' + esc(T('gait.cond.' + k)) + '</span></label>'; }).join('') + '</div></div>' : '') + '</div>';
+        ['easy', 'tempo', 'interval', 'race'].map(function (k) { return '<label class="chip"><input type="radio" name="gaitCond-' + kind + '" data-gait-cond="' + kind + '" value="' + k + '"' + (gaitConds[kind] === k ? ' checked' : '') + ' required><span>' + esc(T('gait.cond.' + k)) + '</span></label>'; }).join('') + '</div></div>' +
+        '<div class="gait-cond"><p class="sub-legend" id="gs-' + kind + '">' + esc(T('gait.speedQ')) + '</p><div class="chips" role="radiogroup" aria-labelledby="gs-' + kind + '">' +
+        [1, 4, 8].map(function (k) { return '<label class="chip"><input type="radio" name="gaitSpeed-' + kind + '" data-gait-speed="' + kind + '" value="' + k + '"' + (gaitSpeeds[kind] === k ? ' checked' : '') + '><span>' + esc(fa(T('gait.speed.' + k))) + '</span></label>'; }).join('') + '</div>' +
+        '<small class="muted">' + esc(T('gait.speedHint')) + '</small></div>' : '') + '</div>';
   }
   // تحلیل فقط وقتی هر فیلم انتخاب‌شده برچسب شرایط دویدن داره
   function gaitReady() {
@@ -3153,7 +3249,7 @@
     if (reports.length) {
       html += gaitReportHtml(reports[0], gaitLive && gaitLive.id === reports[0].id ? gaitLive : null);
       if (reports.length > 1) html += '<section class="card"><h2>' + esc(T('gait.history')) + '</h2><ul class="gait-hist">' + reports.slice(1).map(function (r) {
-        return '<li><span>' + esc(faDate(r.date)) + '</span><b>' + esc(fa(r.v >= 2 ? T('gait.histRow', { s: r.score == null ? '—' : r.score }) : T('gait.histRowOld'))) + '</b>' +
+        return '<li><span>' + esc(faDate(r.date)) + '</span><b>' + esc(fa(r.v >= 2 ? (r.score == null ? T('gait.histNone') : T('gait.histRow', { s: r.score })) : T('gait.histRowOld'))) + '</b>' +
           '<button type="button" class="linklike small" data-gait-del="' + esc(r.id) + '">' + esc(T('gait.remove')) + '</button></li>';
       }).join('') + '</ul></section>';
     }
@@ -3246,7 +3342,15 @@
       }).catch(function () { showToast(T('gait.anim.noRecord')); }).then(function () { b.disabled = false; b.textContent = label; });
     }
   });
+  // زمان تقریبی باقی‌مونده از سرعت پیشرفت تا این لحظه (بعد از ۱۰٪ اول که تخمین معنی‌دار می‌شه)
+  var gaitT0 = 0;
+  function gaitEta(p) {
+    if (!gaitT0 || p < 0.1 || p >= 0.95) return '';
+    var left = (Date.now() - gaitT0) / p * (1 - p) / 1000;
+    return left < 60 ? T('gait.etaSec') : T('gait.etaMin', { n: Math.round(left / 60) });
+  }
   function gaitProgress(text, p) {
+    text += gaitEta(p);
     gaitBusy = { text: text, p: p };
     var st = document.getElementById('gait-stage'), bar = document.getElementById('gait-bar');
     if (st && bar) { st.textContent = fa(text); bar.style.width = Math.round(p * 100) + '%'; } else if (gaitShown()) renderGait();
@@ -3257,8 +3361,9 @@
     gaitError = null;
     releaseGaitLive();
     var files = { side: gaitFiles.side, back: gaitFiles.back }, data = {}, failed = false, result = null;
-    var args = { heightCm: state.profile.heightCm, conditions: { side: gaitConds.side, back: gaitConds.back }, load: gaitLoad() };
+    var args = { heightCm: state.profile.heightCm, conditions: { side: gaitConds.side, back: gaitConds.back }, load: gaitLoad(), timeScale: { side: gaitSpeeds.side, back: gaitSpeeds.back } };
     var pct = function (x) { return Math.round(x * 100); };
+    gaitT0 = Date.now();
     gaitProgress(T('gait.stage.load'), 0.02);
     // فیلم‌ها یکی‌یکی؛ هر کدوم که هست (یکی کافیه)
     var chain = window.CoachPose.load().catch(function () { failed = true; throw new Error('load'); });
@@ -3270,11 +3375,11 @@
     });
     chain.then(function () {
       gaitProgress(T('gait.stage.report'), 0.95);
-      var r = window.CoachGait.analyze({ side: data.side, back: data.back, heightCm: args.heightCm, conditions: args.conditions, load: args.load });
+      var r = window.CoachGait.analyze({ side: data.side, back: data.back, heightCm: args.heightCm, conditions: args.conditions, load: args.load, timeScale: args.timeScale });
       result = r;
       // v: ۲ = گزارش با سطح اطمینان، شرایط دویدن و قاعده‌ی تازه‌ی الگوهای آسیب
       // v: ۳ = هر یافته مال یک نما، شرایط دویدن جدا برای هر فیلم
-      var rep = Object.assign({ id: 'g' + Date.now().toString(36), v: 3, date: C.dateKey(today()), at: new Date().toISOString() }, gaitRepFields(r));
+      var rep = Object.assign({ id: 'g' + Date.now().toString(36), v: 3, date: C.dateKey(today()), at: new Date().toISOString() }, gaitRepFields(r), args.timeScale.side > 1 || args.timeScale.back > 1 ? { timeScale: Object.assign({}, args.timeScale) } : {});
       // تصویر فریم کلیدی از ویدیوی خود هر زاویه (هر خونه‌ای که کاربر گذاشته)
       var shots = [];
       if (r.side) {
@@ -3291,9 +3396,9 @@
       // فقط آخرین گزارش‌ها؛ تصویرها فقط برای آخرین گزارش نگه داشته می‌شن (حجم حافظه)
       state.gaitReports = [rep].concat((state.gaitReports || []).map(function (x) { var y = Object.assign({}, x); delete y.imgSide; delete y.imgBack; return y; })).slice(0, GAIT_KEEP);
       save();
-      gaitFiles = { side: null, back: null }; gaitConds = { side: null, back: null };
+      gaitFiles = { side: null, back: null }; gaitConds = { side: null, back: null }; gaitSpeeds = { side: 1, back: 1 };
       // برای پخش انیمیشنی فقط فایل‌ها و نقاط نگه داشته می‌شن (نه ویدیوی باز)؛ پخش‌کننده فقط وقتی این صفحه بازه ساخته می‌شه
-      var live = { id: rep.id, inputs: {}, args: args, scale: {} };
+      var live = { id: rep.id, inputs: {}, args: args, scale: Object.assign({}, args.timeScale) };
       slots.forEach(function (k) {
         if (!data[k]) return;
         var res = [result.side, result.back].filter(function (x) { return x && x.src === k; })[0] || null;
@@ -3301,6 +3406,7 @@
         live.inputs[k] = { file: files[k], data: { frames: data[k].frames, duration: data[k].duration, w: data[k].w, h: data[k].h, fps: data[k].fps || null }, res: res, reason: fail ? fail.reason : null };
       });
       gaitLive = live;
+      gaitJustDone = true;
       showToast(T('gait.saved'));
     }).catch(function (e) {
       // کد کوتاه مرحله‌ی خطا (open / meta / seek / detect / short) برای پیدا کردن علت روی گوشی‌های مختلف
@@ -3312,9 +3418,21 @@
       window.CoachPose.unload();
       gaitBusy = null;
       if (gaitShown()) renderGait();
+      // نتیجه زیر فرم آپلود ساخته می‌شه؛ صفحه خودکار به گزارش می‌ره
+      var rep = gaitJustDone && document.getElementById('gait-report');
+      gaitJustDone = false;
+      if (rep) rep.scrollIntoView({ behavior: window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
     });
   }
+  // فرم درد: با تیک رضایت، جزئیات باز می‌شن
   app.addEventListener('change', function (e) {
+    if (!e.target.dataset || !e.target.dataset.painConsent) return;
+    var box = e.target.closest('.pain-fields'), det = box && box.querySelector('.pain-details');
+    if (det) det.hidden = !e.target.checked;
+  });
+  app.addEventListener('change', function (e) {
+    var gs = e.target.dataset && e.target.dataset.gaitSpeed;
+    if (gs) { gaitSpeeds[gs] = Number(e.target.value) || 1; return; }
     var ck = e.target.dataset && e.target.dataset.gaitCond;
     if (ck) {
       gaitConds[ck] = e.target.value;
@@ -3328,7 +3446,7 @@
     var k = e.target.dataset && e.target.dataset.gaitFile;
     if (!k) return;
     gaitFiles[k] = e.target.files && e.target.files[0] || null;
-    gaitConds[k] = null;
+    gaitConds[k] = null; gaitSpeeds[k] = 1;
     gaitError = null;
     renderGait();
   });
@@ -3382,6 +3500,20 @@
     var now = today(), key = C.dateKey(now), base = C.sessionFor(state.profile, now), ci = state.checkins[key];
     return { now: now, key: key, base: base, ci: ci, r: effectiveSession(base) };
   }
+  // روز بدون جلسه: جلسه‌ی بعدی برنامه (تا دو هفته جلوتر)
+  function nextSession(key) {
+    for (var i = 1; i <= 14; i++) {
+      // همون جلسه‌ای که اون روز واقعاً نشون داده می‌شه (با دوره‌ی درد و چرخه)
+      var d = C.addDays(C.parseDate(key), i), s = effectiveSession(C.sessionFor(state.profile, d)).session;
+      if (['rest', 'none', 'cancelled'].indexOf(s.type) < 0) return s;
+    }
+    return null;
+  }
+  function nextSessionLine(key) {
+    var s = nextSession(key);
+    if (!s) return '';
+    return '<p class="today-next">' + tt('home.nextSession', { day: s.dayName, date: faDate(s.date, true), s: s.label, t: s.minutes ? T('home.minutes', { n: s.minutes }) : s.target }) + '</p>';
+  }
   // کارت اصلی بالای خانه: «تمرین امروز» و زیرش «چک‌این امروز»
   function homeToday(base, s, ci, key, r) {
     var runDay = ['rest', 'none'].indexOf(base.type) < 0, done = !!state.done[key], cancelled = s.type === 'cancelled';
@@ -3396,8 +3528,15 @@
       '<div class="today-main">' + badge(s.type, s.label) + (s.km ? '<b class="today-target">' + t(s.target) + '</b>' : (s.minutes ? '<b class="today-target">' + tt('home.minutes', { n: s.minutes }) + '</b>' : '')) + '</div>' +
       (main ? '<p class="today-sum">' + t(main) + (wu ? ' <span class="muted">' + t(wu) + '</span>' : '') + '</p>' : '') +
       (base.type === 'none' && state.profile.startDate > key ? '<p class="today-sum">' + esc(T('home.startsOn', { d: faDate(state.profile.startDate) })) + '</p>' : '') +
+      (!runDay && !cancelled ? nextSessionLine(key) : '') +
       btn + '</div>';
     return '<section class="card hcard hcard-today hc-' + s.type + '">' + session + (r ? homeSmartSec(r) : '') + homeCheckinSec(base, ci, key, runDay, done) + '</section>';
+  }
+  // متن وضعیت درد هم‌سطح با پیام مربی (خفیف، متوسط، شدید)، نه یک هشدار ثابت
+  function painTierKey(ci, key) {
+    if (!ci || !ci.pain) return '';
+    var ep = C.painEpisode(state.pains, state.checkins, C.parseDate(key));
+    return ep && ep.tier ? '.' + ep.tier : '._';
   }
   function homeCheckinSec(base, ci, key, runDay, done) {
     var head = function (pill) {
@@ -3408,7 +3547,7 @@
       var rd = ci.pain ? null : C.readiness(ci, recentCheckins(key));
       var st = ci.pain ? 'pain' : !rd.tier ? 'fresh' : rd.tier === 'mild' ? 'ok' : rd.tier === 'moderate' ? 'tired' : 'recover';
       body = head('<span class="pill pill-done">✓ ' + esc(T('home.ci.done')) + '</span>') +
-        '<div class="ready-row ready-' + st + '"><span class="ready-dot" aria-hidden="true"></span><b class="ready-line">' + esc(T('home.ready.' + st)) + '</b></div>' +
+        '<div class="ready-row ready-' + st + '"><span class="ready-dot" aria-hidden="true"></span><b class="ready-line">' + esc(T('home.ready.' + st + painTierKey(ci, key))) + '</b></div>' +
         (ci.pain ? '' : '<a class="linklike small ht-link" href="#checkin">' + esc(T('home.ci.edit')) + '</a>');
     } else if (runDay && !done) {
       body = head() + '<p class="small muted ht-note">' + esc(T('home.ci.todo')) + '</p>' +
@@ -3443,7 +3582,7 @@
     var sign = function (n) { n = Math.round(n); return '‎' + (n > 0 ? '+' : n < 0 ? '−' : '') + fa(Math.abs(n)); };
     return '<section class="card hcard hcard-ready ready-' + st + '"><div class="hcard-top"><span class="hcard-label">' + esc(T('home.ready.title')) + '</span>' +
       '</div>' +
-      '<div class="ready-row"><span class="ready-dot" aria-hidden="true"></span><div><b class="ready-line">' + esc(T('home.ready.' + st)) + '</b>' +
+      '<div class="ready-row"><span class="ready-dot" aria-hidden="true"></span><div><b class="ready-line">' + esc(T('home.ready.' + st + (st === 'pain' ? '._' : ''))) + '</b>' +
       (why.length ? '<span class="small muted">' + esc(why.join(' ')) + '</span>' : '') + '</div></div>' +
       (pm ? '<div class="mini-stats">' +
         '<div><span>' + esc(T('progress.pmc.tsb')) + '</span><b>' + sign(pm.tsb) + '</b></div>' +
@@ -3774,7 +3913,7 @@
       { done: true, title: T('start.plan') },
       C.isWalk(p) ? { done: C.walkGoalInfo(p).kind !== 'none', title: C.walkGoalInfo(p).kind !== 'none' ? T('start.goalDone', { g: T('wgoal.' + C.walkGoalInfo(p).kind + '.t') }) : T('start.goal'), sub: C.walkGoalInfo(p).kind !== 'none' ? '' : T('start.goalSubWalk'), href: '#walkgoals' } : { done: g.type !== 'none', title: g.type !== 'none' ? T('start.goalDone', { g: C.goalLabel(g) }) : T('start.goal'), sub: g.type !== 'none' ? (g.date ? faDate(g.date) : '') : T('start.goalSub'), href: '#race' },
       { done: Object.keys(state.checkins).length > 0, title: T('start.checkin'), sub: T('start.checkinSub'), href: '#checkin' },
-      { done: Object.keys(state.done).length > 0, title: T('start.run'), sub: T('start.runSub'), href: '#plan', attr: ' data-goto-today="1"' },
+      { done: Object.keys(state.done).length > 0, title: T(C.isWalk(p) ? 'start.walk' : 'start.run'), sub: T(C.isWalk(p) ? 'start.walkSub' : 'start.runSub'), href: '#plan', attr: ' data-goto-today="1"' },
       { done: !!(p.name || '').trim(), title: T('start.name'), sub: T('start.nameSub'), href: '#settings', attr: ' data-set-open="person"' }
     ].filter(Boolean);
   }
@@ -3898,15 +4037,18 @@
   }
   function weekLabel(k) { return faDate(k, true); }
   // قبل از جمع شدن داده: محور زمان تا حداقل طول بازه با هفته‌ها/روزهای پیش رو (خالی) ادامه پیدا می‌کنه تا نمودار کم‌کم پر بشه
+  // محور کوتاه‌تر از حداقل: هفته‌ها/روزهای خالی «قبل» از اولین داده اضافه می‌شن (محور هیچ‌وقت از امروز جلوتر نمی‌ره).
+  // پرچم future یعنی «بدون داده» (برای سازگاری با نمودارها)؛ ایندکس داده‌ی اصلی i در خروجی = i + padOf(خروجی، ورودی).
   function padWeeks(W, n) {
-    var out = W.slice(), last = out.length ? C.parseDate(out[out.length - 1].start) : null;
-    if (!last) { last = C.weekStart(today()); out.push({ start: C.dateKey(last), km: 0, vert: 0, runs: 0, partial: true, maKm: null, maVert: null }); }
-    while (out.length < n) { last = C.addDays(last, 7); out.push({ start: C.dateKey(last), km: 0, vert: 0, runs: 0, future: true, maKm: null, maVert: null }); }
+    var out = W.slice(), first = out.length ? C.parseDate(out[0].start) : null;
+    if (!first) { first = C.weekStart(today()); out.push({ start: C.dateKey(first), km: 0, vert: 0, runs: 0, partial: true, maKm: null, maVert: null }); }
+    while (out.length < n) { first = C.addDays(first, -7); out.unshift({ start: C.dateKey(first), km: 0, vert: 0, runs: 0, future: true, maKm: null, maVert: null }); }
     return out;
   }
   function padDays(D, n) {
-    var out = D.slice(), last = out.length ? C.parseDate(out[out.length - 1].date) : C.addDays(today(), -1);
-    while (out.length < n) { last = C.addDays(last, 1); out.push({ date: C.dateKey(last), future: true }); }
+    var out = D.slice(), first = out.length ? C.parseDate(out[0].date) : today();
+    if (!out.length) out.push({ date: C.dateKey(first), future: true });
+    while (out.length < n) { first = C.addDays(first, -1); out.unshift({ date: C.dateKey(first), future: true }); }
     return out;
   }
   // محور y بدون عدد، وقتی هنوز هیچ مقداری نیست
@@ -3936,7 +4078,8 @@
 
     html += a.walk ? progWalkVolCard(pc) : progVolCard(pc);
 
-    html += progPmcCard(pc);
+    // CTL / ATL / TSB برای پیاده‌روی زیادی تخصصیه؛ دقیقه‌های هفته کافیه
+    if (!a.walk) html += progPmcCard(pc);
 
     // ---- ۳. بهبود پیس ----
     // پیس‌ها به ثانیه در واحد کاربر (کیلومتر یا مایل)
@@ -3945,8 +4088,9 @@
       var body;
       if (a.entriesCount < 2 || !changed) {
         // شروع کار: پیس هر هفته از آخرین رکورد/تایم‌تست (خط صاف)، هفته‌های پیش رو خالی
-        var X = padWeeks(W, pc.minW).map(function (w, i) {
-          var s = a.samples[i];
+        var X0 = padWeeks(W, pc.minW), off = X0.length - W.length;
+        var X = X0.map(function (w, i) {
+          var s = a.samples[i - off];
           return s && s.vdot ? { date: s.date, vdot: s.vdot, e: I.pace(s.e), t: I.pace(s.t), i: I.pace(s.i) } : { date: w.start };
         });
         var vs = [];
@@ -4008,7 +4152,7 @@
     (function () {
       var CK = a.checkins, body;
       if (CK.length < 5) {
-        // چند چک‌این اول: محور روزانه (حداقل ۴ هفته)، روزهای پیش رو خالی
+        // چند چک‌این اول: محور روزانه (حداقل ۴ هفته)، روزهای قبل از شروع خالی
         var by0 = {}, D0 = [];
         CK.forEach(function (c) { by0[c.date] = c; });
         for (var d0 = C.parseDate(a.from); C.dateKey(d0) <= a.today; d0 = C.addDays(d0, 1)) D0.push({ date: C.dateKey(d0) });
@@ -4175,6 +4319,12 @@
       });
     return progCard('vol', T('progress.volW.title'), T('progress.volW.desc'), body);
   }
+  // محور قدم: درجه‌های مساوی هر ۲ هزار (یا ۵ هزار برای عددهای بزرگ) قدم، به هزار
+  function stepsAxis(mx) {
+    var st = mx > 20000 ? 5000 : 2000, top = Math.ceil(mx / st) * st, ticks = [];
+    for (var v = 0; v <= top; v += st) ticks.push(v);
+    return { min: 0, max: top, ticks: ticks, fmt: function (v) { return fa(v / 1000); }, label: T('progress.steps.unit') };
+  }
   // پیاده‌روی: قدم روزانه (ثبت روزانه یا قدم جلسه) و خط هدف قدم
   function progStepsCard(c) {
     var D = c.a.steps.slice(-Math.min(c.a.steps.length, Math.max(28, c.minW * 7))), rtl = c.rtl;
@@ -4187,7 +4337,7 @@
       '<div class="ch-legend">' + legendItem(SERIES[0], T('progress.steps.bars'), 'bar') + (target ? legendItem(SERIES[2], T('progress.steps.target')) : '') + '</div>' +
       chartBox('steps', {
         rtl: rtl, n: D.length, aria: T('progress.steps.title'),
-        y: { min: 0, max: Math.max.apply(null, got.concat([target || 0, 10000])), fmt: function (v) { return fa(Math.round(v / 1000)); }, label: T('progress.steps.unit') },
+        y: stepsAxis(Math.max.apply(null, got.concat([target || 0, 10000]))),
         bars: { values: vals, color: BAR, hi: vals.length - 1, hiColor: HI },
         lines: target ? [{ values: D.map(function () { return target; }), color: REF, dash: true }] : [],
         xLabels: function (i) { return faDate(D[i].date, true); }, xPx: 52,
@@ -4309,7 +4459,8 @@
     var race = C.RACE_LABELS[a.goal.type], body;
     var P = S.filter(function (s) { return s.riegel; });
     if (a.entriesCount < 2 || !changed || P.length < 2) {
-      var X = padWeeks(W, c.minW).map(function (w, i) { var s = a.samples[i]; return s && s.riegel ? s : { date: w.start }; });
+      var X0 = padWeeks(W, c.minW), off = X0.length - W.length;
+      var X = X0.map(function (w, i) { var s = a.samples[i - off]; return s && s.riegel ? s : { date: w.start }; });
       var vs = [];
       X.forEach(function (s) { if (s.riegel) vs.push(s.riegel, s.vdotTime); });
       var tf = function (v) { return fa(C.formatDuration(Math.round(v))); };

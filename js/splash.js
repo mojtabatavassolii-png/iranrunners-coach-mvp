@@ -11,8 +11,12 @@
   if (!el) return;
   var root = document.documentElement;
   var seen = false;
-  try { seen = sessionStorage.getItem('gaam-intro') === '1'; sessionStorage.setItem('gaam-intro', '1'); } catch (e) { /* */ }
-  // بار دوم در همین نشست، یا حالت تست با ?today=: بدون معرفی
+  // معرفی کامل فقط بار اولی که اپ روی این دستگاه باز می‌شه؛ بعدش (و بار دوم هر نشست) مستقیم صفحه‌ی ورود
+  try {
+    seen = sessionStorage.getItem('gaam-intro') === '1' || localStorage.getItem('gaam-intro') === '1';
+    sessionStorage.setItem('gaam-intro', '1'); localStorage.setItem('gaam-intro', '1');
+  } catch (e) { /* */ }
+  // بار دوم، یا حالت تست با ?today=: بدون معرفی
   if (seen || /[?&]today=/.test(location.search)) { el.parentNode.removeChild(el); root.classList.remove('pre-intro'); return; }
 
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;

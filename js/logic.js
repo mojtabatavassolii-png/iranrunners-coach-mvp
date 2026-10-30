@@ -1283,7 +1283,9 @@
     segKm = segKm > 0 && kind !== 'plain' ? Math.min(floor05(segKm), floor05(km * 0.4)) : 0;
     var st, extra = '';
     if (!segKm) {
-      st = [T('s.long.plain', { km: km }), T('s.long.water')];
+      st = [T('s.long.plain', { km: km })];
+      // آب همراه فقط وقتی مدت تخمینی از ۶۰ دقیقه بیشتره (نکته، نه قدم تمرین)
+      if (km * ctx.P.pE / 60 > 60) extra = T('s.long.water');
     } else if (kind === 'mp') {
       st = [T('s.long.easyKm', { km: round05(km - segKm) }), T('s.long.mpEnd', { km: segKm }), T('s.long.mpFuel')];
       extra = paceNote(T('lbl.paceMarathon'), zones && zones.marathon);
@@ -1617,7 +1619,7 @@
     var nSessions = Math.min(avail.length, L.sessions);
     var sessionDays = chooseSessionDays(avail, nSessions);
     var longDay = sessionDays.indexOf(6) >= 0 ? 6 : sessionDays[sessionDays.length - 1];
-    var days = [], weeklyKm = null, template = {}, vol = null, workouts = null, period = null, b2bDay = null, hp = null;
+    var days = [], weeklyKm = null, template = {}, vol = null, workouts = null, period = null, b2bDay = null, hp = null, easyAlloc = null;
 
     // ضریب برگشت بعد از مسابقه برای کل هفته (۰٫۷، ۰٫۷۷، ... تا ۱)
     var rfWeek = race && race.date < ws ? returnFactor(daysBetween(addDays(ws, 6), race.date)) : 1;
@@ -1711,13 +1713,13 @@
       var remaining = weeklyKm - longKm - b2bKm - qKm;
       while (easyDays.length && remaining / easyDays.length < 3) easyDays.splice(easyDays.length - 1, 1);
       if (!easyDays.length && nSessions >= 2 && remaining > 0) { longKm = round05(longKm + remaining); remaining = 0; }
-      // لانگ‌ران همیشه از جلسه‌ی آسون بلندتر یا مساویه (مگه اینکه جلسه‌ی آسون دوجلسه‌ای باشه)
-      if (easyDays.length && nSessions >= 2 && !workouts.doubles && remaining / easyDays.length > longKm) {
+      // لانگ‌ران حداقل ۱۵٪ از جلسه‌ی آسون بلندتره (مگه اینکه جلسه‌ی آسون دوجلسه‌ای باشه یا سقف لانگ‌ران اجازه نده)
+      if (easyDays.length && nSessions >= 2 && !workouts.doubles && remaining / easyDays.length * LONG_OVER_EASY > longKm) {
         var pool = longKm + remaining;
-        longKm = Math.ceil(pool / (easyDays.length + 1) * 2) / 2;
+        longKm = Math.min(Math.max(longKm, longCap), Math.ceil(pool * LONG_OVER_EASY / (easyDays.length + LONG_OVER_EASY) * 2) / 2);
         remaining = pool - longKm;
       }
-      var easyAlloc = {};
+      easyAlloc = {};
       if (easyDays.length) {
         var units = Math.max(0, Math.round(remaining * 2));
         var each = Math.floor(units / easyDays.length);
@@ -1751,6 +1753,10 @@
     }
 
     var side = otherRaces(profile), rtrDays = null;
+    // اولین جلسه‌ی کل برنامه (هفته‌ی شروع) نه لانگ‌رانه نه تمرین شدید: یک دویدن آسون هم‌اندازه‌ی روزهای آسون
+    var firstPending = dateKey(ws) === dateKey(weekStart(start)) && level >= 2;
+    var easyKms = easyAlloc ? Object.keys(easyAlloc).map(function (d) { return easyAlloc[d]; }) : [];
+    var firstEasyKm = easyKms.length ? Math.max.apply(null, easyKms) : (weeklyKm ? round05(weeklyKm * 0.2) : 0);
     for (var i = 0; i < 7; i++) {
       var date = addDays(ws, i);
       var s;
@@ -1761,6 +1767,13 @@
       else s = makeRest();
       if (race && s.type !== 'none') s = applyRace(profile, s, date, race, ctx, template._rw, level);
       if (side.length) s = applySideRaces(profile, s, date, side, ctx, template._rw, level);
+      if (firstPending && date >= start && ['rest', 'none'].indexOf(s.type) < 0) {
+        firstPending = false;
+        if (s.type !== 'race' && (s.type === 'long' || isHard(s.type)) && firstEasyKm) {
+          s = makeEasy(Math.min(s.km || firstEasyKm, firstEasyKm), zones, T('s.firstEasy'));
+          s.firstSession = true;
+        }
+      }
       // آسیب: دوره‌ی توقف = بدون دویدن؛ مرحله‌های بازگشت = حداکثر ۳ جلسه‌ی دویدن و پیاده‌روی، یک روز در میون
       var ipd = profile.injuries && profile.injuries.length ? injuryPhase(profile, date) : null;
       if (ipd && s.type !== 'none') {
@@ -2650,11 +2663,13 @@
   }
   function assessWalkLevel(profile) {
     var m = Math.max(0, Number(profile.walkMin) || 0), exp = profile.walkExp || 'never';
-    var vol = walkLevelFromMin(m), lv = Math.min(vol, WALK_EXP_CAP[exp] || 2), notes = [];
-    if (lv < vol) notes.push(T('walkNote.expCap', { from: vol, to: lv }));
-    if (profile.walk30 === 'no' && lv > 4) { notes.push(T('walkNote.no30', { from: lv })); lv = 4; }
+    var vol = walkLevelFromMin(m), lv = Math.min(vol, WALK_EXP_CAP[exp] || 2), notes = [], why = [];
+    if (lv < vol) why.push(T('walkNote.why.exp'));
+    if (profile.walk30 === 'no' && lv > 4) { why.push(T('walkNote.why.no30')); lv = 4; }
     var older = Number(profile.age) >= 60;
-    if (older && lv > 1) { notes.push(T('walkNote.age', { from: lv, to: lv - 1 })); lv--; }
+    if (older && lv > 1) { why.push(T('walkNote.why.age')); lv--; }
+    // یک جمله با نتیجه‌ی نهایی، نه سطح‌های میانی
+    if (why.length) notes.push(T('walkNote.start', { from: vol, to: lv, why: why.join(T('walkNote.and')) }) + (older ? T('walkNote.slow') : ''));
     return { level: lv, volLevel: vol, vdot: null, pbLevel: null, cautious: older, notes: notes, source: 'walk', walk: true,
       info: WALK_LEVELS[lv], volume: { start: m, level: m, weighted: m, last: m, avg: m, gap: null } };
   }
@@ -2922,6 +2937,8 @@
   // برنامه‌ی سطح ۰، و برای سطح ۳ به بالا رسیدن به زمان هدف با پله‌های ۱ واحدی VDOT (دنیلز: هر ۴ تا ۶ هفته).
   // =====================================================================
   var PACE_LEVEL = 3;
+  // لانگ‌ران حداقل این ضریب از جلسه‌ی آسون بلندتره
+  var LONG_OVER_EASY = 1.15;
   // حداقل حجم هفتگی اوج و لانگ‌ران لازم برای تموم کردن راحت هر مسافت (برنامه‌های مبتدی دنیلز و هیگدن)
   var PLAN_NEEDS = { '5': { km: 12, long: 6, ses: 3 }, '10': { km: 30, long: 12, ses: 4 }, '21': { km: 40, long: 18, ses: 4 }, '42': { km: 55, long: 30, ses: 5 } };
   // آماده‌سازی اختصاصی بعد از رسیدن به حجم لازم (فاز کیفی و تیپر)؛ برای تموم کردن مسافت کوتاه‌تر، چون خود افزایش حجم آماده‌سازیه

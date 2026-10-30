@@ -182,6 +182,8 @@ input[type=number], input[type=date], input[type=time], input[type=text], input:
   width: 100%; min-height: 44px;
 }
 input:focus, select:focus, textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.jdate { display: grid; grid-template-columns: 0.8fr 1.4fr 1fr; gap: 8px; }
+.jdate select { min-width: 0; min-height: 44px; }
 textarea { resize: vertical; }
 .row2, .row3 { display: grid; gap: 12px; grid-template-columns: 1fr; }
 @media (min-width: 560px) { .row2 { grid-template-columns: 1fr 1fr; } .row3 { grid-template-columns: repeat(3, 1fr); } }
@@ -276,6 +278,7 @@ textarea { resize: vertical; }
 /* «برگشت به این هفته/ماه»: ناحیه‌ی لمس ۴۴ پیکسلی بدون تغییر ظاهر */
 .week-title .linklike { display: inline-block; padding: 10px 4px; margin: -10px -4px; }
 .week-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 16px 0; }
+.week-empty { margin: 16px 0; padding: 12px 14px; border-radius: 12px; background: var(--primary-soft); color: var(--text); line-height: 1.8; }
 @media (min-width: 720px) { .week-stats { grid-template-columns: repeat(4, 1fr); } }
 .stat { background: var(--surface-elevated); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; }
 .stat span { color: var(--text-secondary); font-size: var(--fs-sm); }
@@ -560,7 +563,7 @@ body.login-mode > .wrap { max-width: none; padding: 0; }
 .btn-icon .chev { display: block; }
 
 /* ---------- چرخه‌ی قاعدگی ---------- */
-.check-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-weight: 500; cursor: pointer; }
+.check-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; min-height: 44px; font-weight: 500; cursor: pointer; }
 .check-row input { width: 20px; height: 20px; accent-color: var(--primary); }
 .cycle-box { background: var(--error-soft); border: 1px solid var(--error); }
 .cycle-box .actions { margin-top: 8px; }
@@ -768,6 +771,7 @@ body.has-tabbar #app { max-width: 720px; margin: 0 auto; }
 .today-main .badge { font-size: var(--fs-base); padding: 4px 14px; }
 .today-target { font-size: var(--fs-xl); font-weight: 800; }
 .today-sum { margin: 10px 0 14px; color: var(--text); line-height: 1.9; }
+.today-next { margin: 0 0 14px; padding: 10px 12px; border-radius: var(--radius-sm, 10px); background: var(--primary-soft); color: var(--text); line-height: 1.8; font-weight: 500; }
 .btn-block { width: 100%; }
 .btn-big { min-height: 52px; font-size: var(--fs-base); }
 .center { text-align: center; }
@@ -1912,7 +1916,9 @@ html.intro.intro-instant #app .login * , html.intro.intro-instant #app .login-la
 .pain-warn { margin: 4px 0 6px; padding-inline-start: 18px; }
 .pain-warn li { margin-bottom: 2px; }
 .pain-fields { margin-top: 10px; }
-.pain-consent { margin-bottom: 8px; }
+.pain-consent { margin: 4px 0 0; min-height: 44px; align-items: center; }
+.pain-consent-box { padding: 12px 14px; border-radius: 12px; background: var(--primary-soft); margin: 8px 0 12px; display: grid; gap: 6px; }
+.pain-consent-box p { margin: 0; text-align: start; }
 .chips-scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .chips-scale .chip span { justify-content: center; min-width: 0; width: 100%; }
 .health-disc { margin: 0 0 12px; }
@@ -1941,3 +1947,21 @@ html.intro.intro-instant #app .login * , html.intro.intro-instant #app .login-la
 .pain-box .linklike, .inj-cur .linklike { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; }
 /* UX9-04: خط‌های کوتاه تاریخ‌دار (استثنای تراز دوطرفه، مثل بقیه‌ی خط‌های اطلاعات) */
 .impact-card > p, .race-item-body > p.small, .inj-cur p.small, .race-warn li { text-align: start; }
+
+/* ---------- بازبینی با شخصیت‌ها (v92) ---------- */
+/* فرم اولیه هم‌عرض بقیه‌ی صفحه‌ها (روی دسکتاپ یک خط ۱۰۰۰ پیکسلی نشه) */
+.onb-wizard { max-width: 720px; margin-inline: auto; }
+/* پیام لحظه‌ای: روی نوار بالای صفحه (هدر)؛ هیچ‌وقت روی دکمه‌ها نمی‌شینه و لمس رو رد می‌کنه */
+.toast, body.has-tabbar .toast { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: auto; pointer-events: none;
+  left: 16px; right: 16px; margin-inline: auto; width: fit-content; max-width: min(520px, calc(100vw - 32px)); transform: none; }
+/* گوشی کوچیک: روزهای هفته تا لبه‌ی کارت تا هر روز حدود ۴۴ پیکسل بشه */
+@media (max-width: 399px) { .week-card .week-grid, .month-grid { margin-inline: -14px; gap: 2px; } }
+/* دکمه‌ی بستن کارت نصب: ناحیه‌ی لمس ۴۴ پیکسل */
+.install-x { width: 44px; height: 44px; top: 4px; inset-inline-end: 4px; }
+/* دسکتاپ پهن: تب‌ها به‌صورت ستون کنار صفحه، نه نوار پایین روی محتوا */
+@media (min-width: 1100px) {
+  body.has-tabbar { padding-bottom: 0; }
+  .tabbar { inset-inline: 24px auto; bottom: auto; top: 50%; transform: translateY(-50%); width: 104px;
+    border: 1px solid var(--border); border-radius: 20px; padding: 8px 0; }
+  .tabbar-inner { grid-template-columns: 1fr; gap: 4px; }
+}
