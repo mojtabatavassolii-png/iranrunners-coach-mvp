@@ -11,6 +11,9 @@ adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS || true
 # اجازه‌ی موقعیت برای ثبت دویدن (پنجره‌ی سیستمی این‌جا زده نمی‌شه)
 adb shell pm grant $PKG android.permission.ACCESS_FINE_LOCATION || true
 adb shell pm grant $PKG android.permission.ACCESS_COARSE_LOCATION || true
+# بلوتوث (اندروید ۱۲+): بدون این، initialize پنجره‌ی اجازه رو باز می‌کنه و منتظر کاربر می‌مونه
+adb shell pm grant $PKG android.permission.BLUETOOTH_SCAN || true
+adb shell pm grant $PKG android.permission.BLUETOOTH_CONNECT || true
 adb logcat -c
 adb shell am start -W -n $PKG/.MainActivity
 sleep 10

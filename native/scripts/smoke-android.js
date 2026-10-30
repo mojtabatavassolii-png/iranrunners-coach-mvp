@@ -14,11 +14,16 @@ const STORE_KEY = 'iranrunners-coach-mvp-v1';   // همون STORE_KEY در js/ap
 const results = [];
 let page, shot = 0;
 
+// هر مرحله حداکثر ۴ دقیقه، تا یک مرحله‌ی گیرکرده (مثلاً پنجره‌ی اجازه‌ای که کسی نمی‌زنه) کل اجرا رو تا سقف ۴۵ دقیقه نگه نداره
+const STEP_MS = 4 * 60 * 1000;
 async function step(name, fn) {
   const t0 = Date.now();
-  try { const note = await fn(); results.push(['✅', name, note || '', Date.now() - t0]); }
+  let timer;
+  const limit = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('step timeout after ' + STEP_MS / 1000 + 's')), STEP_MS); });
+  try { const note = await Promise.race([fn(), limit]); results.push(['✅', name, note || '', Date.now() - t0]); }
   catch (e) { results.push(['❌', name, String(e && e.message || e).split('\n')[0].slice(0, 300), Date.now() - t0]); }
-  try { await page.screenshot({ path: path.join(OUT, String(++shot).padStart(2, '0') + '.png') }); } catch (e) { /* */ }
+  finally { clearTimeout(timer); }
+  try { await page.screenshot({ path: path.join(OUT, String(++shot).padStart(2, '0') + '.png'), timeout: 15000 }); } catch (e) { /* */ }
 }
 function adb(cmd) { return execSync('adb ' + cmd, { encoding: 'utf8', timeout: 30000 }); }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -155,7 +160,10 @@ async function hash() { return page.evaluate(() => location.hash); }
   await step('سنسور ضربان: دکمه‌ی اتصال و آماده شدن بلوتوث', async () => {
     await page.evaluate(() => { location.hash = '#record'; });
     await page.locator('[data-hr="connect"]').waitFor();
-    const r = await page.evaluate(() => Capacitor.Plugins.BluetoothLe.initialize({ androidNeverForLocation: true }).then(() => 'ok', (e) => 'error: ' + (e && e.message)));
+    const r = await page.evaluate(() => Promise.race([
+      Capacitor.Plugins.BluetoothLe.initialize({ androidNeverForLocation: true }).then(() => 'ok', (e) => 'error: ' + (e && e.message)),
+      new Promise((ok) => setTimeout(() => ok('no answer in 20s'), 20000))]));
+    must(r === 'ok', 'initialize: ' + r);
     await page.evaluate(() => { location.hash = '#home'; });
     return 'initialize: ' + r;
   });
