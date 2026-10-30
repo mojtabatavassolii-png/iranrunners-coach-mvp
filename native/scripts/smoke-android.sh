@@ -17,4 +17,9 @@ status=$?
 adb exec-out screencap -p > smoke/final-device.png
 adb logcat -d > smoke/logcat-full.txt
 grep -E "Capacitor|chromium|AndroidRuntime|app.gaam.run" smoke/logcat-full.txt > smoke/logcat.txt || true
+# کرش یا خطای نیتیو مستقیم در لاگ اجرا
+echo "--- native errors (logcat) ---"
+grep -E "FATAL|AndroidRuntime|Capacitor.*(Error|rejected)|E Capacitor" smoke/logcat-full.txt | tail -40 || true
+echo "--- current activity ---"
+adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" || true
 exit $status

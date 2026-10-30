@@ -9,6 +9,7 @@ const { _android } = require('playwright-core');
 
 const OUT = path.join(__dirname, '..', 'smoke');
 const CLIP = path.join(__dirname, '..', '..', 'tests', 'e2e', 'synthetic-clip.mp4');
+const STORE_KEY = 'iranrunners-coach-mvp-v1';   // همون STORE_KEY در js/app.js
 const results = [];
 let page, shot = 0;
 
@@ -67,7 +68,7 @@ async function hash() { return page.evaluate(() => location.hash); }
   await step('ذخیره‌ی نیتیو: داده در Preferences کپی شده', async () => {
     await wait(1500);
     const keys = await page.evaluate(() => Capacitor.Plugins.Preferences.keys().then((r) => r.keys));
-    must(keys.indexOf('iranrunners-coach-state') >= 0, 'keys: ' + keys.join(','));
+    must(keys.indexOf(STORE_KEY) >= 0, 'keys: ' + keys.join(','));
     return keys.length + ' کلید';
   });
 
@@ -75,7 +76,7 @@ async function hash() { return page.evaluate(() => location.hash); }
     await page.evaluate(() => { localStorage.clear(); sessionStorage.removeItem('gaam-restored'); location.reload(); });
     await wait(4000);
     await page.locator('#login-btn, .hcard-today').first().waitFor();
-    const name = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('iranrunners-coach-state')).profile.name; } catch (e) { return null; } });
+    const name = await page.evaluate((k) => { try { return JSON.parse(localStorage.getItem(k)).profile.name; } catch (e) { return null; } }, STORE_KEY);
     must(name === 'تست', 'state not restored: ' + name);
     if (await page.locator('#login-btn').isVisible()) await page.locator('#login-btn').click();
     await page.waitForURL(/#home/, { timeout: 20000 });

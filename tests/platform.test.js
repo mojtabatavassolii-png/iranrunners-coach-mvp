@@ -189,6 +189,8 @@ runs.push(test('نیتیو: یادآوری‌ها اعلان محلی سیستم
     return x.P.ready().then(tick).then(tick).then(tick).then(tick);
   }).then(function () {
     assert.deepStrictEqual(c.pending().map(function (n) { return n.title; }), ['c']);
+    // زنگ دقیق نه (وگرنه اندروید ۱۲+ صفحه‌ی تنظیمات رو باز می‌کنه)
+    assert.strictEqual(c.pending()[0].isExactNotification, false);
     assert.ok(c.calls.indexOf('schedule:a,b') >= 0 && c.calls.indexOf('cancel:2') >= 0);
     x.P.notify.cancelAll();
     return tick().then(tick).then(tick);

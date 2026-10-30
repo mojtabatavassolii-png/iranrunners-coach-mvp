@@ -198,6 +198,8 @@
 
     // اعلان محلی سیستم: در زمان مشخص حتی وقتی اپ بسته‌ست. check() همون موقع زمان‌بندی بررسی می‌شه
     // (اپ بعد از هر ذخیره و هر بار باز شدن دوباره زمان‌بندی می‌کنه).
+    // isExactNotification: false — یادآوری دقیقه‌ای لازم نداره؛ زنگ دقیق در اندروید ۱۲ به بعد اجازه‌ی جدا می‌خواد
+    // و افزونه بدون اون، هر بار صفحه‌ی تنظیمات «Alarms & reminders» رو باز می‌کنه.
     if (LN) {
       var perm = 'default', queue = Promise.resolve(), nextId = 1;
       var mapPerm = function (r) { perm = r && r.display === 'granted' ? 'granted' : r && r.display === 'denied' ? 'denied' : 'default'; return perm; };
@@ -214,12 +216,12 @@
       notify.request = function () { return LN.requestPermissions().then(mapPerm, function () { return perm; }); };
       notify.show = function (title, body) {
         if (perm !== 'granted') return;
-        serial(function () { return LN.schedule({ notifications: [{ id: nextId++, title: title, body: body }] }); });
+        serial(function () { return LN.schedule({ notifications: [{ id: nextId++, title: title, body: body, isExactNotification: false }] }); });
       };
       notify.schedule = function (items) {
         var now = Date.now();
         var list = (items || []).filter(function (it) { return it.at - now > 0 && (!it.check || it.check()); })
-          .map(function (it, i) { return { id: 1000 + i, title: it.title, body: it.body, schedule: { at: it.at, allowWhileIdle: true } }; });
+          .map(function (it, i) { return { id: 1000 + i, title: it.title, body: it.body, schedule: { at: it.at, allowWhileIdle: true }, isExactNotification: false }; });
         serial(function () { return clearPending().then(function () { if (list.length) return LN.schedule({ notifications: list }); }); });
       };
       notify.cancelAll = function () { serial(clearPending); };
