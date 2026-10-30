@@ -165,7 +165,8 @@ function fakeCap(prefs, opts) {
       openHealthConnectSettings: function () { calls.push('hc-settings'); return ok(); }
     },
     BackgroundGeolocation: {
-      addWatcher: function (o, cb) { calls.push('watch:' + o.backgroundMessage); listeners.gps = cb; return ok('w1'); },
+      // مثل پل واقعی Capacitor: شناسه‌ی callback مستقیم (نه Promise)
+      addWatcher: function (o, cb) { calls.push('watch:' + o.backgroundMessage); listeners.gps = cb; return 'w1'; },
       removeWatcher: function (o) { calls.push('unwatch:' + o.id); return ok(); },
       openSettings: function () { calls.push('loc-settings'); return ok(); }
     }

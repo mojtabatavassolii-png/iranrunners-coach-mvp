@@ -117,30 +117,38 @@ async function hash() { return page.evaluate(() => location.hash); }
     const M = 111195;
     let lat = 35.7;
     const fix = () => { lat += 4 / M; adb(`emu geo fix 51.4 ${lat.toFixed(7)}`); };
-    const live = () => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('gaam-run-live')).st.dist; } catch (e) { return null; } });
+    const live = () => page.evaluate(() => { try { const s = JSON.parse(localStorage.getItem('gaam-run-live')).st; return { d: s.dist, n: s.points }; } catch (e) { return { d: null, n: null }; } });
     adb(`emu geo fix 51.4 ${lat}`);
     await page.evaluate(() => { location.hash = '#record'; });
     await page.locator('[data-rec="start"]').click();
+    await page.locator('[data-rec="finish"]').waitFor();
     for (let i = 0; i < 12; i++) { await wait(1000); fix(); }
     await wait(5500); fix();
     const fg = await live();
     adb('shell input keyevent KEYCODE_HOME');
     await wait(1500);
     const notif = /app\.gaam\.run/.test(adb('shell dumpsys notification --noredact'));
+    const fgs = /isForeground=true/.test(adb('shell dumpsys activity services app.gaam.run'));
     for (let i = 0; i < 15; i++) { await wait(1000); fix(); }
+    // نقطه‌های پس‌زمینه در WebView: بعد از برگشت (ذخیره هر ۵ ثانیه)
     adb('shell am start -n app.gaam.run/.MainActivity');
-    await wait(2500);
+    await wait(6000);
+    const bg = await live();
     for (let i = 0; i < 6; i++) { await wait(1000); fix(); }
+    await wait(5500);
     const all = await live();
-    must(fg > 20, 'foreground distance ' + fg);
-    must(all - fg > 35, 'background distance ' + fg + ' → ' + all);
-    must(notif, 'no foreground-service notification while in background');
+    const diag = `نقطه‌ها: پیش‌زمینه ${fg.n}، بعد از پس‌زمینه ${bg.n}، آخر ${all.n} · مسافت ${Math.round(fg.d)}→${Math.round(bg.d)}→${Math.round(all.d)} m · اعلان: ${notif} · سرویس پیش‌زمینه: ${fgs}`;
+    console.log('GPS ' + diag);
+    must(fg.d > 20, 'foreground: ' + diag);
+    must(bg.d - fg.d > 35, 'background: ' + diag);
+    must(all.d - bg.d > 10, 'after return: ' + diag);
+    must(notif && fgs, 'service: ' + diag);
     await page.locator('[data-rec="finish"]').click();
     await page.locator('[data-rec="save"]').click();
     await page.waitForURL(/#plan/);
     const log = await page.evaluate((k) => { const s = JSON.parse(localStorage.getItem(k)); const d = Object.keys(s.done)[0]; return s.doneLog[d]; }, STORE_KEY);
     must(log && log.src === 'gps' && log.actual.km > 0.05, JSON.stringify(log));
-    return `پیش‌زمینه ${Math.round(fg)} m · کل ${Math.round(all)} m · ذخیره ${log.actual.km} km در ${log.actual.sec}s · اعلان سرویس: ${notif ? 'بله' : 'نه'}`;
+    return diag + ` · ذخیره ${log.actual.km} km در ${log.actual.sec}s`;
   });
 
   await step('دکمه‌ی برگشت اندروید', async () => {

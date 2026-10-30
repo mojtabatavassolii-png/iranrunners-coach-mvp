@@ -27,7 +27,8 @@ timeout 10 adb get-state || echo "device offline after tests"
 grep -E "Capacitor|chromium|AndroidRuntime|app.gaam.run" smoke/logcat-full.txt > smoke/logcat.txt || true
 # کرش یا خطای نیتیو مستقیم در لاگ اجرا
 echo "--- native errors (logcat) ---"
-grep -E "FATAL|AndroidRuntime|Capacitor.*(Error|rejected)|E Capacitor" smoke/logcat-full.txt | tail -40 || true
+# (خط‌های فراخوانی افزونه‌ها کنار گذاشته می‌شن؛ مقدار ذخیره‌ها رو دارن)
+grep -E "FATAL|AndroidRuntime|Capacitor.*(Error|rejected)|E Capacitor|BackgroundGeolocation|Failed to foreground" smoke/logcat-full.txt | grep -v "methodData" | tail -40 || true
 echo "--- current activity ---"
 timeout 20 adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" || true
 exit $status

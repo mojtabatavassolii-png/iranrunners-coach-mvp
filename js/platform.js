@@ -326,11 +326,13 @@
       gps.background = function () { return true; };
       gps.start = function (onPoint, onError, texts) {
         texts = texts || {};
-        return BG.addWatcher({ backgroundTitle: texts.title, backgroundMessage: texts.message || 'GPS', requestPermissions: true, stale: false, distanceFilter: 0 },
+        // از پل Capacitor (بدون بسته‌ی npm افزونه)، متد callback شناسه رو مستقیم برمی‌گردونه، نه Promise
+        var r = BG.addWatcher({ backgroundTitle: texts.title, backgroundMessage: texts.message || 'GPS', requestPermissions: true, stale: false, distanceFilter: 0 },
           function (loc, err) {
             if (err) { onError(err.code === 'NOT_AUTHORIZED' ? 'denied' : 'unavailable'); return; }
             if (loc) onPoint({ lat: loc.latitude, lon: loc.longitude, acc: loc.accuracy, t: loc.time || Date.now() });
-          }).then(function (id) { return { id: id }; });
+          });
+        return Promise.resolve(r).then(function (id) { return { id: id }; });
       };
       gps.stop = function (h) { return h && h.id ? BG.removeWatcher({ id: h.id }).catch(noop) : Promise.resolve(); };
       gps.canOpenSettings = function () { return true; };
