@@ -11,13 +11,10 @@ adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS || true
 adb logcat -c
 adb shell am start -W -n $PKG/.MainActivity
 sleep 10
-PID=$(adb shell pidof $PKG | tr -d '\r')
-echo "pid: $PID"
-adb forward tcp:9222 localabstract:webview_devtools_remote_$PID
 npm i --no-save --no-audit --no-fund playwright-core@1.63.0 >/dev/null
 node scripts/smoke-android.js
 status=$?
 adb exec-out screencap -p > smoke/final-device.png
 adb logcat -d > smoke/logcat-full.txt
-grep -E "Capacitor|chromium|AndroidRuntime|$PKG" smoke/logcat-full.txt > smoke/logcat.txt || true
+grep -E "Capacitor|chromium|AndroidRuntime|app.gaam.run" smoke/logcat-full.txt > smoke/logcat.txt || true
 exit $status

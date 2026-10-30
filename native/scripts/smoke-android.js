@@ -4,7 +4,8 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { chromium } = require('playwright-core');
+// WebView اندروید «مرورگر» کامل نیست و connectOverCDP بهش وصل نمی‌شه؛ API اندروید Playwright مستقیم به WebView اپ وصل می‌شه
+const { _android } = require('playwright-core');
 
 const OUT = path.join(__dirname, '..', 'smoke');
 const CLIP = path.join(__dirname, '..', '..', 'tests', 'e2e', 'synthetic-clip.mp4');
@@ -25,8 +26,10 @@ async function next() { await page.click('#onb-next'); await page.locator('#onb-
 async function hash() { return page.evaluate(() => location.hash); }
 
 (async () => {
-  const browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
-  page = browser.contexts()[0].pages()[0];
+  const [device] = await _android.devices();
+  if (!device) throw new Error('no android device');
+  const webview = await device.webView({ pkg: 'app.gaam.run' }, { timeout: 60000 });
+  page = await webview.page();
   page.setDefaultTimeout(30000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e && e.message || e)));
@@ -131,6 +134,6 @@ async function hash() { return page.evaluate(() => location.hash); }
   fs.writeFileSync(path.join(OUT, 'result.md'), md + '\n');
   console.log(md);
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## Android emulator\n\n' + md + '\n');
-  await browser.close().catch(() => {});
+  await device.close().catch(() => {});
   process.exit(results.some((r) => r[0] === '❌') ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
