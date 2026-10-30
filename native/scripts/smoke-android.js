@@ -126,6 +126,15 @@ async function hash() { return page.evaluate(() => location.hash); }
 
   try { fs.writeFileSync(path.join(OUT, 'meminfo-before-gait.txt'), adb('shell cat /proc/meminfo')); } catch (e) { /* */ }
   await step('بیومکانیک: MediaPipe در WebView و پایان تحلیل', async () => {
+    // WebGL شبیه‌ساز (ترجمه‌ی GL روی میزبان) با GPU-delegate مدیاپایپ خود شبیه‌ساز رو از کار می‌اندازه؛
+    // بدون WebGL، اپ خودش به CPU برمی‌گرده (همون مسیری که در گوشی‌های بدون WebGL2 اجرا می‌شه). مسیر GPU فقط روی گوشی واقعی تست می‌شه.
+    await page.evaluate(() => {
+      [window.HTMLCanvasElement, window.OffscreenCanvas].forEach((C) => {
+        if (!C) return;
+        const orig = C.prototype.getContext;
+        C.prototype.getContext = function (type, o) { return /webgl/i.test(type) ? null : orig.call(this, type, o); };
+      });
+    });
     await page.evaluate(() => { location.hash = '#gait'; });
     await page.locator('input[type=file][data-gait-file="side"]').setInputFiles({ name: path.basename(CLIP), mimeType: CLIP.endsWith('.webm') ? 'video/webm' : 'video/mp4', buffer: fs.readFileSync(CLIP) });
     await page.locator('label:has(> input[data-gait-cond="side"][value="easy"])').click();
