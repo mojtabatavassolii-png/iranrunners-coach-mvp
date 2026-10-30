@@ -124,23 +124,38 @@ async function hash() { return page.evaluate(() => location.hash); }
     return top.slice(0, 160);
   });
 
+  // تحلیل ویدیو در شبیه‌ساز: GPU-delegate مدیاپایپ از ترجمه‌ی GL شبیه‌ساز رد می‌شه و خود شبیه‌ساز رو از کار می‌اندازه
+  // (۳ اجرا، با H.264 و VP8). پس این‌جا همون اجزای نیتیو‌حساس با CPU بررسی می‌شن: بارگذاری wasm و مدل از https://localhost،
+  // باز کردن ویدیو با CoachPose.openVideo، و تشخیص بدن روی فریم‌های واقعی کلیپ. مسیر کامل با GPU فقط روی گوشی واقعی.
   try { fs.writeFileSync(path.join(OUT, 'meminfo-before-gait.txt'), adb('shell cat /proc/meminfo')); } catch (e) { /* */ }
-  await step('بیومکانیک: MediaPipe در WebView و پایان تحلیل', async () => {
-    // WebGL شبیه‌ساز (ترجمه‌ی GL روی میزبان) با GPU-delegate مدیاپایپ خود شبیه‌ساز رو از کار می‌اندازه؛
-    // بدون WebGL، اپ خودش به CPU برمی‌گرده (همون مسیری که در گوشی‌های بدون WebGL2 اجرا می‌شه). مسیر GPU فقط روی گوشی واقعی تست می‌شه.
-    await page.evaluate(() => {
-      [window.HTMLCanvasElement, window.OffscreenCanvas].forEach((C) => {
-        if (!C) return;
-        const orig = C.prototype.getContext;
-        C.prototype.getContext = function (type, o) { return /webgl/i.test(type) ? null : orig.call(this, type, o); };
-      });
-    });
-    await page.evaluate(() => { location.hash = '#gait'; });
-    await page.locator('input[type=file][data-gait-file="side"]').setInputFiles({ name: path.basename(CLIP), mimeType: CLIP.endsWith('.webm') ? 'video/webm' : 'video/mp4', buffer: fs.readFileSync(CLIP) });
-    await page.locator('label:has(> input[data-gait-cond="side"][value="easy"])').click();
-    await page.locator('[data-gait-run]').click();
-    await page.locator('#gait-report, #app .form-errors').first().waitFor({ timeout: 8 * 60 * 1000 });
-    return (await page.locator('#gait-report, #app .form-errors').first().innerText()).replace(/\s+/g, ' ').slice(0, 140);
+  await step('MediaPipe در WebView (CPU): wasm و مدل، ویدیو و تشخیص روی ۱۰ فریم', async () => {
+    const b64 = fs.readFileSync(CLIP).toString('base64'), type = CLIP.endsWith('.webm') ? 'video/webm' : 'video/mp4';
+    const r = await page.evaluate(async ({ b64, type }) => {
+      const t0 = performance.now(), abs = (p) => new URL(p, document.baseURI).href;
+      const bin = atob(b64), u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const v = await CoachPose.openVideo(new File([u8], 'clip', { type }));
+      const mp = await import(abs('js/vendor/mediapipe/vision_bundle.mjs'));
+      const fset = await mp.FilesetResolver.forVisionTasks(abs('js/vendor/mediapipe/wasm'));
+      const lm = await mp.PoseLandmarker.createFromOptions(fset, { baseOptions: { modelAssetPath: abs('models/pose_landmarker_full.task'), delegate: 'CPU' }, runningMode: 'VIDEO', numPoses: 1 });
+      const tLoad = performance.now() - t0;
+      const cv = document.createElement('canvas'); cv.width = 480; cv.height = Math.round(480 * v.videoHeight / v.videoWidth);
+      const g = cv.getContext('2d');
+      let frames = 0, people = 0, clock = 1;
+      for (let i = 0; i < 10; i++) {
+        v.currentTime = Math.min(v.duration - 0.05, i * 0.25);
+        await new Promise((ok) => { v.addEventListener('seeked', ok, { once: true }); setTimeout(ok, 3000); });
+        g.drawImage(v, 0, 0, cv.width, cv.height);
+        const res = lm.detectForVideo(cv, clock += 40);
+        frames++; if (res.landmarks && res.landmarks.length) people++;
+      }
+      const out = { w: v.videoWidth, h: v.videoHeight, dur: +v.duration.toFixed(1), frames, people, loadMs: Math.round(tLoad), totalMs: Math.round(performance.now() - t0) };
+      lm.close(); CoachPose.release(v);
+      return out;
+    }, { b64, type });
+    must(r.frames === 10 && r.w > 0, JSON.stringify(r));
+    // کلیپ ساختگی آدم نداره؛ انتظار: صفر
+    return `${r.w}×${r.h} ${r.dur}s · ${r.frames} فریم، ${r.people} آدم · بارگذاری ${r.loadMs}ms · کل ${r.totalMs}ms`;
   });
 
   await step('بدون خطای جاوااسکریپت', async () => { must(!errors.length, errors.slice(0, 5).join(' | ')); });
