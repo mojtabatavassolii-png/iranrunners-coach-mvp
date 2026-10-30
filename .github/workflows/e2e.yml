@@ -1,0 +1,110 @@
+# تست دوره‌ای مسیرهای اصلی گام روی گوشی، تبلت و دسکتاپ شبیه‌سازی‌شده (Chromium، WebKit، Firefox)، هر ۴۸ ساعت، با گزارش ایمیلی.
+# cron گیت‌هاب «هر ۴۸ ساعت» دقیق نداره: هر روز بیدار می‌شه و مرحله‌ی gate فقط وقتی ۴۷ ساعت از آخرین اجرای واقعی گذشته باشه تست‌ها رو اجرا می‌کنه.
+# اجرای دستی (Run workflow) همیشه اجرا می‌شه.
+# ایمیل: secretهای MAIL_USERNAME (آدرس جیمیل فرستنده)، MAIL_PASSWORD (App Password جیمیل) و MAIL_TO (گیرنده) در
+# Settings → Secrets and variables → Actions. بدون این‌ها، تست‌ها اجرا می‌شن و فقط ایمیل فرستاده نمی‌شه.
+name: Periodic device tests
+
+on:
+  schedule:
+    - cron: '17 3 * * *'   # ۰۳:۱۷ UTC = ۶:۴۷ صبح تهران
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.g.outputs.run }}
+    steps:
+      - id: g
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          # آخرین اجرای واقعی = آخرین artifact نتایج
+          last=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=e2e-results&per_page=1" --jq '.artifacts[0].created_at // empty')
+          if [ -z "$last" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          age=$(( ( $(date +%s) - $(date -d "$last" +%s) ) / 3600 ))
+          echo "last run ${age}h ago"
+          if [ "$age" -ge 47 ]; then echo "run=true" >> "$GITHUB_OUTPUT"; else echo "run=false" >> "$GITHUB_OUTPUT"; fi
+
+  test:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: tests/e2e
+    env:
+      CI: 'true'
+      BASE_URL: https://mojtabatavassolii-png.github.io/iranrunners-coach-mvp/
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright and browsers
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium webkit firefox
+      - name: Previous results (for comparison)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=e2e-results&per_page=1" --jq '.artifacts[0].id // empty')
+          if [ -n "$id" ]; then
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > prev.zip && mkdir -p prev && unzip -o -q prev.zip -d prev || echo "no previous results"
+          fi
+      - name: Run tests
+        id: run
+        run: npx playwright test || echo "failed=true" >> "$GITHUB_OUTPUT"
+      - name: Build report
+        if: always()
+        run: |
+          node report.js
+          cat out/summary.md >> "$GITHUB_STEP_SUMMARY"
+          echo "SUBJECT=$(cat out/subject.txt)" >> "$GITHUB_ENV"
+      - name: Save results for the next comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: tests/e2e/out/results.json
+          retention-days: 14
+      - name: Save report, screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            tests/e2e/out/
+            tests/e2e/test-results/
+          retention-days: 14
+      - name: Email the report
+        if: always() && env.MAIL_USERNAME != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          from: Gaam tests <${{ secrets.MAIL_USERNAME }}>
+          to: ${{ secrets.MAIL_TO }}
+          subject: ${{ env.SUBJECT }}
+          html_body: file://tests/e2e/out/email.html
+          attachments: tests/e2e/out/failures/*.png
+          ignore_cert: false
+      - name: Mark the run red when tests failed
+        if: steps.run.outputs.failed == 'true'
+        run: exit 1

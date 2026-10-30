@@ -1,0 +1,12 @@
+{
+  "name": "gaam-e2e",
+  "private": true,
+  "description": "Periodic end-to-end tests of Gaam's main flows on emulated phones, tablets and desktop (Chromium, WebKit, Firefox). Not part of the deployed app.",
+  "scripts": {
+    "test": "playwright test",
+    "report": "node report.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
