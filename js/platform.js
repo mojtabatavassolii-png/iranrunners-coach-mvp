@@ -5,9 +5,10 @@
  *
  * - info:    نوع پلتفرم (web، ios، android)، نیتیو بودن، آیفون، نصب‌شده (PWA)
  * - store:   ذخیره‌ی ماندگار کلید/مقدار (متن). API همگامه و روی یک کش در حافظه کار می‌کنه؛ پشتوانه‌ی وب localStorage است.
- *            پشتوانه‌ی نیتیو (ناهمگام، مثل Preferences یا SQLite) قبل از اجرای اپ کش رو پر می‌کنه: ready() و نوشتن write-through.
+ *            پشتوانه‌ی ناهمگام (مثل SQLite) با useBackend قبل از اجرای اپ کش رو پر می‌کنه؛ اپ نیتیو فعلاً localStorage رو در Preferences کپی می‌کنه.
  * - session: داده‌ی همین نشست (sessionStorage)
  * - files:   ذخیره یا اشتراک فایل، چاپ
+ * نسخه‌ی نیتیو (پایین فایل): Preferences، LocalNotifications، Filesystem و Share، و دکمه‌ی برگشت اندروید با App
  * - notify:  اجازه و نمایش اعلان، زمان‌بندی یادآوری
  * - sw:      سرویس‌ورکر (فقط وب)
  * باید قبل از i18n.js و app.js بار بشه.
@@ -111,6 +112,7 @@
       return download(name, blob);
     },
     canShareFile: canShareFile,
+    canPrint: function () { return typeof root.print === 'function'; },
     // چاپ صفحه‌ی فعلی؛ before و after برای آماده کردن و برگردوندن صفحه
     print: function (before, after) {
       if (before) before();
@@ -160,10 +162,105 @@
     }
   };
 
+  var ready = Promise.resolve();
+
+  // ---------- native (Capacitor) ----------
+  // افزونه‌ها از Capacitor.Plugins خونده می‌شن (پل نیتیو خودش اون‌ها رو تزریق می‌کنه؛ باندلر لازم نیست).
+  // هر افزونه‌ای که نباشه، همون رفتار وب می‌مونه.
+  if (isNative) {
+    var plug = function (name) { return (cap.Plugins || {})[name]; };
+    var noop = function () {};
+    var Prefs = plug('Preferences'), LN = plug('LocalNotifications'), FS = plug('Filesystem'), Share = plug('Share'), App = plug('App');
+
+    // ذخیره: localStorage همچنان منبع همگامه و هر نوشتن در Preferences (فایل نیتیو) هم کپی می‌شه.
+    // اگه سیستم داده‌ی WebView رو پاک کرده باشه، شروع بعدی از Preferences برمی‌گرده و صفحه یک بار دوباره بار می‌شه.
+    if (Prefs) {
+      var webSet = webBackend.set, webRemove = webBackend.remove;
+      webBackend.set = function (k, v) { webSet(k, v); Prefs.set({ key: k, value: v }).catch(noop); };
+      webBackend.remove = function (k) { webRemove(k); Prefs.remove({ key: k }).catch(noop); };
+      var mine = function (k) { return k.indexOf('iranrunners-coach-') === 0 || k.indexOf('gaam-') === 0; };
+      ready = Prefs.keys().then(function (r) {
+        var saved = (r.keys || []).filter(mine), local = webBackend.keys().filter(mine);
+        if (local.length && !saved.length) {
+          // اولین اجرا با این نسخه: هر چی هست به Preferences
+          return Promise.all(local.map(function (k) { return Prefs.set({ key: k, value: webBackend.get(k) }); }));
+        }
+        if (!local.length && saved.length && session.get('gaam-restored') !== '1') {
+          return Promise.all(saved.map(function (k) { return Prefs.get({ key: k }); })).then(function (vals) {
+            saved.forEach(function (k, i) { if (vals[i].value != null) webSet(k, vals[i].value); });
+            // فقط یک بار در هر نشست، تا اگه نوشتن نشد حلقه‌ی بارگذاری درست نشه
+            session.set('gaam-restored', '1');
+            root.location.reload();
+          });
+        }
+      }).catch(noop);
+    }
+
+    // اعلان محلی سیستم: در زمان مشخص حتی وقتی اپ بسته‌ست. check() همون موقع زمان‌بندی بررسی می‌شه
+    // (اپ بعد از هر ذخیره و هر بار باز شدن دوباره زمان‌بندی می‌کنه).
+    if (LN) {
+      var perm = 'default', queue = Promise.resolve(), nextId = 1;
+      var mapPerm = function (r) { perm = r && r.display === 'granted' ? 'granted' : r && r.display === 'denied' ? 'denied' : 'default'; return perm; };
+      LN.checkPermissions().then(mapPerm, noop);
+      var serial = function (fn) { queue = queue.then(fn).catch(noop); return queue; };
+      var clearPending = function () {
+        return LN.getPending().then(function (r) {
+          var n = (r.notifications || []).map(function (x) { return { id: x.id }; });
+          if (n.length) return LN.cancel({ notifications: n });
+        });
+      };
+      notify.supported = function () { return true; };
+      notify.permission = function () { return perm; };
+      notify.request = function () { return LN.requestPermissions().then(mapPerm, function () { return perm; }); };
+      notify.show = function (title, body) {
+        if (perm !== 'granted') return;
+        serial(function () { return LN.schedule({ notifications: [{ id: nextId++, title: title, body: body }] }); });
+      };
+      notify.schedule = function (items) {
+        var now = Date.now();
+        var list = (items || []).filter(function (it) { return it.at - now > 0 && (!it.check || it.check()); })
+          .map(function (it, i) { return { id: 1000 + i, title: it.title, body: it.body, schedule: { at: it.at, allowWhileIdle: true } }; });
+        serial(function () { return clearPending().then(function () { if (list.length) return LN.schedule({ notifications: list }); }); });
+      };
+      notify.cancelAll = function () { serial(clearPending); };
+    }
+
+    // فایل: در WebView دانلود وجود نداره؛ فایل در کش اپ نوشته و منوی اشتراک سیستم باز می‌شه
+    if (FS) {
+      var toBase64 = function (blob) {
+        return new Promise(function (res, rej) {
+          var r = new root.FileReader();
+          r.onload = function () { res(String(r.result).split(',')[1] || ''); };
+          r.onerror = function () { rej(r.error); };
+          r.readAsDataURL(blob);
+        });
+      };
+      files.save = function (name, blob, opts) {
+        opts = opts || {};
+        return toBase64(blob).then(function (data) {
+          if (!Share) return FS.writeFile({ path: name, data: data, directory: 'DOCUMENTS' }).then(function () { return 'downloaded'; });
+          return FS.writeFile({ path: name, data: data, directory: 'CACHE' }).then(function (w) {
+            return Share.share({ title: opts.title || name, files: [w.uri] }).then(function () { return 'shared'; }, function (e) {
+              if (/cancel/i.test((e && e.message) || '')) return 'cancelled';
+              throw e;
+            });
+          });
+        });
+      };
+    }
+    // چاپ در WebView اندروید و iOS کار نمی‌کنه
+    files.canPrint = function () { return false; };
+
+    // دکمه‌ی برگشت اندروید: صفحه‌ی قبلی اپ، و در اولین صفحه بستن اپ
+    if (App) {
+      App.addListener('backButton', function (e) { if (e && e.canGoBack) root.history.back(); else App.exitApp(); });
+    }
+  }
+
   root.CoachPlatform = {
     kind: kind, isNative: isNative, isIos: isIos, isStandalone: isStandalone, isTouch: isTouch,
     store: store, session: session, files: files, notify: notify, sw: sw,
-    // آماده بودن داده‌ها (وب: بلافاصله)
-    ready: function () { return Promise.resolve(); }
+    // آماده بودن داده‌ها (وب: بلافاصله؛ نیتیو: بعد از هماهنگی با Preferences)
+    ready: function () { return ready; }
   };
 })(typeof window !== 'undefined' ? window : this);

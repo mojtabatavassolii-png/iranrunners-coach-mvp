@@ -1,0 +1,24 @@
+{
+  "name": "gaam-native",
+  "private": true,
+  "description": "Gaam as an Android and iOS app (Capacitor). The web app in the repo root is copied into www/ before each sync.",
+  "scripts": {
+    "web": "node scripts/copy-web.js",
+    "sync": "npm run web && cap sync",
+    "android": "npm run sync && cap open android",
+    "ios": "npm run sync && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/local-notifications": "8.3.1",
+    "@capacitor/preferences": "8.0.1",
+    "@capacitor/share": "8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

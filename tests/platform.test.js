@@ -24,7 +24,7 @@ function memStorage(quota) {
   // Object.keys(localStorage) فقط کلیدهای ذخیره‌شده رو برمی‌گردونه
   return new Proxy(s, { ownKeys: function () { return Object.keys(d); }, getOwnPropertyDescriptor: function (t, k) { return k in d ? { enumerable: true, configurable: true, value: d[k] } : undefined; } });
 }
-// یک window ساختگی؛ o: { ua, touch, capacitor, canShare, share, quota, standalone }
+// یک window ساختگی؛ o: { ua, touch, capacitor, canShare, share, quota, standalone, notification, local }
 function load(o) {
   o = o || {};
   var log = { downloads: [], shares: [], notes: [], timers: [] };
@@ -38,13 +38,17 @@ function load(o) {
     Capacitor: o.capacitor,
     document: { body: body, createElement: function () { var a = { click: function () { log.downloads.push(a.download); }, remove: function () {} }; return a; } },
     addEventListener: function () {}, removeEventListener: function () {}, print: function () { log.printed = true; },
-    Notification: o.notification
+    Notification: o.notification,
+    history: { back: function () { log.back = true; } },
+    FileReader: function () { var r = this; r.readAsDataURL = function () { r.result = 'data:x;base64,QUJD'; r.onload(); }; }
   };
+  win.location.reload = function () { log.reloaded = true; };
+  if (o.local) Object.keys(o.local).forEach(function (k) { win.localStorage.setItem(k, o.local[k]); });
   if (!o.notification) delete win.Notification;
   var ctx = { window: win, URL: { createObjectURL: function () { return 'blob:x'; }, revokeObjectURL: function () {} },
     File: function (parts, name, opts) { this.name = name; this.type = opts && opts.type; },
     setTimeout: function (fn, ms) { log.timers.push({ fn: fn, ms: ms }); return log.timers.length; }, clearTimeout: function (id) { if (log.timers[id - 1]) log.timers[id - 1].fn = null; },
-    Promise: Promise, Date: Date, JSON: JSON, Object: Object, String: String, Math: Math };
+    Promise: Promise, Date: Date, JSON: JSON, Object: Object, String: String, Math: Math, Error: Error };
   vm.runInNewContext(SRC, ctx);
   return { P: win.CoachPlatform, win: win, log: log };
 }
@@ -128,6 +132,82 @@ runs.push(test('اعلان: بدون اجازه چیزی زمان‌بندی ن�
   var none = load();
   assert.strictEqual(none.P.notify.supported(), false);
   assert.strictEqual(none.P.notify.permission(), 'denied');
+}));
+
+// Capacitor ساختگی با افزونه‌های نیتیو؛ همه‌ی فراخوانی‌ها در calls ثبت می‌شن
+function fakeCap(prefs, opts) {
+  opts = opts || {};
+  var calls = [], pending = [], listeners = {};
+  var ok = function (v) { return Promise.resolve(v); };
+  var Plugins = {
+    Preferences: {
+      keys: function () { return ok({ keys: Object.keys(prefs) }); },
+      get: function (o) { return ok({ value: Object.prototype.hasOwnProperty.call(prefs, o.key) ? prefs[o.key] : null }); },
+      set: function (o) { prefs[o.key] = o.value; return ok(); },
+      remove: function (o) { delete prefs[o.key]; return ok(); }
+    },
+    LocalNotifications: {
+      checkPermissions: function () { return ok({ display: opts.perm || 'granted' }); },
+      requestPermissions: function () { return ok({ display: 'granted' }); },
+      getPending: function () { return ok({ notifications: pending.slice() }); },
+      cancel: function (o) { var ids = o.notifications.map(function (n) { return n.id; }); pending = pending.filter(function (n) { return ids.indexOf(n.id) < 0; }); calls.push('cancel:' + ids.length); return ok(); },
+      schedule: function (o) { pending = pending.concat(o.notifications); calls.push('schedule:' + o.notifications.map(function (n) { return n.title; }).join(',')); return ok(); }
+    },
+    Filesystem: { writeFile: function (o) { calls.push('write:' + o.directory + ':' + o.path + ':' + o.data); return ok({ uri: 'file:///cache/' + o.path }); } },
+    Share: { share: function (o) { calls.push('share:' + o.files[0]); return opts.shareCancel ? Promise.reject(new Error('Share canceled')) : ok(); } },
+    App: { addListener: function (n, fn) { listeners[n] = fn; }, exitApp: function () { calls.push('exit'); } }
+  };
+  return { isNativePlatform: function () { return true; }, getPlatform: function () { return 'android'; }, Plugins: Plugins, calls: calls, pending: function () { return pending; }, listeners: listeners };
+}
+function tick() { return new Promise(function (r) { setImmediate(r); }); }
+
+runs.push(test('نیتیو: نوشتن‌ها در Preferences هم کپی می‌شن؛ اگه داده‌ی WebView پاک شده باشه برمی‌گرده و یک بار reload', function () {
+  var prefs = {}, c = fakeCap(prefs), x = load({ capacitor: c });
+  return x.P.ready().then(function () {
+    x.P.store.set('iranrunners-coach-state', '{"a":1}');
+    x.P.store.remove('gaam-x');
+    assert.strictEqual(prefs['iranrunners-coach-state'], '{"a":1}');
+    var y = load({ capacitor: fakeCap(prefs) });
+    return y.P.ready().then(function () {
+      assert.strictEqual(y.log.reloaded, true);
+      assert.strictEqual(y.win.localStorage.getItem('iranrunners-coach-state'), '{"a":1}');
+    });
+  }).then(function () {
+    // داده‌ی قدیمی در WebView و Preferences خالی: همه کپی می‌شن
+    var p2 = {}, w = load({ capacitor: fakeCap(p2), local: { 'gaam-lang': 'en', other: 'x' } });
+    return w.P.ready().then(function () { assert.deepStrictEqual(p2, { 'gaam-lang': 'en' }); assert.ok(!w.log.reloaded); });
+  });
+}));
+runs.push(test('نیتیو: یادآوری‌ها اعلان محلی سیستم‌ان؛ check و زمان گذشته موقع زمان‌بندی؛ جایگزینی قبلی‌ها', function () {
+  var c = fakeCap({}), x = load({ capacitor: c }), now = Date.now();
+  return tick().then(function () {
+    assert.strictEqual(x.P.notify.supported(), true);
+    assert.strictEqual(x.P.notify.permission(), 'granted');
+    x.P.notify.schedule([{ at: new Date(now - 1000), title: 'past' }, { at: new Date(now + 5000), title: 'a' },
+      { at: new Date(now + 9000), title: 'skip', check: function () { return false; } }, { at: new Date(now + 9000), title: 'b' }]);
+    x.P.notify.schedule([{ at: new Date(now + 5000), title: 'c' }]);
+    return x.P.ready().then(tick).then(tick).then(tick).then(tick);
+  }).then(function () {
+    assert.deepStrictEqual(c.pending().map(function (n) { return n.title; }), ['c']);
+    assert.ok(c.calls.indexOf('schedule:a,b') >= 0 && c.calls.indexOf('cancel:2') >= 0);
+    x.P.notify.cancelAll();
+    return tick().then(tick).then(tick);
+  }).then(function () { assert.strictEqual(c.pending().length, 0); });
+}));
+runs.push(test('نیتیو: فایل در کش نوشته و منوی اشتراک باز می‌شه؛ لغو؛ چاپ نداره؛ دکمه‌ی برگشت', function () {
+  var c = fakeCap({}), x = load({ capacitor: c });
+  assert.strictEqual(x.P.files.canPrint(), false);
+  assert.strictEqual(load().P.files.canPrint(), true);
+  return x.P.files.save('b.json', { type: 'application/json' }, { share: true }).then(function (r) {
+    assert.strictEqual(r, 'shared');
+    assert.deepStrictEqual(c.calls.slice(0, 2), ['write:CACHE:b.json:QUJD', 'share:file:///cache/b.json']);
+    assert.deepStrictEqual(x.log.downloads, []);
+    var cc = fakeCap({}, { shareCancel: true });
+    return load({ capacitor: cc }).P.files.save('b.json', {}).then(function (r2) { assert.strictEqual(r2, 'cancelled'); });
+  }).then(function () {
+    c.listeners.backButton({ canGoBack: true }); assert.strictEqual(x.log.back, true);
+    c.listeners.backButton({ canGoBack: false }); assert.ok(c.calls.indexOf('exit') >= 0);
+  });
 }));
 
 Promise.all(runs).then(function () { console.log(passed + ' تست لایه‌ی پلتفرم موفق' + (process.exitCode ? ' — برخی ناموفق' : '')); });

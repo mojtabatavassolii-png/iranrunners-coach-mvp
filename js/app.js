@@ -39,7 +39,10 @@
     memoryFallback = state;
     try { P.store.set(STORE_KEY, JSON.stringify(state)); }
     catch (e) { showToast(T('app.saveFailed')); }
+    // یادآوری‌ها با داده‌ی تازه (مثلاً جلسه‌ی انجام‌شده‌ی امروز دیگه یادآوری نمی‌خواد)
+    clearTimeout(notifyTimer); notifyTimer = setTimeout(function () { scheduleNotify(); }, 1000);
   }
+  var notifyTimer = null;
   var state = load();
 
   // ---------- تنظیمات نمایش (جدا از پروفایل): تقویم، شروع هفته، نمای برنامه ----------
@@ -3201,7 +3204,7 @@
     });
     return '<section class="card gait-expert" id="gait-expert"><details><summary><b>' + esc(T(X + 'title')) + '</b></summary>' +
       '<p class="small muted">' + esc(T(X + 'sub')) + '</p>' +
-      '<button type="button" class="btn btn-outline gait-print" data-gait-print="1">' + esc(T(X + 'print')) + '</button>' +
+      (P.files.canPrint() ? '<button type="button" class="btn btn-outline gait-print" data-gait-print="1">' + esc(T(X + 'print')) + '</button>' : '') +
       '<h3>' + esc(T('gait.report')) + esc(T('progress.sep')) + esc(T(X + 'meta')) + '</h3><dl class="gx-meta">' +
       meta.map(function (m) { return '<dt>' + esc(m[0]) + '</dt><dd>' + esc(m[1]) + '</dd>'; }).join('') + '</dl>' +
       '<div class="gx-table"><table><thead><tr>' + ['param', 'view', 'value', 'conf', 'ref', 'src', 'ev'].map(function (c) { return '<th>' + esc(T(X + 'cols.' + c)) + '</th>'; }).join('') +
@@ -4005,6 +4008,8 @@
     P.notify.schedule(items);
   }
   setTimeout(scheduleNotify, 1500);
+  // اپ دوباره باز شد (روز ممکنه عوض شده باشه)
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) scheduleNotify(); });
 
   // ---------- چک‌لیست شروع (فقط کاربرهای تازه؛ بعد از کامل شدن، همون روز یک پیام و بعد محو) ----------
   function checklistSteps(p) {

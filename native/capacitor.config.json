@@ -1,0 +1,17 @@
+{
+  "appId": "app.gaam.run",
+  "appName": "گام",
+  "webDir": "www",
+  "backgroundColor": "#121214",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#D8C4A0"
+    }
+  }
+}

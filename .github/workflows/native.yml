@@ -1,0 +1,86 @@
+# ساخت اپ نیتیو گام (Capacitor) روی هر تغییر اپ یا پوشه‌ی native:
+# - اندروید: APK دیباگ، بعد نصب و اجرا روی شبیه‌ساز اندروید، با اسکرین‌شات و لاگ کنسول WebView
+# - iOS: ساخت برای شبیه‌ساز (بدون امضا؛ برای نصب روی آیفون واقعی حساب Apple Developer لازمه)
+# APK و اسکرین‌شات در Artifacts همون اجرا هست.
+name: Native app build
+
+on:
+  push:
+    branches: [main]
+    paths: ['native/**', 'js/**', 'css/**', 'index.html', 'privacy.html', 'public/**', '.github/workflows/native.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Copy the web app and sync Capacitor
+        run: npm ci && npm run sync -- android
+      - name: Build debug APK
+        working-directory: native/android
+        run: ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gaam-android-debug
+          path: native/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Run on the Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          working-directory: native
+          script: bash scripts/smoke-android.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gaam-android-smoke
+          path: native/smoke/
+          retention-days: 14
+
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: native
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Copy the web app and sync Capacitor
+        run: npm ci && npm run sync -- ios
+      - name: Build for the iOS simulator (unsigned)
+        run: |
+          xcodebuild -version
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -40
+          test -d build/Build/Products/Debug-iphonesimulator/App.app

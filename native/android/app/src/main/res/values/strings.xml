@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">گام</string>
+    <string name="title_activity_main">گام</string>
+    <string name="package_name">app.gaam.run</string>
+    <string name="custom_url_scheme">app.gaam.run</string>
+</resources>
