@@ -5,7 +5,7 @@
  * - بقیه (آیکون‌ها، فونت وزیرمتن روی خود سایت): کش و به‌روزرسانی در پس‌زمینه.
  * با هر انتشار، VERSION و نسخه‌ی فایل‌ها در index.html با هم بالا می‌رن (تست این هماهنگی رو بررسی می‌کنه).
  */
-var VERSION = '94';
+var VERSION = '95';
 var CACHE = 'coach-v' + VERSION;
 // صبر حداکثر برای شبکه موقع باز کردن صفحه، قبل از نشون دادن نسخه‌ی کش‌شده
 var NAV_WAIT = 1500;
@@ -16,6 +16,7 @@ function isBig(url) { return url.pathname.indexOf('/js/vendor/mediapipe/') >= 0 
 var SHELL = [
   './',
   'index.html',
+  'privacy.html',
   'manifest.json',
   'css/style.css?v=' + VERSION,
   'js/vendor/jalaali.js?v=' + VERSION,

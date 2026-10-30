@@ -1509,6 +1509,7 @@
       rowProgress: 'Charts for mileage, training load, pace and check-ins', rowProgressWalk: 'Charts for weekly minutes, daily steps and check-ins', rowGait: 'Running form analysis from a short video', rowGaitLast: 'Latest analysis: {d} · {s}% within the usual range',
       joined: 'Joined {d}', edit: 'Edit profile', levelLink: 'Suggested plans for your level', levelLinkWalk: 'This week\'s walking plan', goalSetShort: 'No goal set yet',
       groups: { mine: 'My stuff', prefs: 'My preferences' },
+      privacy: 'Privacy and support', privacySub: 'Your data stays on this device',
       noName: 'Runner', noNameHint: 'Add your name in {link}.', noNameLink: 'Edit profile',
       tabs: { aria: 'Profile sections', progress: 'Progress', gait: 'Biomechanics' },
       goalOthers: { one: '+{n} more race', other: '+{n} more races' }, goalSet: 'Set a goal →', goalManage: 'Races and results →', levelNum: '{n} of 10', goalIn: { one: '{n} day to go', other: '{n} days to go' }, fitnessSub: 'log a time trial or new result',

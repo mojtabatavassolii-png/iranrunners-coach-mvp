@@ -5099,7 +5099,9 @@
         ['#settings', 'person', T('settingsPage.person'), T('settingsPage.personSub', { age: p.age, n: lv.level }), 'person'],
         // اپ نیتیو نصب لازم نداره
         P.isNative ? null : ['#settings', 'install', T('install.title'), T('install.short.' + installMode()), 'install'],
-        ['#settings', 'data', T('settingsPage.data'), T('profile.statsVal', { c: Object.keys(state.checkins).length, d: Object.keys(state.done).length }), 'data']
+        ['#settings', 'data', T('settingsPage.data'), T('profile.statsVal', { c: Object.keys(state.checkins).length, d: Object.keys(state.done).length }), 'data'],
+        // صفحه‌ی عمومی حریم خصوصی و پشتیبانی (همون لینکی که در فروشگاه‌های اپ ثبت می‌شه)
+        ['privacy.html' + (I.getLang() === 'en' ? '?lang=en' : ''), 'shield', T('profile.privacy'), T('profile.privacySub')]
       ]) + '<section class="card">' + signOutBlock() + '</section>' +
       '';
   }
@@ -5185,6 +5187,7 @@
 
   // ---------- تنظیمات: دسته‌های جمع‌وبازشونده ----------
   var SET_ICONS = {
+    shield: '<path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/>',
     lang: '<path d="M4 5h8M8 3v2M5.5 5c.8 3.5 3.3 6.2 6.5 7.5M11 5c-.8 4-3.4 7.2-7 8.5"/><path d="M13 21l4-9 4 9M14.5 18h5"/>',
     cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
     bell: '<path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 8 2.5 8h-17S6 15 6 9z"/><path d="M10.3 20a1.9 1.9 0 0 0 3.4 0"/>',
