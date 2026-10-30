@@ -12,9 +12,10 @@
   var root = document.documentElement;
   var seen = false;
   // معرفی کامل فقط بار اولی که اپ روی این دستگاه باز می‌شه؛ بعدش (و بار دوم هر نشست) مستقیم صفحه‌ی ورود
+  var P = window.CoachPlatform;
   try {
-    seen = sessionStorage.getItem('gaam-intro') === '1' || localStorage.getItem('gaam-intro') === '1';
-    sessionStorage.setItem('gaam-intro', '1'); localStorage.setItem('gaam-intro', '1');
+    seen = P.session.get('gaam-intro') === '1' || P.store.get('gaam-intro') === '1';
+    P.session.set('gaam-intro', '1'); P.store.set('gaam-intro', '1');
   } catch (e) { /* */ }
   // بار دوم، یا حالت تست با ?today=: بدون معرفی
   if (seen || /[?&]today=/.test(location.search)) { el.parentNode.removeChild(el); root.classList.remove('pre-intro'); return; }

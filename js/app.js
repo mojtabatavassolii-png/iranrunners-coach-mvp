@@ -1,11 +1,12 @@
 /*
- * رابط کاربری «گام» — بدون فریم‌ورک، داده‌ها فقط در localStorage.
+ * رابط کاربری «گام» — بدون فریم‌ورک، داده‌ها فقط روی دستگاه (از طریق js/platform.js).
  * همه‌ی متن‌ها از دیکشنری ترجمه خونده می‌شن (js/i18n/fa.js و en.js)؛ T('کلید', {پارامتر}).
  */
 (function () {
   'use strict';
   var C = window.CoachLogic;
   var I = window.CoachI18n;
+  var P = window.CoachPlatform;
   var T = I.t;
   var STORE_KEY = 'iranrunners-coach-mvp-v1';
   var SESSION_KEY = 'iranrunners-coach-session';
@@ -26,17 +27,17 @@
   function emptyState() { return { profile: null, checkins: {}, done: {}, ackPain: {}, postRuns: {}, cycleChoices: {}, doneLog: {}, pains: {} }; }
   function load() {
     try {
-      var raw = localStorage.getItem(STORE_KEY);
+      var raw = P.store.get(STORE_KEY);
       if (raw) {
         var s = JSON.parse(raw);
         return Object.assign(emptyState(), s);
       }
-    } catch (e) { /* localStorage در دسترس نیست */ }
+    } catch (e) { /* ذخیره‌ی دستگاه در دسترس نیست */ }
     return memoryFallback || emptyState();
   }
   function save() {
     memoryFallback = state;
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+    try { P.store.set(STORE_KEY, JSON.stringify(state)); }
     catch (e) { showToast(T('app.saveFailed')); }
   }
   var state = load();
@@ -47,10 +48,10 @@
   var WS_MAP = { sat: 6, sun: 0, mon: 1 };
   function loadSettings() {
     var d = { calendar: 'auto', weekStart: 'auto', planView: 'week', cycleMarkers: true, progressRange: '3m', units: 'km', theme: 'auto' };
-    try { return Object.assign(d, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) { return d; }
+    try { return Object.assign(d, JSON.parse(P.store.get(SETTINGS_KEY) || '{}')); } catch (e) { return d; }
   }
   var settings = loadSettings();
-  function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* */ } }
+  function saveSettings() { try { P.store.set(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* */ } }
   // ظاهر: auto = مثل گوشی، light یا dark = انتخاب کاربر (رنگ‌ها همه از css/theme.css)
   var darkQuery = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
   function isLightTheme() { return settings.theme === 'light' || (settings.theme !== 'dark' && !!darkQuery && !darkQuery.matches); }
@@ -73,11 +74,11 @@
   // ورود: یک‌بار در هر نشست مرورگر
   var enteredMemory = false;
   function isEntered() {
-    try { return sessionStorage.getItem(SESSION_KEY) === '1' || enteredMemory; } catch (e) { return enteredMemory; }
+    try { return P.session.get(SESSION_KEY) === '1' || enteredMemory; } catch (e) { return enteredMemory; }
   }
   function setEntered(v) {
     enteredMemory = v;
-    try { if (v) sessionStorage.setItem(SESSION_KEY, '1'); else sessionStorage.removeItem(SESSION_KEY); } catch (e) { /* */ }
+    try { if (v) P.session.set(SESSION_KEY, '1'); else P.session.remove(SESSION_KEY); } catch (e) { /* */ }
   }
 
   // امکان تست با تاریخ دلخواه: ?today=2026-12-10
@@ -811,7 +812,7 @@
   // پروفایل فعلی و عکسش روی همین دستگاه کنار گذاشته می‌شن و از صفحه‌ی ورود برمی‌گردن.
   // اگه قبلاً پروفایلی کنار گذاشته شده باشه، همون حفظ می‌شه و پروفایل فعلی (آزمایشی) پاک می‌شه.
   var STASH_KEY = 'iranrunners-coach-stash', STASH_AVATAR_KEY = 'iranrunners-coach-stash-avatar';
-  function getStash() { try { var r = localStorage.getItem(STASH_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+  function getStash() { try { var r = P.store.get(STASH_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
   function stashName(st) {
     var p = st && st.profile;
     return p ? [p.name, p.lastName].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' ') || T('profile.noName') : '';
@@ -834,11 +835,11 @@
   function signOut() {
     try {
       if (!getStash() && state.profile) {
-        localStorage.setItem(STASH_KEY, JSON.stringify(state));
-        var av = localStorage.getItem(AVATAR_KEY);
-        if (av) localStorage.setItem(STASH_AVATAR_KEY, av);
+        P.store.set(STASH_KEY, JSON.stringify(state));
+        var av = P.store.get(AVATAR_KEY);
+        if (av) P.store.set(STASH_AVATAR_KEY, av);
       }
-      localStorage.removeItem(STORE_KEY); localStorage.removeItem(AVATAR_KEY);
+      P.store.remove(STORE_KEY); P.store.remove(AVATAR_KEY);
     } catch (e) { showToast(T('app.saveFailed')); return; }
     state = emptyState(); memoryFallback = null;
     setEntered(false);
@@ -851,10 +852,10 @@
     var st = getStash();
     if (!st) return;
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(st));
-      var av = localStorage.getItem(STASH_AVATAR_KEY);
-      if (av) localStorage.setItem(AVATAR_KEY, av); else localStorage.removeItem(AVATAR_KEY);
-      localStorage.removeItem(STASH_KEY); localStorage.removeItem(STASH_AVATAR_KEY);
+      P.store.set(STORE_KEY, JSON.stringify(st));
+      var av = P.store.get(STASH_AVATAR_KEY);
+      if (av) P.store.set(AVATAR_KEY, av); else P.store.remove(AVATAR_KEY);
+      P.store.remove(STASH_KEY); P.store.remove(STASH_AVATAR_KEY);
     } catch (e) { showToast(T('app.saveFailed')); return; }
     state = Object.assign(emptyState(), st); memoryFallback = state;
     setEntered(true);
@@ -878,24 +879,15 @@
   var BACKUP_FORMAT = 1, BACKUP_MAX_BYTES = 30 * 1024 * 1024;
   function backupData() {
     var av = null, st = null, lg = null;
-    try { av = localStorage.getItem(AVATAR_KEY); st = localStorage.getItem(SETTINGS_KEY); lg = localStorage.getItem(I.LANG_KEY); } catch (e) { /* */ }
+    try { av = P.store.get(AVATAR_KEY); st = P.store.get(SETTINGS_KEY); lg = P.store.get(I.LANG_KEY); } catch (e) { /* */ }
     return { app: 'gaam', kind: 'backup', format: BACKUP_FORMAT, appVersion: ASSET_V, exportedAt: new Date().toISOString(),
       data: { state: state, avatar: av, settings: st ? JSON.parse(st) : null, lang: lg } };
   }
   function exportBackup() {
     var name = 'gaam-backup-' + C.dateKey(new Date()) + '.json';
     var blob = new Blob([JSON.stringify(backupData())], { type: 'application/json' });
-    var file = typeof File === 'function' ? new File([blob], name, { type: 'application/json' }) : null;
     // گوشی: منوی اشتراک (ذخیره در Files، درایو، پیام‌رسان)؛ وگرنه دانلود
-    var touch = (navigator.maxTouchPoints || 0) > 0;
-    if (touch && file && navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: name }).then(function () { showToast(T('backup.exported')); }, function () { /* لغو */ });
-      return;
-    }
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
-    showToast(T('backup.exported'));
+    P.files.save(name, blob, { share: true }).then(function (r) { if (r !== 'cancelled') showToast(T('backup.exported')); });
   }
   // خوندن و بررسی فایل؛ نتیجه: { ok, backup, summary } یا { ok: false, error }
   function readBackupFile(file) {
@@ -921,23 +913,23 @@
   function applyBackup(b) {
     var d = b.data;
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(d.state));
-      if (d.avatar) localStorage.setItem(AVATAR_KEY, d.avatar); else localStorage.removeItem(AVATAR_KEY);
-      if (d.settings && typeof d.settings === 'object') localStorage.setItem(SETTINGS_KEY, JSON.stringify(d.settings));
-      if (d.lang === 'fa' || d.lang === 'en') localStorage.setItem(I.LANG_KEY, d.lang);
+      P.store.set(STORE_KEY, JSON.stringify(d.state));
+      if (d.avatar) P.store.set(AVATAR_KEY, d.avatar); else P.store.remove(AVATAR_KEY);
+      if (d.settings && typeof d.settings === 'object') P.store.set(SETTINGS_KEY, JSON.stringify(d.settings));
+      if (d.lang === 'fa' || d.lang === 'en') P.store.set(I.LANG_KEY, d.lang);
     } catch (e) { showToast(T('backup.saveFailed')); return; }
     setEntered(true);
-    try { sessionStorage.setItem('gaam-imported', '1'); } catch (e) { /* */ }
+    try { P.session.set('gaam-imported', '1'); } catch (e) { /* */ }
     location.hash = '#home';
     location.reload();
   }
   // پاک کردن همه‌ی داده‌های اپ روی این دستگاه (شامل پروفایل کنارگذاشته و تنظیمات)؛ کش فایل‌های اپ می‌مونه
   function wipeAll() {
     try {
-      Object.keys(localStorage).filter(function (k) { return k.indexOf('iranrunners-coach-') === 0 || k.indexOf('gaam-') === 0; })
-        .forEach(function (k) { localStorage.removeItem(k); });
-      Object.keys(sessionStorage).filter(function (k) { return k.indexOf('iranrunners-coach-') === 0 || k.indexOf('gaam-') === 0; })
-        .forEach(function (k) { sessionStorage.removeItem(k); });
+      P.store.keys().filter(function (k) { return k.indexOf('iranrunners-coach-') === 0 || k.indexOf('gaam-') === 0; })
+        .forEach(function (k) { P.store.remove(k); });
+      P.session.keys().filter(function (k) { return k.indexOf('iranrunners-coach-') === 0 || k.indexOf('gaam-') === 0; })
+        .forEach(function (k) { P.session.remove(k); });
     } catch (e) { /* */ }
     state = emptyState(); memoryFallback = null;
     setEntered(false);
@@ -3450,11 +3442,8 @@
       var label = b.textContent; b.disabled = true; b.textContent = T('gait.anim.saving');
       pl.record().then(function (blob) {
         var ext = /mp4/.test(blob.type) ? 'mp4' : 'webm', name = 'running-form-' + b.dataset.gp + '.' + ext;
-        var file = typeof File === 'function' ? new File([blob], name, { type: blob.type }) : null;
-        // گوشی: منوی اشتراک (ذخیره در گالری)؛ وگرنه دانلود
-        if (file && navigator.canShare && navigator.canShare({ files: [file] })) return navigator.share({ files: [file] }).catch(function () {});
-        var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
-        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+        // منوی اشتراک (ذخیره در گالری) هر جا ممکنه؛ وگرنه دانلود
+        return P.files.save(name, blob, { share: true, shareAlways: true });
       }).catch(function () { showToast(T('gait.anim.noRecord')); }).then(function () { b.disabled = false; b.textContent = label; });
     }
   });
@@ -3574,11 +3563,7 @@
       // فقط نسخه‌ی تخصصی چاپ می‌شه (با رنگ‌های روشن؛ css/theme.css)
       var ex = document.getElementById('gait-expert'), dt = ex && ex.querySelector('details');
       if (dt) dt.open = true;
-      document.body.classList.add('print-gait');
-      var done = function () { document.body.classList.remove('print-gait'); window.removeEventListener('afterprint', done); };
-      window.addEventListener('afterprint', done);
-      window.print();
-      setTimeout(done, 1000);
+      P.files.print(function () { document.body.classList.add('print-gait'); }, function () { document.body.classList.remove('print-gait'); });
       return;
     }
     var d = e.target.closest('[data-gait-del]');
@@ -3979,7 +3964,7 @@
       '<div class="field"><label for="rm-time">' + esc(T('remind.time')) + '</label>' + tpo({ id: 'rm-time', name: 'rmTime', mode: 'clock', value: r.time, aria: T('remind.time') }) + '</div>' +
       '<p class="small muted">' + esc(T('remind.calHint')) + '</p>' +
       '<div class="actions"><button type="button" class="btn btn-outline" data-ics="1">' + esc(T('remind.cal')) + '</button>' +
-      ('Notification' in window ? '<button type="button" class="btn btn-ghost" data-notify="1">' + esc(T(r.notify && Notification.permission === 'granted' ? 'remind.notifyOn' : 'remind.notify')) + '</button>' : '') + '</div>' +
+      (P.notify.supported() ? '<button type="button" class="btn btn-ghost" data-notify="1">' + esc(T(r.notify && P.notify.permission() === 'granted' ? 'remind.notifyOn' : 'remind.notify')) + '</button>' : '') + '</div>' +
       '';
   }
   app.addEventListener('change', function (e) {
@@ -3991,34 +3976,33 @@
   });
   app.addEventListener('click', function (e) {
     if (e.target.closest('[data-ics]')) {
-      var blob = new Blob([icsFile()], { type: 'text/calendar' }), a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = 'walking-plan.ics'; document.body.appendChild(a); a.click();
-      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
-      showToast(T('remind.calDone'));
+      P.files.save('walking-plan.ics', new Blob([icsFile()], { type: 'text/calendar' })).then(function () { showToast(T('remind.calDone')); });
       return;
     }
-    if (e.target.closest('[data-notify]') && 'Notification' in window) {
-      Notification.requestPermission().then(function (perm) {
+    if (e.target.closest('[data-notify]') && P.notify.supported()) {
+      P.notify.request().then(function (perm) {
         state.reminder = state.reminder || {}; state.reminder.notify = perm === 'granted';
         save(); showToast(T(perm === 'granted' ? 'remind.notifyOk' : 'remind.notifyNo')); scheduleNotify(); route();
       });
     }
   });
-  // اعلان در ساعت یادآوری، فقط وقتی اپ بازه (بدون سرور)
-  var notifyTimer = null;
+  // اعلان در ساعت یادآوری برای روزهای تمرین هفته‌ی پیش رو. وب: فقط تا وقتی اپ بازه (بدون سرور)؛
+  // نیتیو: اعلان محلی سیستم، حتی با اپ بسته. درست قبل از نمایش (وب) دوباره بررسی می‌شه که جلسه هنوز انجام نشده باشه.
+  var NOTIFY_DAYS = 7;
   function scheduleNotify() {
-    clearTimeout(notifyTimer);
-    if (!state.profile || !('Notification' in window) || Notification.permission !== 'granted') return;
+    P.notify.cancelAll();
+    if (!state.profile || P.notify.permission() !== 'granted') return;
     var r = reminderCfg();
     if (!r.on || !r.notify) return;
-    var now = new Date(), at = new Date(now), hm = r.time.split(':').map(Number);
-    at.setHours(hm[0], hm[1], 0, 0);
-    if (at <= now) return;
-    notifyTimer = setTimeout(function () {
-      var k = C.dateKey(new Date()), s = C.sessionFor(state.profile, new Date());
-      if (state.done[k] || ['rest', 'none'].indexOf(s.type) >= 0) return;
-      try { new Notification(T('remind.bannerT'), { body: fa(T('remind.banner', { s: s.label, n: s.minutes || '' })), icon: 'public/assets/icon-192.png' }); } catch (er) { /* */ }
-    }, Math.min(at - now, 2147483000));
+    var hm = r.time.split(':').map(Number), items = [];
+    for (var i = 0; i < NOTIFY_DAYS; i++) {
+      var d = C.addDays(today(), i), at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hm[0], hm[1]);
+      var s = C.sessionFor(state.profile, d), k = C.dateKey(d);
+      if (['rest', 'none'].indexOf(s.type) >= 0 || state.done[k]) continue;
+      items.push({ at: at, title: T('remind.bannerT'), body: fa(T('remind.banner', { s: s.label, n: s.minutes || '' })), icon: 'public/assets/icon-192.png',
+        check: (function (key) { return function () { return !state.done[key]; }; })(k) });
+    }
+    P.notify.schedule(items);
   }
   setTimeout(scheduleNotify, 1500);
 
@@ -4968,7 +4952,7 @@
       list.map(function (w) { return '<li>' + t(w) + '</li>'; }).join('') + '</ul></section>';
   }
 
-  // نوع تقویم و روز شروع هفته؛ مستقل از زبان، ذخیره در localStorage
+  // نوع تقویم و روز شروع هفته؛ مستقل از زبان، ذخیره روی دستگاه
   function cycleSettings() {
     var p = state.profile;
     if (!p || p.sex !== 'female') return '';
@@ -5011,9 +4995,9 @@
       openSettings.theme = true; route();
     }
   });
-  // ---------- عکس پروفایل: فقط در همین مرورگر (localStorage)، کوچک‌شده به ۳۰۰×۳۰۰ ----------
+  // ---------- عکس پروفایل: فقط روی همین دستگاه، کوچک‌شده به ۳۰۰×۳۰۰ ----------
   var AVATAR_KEY = 'iranrunners-coach-avatar', AVATAR_PX = 300, AVATAR_MAX_BYTES = 120 * 1024;
-  function getAvatar() { try { return localStorage.getItem(AVATAR_KEY); } catch (e) { return null; } }
+  function getAvatar() { try { return P.store.get(AVATAR_KEY); } catch (e) { return null; } }
   function avatarHtml(size) {
     var src = getAvatar(), p = state.profile, name = (p && p.name || '').trim();
     if (src) return '<img class="avatar-img" src="' + esc(src) + '" alt="" width="' + size + '" height="' + size + '">';
@@ -5046,14 +5030,14 @@
     if (!f) return;
     if (!/^image\//.test(f.type)) { showToast(T('profile.photoBad')); return; }
     shrinkImage(f, function (data) {
-      try { localStorage.setItem(AVATAR_KEY, data); showToast(T('profile.photoSaved')); }
+      try { P.store.set(AVATAR_KEY, data); showToast(T('profile.photoSaved')); }
       catch (err) { showToast(T('profile.photoFull')); }
       refreshAvatars();
     }, function () { showToast(T('profile.photoBad')); });
   });
   app.addEventListener('click', function (e) {
     if (!(e.target.closest && e.target.closest('[data-avatar-remove]'))) return;
-    try { localStorage.removeItem(AVATAR_KEY); } catch (err) { /* */ }
+    try { P.store.remove(AVATAR_KEY); } catch (err) { /* */ }
     refreshAvatars();
   });
   // همه‌ی جاهایی که عکس نشون داده می‌شه (هدر، فرم ویرایش، پروفایل)
@@ -5113,7 +5097,8 @@
         ['#settings', 'cal', T('settingsPage.cal'), T('settings.' + I.getCalendar()), 'cal'],
         ['#settings', 'health', T('settingsPage.health'), T(p.sex === 'female' ? ((p.cycle || {}).enabled ? 'settingsPage.cycleOn' : 'settingsPage.cycleOff') : 'settingsPage.cycleNA'), 'health'],
         ['#settings', 'person', T('settingsPage.person'), T('settingsPage.personSub', { age: p.age, n: lv.level }), 'person'],
-        ['#settings', 'install', T('install.title'), T('install.short.' + installMode()), 'install'],
+        // اپ نیتیو نصب لازم نداره
+        P.isNative ? null : ['#settings', 'install', T('install.title'), T('install.short.' + installMode()), 'install'],
         ['#settings', 'data', T('settingsPage.data'), T('profile.statsVal', { c: Object.keys(state.checkins).length, d: Object.keys(state.done).length }), 'data']
       ]) + '<section class="card">' + signOutBlock() + '</section>' +
       '';
@@ -5142,7 +5127,7 @@
     return '<p class="group-label" role="heading" aria-level="2">' + esc(label) + '</p><nav class="card list-group" aria-label="' + esc(label) + '">' + listRows(rows) + '</nav>';
   }
   function listRows(rows) {
-    return rows.map(function (r) {
+    return rows.filter(Boolean).map(function (r) {
       return '<a class="list-row" href="' + r[0] + '"' + (r[4] ? ' data-set-open="' + r[4] + '"' : '') + '>' +
         '<span class="lr-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + SET_ICONS[r[1]] + '</svg></span>' +
         '<span class="lr-text"><b>' + esc(r[2]) + '</b>' + (r[3] ? '<small>' + t(r[3]) + '</small>' : '') + '</span>' + chevron(isRtl() ? 'left' : 'right') + '</a>';
@@ -5260,7 +5245,7 @@
       // یادآوری جلسه‌ها
       setSection('remind', 'bell', T('remind.title'), esc(remindSub()), remindSection()) +
       // نصب اپلیکیشن
-      setSection('install', 'install', T('install.title'), esc(T('install.short.' + installMode())), installSectionBody()) +
+      (P.isNative ? '' : setSection('install', 'install', T('install.title'), esc(T('install.short.' + installMode())), installSectionBody())) +
       // ۲. تقویم
       setSection('cal', 'cal', T('settingsPage.cal'), tt('settings.current', { cal: T('settings.' + I.getCalendar()), day: C.DAY_NAMES[C.WEEK_ORDER[0]] }),
         '<div class="row2"><div class="field"><label for="set-cal">' + esc(T('settings.calendar')) + '</label>' +
@@ -5375,13 +5360,7 @@
   // نصب اپلیکیشن (PWA): اندروید/کروم با پنجره‌ی نصب مستقیم، آیفون با راهنمای «افزودن به صفحه‌ی اصلی»
   // =====================================================================
   var installEvt = null, INSTALL_DISMISS_KEY = 'iranrunners-coach-install-dismissed';
-  function isStandalone() {
-    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
-  }
-  function isIos() {
-    var ua = navigator.userAgent || '';
-    return /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  }
+  var isStandalone = P.isStandalone, isIos = P.isIos;
   // 'installed' | 'prompt' (نصب مستقیم) | 'ios' (راهنما) | 'other' (از منوی مرورگر)
   function installMode() {
     if (isStandalone()) return 'installed';
@@ -5389,7 +5368,7 @@
     if (isIos()) return 'ios';
     return 'other';
   }
-  function installDismissed() { try { return !!localStorage.getItem(INSTALL_DISMISS_KEY); } catch (e) { return false; } }
+  function installDismissed() { try { return !!P.store.get(INSTALL_DISMISS_KEY); } catch (e) { return false; } }
   var DL_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v8M8.8 11.8 12 15l3.2-3.2"/></svg>';
   // بنر صفحه‌ی امروز: فقط وقتی نصب ممکنه (اندروید یا آیفون) و کاربر نبسته
   function installBanner() {
@@ -5450,7 +5429,7 @@
       return;
     }
     if (t.closest && t.closest('[data-install-dismiss]')) {
-      try { localStorage.setItem(INSTALL_DISMISS_KEY, new Date().toISOString()); } catch (err) { /* */ }
+      try { P.store.set(INSTALL_DISMISS_KEY, new Date().toISOString()); } catch (err) { /* */ }
       refreshInstallUi();
       return;
     }
@@ -5461,8 +5440,8 @@
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvt = e; refreshInstallUi(); });
   window.addEventListener('appinstalled', function () { installEvt = null; showToast(T('install.done')); refreshInstallUi(); });
 
-  // سرویس‌ورکر: فقط روی HTTPS یا localhost
-  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  // سرویس‌ورکر: فقط وب، روی HTTPS یا localhost (در اپ نیتیو همه‌ی فایل‌ها داخل بسته‌ان)
+  if (P.sw.supported()) {
     // نسخه‌ی تازه: سرویس‌ورکر جدید خودش فعال می‌شه (skipWaiting + clients.claim) و صفحه یک بار دوباره بار می‌شه.
     // بار اول نصب (صفحه هنوز کنترل‌کننده نداشته) نیازی به بارگذاری دوباره نیست.
     var swHadController = !!navigator.serviceWorker.controller, swReloading = false;
@@ -5470,11 +5449,11 @@
       if (!swHadController || swReloading) { swHadController = true; return; }
       try {
         // جلوگیری از حلقه: حداکثر یک بار در هر ۱۰ ثانیه
-        var last = +sessionStorage.getItem('gaam-sw-reload') || 0;
+        var last = +P.session.get('gaam-sw-reload') || 0;
         if (Date.now() - last < 10000) return;
-        sessionStorage.setItem('gaam-sw-reload', String(Date.now()));
+        P.session.set('gaam-sw-reload', String(Date.now()));
         // اگه معرفی هنوز در حال اجراست، بعد از بارگذاری دوباره از اول پخش بشه
-        if (document.getElementById('splash')) sessionStorage.removeItem('gaam-intro');
+        if (document.getElementById('splash')) P.session.remove('gaam-intro');
       } catch (e) { /* */ }
       swReloading = true;
       location.reload();
@@ -5492,5 +5471,5 @@
   var initNav = navState();
   if (initNav) { navDepth = initNav.depth; restore(initNav); } else { setNav({ depth: 0, from: null }); route(); }
   // بعد از بازگردانی پشتیبان (که صفحه رو دوباره بار می‌کنه)
-  try { if (sessionStorage.getItem('gaam-imported')) { sessionStorage.removeItem('gaam-imported'); setTimeout(function () { showToast(T('backup.imported')); }, 300); } } catch (e) { /* */ }
+  try { if (P.session.get('gaam-imported')) { P.session.remove('gaam-imported'); setTimeout(function () { showToast(T('backup.imported')); }, 300); } } catch (e) { /* */ }
 })();

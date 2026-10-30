@@ -12,9 +12,12 @@
 | `js/i18n/fa.js` و `js/i18n/en.js` | دیکشنری مرکزی همه‌ی متن‌ها (فارسی و انگلیسی) با کلیدهای یکسان |
 | `js/i18n/learn-fa.js` و `js/i18n/learn-en.js` | مقاله‌های بخش آموزش؛ با `extend` زیر کلید `learn` به دیکشنری اضافه می‌شن |
 | `js/logic.js` | موتور قوانین (فقط if/else و جدول تصمیم) — ساخت برنامه، تطبیق با چک‌این، Riegel، تیپر |
-| `js/app.js` | رابط کاربری و ذخیره‌سازی |
+| `js/platform.js` | لایه‌ی پلتفرم: ذخیره‌سازی، نشست، ذخیره و اشتراک فایل، چاپ، اعلان و سرویس‌ورکر. هر چیزی که به مرورگر یا اپ نیتیو وابسته‌ست فقط از این‌جا رد می‌شه؛ برای نسخه‌ی Capacitor فقط همین فایل عوض می‌شه |
+| `js/app.js` | رابط کاربری |
 | `js/charts.js` | نمودارهای SVG بخش «پیشرفت من» (بدون کتابخانه‌ی بیرونی) |
 | `tests/logic.test.js` | تست قوانین مربیگری: `node tests/logic.test.js` |
+| `tests/platform.test.js` | تست لایه‌ی پلتفرم با یک window ساختگی: `node tests/platform.test.js` |
+| `tests/e2e/` | تست دوره‌ای مسیرهای اصلی روی گوشی، تبلت و دسکتاپ شبیه‌سازی‌شده (Playwright) |
 
 ## سطح‌بندی ده‌گانه
 
@@ -222,6 +225,8 @@
 ```sh
 python3 -m http.server 8000
 node tests/logic.test.js
+node tests/gait.test.js
+node tests/platform.test.js
 ```
 
 برای تست سناریوها با تاریخ دلخواه: `index.html?today=2026-12-10`

@@ -9,6 +9,8 @@
   var LANGS = ['fa', 'en'];
   var dicts = {};
   var lang = 'fa';
+  // ذخیره‌ی دستگاه از js/platform.js (در تست‌های node نیست → localStorage اگه باشه)
+  function store() { return (root.CoachPlatform && root.CoachPlatform.store) || root.localStorage; }
 
   function register(code, dict) { dicts[code] = dict; }
   // افزودن یک بخش جدا (مثل مقاله‌های آموزش) به دیکشنری یک زبان
@@ -68,10 +70,10 @@
   function setLang(code, persist) {
     if (LANGS.indexOf(code) < 0) return;
     lang = code;
-    if (persist !== false) { try { localStorage.setItem(LANG_KEY, code); } catch (e) { /* */ } }
+    if (persist !== false) { try { store().set(LANG_KEY, code); } catch (e) { /* */ } }
   }
   function savedLang() {
-    try { var v = localStorage.getItem(LANG_KEY); return LANGS.indexOf(v) >= 0 ? v : null; } catch (e) { return null; }
+    try { var v = store().get(LANG_KEY); return LANGS.indexOf(v) >= 0 ? v : null; } catch (e) { return null; }
   }
   function dir() { return lang === 'fa' ? 'rtl' : 'ltr'; }
 
