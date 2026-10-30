@@ -13,6 +13,7 @@
  * - sw:      سرویس‌ورکر (فقط وب)
  * - health:  خوندن تمرین‌ها از Apple Health یا Health Connect (فقط نیتیو)
  * - gps:     موقعیت برای ثبت دویدن (وب: فقط با صفحه‌ی باز؛ نیتیو: پس‌زمینه)
+ * - hr:      سنسور ضربان قلب بلوتوث (وب: Web Bluetooth؛ نیتیو: bluetooth-le)
  * باید قبل از i18n.js و app.js بار بشه.
  */
 (function (root) {
@@ -202,6 +203,44 @@
     openSettings: function () { return Promise.resolve(); }
   };
 
+  // ---------- hr ----------
+  // سنسور ضربان قلب بلوتوث (سرویس استاندارد Heart Rate). وب: Web Bluetooth (کروم اندروید و دسکتاپ؛ Safari نداره).
+  // نیتیو: @capacitor-community/bluetooth-le. connect(saved, onData(bytes), onState('lost')) → Promise<{ id, name, stop() }>
+  // saved: { id } دستگاه قبلی (نیتیو مستقیم وصل می‌شه، بدون پنجره‌ی انتخاب)؛ خطا: 'cancelled' | 'failed'
+  var HR_SVC = '0000180d-0000-1000-8000-00805f9b34fb', HR_CHR = '00002a37-0000-1000-8000-00805f9b34fb';
+  function hexBytes(v) {
+    if (v && typeof v !== 'string') return Array.prototype.slice.call(new Uint8Array(v.buffer || v, v.byteOffset || 0, v.byteLength));
+    var out = [], s = String(v || '').replace(/[^0-9a-f]/gi, '');
+    for (var i = 0; i + 1 < s.length; i += 2) out.push(parseInt(s.substr(i, 2), 16));
+    return out;
+  }
+  function hrError(e) { return /cancel|chosen|abort/i.test((e && (e.name + ' ' + e.message)) || '') ? 'cancelled' : 'failed'; }
+  var hr = {
+    supported: function () { return !!(nav.bluetooth && nav.bluetooth.requestDevice); },
+    connect: function (saved, onData, onState) {
+      var dev = saved && saved.device, ch = null;
+      var lost = function () { onState('lost'); };
+      var picked = dev ? Promise.resolve(dev) : nav.bluetooth.requestDevice({ filters: [{ services: ['heart_rate'] }] });
+      return picked.then(function (d) {
+        dev = d;
+        dev.removeEventListener('gattserverdisconnected', lost);
+        dev.addEventListener('gattserverdisconnected', lost);
+        return dev.gatt.connect();
+      }).then(function (server) { return server.getPrimaryService('heart_rate'); })
+        .then(function (svc) { return svc.getCharacteristic('heart_rate_measurement'); })
+        .then(function (c) {
+          ch = c;
+          ch.addEventListener('characteristicvaluechanged', function (e) { onData(hexBytes(e.target.value)); });
+          return ch.startNotifications();
+        }).then(function () {
+          return { id: dev.id, name: dev.name || '', device: dev, stop: function () {
+            dev.removeEventListener('gattserverdisconnected', lost);
+            try { if (dev.gatt.connected) dev.gatt.disconnect(); } catch (e) { /* */ }
+          } };
+        }, function (e) { throw hrError(e); });
+    }
+  };
+
   var ready = Promise.resolve();
 
   // ---------- native (Capacitor) ----------
@@ -210,7 +249,7 @@
   if (isNative) {
     var plug = function (name) { return (cap.Plugins || {})[name]; };
     var noop = function () {};
-    var Prefs = plug('Preferences'), LN = plug('LocalNotifications'), FS = plug('Filesystem'), Share = plug('Share'), App = plug('App'), Health = plug('Health'), BG = plug('BackgroundGeolocation');
+    var Prefs = plug('Preferences'), LN = plug('LocalNotifications'), FS = plug('Filesystem'), Share = plug('Share'), App = plug('App'), Health = plug('Health'), BG = plug('BackgroundGeolocation'), BLE = plug('BluetoothLe');
 
     // ذخیره: localStorage همچنان منبع همگامه و هر نوشتن در Preferences (فایل نیتیو) هم کپی می‌شه.
     // اگه سیستم داده‌ی WebView رو پاک کرده باشه، شروع بعدی از Preferences برمی‌گرده و صفحه یک بار دوباره بار می‌شه.
@@ -339,6 +378,37 @@
       gps.openSettings = function () { return BG.openSettings().catch(noop); };
     }
 
+    // سنسور ضربان با @capacitor-community/bluetooth-le (همون فراخوانی‌های BleClient، مستقیم از پل)؛
+    // اسکن بلوتوث برای موقعیت استفاده نمی‌شه (neverForLocation)
+    if (BLE) {
+      var bleReady = null;
+      hr.supported = function () { return true; };
+      hr.connect = function (saved, onData, onState) {
+        var id = saved && saved.id, name = (saved && saved.name) || '', subs = [];
+        var listen = function (key, fn) { return Promise.resolve(BLE.addListener(key, fn)).then(function (h) { subs.push(h); }); };
+        bleReady = bleReady || BLE.initialize({ androidNeverForLocation: true });
+        var pick = function () { return BLE.requestDevice({ services: [HR_SVC] }).then(function (d) { id = d.deviceId; name = d.name || ''; }); };
+        var open = function () {
+          return listen('disconnected|' + id, function () { onState('lost'); })
+            .then(function () { return BLE.connect({ deviceId: id, timeout: 10000 }); })
+            .then(function () { return listen('notification|' + id + '|' + HR_SVC + '|' + HR_CHR, function (e) { onData(hexBytes(e && e.value)); }); })
+            .then(function () { return BLE.startNotifications({ deviceId: id, service: HR_SVC, characteristic: HR_CHR }); });
+        };
+        var clear = function () { subs.forEach(function (h) { try { h.remove(); } catch (e) { /* */ } }); subs = []; };
+        return bleReady.then(function () {
+          // دستگاه قبلی: مستقیم؛ اگه نشد، پنجره‌ی انتخاب
+          if (id) return open().catch(function () { clear(); id = null; return pick().then(open); });
+          return pick().then(open);
+        }).then(function () {
+          return { id: id, name: name, stop: function () {
+            clear();
+            BLE.stopNotifications({ deviceId: id, service: HR_SVC, characteristic: HR_CHR }).catch(noop)
+              .then(function () { return BLE.disconnect({ deviceId: id }); }).catch(noop);
+          } };
+        }, function (e) { clear(); throw hrError(e); });
+      };
+    }
+
     // دکمه‌ی برگشت اندروید: صفحه‌ی قبلی اپ، و در اولین صفحه بستن اپ
     if (App) {
       App.addListener('backButton', function (e) { if (e && e.canGoBack) root.history.back(); else App.exitApp(); });
@@ -347,7 +417,7 @@
 
   root.CoachPlatform = {
     kind: kind, isNative: isNative, isIos: isIos, isStandalone: isStandalone, isTouch: isTouch,
-    store: store, session: session, files: files, notify: notify, sw: sw, health: health, gps: gps,
+    store: store, session: session, files: files, notify: notify, sw: sw, health: health, gps: gps, hr: hr,
     // آماده بودن داده‌ها (وب: بلافاصله؛ نیتیو: بعد از هماهنگی با Preferences)
     ready: function () { return ready; }
   };

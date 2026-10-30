@@ -10,9 +10,12 @@
 	<string>Gaam uses your location only while you record a run, to measure distance and pace. Locations are not stored or sent anywhere; only the distance, time and per-kilometre splits are kept on your device.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>While you record a run, Gaam keeps measuring distance with the screen locked or the app in the background. Recording stops when you finish the run; locations are not stored or sent anywhere.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Gaam connects to your Bluetooth heart rate sensor (chest strap or armband) to show your heart rate while you record a run. Only the average and maximum heart rate are kept on your device.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<string>bluetooth-central</string>
 	</array>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Gaam reads your running and walking workouts from Apple Health to mark planned sessions as done, with their distance and time. Nothing leaves your device and Gaam never writes to Apple Health.</string>

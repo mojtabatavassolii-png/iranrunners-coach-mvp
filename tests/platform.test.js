@@ -164,6 +164,15 @@ function fakeCap(prefs, opts) {
         { workoutType: 'walking', duration: 900, startDate: '2026-10-27T03:45:00Z', endDate: '2026-10-27T04:00:00Z' }] }); },
       openHealthConnectSettings: function () { calls.push('hc-settings'); return ok(); }
     },
+    BluetoothLe: {
+      initialize: function (o) { calls.push('ble-init:' + o.androidNeverForLocation); return ok(); },
+      requestDevice: function (o) { calls.push('ble-pick:' + o.services[0].slice(4, 8)); return opts.bleCancel ? Promise.reject(new Error('requestDevice cancelled')) : ok({ deviceId: 'AA:BB', name: 'HRM-Pro' }); },
+      addListener: function (k, fn) { listeners[k] = fn; return ok({ remove: function () { delete listeners[k]; } }); },
+      connect: function (o) { calls.push('ble-connect:' + o.deviceId); return opts.bleConnectFail && o.deviceId === 'OLD' ? Promise.reject(new Error('timeout')) : ok(); },
+      startNotifications: function (o) { calls.push('ble-notify:' + o.characteristic.slice(4, 8)); return ok(); },
+      stopNotifications: function () { calls.push('ble-stop'); return ok(); },
+      disconnect: function (o) { calls.push('ble-disconnect:' + o.deviceId); return ok(); }
+    },
     BackgroundGeolocation: {
       // مثل پل واقعی Capacitor: شناسه‌ی callback مستقیم (نه Promise)
       addWatcher: function (o, cb) { calls.push('watch:' + o.backgroundMessage); listeners.gps = cb; return 'w1'; },
@@ -210,6 +219,32 @@ runs.push(test('GPS: نیتیو با سرویس پس‌زمینه؛ نقطه‌�
     assert.deepStrictEqual(errs, ['denied']);
     return x.P.gps.stop(h);
   }).then(function () { assert.ok(c.calls.indexOf('unwatch:w1') >= 0); });
+}));
+runs.push(test('ضربان: سنسور بلوتوث، عددها از رشته‌ی hex، قطع اتصال، دستگاه قبلی و لغو', function () {
+  var c = fakeCap({}), x = load({ capacitor: c }), data = [], states = [];
+  assert.strictEqual(x.P.hr.supported(), true);
+  assert.strictEqual(load().P.hr.supported(), false);
+  return x.P.hr.connect(null, function (b) { data.push(b); }, function (s) { states.push(s); }).then(function (h) {
+    assert.strictEqual(h.id, 'AA:BB'); assert.strictEqual(h.name, 'HRM-Pro');
+    assert.deepStrictEqual(c.calls.slice(0, 4), ['ble-init:true', 'ble-pick:180d', 'ble-connect:AA:BB', 'ble-notify:2a37']);
+    c.listeners['notification|AA:BB|0000180d-0000-1000-8000-00805f9b34fb|00002a37-0000-1000-8000-00805f9b34fb']({ value: '06 8c' });
+    c.listeners['disconnected|AA:BB']();
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(data)), [[6, 140]]);
+    assert.deepStrictEqual(states, ['lost']);
+    h.stop();
+    return tick().then(tick);
+  }).then(function () {
+    assert.ok(c.calls.indexOf('ble-disconnect:AA:BB') >= 0);
+    // دستگاه قبلی در دسترس نیست → پنجره‌ی انتخاب
+    var c2 = fakeCap({}, { bleConnectFail: true }), y = load({ capacitor: c2 });
+    return y.P.hr.connect({ id: 'OLD' }, function () {}, function () {}).then(function (h2) {
+      assert.strictEqual(h2.id, 'AA:BB');
+      assert.ok(c2.calls.indexOf('ble-connect:OLD') >= 0 && c2.calls.indexOf('ble-pick:180d') >= 0);
+    });
+  }).then(function () {
+    var z = load({ capacitor: fakeCap({}, { bleCancel: true }) });
+    return z.P.hr.connect(null, function () {}, function () {}).then(function () { throw new Error('should fail'); }, function (e) { assert.strictEqual(e, 'cancelled'); });
+  });
 }));
 function tick() { return new Promise(function (r) { setImmediate(r); }); }
 

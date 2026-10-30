@@ -2002,3 +2002,12 @@ html.intro #app .login-import { opacity: 0; }
 @keyframes rec-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .rec-dot { animation: none; } }
 @media (max-width: 360px) { .rec-time { font-size: 3.25rem; } .rec-stats b { font-size: var(--fs-lg); } }
+/* سنسور ضربان در صفحه‌ی ثبت */
+.rec-hr { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); background: var(--surface-elevated); border-radius: 16px; padding: var(--sp-3); margin: var(--sp-2) 0; }
+.rec-hr-title { flex-basis: 100%; font-size: var(--fs-sm); color: var(--text-secondary); }
+.rec-hr-val b { font-size: var(--fs-2xl); font-weight: 900; font-variant-numeric: tabular-nums; }
+.rec-hr-val small { color: var(--text-secondary); }
+.rec-hr-val.is-above b { color: var(--error); }
+.rec-hr p { margin: 0; flex: 1; min-width: 10em; text-align: start; }
+.rec-hr .btn { flex: 1 1 auto; }
+.rec-hr .form-errors { flex-basis: 100%; }

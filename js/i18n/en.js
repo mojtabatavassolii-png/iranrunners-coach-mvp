@@ -1646,7 +1646,22 @@
       livePause: 'Recording paused:',
       settings: 'Location settings',
       unavailable: 'This device or browser has no GPS.',
-      err: { denied: 'Location permission wasn\'t granted. Distance can\'t be measured without it.', unavailable: 'Location isn\'t available. Go outside or turn on the phone\'s GPS.' }
+      err: { denied: 'Location permission wasn\'t granted. Distance can\'t be measured without it.', unavailable: 'Location isn\'t available. Go outside or turn on the phone\'s GPS.' },
+      hr: {
+        title: 'Heart rate',
+        connect: 'Connect heart rate sensor (Bluetooth)',
+        connecting: 'Connecting…',
+        connected: 'Sensor connected',
+        reconnect: 'Reconnect',
+        off: 'Disconnect sensor',
+        bpm: 'bpm',
+        easy: 'Easy heart rate ceiling: {n}',
+        above: 'Above your easy ceiling ({n}); slow down',
+        lost: 'Sensor disconnected',
+        failed: 'The sensor didn\'t connect. Make sure it\'s on, close to the phone, and Bluetooth is on.',
+        line: 'Avg heart rate {a}, max {m}',
+        lineAbove: '({n} min above easy ceiling)'
+      }
     },
 
     backup: {

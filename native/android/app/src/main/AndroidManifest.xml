@@ -40,6 +40,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- سنسور ضربان بلوتوث: اسکن فقط برای پیدا کردن سنسور، نه موقعیت -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" tools:targetApi="s" />
     <!-- GPS لازمه برای ثبت دویدن، ولی اپ بدون اون هم کار می‌کنه (فیلتر فروشگاه نشه) -->
     <uses-feature android:name="android.hardware.location.gps" android:required="false" tools:replace="android:required" />
 

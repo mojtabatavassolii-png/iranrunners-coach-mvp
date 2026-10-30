@@ -26,7 +26,7 @@ jobs:
         with:
           node-version: 20
       - name: Rule tests
-        run: node tests/logic.test.js && node tests/gait.test.js && node tests/platform.test.js && node tests/track.test.js
+        run: node tests/logic.test.js && node tests/gait.test.js && node tests/platform.test.js && node tests/track.test.js && node tests/hr.test.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

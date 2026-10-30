@@ -571,11 +571,11 @@
   // مسافت و زمان با CoachTrack از نقطه‌های CoachPlatform.gps (وب: فقط با صفحه‌ی باز؛ اپ نیتیو: در پس‌زمینه هم).
   // مختصات ذخیره نمی‌شن؛ فقط در حین ثبت، وضعیت (با آخرین نقطه) در REC_KEY نگه داشته می‌شه تا اگه اپ بسته شد ثبت از دست نره.
   // ذخیره: جلسه‌ی همون روز «انجام شد» با km، زمان، ساعت شروع و اسپلیت‌ها، و بعد فرم «بعد از دویدن».
-  var K = window.CoachTrack, REC_KEY = 'gaam-run-live';
+  var K = window.CoachTrack, H = window.CoachHr, REC_KEY = 'gaam-run-live';
   var rec = null, recTimer = null, recSavedAt = 0;
   (function () {
     var live = P.store.getJSON(REC_KEY);
-    if (live && live.st && live.key) { rec = { key: live.key, st: live.st, status: 'pause', recovered: true, handle: null }; K.pause(rec.st, Date.now()); }
+    if (live && live.st && live.key) { rec = { key: live.key, st: live.st, hr: live.hr || null, status: 'pause', recovered: true, handle: null }; K.pause(rec.st, Date.now()); if (rec.hr) H.gap(rec.hr); }
   })();
   function recLive() { return !!(rec && (rec.status === 'run' || rec.status === 'pause')); }
   function recPersist(force) {
@@ -583,10 +583,11 @@
     var now = Date.now();
     if (!force && now - recSavedAt < 5000) return;
     recSavedAt = now;
-    try { P.store.setJSON(REC_KEY, { key: rec.key, st: rec.st }); } catch (e) { /* */ }
+    try { P.store.setJSON(REC_KEY, { key: rec.key, st: rec.st, hr: rec.hr || null }); } catch (e) { /* */ }
   }
   function recClear() {
     if (rec && rec.handle) P.gps.stop(rec.handle);
+    hrStop();
     clearInterval(recTimer); recTimer = null;
     rec = null;
     P.store.remove(REC_KEY);
@@ -616,6 +617,83 @@
     return P.gps.start(recPoint, recError, { title: T('rec.notifTitle'), message: T('rec.notif') })
       .then(function (h) { if (rec) rec.handle = h; }, function () { recError('unavailable'); });
   }
+  // ---------- سنسور ضربان (CoachHr + CoachPlatform.hr) ----------
+  // سنسور می‌تونه قبل از «شروع» وصل بشه (فقط عدد زنده)؛ آمار فقط حین ثبت جمع می‌شه. دستگاه قبلی در HR_DEV_KEY (فقط شناسه و اسم).
+  // قطع شدن حین ثبت: یک بار خودکار دوباره وصل می‌شه؛ نشد، دکمه‌ی «اتصال دوباره».
+  var HR_DEV_KEY = 'gaam-hr-device', hrConn = null, hrState = 'off', hrNow = null, hrMsg = '', hrRetry = null;
+  function hrEasyMax() {
+    var z = state.profile && C.hrZones(state.profile), s = rec && recSession(rec.key);
+    return z && s && s.easyEffort ? z.easy[1] : null;
+  }
+  function hrData(bytes) {
+    var p = H.parse(bytes), now = Date.now();
+    if (!p || !H.valid(p.bpm)) return;
+    hrNow = { bpm: p.bpm, t: now, contact: p.contact };
+    if (rec && rec.st && rec.hr) H.add(rec.hr, p.bpm, now, hrEasyMax(), rec.status === 'run');
+    hrPaint();
+  }
+  function hrConnect(retry) {
+    if (hrState === 'connecting') return;
+    hrState = 'connecting'; hrMsg = '';
+    if (!retry) hrPaint(true);
+    var saved = (hrConn && hrConn.device) ? hrConn : P.store.getJSON(HR_DEV_KEY);
+    P.hr.connect(saved, hrData, function () {
+      hrState = 'lost'; hrNow = null;
+      if (rec && rec.hr) H.gap(rec.hr);
+      // یک بار خودکار
+      clearTimeout(hrRetry);
+      if (!retry) hrRetry = setTimeout(function () { hrConnect(true); }, 3000);
+      hrPaint(true);
+    }).then(function (h) {
+      hrConn = h; hrState = 'on';
+      try { P.store.setJSON(HR_DEV_KEY, { id: h.id, name: h.name }); } catch (e) { /* */ }
+      hrPaint(true);
+    }, function (code) {
+      hrState = hrConn ? 'lost' : 'off';
+      if (code !== 'cancelled') hrMsg = 'failed';
+      hrPaint(true);
+    });
+  }
+  function hrStop() {
+    clearTimeout(hrRetry);
+    if (hrConn) hrConn.stop();
+    hrConn = null; hrState = 'off'; hrNow = null; hrMsg = '';
+  }
+  function hrBlock() {
+    if (!P.hr.supported()) return '';
+    var fresh = hrNow && Date.now() - hrNow.t < 5000, easy = hrEasyMax(), above = fresh && easy && hrNow.bpm > easy;
+    var body;
+    if (hrState === 'on' || (hrState === 'lost' && hrConn)) {
+      body = '<div class="rec-hr-val' + (above ? ' is-above' : '') + '"><b id="rec-hr">' + (fresh ? fa(hrNow.bpm) : '—') + '</b> <small>' + esc(T('rec.hr.bpm')) + '</small></div>' +
+        '<p class="small muted" id="rec-hr-note">' + esc(hrState === 'lost' ? T('rec.hr.lost') : (above ? T('rec.hr.above', { n: fa(easy) }) : (easy ? T('rec.hr.easy', { n: fa(easy) }) : (hrConn.name || T('rec.hr.connected'))))) + '</p>' +
+        (hrState === 'lost' ? '<button type="button" class="btn btn-outline" data-hr="connect">' + esc(T('rec.hr.reconnect')) + '</button>' : '') +
+        '<button type="button" class="btn btn-ghost" data-hr="off">' + esc(T('rec.hr.off')) + '</button>';
+    } else {
+      body = '<button type="button" class="btn btn-outline" data-hr="connect"' + (hrState === 'connecting' ? ' disabled' : '') + '>' +
+        esc(T(hrState === 'connecting' ? 'rec.hr.connecting' : 'rec.hr.connect')) + '</button>' +
+        (hrMsg ? '<p class="form-errors" role="alert">' + esc(T('rec.hr.failed')) + '</p>' : '');
+    }
+    return '<div class="rec-hr" id="rec-hr-box"><span class="rec-hr-title">' + esc(T('rec.hr.title')) + '</span>' + body + '</div>';
+  }
+  // full: کل جعبه دوباره ساخته بشه؛ وگرنه فقط عدد
+  function hrPaint(full) {
+    var box = document.getElementById('rec-hr-box');
+    if (!box) return;
+    if (full) { box.outerHTML = hrBlock(); return; }
+    var b = document.getElementById('rec-hr'), fresh = hrNow && Date.now() - hrNow.t < 5000, easy = hrEasyMax(), above = !!(fresh && easy && hrNow.bpm > easy);
+    if (!b) return;
+    b.textContent = fresh ? fa(hrNow.bpm) : '—';
+    b.parentNode.classList.toggle('is-above', above);
+    var n = document.getElementById('rec-hr-note');
+    if (n && easy && hrState === 'on') n.textContent = above ? T('rec.hr.above', { n: fa(easy) }) : T('rec.hr.easy', { n: fa(easy) });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-hr]');
+    if (!b) return;
+    if (b.dataset.hr === 'connect') hrConnect(false);
+    else { hrStop(); hrPaint(true); }
+  });
+
   function recTick() {
     if (!rec || !rec.st) return;
     var now = Date.now(), st = rec.st, el = function (id) { return document.getElementById(id); };
@@ -626,6 +704,7 @@
     el('rec-cur').textContent = recPace(K.currentPace(st, now));
     el('rec-signal').textContent = T('rec.signal.' + K.signal(st));
     el('rec-signal').className = 'rec-signal rec-sig-' + K.signal(st);
+    hrPaint(false);
   }
   function recSession(key) {
     return loggable(effectiveSession(C.sessionFor(state.profile, C.parseDate(key))).session);
@@ -648,7 +727,8 @@
       '<div><dt>' + esc(T('rec.dist')) + '</dt><dd><b id="rec-km">' + fa(dKm(st ? Math.floor(st.dist / 10) / 100 : 0).toFixed(2)) + '</b> <small>' + esc(u) + '</small></dd></div>' +
       '<div><dt>' + esc(T('rec.avg')) + '</dt><dd><b id="rec-avg">' + recPace(st && K.avgPace(st, now)) + '</b></dd></div>' +
       '<div><dt>' + esc(T('rec.cur')) + '</dt><dd><b id="rec-cur">' + recPace(st && K.currentPace(st, now)) + '</b></dd></div></dl>' +
-      '<p class="rec-signal rec-sig-' + (st ? K.signal(st) : 'wait') + '" id="rec-signal">' + esc(T('rec.signal.' + (st ? K.signal(st) : 'wait'))) + '</p>';
+      '<p class="rec-signal rec-sig-' + (st ? K.signal(st) : 'wait') + '" id="rec-signal">' + esc(T('rec.signal.' + (st ? K.signal(st) : 'wait'))) + '</p>' +
+      (rec.status !== 'done' ? hrBlock() : '');
     if (rec.err) {
       html += '<p class="form-errors" role="alert">' + esc(T('rec.err.' + rec.err)) + '</p>' +
         (rec.err === 'denied' && P.gps.canOpenSettings() ? '<button type="button" class="btn btn-outline" data-rec-settings="1">' + esc(T('rec.settings')) + '</button>' : '');
@@ -681,9 +761,9 @@
     if (!b || !rec) return;
     var a = b.dataset.rec, now = Date.now();
     if (a !== 'discard') rec.discardAsk = false;
-    if (a === 'start') { rec.err = null; rec.st = K.create(now); rec.status = 'run'; rec.recovered = false; recPersist(true); recWatch(); }
-    else if (a === 'pause') { K.pause(rec.st, now); rec.status = 'pause'; recPersist(true); }
-    else if (a === 'resume') { K.resume(rec.st, now); rec.status = 'run'; rec.recovered = false; recPersist(true); recWatch(); }
+    if (a === 'start') { rec.err = null; rec.st = K.create(now); rec.hr = H.create(); rec.status = 'run'; rec.recovered = false; recPersist(true); recWatch(); }
+    else if (a === 'pause') { K.pause(rec.st, now); if (rec.hr) H.gap(rec.hr); rec.status = 'pause'; recPersist(true); }
+    else if (a === 'resume') { K.resume(rec.st, now); if (rec.hr) H.gap(rec.hr); else rec.hr = H.create(); rec.status = 'run'; rec.recovered = false; recPersist(true); recWatch(); }
     else if (a === 'finish') { if (rec.status === 'run') K.pause(rec.st, now); rec.status = 'done'; recPersist(true); }
     else if (a === 'back') { rec.status = 'pause'; }
     else if (a === 'discard') {
@@ -696,6 +776,8 @@
       log.actual = { km: sm.km, sec: sm.sec, start: sm.start };
       log.src = 'gps';
       if (sm.splits.length) log.splits = sm.splits; else delete log.splits;
+      var hs = rec.hr && H.summary(rec.hr);
+      if (hs && hs.sec >= 30) log.hr = { avg: hs.avg, max: hs.max, above: hs.aboveSec, easyMax: hrEasyMax() }; else delete log.hr;
       recClear();
       save();
       showToast(T('rec.saved'));
@@ -1833,6 +1915,7 @@
     if (pace) parts.push(tt('post.actPace', { p: paceFmt(pace) }));
     if (log.src === 'health') parts.push('<span class="muted">' + esc(T('sync.from', { name: healthName() })) + '</span>');
     if (log.src === 'gps') parts.push('<span class="muted">' + esc(T('rec.src')) + '</span>');
+    if (log.hr) parts.push(tt('rec.hr.line', { a: log.hr.avg, m: log.hr.max }) + (log.hr.easyMax && log.hr.above >= 60 ? ' <span class="muted">' + tt('rec.hr.lineAbove', { n: Math.round(log.hr.above / 60) }) + '</span>' : ''));
     if (log.splits && log.splits.length) parts.push('<span class="muted">' + esc(T('rec.splits')) + ' ' + log.splits.map(function (x) { return '<span dir="ltr">' + fa(C.formatDuration(x)) + '</span>'; }).join(' · ') + '</span>');
     return '<p class="actual-line"><b>' + esc(T('post.actRecorded')) + '</b> ' + parts.join(T('progress.sep')) + '</p>';
   }

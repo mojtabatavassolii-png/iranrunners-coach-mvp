@@ -326,3 +326,47 @@ test('ثبت با GPS: شروع، بازگشت بعد از بستن صفحه، �
   await page.locator('[data-postrun-cancel]').first().click();
   await expect(page.locator('.actual-line').first()).toContainText('با GPS گام');
 });
+
+// ---------- ۱۳. سنسور ضربان قلب بلوتوث حین ثبت (Web Bluetooth ساختگی) ----------
+test('سنسور ضربان: اتصال، عدد زنده، ذخیره‌ی میانگین و بیشینه با دویدن', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'موقعیت ساختگی پیوسته فقط در Chromium مطمئنه');
+  test.setTimeout(120000);
+  const M = 111195;
+  let lat = 35.7;
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: lat, longitude: 51.4, accuracy: 5 });
+  await page.addInitScript(() => {
+    const ch = { addEventListener: (t, f) => { ch.f = f; }, startNotifications: () => Promise.resolve(ch) };
+    const dev = { id: 'dev1', name: 'HRM-Test', addEventListener() {}, removeEventListener() {},
+      gatt: { connected: true, disconnect() {}, connect: () => Promise.resolve({ getPrimaryService: () => Promise.resolve({ getCharacteristic: () => Promise.resolve(ch) }) }) } };
+    Object.defineProperty(navigator, 'bluetooth', { value: { requestDevice: () => Promise.resolve(dev) } });
+    // بسته‌ی استاندارد: پرچم ۰، ضربان ۸ بیتی
+    window.__hr = (bpm) => ch.f && ch.f({ target: { value: new DataView(new Uint8Array([0, bpm]).buffer) } });
+  });
+  await onboard(page);
+  await page.evaluate(() => { location.hash = '#record'; });
+  await page.locator('[data-hr="connect"]').click();
+  await page.evaluate(() => window.__hr(120));
+  await expect(page.locator('#rec-hr')).toHaveText('۱۲۰');
+  await page.locator('[data-rec="start"]').click();
+  // ضربان کمتر از ۳۰ ثانیه ذخیره نمی‌شه؛ ۳۴ ثانیه: نصف اول ۱۴۰، نصف دوم ۱۶۰
+  for (let i = 0; i < 34; i++) {
+    await page.waitForTimeout(1000);
+    lat += 6 / M;
+    await context.setGeolocation({ latitude: lat, longitude: 51.4, accuracy: 5 });
+    await page.evaluate((b) => window.__hr(b), i < 17 ? 140 : 160);
+  }
+  await expect(page.locator('#rec-hr')).toHaveText('۱۶۰');
+  await page.locator('[data-rec="finish"]').click();
+  await page.locator('[data-rec="save"]').click();
+  await expect(page).toHaveURL(/#plan/);
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('iranrunners-coach-mvp-v1')));
+  const key = Object.keys(st.done)[0], hr = st.doneLog[key].hr;
+  expect(hr.max).toBe(160);
+  expect(hr.avg).toBeGreaterThanOrEqual(140);
+  expect(hr.avg).toBeLessThanOrEqual(160);
+  // دستگاه برای دفعه‌ی بعد (فقط شناسه و اسم)
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gaam-hr-device')))).toEqual({ id: 'dev1', name: 'HRM-Test' });
+  await page.locator('[data-postrun-cancel]').first().click();
+  await expect(page.locator('.actual-line').first()).toContainText('ضربان میانگین');
+});

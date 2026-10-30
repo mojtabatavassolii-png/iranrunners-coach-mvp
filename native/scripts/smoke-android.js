@@ -43,11 +43,11 @@ async function hash() { return page.evaluate(() => location.hash); }
   await step('اجرای نیتیو و افزونه‌ها', async () => {
     const info = await page.evaluate(() => ({
       native: !!(window.Capacitor && Capacitor.isNativePlatform()), kind: CoachPlatform.kind, origin: location.origin,
-      plugins: ['Preferences', 'LocalNotifications', 'Filesystem', 'Share', 'App', 'Health', 'BackgroundGeolocation'].filter((n) => Capacitor.Plugins[n]),
+      plugins: ['Preferences', 'LocalNotifications', 'Filesystem', 'Share', 'App', 'Health', 'BackgroundGeolocation', 'BluetoothLe'].filter((n) => Capacitor.Plugins[n]),
       sw: CoachPlatform.sw.supported(), print: CoachPlatform.files.canPrint(), ua: navigator.userAgent
     }));
     must(info.native && info.kind === 'android', 'not native: ' + JSON.stringify(info));
-    must(info.plugins.length === 7, 'plugins: ' + info.plugins.join(','));
+    must(info.plugins.length === 8, 'plugins: ' + info.plugins.join(','));
     must(!info.sw && !info.print, 'sw/print should be off');
     return info.origin + ' · ' + info.plugins.join(', ') + ' · ' + (info.ua.match(/Chrome\/[\d.]+/) || [''])[0];
   });
@@ -149,6 +149,15 @@ async function hash() { return page.evaluate(() => location.hash); }
     const log = await page.evaluate((k) => { const s = JSON.parse(localStorage.getItem(k)); const d = Object.keys(s.done)[0]; return s.doneLog[d]; }, STORE_KEY);
     must(log && log.src === 'gps' && log.actual.km > 0.05, JSON.stringify(log));
     return diag + ` · ذخیره ${log.actual.km} km در ${log.actual.sec}s`;
+  });
+
+  // گوشی مجازی سنسور ضربان نداره؛ فقط دکمه‌ی اتصال در صفحه‌ی ثبت و آماده شدن بلوتوث
+  await step('سنسور ضربان: دکمه‌ی اتصال و آماده شدن بلوتوث', async () => {
+    await page.evaluate(() => { location.hash = '#record'; });
+    await page.locator('[data-hr="connect"]').waitFor();
+    const r = await page.evaluate(() => Capacitor.Plugins.BluetoothLe.initialize({ androidNeverForLocation: true }).then(() => 'ok', (e) => 'error: ' + (e && e.message)));
+    await page.evaluate(() => { location.hash = '#home'; });
+    return 'initialize: ' + r;
   });
 
   await step('دکمه‌ی برگشت اندروید', async () => {
