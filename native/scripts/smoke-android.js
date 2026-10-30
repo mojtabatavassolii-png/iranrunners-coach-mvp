@@ -36,8 +36,9 @@ async function hash() { return page.evaluate(() => location.hash); }
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e && e.message || e)));
   // «Share canceled»: پل Capacitor رد شدن هر فراخوانی رو در کنسول می‌نویسه؛ اپ لغو اشتراک رو عادی در نظر می‌گیره.
+  // «INFO: …»: پیام‌های اطلاعاتی MediaPipe (مثل ساخته شدن XNNPACK) که با console.error چاپ می‌شن.
   // «Error injecting safe area CSS»: کد خود Capacitor که موقع reload پیش از ساخته شدن صفحه اجرا می‌شه؛ اپ از env(safe-area-inset-*) استفاده می‌کنه
-  page.on('console', (m) => { if (m.type() === 'error' && !/Share canceled|Error injecting safe area CSS/.test(m.text())) errors.push('console: ' + m.text()); });
+  page.on('console', (m) => { if (m.type() === 'error' && !/Share canceled|Error injecting safe area CSS|^INFO: /.test(m.text())) errors.push('console: ' + m.text()); });
 
   await step('اجرای نیتیو و افزونه‌ها', async () => {
     const info = await page.evaluate(() => ({
