@@ -19,7 +19,7 @@ async function step(name, fn) {
   catch (e) { results.push(['❌', name, String(e && e.message || e).split('\n')[0].slice(0, 300), Date.now() - t0]); }
   try { await page.screenshot({ path: path.join(OUT, String(++shot).padStart(2, '0') + '.png') }); } catch (e) { /* */ }
 }
-function adb(cmd) { return execSync('adb ' + cmd, { encoding: 'utf8' }); }
+function adb(cmd) { return execSync('adb ' + cmd, { encoding: 'utf8', timeout: 30000 }); }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 function must(cond, msg) { if (!cond) throw new Error(msg); }
 async function chip(name, value) { await page.locator(`label:has(> input[name="${name}"][value="${value}"])`).first().click(); }
@@ -34,7 +34,8 @@ async function hash() { return page.evaluate(() => location.hash); }
   page.setDefaultTimeout(30000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e && e.message || e)));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+  // «Share canceled»: پل Capacitor رد شدن هر فراخوانی رو در کنسول می‌نویسه؛ اپ لغو اشتراک رو عادی در نظر می‌گیره
+  page.on('console', (m) => { if (m.type() === 'error' && !/Share canceled/.test(m.text())) errors.push('console: ' + m.text()); });
 
   await step('اجرای نیتیو و افزونه‌ها', async () => {
     const info = await page.evaluate(() => ({
@@ -119,6 +120,7 @@ async function hash() { return page.evaluate(() => location.hash); }
     return top.slice(0, 160);
   });
 
+  try { fs.writeFileSync(path.join(OUT, 'meminfo-before-gait.txt'), adb('shell cat /proc/meminfo')); } catch (e) { /* */ }
   await step('بیومکانیک: MediaPipe در WebView و پایان تحلیل', async () => {
     await page.evaluate(() => { location.hash = '#gait'; });
     await page.locator('input[type=file][data-gait-file="side"]').setInputFiles({ name: 'clip.mp4', mimeType: 'video/mp4', buffer: fs.readFileSync(CLIP) });

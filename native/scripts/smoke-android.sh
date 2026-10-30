@@ -14,12 +14,14 @@ sleep 10
 npm i --no-save --no-audit --no-fund playwright-core@1.63.0 >/dev/null
 node scripts/smoke-android.js
 status=$?
-adb exec-out screencap -p > smoke/final-device.png
-adb logcat -d > smoke/logcat-full.txt
+# اگه شبیه‌ساز از کار افتاده باشه، adb منتظر می‌مونه؛ هر فرمان سقف زمانی داره
+timeout 30 adb exec-out screencap -p > smoke/final-device.png
+timeout 60 adb logcat -d > smoke/logcat-full.txt
+timeout 10 adb get-state || echo "device offline after tests" 
 grep -E "Capacitor|chromium|AndroidRuntime|app.gaam.run" smoke/logcat-full.txt > smoke/logcat.txt || true
 # کرش یا خطای نیتیو مستقیم در لاگ اجرا
 echo "--- native errors (logcat) ---"
 grep -E "FATAL|AndroidRuntime|Capacitor.*(Error|rejected)|E Capacitor" smoke/logcat-full.txt | tail -40 || true
 echo "--- current activity ---"
-adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" || true
+timeout 20 adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" || true
 exit $status
