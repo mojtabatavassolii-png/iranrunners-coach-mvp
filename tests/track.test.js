@@ -97,4 +97,40 @@ test('وضعیت سیگنال', function () {
   assert.strictEqual(K.signal(st), 'good');
 });
 
+test('شکل مسیر: نقطه هر ۸ متر، تکه‌ی تازه بعد از توقف، جای کیلومترها، ساده‌سازی و polyline', function () {
+  var t0 = 1e12, st = K.create(t0);
+  K.add(st, { lat: 35.7, lon: 51.4, acc: 5, t: t0 });
+  var e = run(st, 35.7, t0, 400, 3, 5);               // ۱۲۰۰ متر مستقیم
+  assert.strictEqual(st.route.length, 1);
+  assert.ok(st.route[0].length >= 90 && st.route[0].length <= 155, st.route[0].length);   // حداقل هر ۸ متر (با گام ۳ متری، هر ۹ تا ۱۲ متر)
+  assert.strictEqual(st.kmMarks.length, 1);
+  assert.ok(Math.abs(K.haversine({ lat: 35.7, lon: 51.4 }, { lat: st.kmMarks[0][0], lon: st.kmMarks[0][1] }) - 1000) < 10);
+  K.pause(st, e.t); K.resume(st, e.t + 60000);
+  K.add(st, { lat: e.lat + 50 / M, lon: 51.4, acc: 5, t: e.t + 60000 });
+  run(st, e.lat + 50 / M, e.t + 60000, 50, 3, 5);
+  assert.strictEqual(st.route.length, 2);
+  var out = K.routeOut(st);
+  assert.strictEqual(out.segs.length, 2);
+  // خط مستقیم بعد از ساده‌سازی فقط دو سر داره
+  var seg0 = K.decode(out.segs[0]);
+  assert.strictEqual(seg0.length, 2);
+  assert.ok(Math.abs(seg0[0][0] - 35.7) < 1e-5 && Math.abs(seg0[1][0] - e.lat) < 2e-5, JSON.stringify(seg0));
+  assert.strictEqual(K.decode(out.km).length, 1);
+  // رمزگذاری استاندارد polyline (نمونه‌ی مستندات گوگل)
+  assert.strictEqual(K.encode([[38.5, -120.2], [40.7, -120.95], [43.252, -126.453]]), '_p~iF~ps|U_ulLnnqC_mqNvxq`@');
+  assert.deepStrictEqual(K.decode('_p~iF~ps|U_ulLnnqC_mqNvxq`@'), [[38.5, -120.2], [40.7, -120.95], [43.252, -126.453]]);
+  // بدون حرکت، مسیری نیست
+  assert.strictEqual(K.routeOut(K.create(0)), null);
+});
+
+test('ساده‌سازی مسیر پیچ‌ها رو نگه می‌داره', function () {
+  // مربع ۱۰۰ متری با نقطه هر ۵ متر
+  var pts = [], lat = 35.7, lon = 51.4, kx = 111195 * Math.cos(35.7 * Math.PI / 180);
+  for (var i = 0; i <= 20; i++) pts.push([lat, lon + i * 5 / kx]);
+  for (i = 1; i <= 20; i++) pts.push([lat + i * 5 / M, lon + 100 / kx]);
+  for (i = 1; i <= 20; i++) pts.push([lat + 100 / M, lon + (100 - i * 5) / kx]);
+  var s = K.simplify(pts, 4);
+  assert.strictEqual(s.length, 4);
+});
+
 console.log(passed + ' تست ثبت GPS موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

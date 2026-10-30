@@ -617,6 +617,61 @@
     return P.gps.start(recPoint, recError, { title: T('rec.notifTitle'), message: T('rec.notif') })
       .then(function (h) { if (rec) rec.handle = h; }, function () { recError('unavailable'); });
   }
+  // ---------- شکل مسیر (SVG، بدون نقشه‌ی زمینه و بدون اینترنت) ----------
+  // segs: [[[lat, lon], ...], ...] تکه‌ها؛ km: جای هر کیلومتر؛ live: نقطه‌ی آخر «جای فعلی»ه، وگرنه «پایان»
+  function routeSvg(segs, km, live) {
+    var all = [];
+    segs.forEach(function (s) { all = all.concat(s); });
+    if (all.length < 2) return '';
+    var W = 320, H = 220, PAD = 16, lat0 = all[0][0] * Math.PI / 180;
+    var kx = 111320 * Math.cos(lat0), ky = 110540;
+    var xs = all.map(function (q) { return q[1] * kx; }), ys = all.map(function (q) { return -q[0] * ky; });
+    var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs), minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+    // مسیر خیلی کوتاه بیش از حد بزرگ نشه (حداقل ۸۰ متر در هر طرف)
+    var w = Math.max(80, maxX - minX), h = Math.max(80, maxY - minY), cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    var sc = Math.min((W - 2 * PAD) / w, (H - 2 * PAD) / h);
+    var P = function (q) { return [(W / 2 + (q[1] * kx - cx) * sc).toFixed(1), (H / 2 + (-q[0] * ky - cy) * sc).toFixed(1)]; };
+    var lines = segs.filter(function (s) { return s.length >= 2; }).map(function (s) {
+      return '<polyline points="' + s.map(function (q) { return P(q).join(','); }).join(' ') + '" fill="none" stroke="var(--primary)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>';
+    }).join('');
+    var a = P(all[0]), b = P(all[all.length - 1]);
+    var marks = (km || []).map(function (q, i) {
+      var m = P(q);
+      return '<circle cx="' + m[0] + '" cy="' + m[1] + '" r="8" fill="var(--surface)" stroke="var(--text-secondary)" stroke-width="1.5"/>' +
+        '<text x="' + m[0] + '" y="' + (Number(m[1]) + 3.5) + '" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text)">' + fa(i + 1) + '</text>';
+    }).join('');
+    var end = live ? '<circle class="route-now" cx="' + b[0] + '" cy="' + b[1] + '" r="7" fill="var(--info)" stroke="var(--surface)" stroke-width="2.5"/>'
+      : '<circle cx="' + b[0] + '" cy="' + b[1] + '" r="6" fill="var(--surface)" stroke="var(--text)" stroke-width="3"/>';
+    return '<svg class="route-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(T('rec.route.aria')) + '" dir="ltr">' + lines +
+      '<circle cx="' + a[0] + '" cy="' + a[1] + '" r="6" fill="var(--success)" stroke="var(--surface)" stroke-width="2"/>' + marks + end + '</svg>';
+  }
+  function liveRoute() {
+    var st = rec && rec.st;
+    var svg = st && st.route ? routeSvg(st.route, st.kmMarks, true) : '';
+    return svg || '<p class="small muted route-empty">' + esc(T('rec.route.empty')) + '</p>';
+  }
+  // مسیر ذخیره‌شده‌ی یک روز (زیر عددهای ثبت‌شده)، با «حذف مسیر» دومرحله‌ای
+  var routeDelAsk = null;
+  function routeView(key) {
+    var log = (state.doneLog || {})[key], r = log && log.route;
+    if (!r || !r.segs) return '';
+    var svg = routeSvg(r.segs.map(K.decode), r.km ? K.decode(r.km) : []);
+    if (!svg) return '';
+    return '<figure class="route-fig">' + svg + '<figcaption class="small muted">' + esc(T('rec.route.caption')) +
+      ' <button type="button" class="linklike small" data-route-del="' + key + '">' + esc(T(routeDelAsk === key ? 'rec.route.delSure' : 'rec.route.del')) + '</button></figcaption></figure>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-route-del]');
+    if (!b) return;
+    var k = b.dataset.routeDel;
+    if (routeDelAsk !== k) { routeDelAsk = k; route(); return; }
+    routeDelAsk = null;
+    if (state.doneLog && state.doneLog[k]) delete state.doneLog[k].route;
+    save();
+    showToast(T('rec.route.deleted'));
+    route();
+  });
+
   // ---------- سنسور ضربان (CoachHr + CoachPlatform.hr) ----------
   // سنسور می‌تونه قبل از «شروع» وصل بشه (فقط عدد زنده)؛ آمار فقط حین ثبت جمع می‌شه. دستگاه قبلی در HR_DEV_KEY (فقط شناسه و اسم).
   // قطع شدن حین ثبت: یک بار خودکار دوباره وصل می‌شه؛ نشد، دکمه‌ی «اتصال دوباره».
@@ -704,6 +759,8 @@
     el('rec-cur').textContent = recPace(K.currentPace(st, now));
     el('rec-signal').textContent = T('rec.signal.' + K.signal(st));
     el('rec-signal').className = 'rec-signal rec-sig-' + K.signal(st);
+    var rt = el('rec-route');
+    if (rt) rt.innerHTML = liveRoute();
     hrPaint(false);
   }
   function recSession(key) {
@@ -728,6 +785,7 @@
       '<div><dt>' + esc(T('rec.avg')) + '</dt><dd><b id="rec-avg">' + recPace(st && K.avgPace(st, now)) + '</b></dd></div>' +
       '<div><dt>' + esc(T('rec.cur')) + '</dt><dd><b id="rec-cur">' + recPace(st && K.currentPace(st, now)) + '</b></dd></div></dl>' +
       '<p class="rec-signal rec-sig-' + (st ? K.signal(st) : 'wait') + '" id="rec-signal">' + esc(T('rec.signal.' + (st ? K.signal(st) : 'wait'))) + '</p>' +
+      '<div class="rec-route" id="rec-route">' + liveRoute() + '</div>' +
       (rec.status !== 'done' ? hrBlock() : '');
     if (rec.err) {
       html += '<p class="form-errors" role="alert">' + esc(T('rec.err.' + rec.err)) + '</p>' +
@@ -776,6 +834,8 @@
       log.actual = { km: sm.km, sec: sm.sec, start: sm.start };
       log.src = 'gps';
       if (sm.splits.length) log.splits = sm.splits; else delete log.splits;
+      var rt = K.routeOut(rec.st);
+      if (rt) log.route = rt; else delete log.route;
       var hs = rec.hr && H.summary(rec.hr);
       if (hs && hs.sec >= 30) log.hr = { avg: hs.avg, max: hs.max, above: hs.aboveSec, easyMax: hrEasyMax() }; else delete log.hr;
       recClear();
@@ -1922,7 +1982,7 @@
   function postRunBlock(key, s, prefix) {
     var post = state.postRuns[key], done = !!state.done[key], out = '';
     if (done && postRunOpen !== key) {
-      out += actualLine(key) + '<button type="button" class="linklike small" data-postrun="' + key + '">' + esc(T((state.doneLog || {})[key] && state.doneLog[key].actual ? 'post.actEdit' : 'post.actAdd')) + '</button>';
+      out += actualLine(key) + routeView(key) + '<button type="button" class="linklike small" data-postrun="' + key + '">' + esc(T((state.doneLog || {})[key] && state.doneLog[key].actual ? 'post.actEdit' : 'post.actAdd')) + '</button>';
       if (s.easyEffort && post) {
         var fb = C.easyRunFeedback(post, s.type);
         if (fb) {

@@ -1629,7 +1629,7 @@
       cur: 'Current pace',
       signal: { wait: 'Finding GPS…', weak: 'Weak GPS signal', good: 'Good GPS signal' },
       webNote: 'In the browser, recording continues only while this page is open and the screen is on. The phone app keeps recording with the screen locked.',
-      bgNote: 'Recording continues with the screen locked or the app in the background. Locations aren\'t stored; only distance, time and splits.',
+      bgNote: 'Recording continues with the screen locked or the app in the background. The route shape, distance, time and splits are stored only on this phone.',
       noCheckin: 'You haven\'t checked in today yet; better to do it before you start.',
       recovered: 'A recording was left unfinished (the app was closed). Resume it or finish it.',
       doneQ: 'Save this run?',
@@ -1647,6 +1647,14 @@
       settings: 'Location settings',
       unavailable: 'This device or browser has no GPS.',
       err: { denied: 'Location permission wasn\'t granted. Distance can\'t be measured without it.', unavailable: 'Location isn\'t available. Go outside or turn on the phone\'s GPS.' },
+      route: {
+        empty: 'Your route will be drawn here.',
+        aria: 'Shape of the run route, with start, finish and each kilometre',
+        caption: 'Route shape (green: start, numbers: each km). Only on this device.',
+        del: 'Delete route',
+        delSure: 'Sure? Tap again',
+        deleted: 'Route deleted'
+      },
       hr: {
         title: 'Heart rate',
         connect: 'Connect heart rate sensor (Bluetooth)',

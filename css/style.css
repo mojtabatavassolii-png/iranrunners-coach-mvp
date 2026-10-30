@@ -2011,3 +2011,11 @@ html.intro #app .login-import { opacity: 0; }
 .rec-hr p { margin: 0; flex: 1; min-width: 10em; text-align: start; }
 .rec-hr .btn { flex: 1 1 auto; }
 .rec-hr .form-errors { flex-basis: 100%; }
+/* شکل مسیر (ثبت زنده و دویدن ذخیره‌شده) */
+.rec-route { margin: var(--sp-2) 0; }
+.route-svg { display: block; width: 100%; height: auto; max-height: 260px; background: var(--surface-elevated); border-radius: 16px; }
+.route-empty { text-align: center; padding: var(--sp-5) var(--sp-3); background: var(--surface-elevated); border-radius: 16px; margin: 0; }
+.route-now { animation: rec-pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .route-now { animation: none; } }
+.route-fig { margin: var(--sp-2) 0; }
+.route-fig figcaption { margin-top: var(--sp-1); }

@@ -295,6 +295,8 @@ test('ثبت با GPS: شروع، بازگشت بعد از بستن صفحه، �
   await page.locator('[data-rec="start"]').click();
   await walk(8);
   await expect.poll(async () => Number((await page.locator('#rec-km').innerText()).replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace('٫', '.'))).toBeGreaterThan(0.02);
+  // شکل مسیر زنده
+  await expect(page.locator('#rec-route svg polyline')).toHaveCount(1);
   // صفحه بسته و باز شد: ثبت متوقف‌شده برمی‌گرده
   await page.reload();
   await expect(page.locator('.rec-card .alert')).toContainText('ناتموم');
@@ -316,8 +318,8 @@ test('ثبت با GPS: شروع، بازگشت بعد از بستن صفحه، �
   expect(a.km).toBeGreaterThan(0.06);
   expect(a.km).toBeLessThan(0.14);
   expect(a.sec).toBeGreaterThan(10);
-  // مختصات ذخیره نمی‌شن و ثبت زنده پاک شده
-  expect(JSON.stringify(st)).not.toContain('35.7');
+  // شکل مسیر ذخیره شده (دو تکه: قبل و بعد از بستن صفحه) و ثبت زنده پاک شده
+  expect(st.doneLog[key].route.segs.length).toBe(2);
   expect(await page.evaluate(() => localStorage.getItem('gaam-run-live'))).toBeNull();
   // فرم «بعد از دویدن» با عددهای ثبت‌شده باز می‌شه؛ بعد از بستنش خط «ثبت‌شده» با منبع
   const form = page.locator('[data-postrun-form="' + key + '"]');
@@ -325,6 +327,14 @@ test('ثبت با GPS: شروع، بازگشت بعد از بستن صفحه، �
   await expect(form.locator('input[name=actKm]')).not.toHaveValue('');
   await page.locator('[data-postrun-cancel]').first().click();
   await expect(page.locator('.actual-line').first()).toContainText('با GPS گام');
+  // مسیر ذخیره‌شده زیر عددها، و حذفش (دو مرحله)
+  await expect(page.locator('.route-fig svg polyline')).toHaveCount(2);
+  await page.locator('[data-route-del]').first().click();
+  await page.locator('[data-route-del]').first().click();
+  await expect(page.locator('.route-fig')).toHaveCount(0);
+  const st2 = await page.evaluate(() => JSON.parse(localStorage.getItem('iranrunners-coach-mvp-v1')));
+  expect(st2.doneLog[key].route).toBeUndefined();
+  expect(st2.doneLog[key].actual.km).toBe(a.km);
 });
 
 // ---------- ۱۳. سنسور ضربان قلب بلوتوث حین ثبت (Web Bluetooth ساختگی) ----------
