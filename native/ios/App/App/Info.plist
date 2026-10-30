@@ -6,6 +6,14 @@
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Gaam uses your location only while you record a run, to measure distance and pace. Locations are not stored or sent anywhere; only the distance, time and per-kilometre splits are kept on your device.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>While you record a run, Gaam keeps measuring distance with the screen locked or the app in the background. Recording stops when you finish the run; locations are not stored or sent anywhere.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Gaam reads your running and walking workouts from Apple Health to mark planned sessions as done, with their distance and time. Nothing leaves your device and Gaam never writes to Apple Health.</string>
 	<key>NSCameraUsageDescription</key>

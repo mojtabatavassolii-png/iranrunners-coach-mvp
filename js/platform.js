@@ -12,6 +12,7 @@
  * - notify:  اجازه و نمایش اعلان، زمان‌بندی یادآوری
  * - sw:      سرویس‌ورکر (فقط وب)
  * - health:  خوندن تمرین‌ها از Apple Health یا Health Connect (فقط نیتیو)
+ * - gps:     موقعیت برای ثبت دویدن (وب: فقط با صفحه‌ی باز؛ نیتیو: پس‌زمینه)
  * باید قبل از i18n.js و app.js بار بشه.
  */
 (function (root) {
@@ -176,6 +177,31 @@
     openSettings: function () { return Promise.resolve(); }
   };
 
+  // ---------- gps ----------
+  // موقعیت برای ثبت دویدن. وب: navigator.geolocation فقط تا وقتی صفحه بازه (با Wake Lock که صفحه خاموش نشه).
+  // نیتیو: سرویس پس‌زمینه با اعلان، حتی با صفحه‌ی قفل. نقطه: { lat, lon, acc, t }.
+  // start(onPoint, onError, texts) → Promise<handle>؛ خطاها: 'denied' | 'unavailable'
+  var gps = {
+    supported: function () { return !!(nav.geolocation && nav.geolocation.watchPosition); },
+    background: function () { return false; },
+    start: function (onPoint, onError) {
+      var lock = null;
+      // صفحه روشن بمونه (مرورگرهایی که پشتیبانی می‌کنن)
+      if (nav.wakeLock && nav.wakeLock.request) nav.wakeLock.request('screen').then(function (l) { lock = l; }, function () {});
+      var id = nav.geolocation.watchPosition(function (p) {
+        onPoint({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: p.timestamp || Date.now() });
+      }, function (e) {
+        // ۳ (TIMEOUT): فقط مدتی نقطه‌ی تازه نیومده؛ ثبت ادامه داره
+        if (e && e.code === 3) return;
+        onError(e && e.code === 1 ? 'denied' : 'unavailable');
+      }, { enableHighAccuracy: true, maximumAge: 0 });
+      return Promise.resolve({ stop: function () { nav.geolocation.clearWatch(id); if (lock) { try { lock.release(); } catch (e) { /* */ } } } });
+    },
+    stop: function (h) { if (h && h.stop) h.stop(); return Promise.resolve(); },
+    canOpenSettings: function () { return false; },
+    openSettings: function () { return Promise.resolve(); }
+  };
+
   var ready = Promise.resolve();
 
   // ---------- native (Capacitor) ----------
@@ -184,7 +210,7 @@
   if (isNative) {
     var plug = function (name) { return (cap.Plugins || {})[name]; };
     var noop = function () {};
-    var Prefs = plug('Preferences'), LN = plug('LocalNotifications'), FS = plug('Filesystem'), Share = plug('Share'), App = plug('App'), Health = plug('Health');
+    var Prefs = plug('Preferences'), LN = plug('LocalNotifications'), FS = plug('Filesystem'), Share = plug('Share'), App = plug('App'), Health = plug('Health'), BG = plug('BackgroundGeolocation');
 
     // ذخیره: localStorage همچنان منبع همگامه و هر نوشتن در Preferences (فایل نیتیو) هم کپی می‌شه.
     // اگه سیستم داده‌ی WebView رو پاک کرده باشه، شروع بعدی از Preferences برمی‌گرده و صفحه یک بار دوباره بار می‌شه.
@@ -294,6 +320,23 @@
       health.openSettings = function () { return kind === 'android' ? Health.openHealthConnectSettings().catch(noop) : Promise.resolve(); };
     }
 
+    // GPS در پس‌زمینه (@capacitor-community/background-geolocation): اندروید سرویس پیش‌زمینه با اعلان، آیفون حالت location
+    if (BG) {
+      gps.supported = function () { return true; };
+      gps.background = function () { return true; };
+      gps.start = function (onPoint, onError, texts) {
+        texts = texts || {};
+        return BG.addWatcher({ backgroundTitle: texts.title, backgroundMessage: texts.message || 'GPS', requestPermissions: true, stale: false, distanceFilter: 0 },
+          function (loc, err) {
+            if (err) { onError(err.code === 'NOT_AUTHORIZED' ? 'denied' : 'unavailable'); return; }
+            if (loc) onPoint({ lat: loc.latitude, lon: loc.longitude, acc: loc.accuracy, t: loc.time || Date.now() });
+          }).then(function (id) { return { id: id }; });
+      };
+      gps.stop = function (h) { return h && h.id ? BG.removeWatcher({ id: h.id }).catch(noop) : Promise.resolve(); };
+      gps.canOpenSettings = function () { return true; };
+      gps.openSettings = function () { return BG.openSettings().catch(noop); };
+    }
+
     // دکمه‌ی برگشت اندروید: صفحه‌ی قبلی اپ، و در اولین صفحه بستن اپ
     if (App) {
       App.addListener('backButton', function (e) { if (e && e.canGoBack) root.history.back(); else App.exitApp(); });
@@ -302,7 +345,7 @@
 
   root.CoachPlatform = {
     kind: kind, isNative: isNative, isIos: isIos, isStandalone: isStandalone, isTouch: isTouch,
-    store: store, session: session, files: files, notify: notify, sw: sw, health: health,
+    store: store, session: session, files: files, notify: notify, sw: sw, health: health, gps: gps,
     // آماده بودن داده‌ها (وب: بلافاصله؛ نیتیو: بعد از هماهنگی با Preferences)
     ready: function () { return ready; }
   };

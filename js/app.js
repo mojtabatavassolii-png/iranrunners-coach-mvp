@@ -566,7 +566,160 @@
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, health: renderHealth, settings: renderSettings, plans: renderPlans, walkgoals: renderWalkGoals, progress: renderProgressPage, gait: renderGaitPage, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
+  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, health: renderHealth, settings: renderSettings, plans: renderPlans, walkgoals: renderWalkGoals, progress: renderProgressPage, gait: renderGaitPage, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding, record: renderRecord };
+  // ---------- ثبت دویدن با GPS (#record) ----------
+  // مسافت و زمان با CoachTrack از نقطه‌های CoachPlatform.gps (وب: فقط با صفحه‌ی باز؛ اپ نیتیو: در پس‌زمینه هم).
+  // مختصات ذخیره نمی‌شن؛ فقط در حین ثبت، وضعیت (با آخرین نقطه) در REC_KEY نگه داشته می‌شه تا اگه اپ بسته شد ثبت از دست نره.
+  // ذخیره: جلسه‌ی همون روز «انجام شد» با km، زمان، ساعت شروع و اسپلیت‌ها، و بعد فرم «بعد از دویدن».
+  var K = window.CoachTrack, REC_KEY = 'gaam-run-live';
+  var rec = null, recTimer = null, recSavedAt = 0;
+  (function () {
+    var live = P.store.getJSON(REC_KEY);
+    if (live && live.st && live.key) { rec = { key: live.key, st: live.st, status: 'pause', recovered: true, handle: null }; K.pause(rec.st, Date.now()); }
+  })();
+  function recLive() { return !!(rec && (rec.status === 'run' || rec.status === 'pause')); }
+  function recPersist(force) {
+    if (!rec || !rec.st) return;
+    var now = Date.now();
+    if (!force && now - recSavedAt < 5000) return;
+    recSavedAt = now;
+    try { P.store.setJSON(REC_KEY, { key: rec.key, st: rec.st }); } catch (e) { /* */ }
+  }
+  function recClear() {
+    if (rec && rec.handle) P.gps.stop(rec.handle);
+    clearInterval(recTimer); recTimer = null;
+    rec = null;
+    P.store.remove(REC_KEY);
+  }
+  function recClock(sec) {
+    sec = Math.max(0, Math.round(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60, p2 = function (n) { return (n < 10 ? '0' : '') + n; };
+    return fa((h ? h + ':' + p2(m) : m) + ':' + p2(s));
+  }
+  function recPace(v) { return v ? fa(paceFmt(v)) : '—'; }
+  function recPoint(p) {
+    if (!rec || !rec.st || rec.status !== 'run') return;
+    // موقعیت دوباره رسید: پیام خطای قبلی برداشته می‌شه
+    if (rec.err) { rec.err = null; if (location.hash === '#record') renderRecord(); }
+    K.add(rec.st, p);
+    recPersist(false);
+  }
+  function recError(code) {
+    if (!rec) return;
+    rec.err = code;
+    // بدون اجازه، ثبت شروع نشده حساب می‌شه
+    if (code === 'denied' && rec.st && rec.st.points === 0) { if (rec.handle) P.gps.stop(rec.handle); rec.handle = null; rec.status = 'idle'; rec.st = null; }
+    if (location.hash === '#record') renderRecord();
+  }
+  function recWatch() {
+    if (rec.handle) return Promise.resolve();
+    return P.gps.start(recPoint, recError, { title: T('rec.notifTitle'), message: T('rec.notif') })
+      .then(function (h) { if (rec) rec.handle = h; }, function () { recError('unavailable'); });
+  }
+  function recTick() {
+    if (!rec || !rec.st) return;
+    var now = Date.now(), st = rec.st, el = function (id) { return document.getElementById(id); };
+    if (!el('rec-time')) return;
+    el('rec-time').textContent = recClock(K.elapsed(st, now) / 1000);
+    el('rec-km').textContent = fa(dKm(Math.floor(st.dist / 10) / 100).toFixed(2));
+    el('rec-avg').textContent = recPace(K.avgPace(st, now));
+    el('rec-cur').textContent = recPace(K.currentPace(st, now));
+    el('rec-signal').textContent = T('rec.signal.' + K.signal(st));
+    el('rec-signal').className = 'rec-signal rec-sig-' + K.signal(st);
+  }
+  function recSession(key) {
+    return loggable(effectiveSession(C.sessionFor(state.profile, C.parseDate(key))).session);
+  }
+  function renderRecord() {
+    var todayKey = C.dateKey(today());
+    if (!rec) rec = { key: todayKey, st: null, status: 'idle', handle: null };
+    var s = recSession(rec.key), st = rec.st, now = Date.now(), u = T('units.word.' + I.getUnits());
+    var target = s.km ? t(s.target) : (s.minutes ? tt('home.minutes', { n: s.minutes }) : '');
+    var html = '<section class="card rec-card"><p class="eyebrow">' + esc(T('rec.title')) + '</p>' +
+      '<h1 class="rec-head">' + badge(s.type, s.label) + (target ? ' <span class="rec-target">' + target + '</span>' : '') + '</h1>';
+    if (!P.gps.supported()) {
+      app.innerHTML = html + '<p class="form-errors" role="alert">' + esc(T('rec.unavailable')) + '</p></section>';
+      return;
+    }
+    if (rec.recovered) html += '<div class="alert alert-note" role="status"><p>' + esc(T('rec.recovered')) + '</p></div>';
+    if (rec.status === 'idle' && rec.key === todayKey && !state.checkins[todayKey]) html += '<p class="small muted">' + esc(T('rec.noCheckin')) + ' <a href="#checkin">' + esc(T('home.startCheckin')) + '</a></p>';
+    html += '<div class="rec-time" id="rec-time" aria-live="off">' + recClock(st ? K.elapsed(st, now) / 1000 : 0) + '</div>' +
+      '<dl class="rec-stats">' +
+      '<div><dt>' + esc(T('rec.dist')) + '</dt><dd><b id="rec-km">' + fa(dKm(st ? Math.floor(st.dist / 10) / 100 : 0).toFixed(2)) + '</b> <small>' + esc(u) + '</small></dd></div>' +
+      '<div><dt>' + esc(T('rec.avg')) + '</dt><dd><b id="rec-avg">' + recPace(st && K.avgPace(st, now)) + '</b></dd></div>' +
+      '<div><dt>' + esc(T('rec.cur')) + '</dt><dd><b id="rec-cur">' + recPace(st && K.currentPace(st, now)) + '</b></dd></div></dl>' +
+      '<p class="rec-signal rec-sig-' + (st ? K.signal(st) : 'wait') + '" id="rec-signal">' + esc(T('rec.signal.' + (st ? K.signal(st) : 'wait'))) + '</p>';
+    if (rec.err) {
+      html += '<p class="form-errors" role="alert">' + esc(T('rec.err.' + rec.err)) + '</p>' +
+        (rec.err === 'denied' && P.gps.canOpenSettings() ? '<button type="button" class="btn btn-outline" data-rec-settings="1">' + esc(T('rec.settings')) + '</button>' : '');
+    }
+    if (rec.status === 'idle') {
+      html += '<div class="rec-actions"><button type="button" class="btn btn-primary btn-block rec-big" data-rec="start">' + esc(T('rec.start')) + '</button></div>' +
+        '<p class="small muted">' + esc(T(P.gps.background() ? 'rec.bgNote' : 'rec.webNote')) + '</p>';
+    } else if (rec.status === 'run' || rec.status === 'pause') {
+      html += '<div class="rec-actions">' + (rec.status === 'run'
+        ? '<button type="button" class="btn btn-outline rec-big" data-rec="pause">' + esc(T('rec.pause')) + '</button>'
+        : '<button type="button" class="btn btn-primary rec-big" data-rec="resume">' + esc(T('rec.resume')) + '</button>') +
+        '<button type="button" class="btn btn-outline rec-big" data-rec="finish">' + esc(T('rec.finish')) + '</button></div>' +
+        (rec.status === 'pause' ? '<p class="small muted">' + esc(T('rec.paused')) + '</p>' : '');
+    } else if (rec.status === 'done') {
+      var sm = K.summary(st, now);
+      html += '<div class="rec-done"><p><b>' + esc(T('rec.doneQ')) + '</b></p>' +
+        (sm.splits.length ? '<p class="small">' + esc(T('rec.splits')) + ' ' + sm.splits.map(function (x) { return '<span dir="ltr">' + fa(C.formatDuration(x)) + '</span>'; }).join(' · ') + '</p>' : '') +
+        (sm.km < 0.05 ? '<p class="form-errors" role="alert">' + esc(T('rec.tooShort')) + '</p>' : '') +
+        '<div class="rec-actions">' + (sm.km >= 0.05 ? '<button type="button" class="btn btn-primary rec-big" data-rec="save">' + esc(T('rec.save')) + '</button>' : '') +
+        '<button type="button" class="btn btn-outline rec-big" data-rec="back">' + esc(T('rec.back')) + '</button></div>' +
+        '<button type="button" class="btn btn-ghost" data-rec="discard">' + esc(T(rec.discardAsk ? 'rec.discardSure' : 'rec.discard')) + '</button></div>';
+    }
+    app.innerHTML = html + '</section>';
+    clearInterval(recTimer);
+    recTimer = rec.status === 'run' ? setInterval(recTick, 1000) : null;
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-rec]');
+    if (e.target.closest && e.target.closest('[data-rec-settings]')) { P.gps.openSettings(); return; }
+    if (!b || !rec) return;
+    var a = b.dataset.rec, now = Date.now();
+    if (a !== 'discard') rec.discardAsk = false;
+    if (a === 'start') { rec.err = null; rec.st = K.create(now); rec.status = 'run'; rec.recovered = false; recPersist(true); recWatch(); }
+    else if (a === 'pause') { K.pause(rec.st, now); rec.status = 'pause'; recPersist(true); }
+    else if (a === 'resume') { K.resume(rec.st, now); rec.status = 'run'; rec.recovered = false; recPersist(true); recWatch(); }
+    else if (a === 'finish') { if (rec.status === 'run') K.pause(rec.st, now); rec.status = 'done'; recPersist(true); }
+    else if (a === 'back') { rec.status = 'pause'; }
+    else if (a === 'discard') {
+      if (!rec.discardAsk) { rec.discardAsk = true; }
+      else { recClear(); showToast(T('rec.discarded')); location.hash = '#home'; return; }
+    } else if (a === 'save') {
+      var sm = K.summary(rec.st, now), key = rec.key;
+      if (!state.done[key]) markDone(key);
+      var log = state.doneLog[key];
+      log.actual = { km: sm.km, sec: sm.sec, start: sm.start };
+      log.src = 'gps';
+      if (sm.splits.length) log.splits = sm.splits; else delete log.splits;
+      recClear();
+      save();
+      showToast(T('rec.saved'));
+      // فرم «بعد از دویدن» (سختی و پیس برای ایزی) روی همون روز
+      postRunOpen = key; selectedDay = key; viewWeekOffset = 0;
+      location.hash = '#plan';
+      setTimeout(function () { var pf = app.querySelector('[data-postrun-form="' + key + '"]'); if (pf) pf.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 50);
+      return;
+    }
+    renderRecord();
+  });
+  // دکمه‌ی «ثبت با GPS» برای جلسه‌ی امروز (خانه و برنامه)
+  function recButton(key, s, cls) {
+    if (!P.gps.supported() || key !== C.dateKey(today()) || state.done[key] || ['rest', 'none', 'cancelled'].indexOf(s.type) >= 0) return '';
+    return '<a class="btn ' + (cls || 'btn-primary') + ' btn-block rec-entry" href="#record">' + esc(T(recLive() ? 'rec.continue' : 'rec.entry')) + '</a>';
+  }
+  // ثبت در حال انجام: یک نوار در خانه
+  function recBanner() {
+    if (!recLive()) return '';
+    var st = rec.st, now = Date.now();
+    return '<a class="card rec-banner" href="#record"><span class="rec-dot" aria-hidden="true"></span><span><b>' + esc(T(rec.status === 'run' ? 'rec.liveRun' : 'rec.livePause')) + '</b> ' +
+      fa(dKm(Math.floor(st.dist / 10) / 100).toFixed(2)) + ' ' + esc(T('units.word.' + I.getUnits())) + T('progress.sep') + recClock(K.elapsed(st, now) / 1000) + '</span></a>';
+  }
+
   // ---------- تمرین‌های Apple Health / Health Connect (فقط اپ نیتیو) ----------
   // state.healthSync: { on, last (ISO), seen: { id تمرین: روز } }. موقع باز شدن اپ و برگشت به اون، ۱۴ روز اخیر خونده می‌شه
   // و هر تمرین مناسب (C.healthMatches) جلسه‌ی همون روز رو «انجام شد» با عدد واقعی می‌زنه.
@@ -730,7 +883,7 @@
     if (e.target.closest && e.target.closest('[data-focus-period]')) pendingFocus = 'period-card';
   }, true);
   // صفحه‌های فرعی: نوار برگشت بالای صفحه (برگشت واقعی تاریخچه، وگرنه تب مادر)
-  var SUB_PAGES = { checkin: '#home', health: '#profile', race: '#profile', plans: '#race', walkgoals: '#profile', progress: '#profile', gait: '#profile', fitness: '#progress', guide: '#learn', settings: '#profile' };
+  var SUB_PAGES = { checkin: '#home', health: '#profile', race: '#profile', plans: '#race', walkgoals: '#profile', progress: '#profile', gait: '#profile', fitness: '#progress', guide: '#learn', settings: '#profile', record: '#home' };
   function backBar(v) {
     var s = navState(), from = s && s.depth > 0 ? s.from : null;
     return '<nav class="back-bar"><a class="learn-back" href="' + SUB_PAGES[v] + '"' + (from ? ' data-nav-back="1"' : '') + '>' +
@@ -739,7 +892,7 @@
   // تب مادر هر صفحه
   var TABS = ['home', 'plan', 'learn', 'profile'];
   var TAB_OF = { home: 'home', checkin: 'home', health: 'profile', race: 'profile', plans: 'profile', walkgoals: 'profile', progress: 'profile', gait: 'profile', plan: 'plan', fitness: 'profile',
-    learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile' };
+    learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile', record: 'home' };
   // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
   var lastView = null, lastTab = null;
   function animateView(v, tab) {
@@ -1679,6 +1832,8 @@
     var pace = C.actualPace(log);
     if (pace) parts.push(tt('post.actPace', { p: paceFmt(pace) }));
     if (log.src === 'health') parts.push('<span class="muted">' + esc(T('sync.from', { name: healthName() })) + '</span>');
+    if (log.src === 'gps') parts.push('<span class="muted">' + esc(T('rec.src')) + '</span>');
+    if (log.splits && log.splits.length) parts.push('<span class="muted">' + esc(T('rec.splits')) + ' ' + log.splits.map(function (x) { return '<span dir="ltr">' + fa(C.formatDuration(x)) + '</span>'; }).join(' · ') + '</span>');
     return '<p class="actual-line"><b>' + esc(T('post.actRecorded')) + '</b> ' + parts.join(T('progress.sep')) + '</p>';
   }
   function postRunBlock(key, s, prefix) {
@@ -1912,6 +2067,7 @@
       '</div>' +
       (d === todayKey && !state.checkins[todayKey] && !state.done[d] && ['rest', 'none'].indexOf(ss.type) < 0 ?
         '<div class="checkin-cta"><p>' + esc(T('today.cta')) + '</p><a class="btn btn-primary" href="#checkin">' + esc(T('home.startCheckin')) + '</a></div>' : '') +
+      (d === todayKey ? recButton(d, ls, 'btn-outline') : '') +
       (rs.adaptation ? adaptationBox(rs.adaptation, d) : '') + cycleBox(rs, d, todayKey, true) +
       (ss.type !== 'cancelled' ? sessionBody(ss, canLog && ls === ss ? { key: d, prefix: 'panel' } : {}) : '') +
       (canLog && ls !== ss ? postRunBlock(d, ls, 'panel') : '') +
@@ -3682,7 +3838,7 @@
     // آمادگی، پیشرفت هفته و نکته‌های فیتنس/قدم‌ها → پیشرفت؛ چرخه → برنامه؛ نصب → پروفایل؛ اهداف و مسیر → مسابقه و اهداف
     void p;
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
-      '<h1>' + esc(T(greetKey())) + '</h1></header>' + homeToday(base, r.session, ci, key, r) + homeChecklist(now);
+      '<h1>' + esc(T(greetKey())) + '</h1></header>' + recBanner() + homeToday(base, r.session, ci, key, r) + homeChecklist(now);
     app.innerHTML = '<div class="home">' + html + '</div>';
     collapseChecklist();
   }
@@ -3720,7 +3876,7 @@
       (main ? '<p class="today-sum">' + t(main) + (wu ? ' <span class="muted">' + t(wu) + '</span>' : '') + '</p>' : '') +
       (base.type === 'none' && state.profile.startDate > key ? '<p class="today-sum">' + esc(T('home.startsOn', { d: faDate(state.profile.startDate) })) + '</p>' : '') +
       (!runDay && !cancelled ? nextSessionLine(key) : '') +
-      btn + '</div>';
+      (runDay && !cancelled ? recButton(key, s) : '') + btn + '</div>';
     return '<section class="card hcard hcard-today hc-' + s.type + '">' + session + (r ? homeSmartSec(r) : '') + homeCheckinSec(base, ci, key, runDay, done) + '</section>';
   }
   // متن وضعیت درد هم‌سطح با پیام مربی (خفیف، متوسط، شدید)، نه یک هشدار ثابت

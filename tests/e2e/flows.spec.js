@@ -272,3 +272,57 @@ test('سلامت (نیتیو ساختگی): اتصال، ثبت خودکار د�
   await page.locator('#set-sync [data-health-off]').click();
   await expect(page.locator('#set-sync [data-health-connect]')).toBeVisible();
 });
+
+// ---------- ۱۲. ثبت دویدن با GPS (مرورگر؛ موقعیت ساختگی Playwright) ----------
+// حرکت به سمت شمال، هر ثانیه ۶ متر؛ وسطش صفحه دوباره بار می‌شه (ثبت ناتموم باید برگرده)، بعد ذخیره
+test('ثبت با GPS: شروع، بازگشت بعد از بستن صفحه، پایان و ذخیره در جلسه‌ی امروز', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'موقعیت ساختگی پیوسته فقط در Chromium مطمئنه');
+  test.setTimeout(120000);
+  const M = 111195;
+  let lat = 35.7;
+  await context.grantPermissions(['geolocation']);
+  await context.setGeolocation({ latitude: lat, longitude: 51.4, accuracy: 5 });
+  async function walk(n) {
+    for (let i = 0; i < n; i++) {
+      await page.waitForTimeout(1000);
+      lat += 6 / M;
+      await context.setGeolocation({ latitude: lat, longitude: 51.4, accuracy: 5 });
+    }
+  }
+  await onboard(page);
+  await page.locator('.hcard-today .rec-entry').click();
+  await expect(page).toHaveURL(/#record/);
+  await page.locator('[data-rec="start"]').click();
+  await walk(8);
+  await expect.poll(async () => Number((await page.locator('#rec-km').innerText()).replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace('٫', '.'))).toBeGreaterThan(0.02);
+  // صفحه بسته و باز شد: ثبت متوقف‌شده برمی‌گرده
+  await page.reload();
+  await expect(page.locator('.rec-card .alert')).toContainText('ناتموم');
+  // در خانه یک نوار ثبت متوقف‌شده هست که به همین صفحه برمی‌گرده
+  await page.evaluate(() => { location.hash = '#home'; });
+  await expect(page.locator('.rec-banner')).toContainText('ثبت متوقف شده');
+  await page.locator('.rec-banner').click();
+  await expect(page).toHaveURL(/#record/);
+  await page.locator('[data-rec="resume"]').click();
+  await walk(8);
+  await page.locator('[data-rec="finish"]').click();
+  await expect(page.locator('[data-rec="save"]')).toBeVisible();
+  await page.locator('[data-rec="save"]').click();
+  await expect(page).toHaveURL(/#plan/);
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('iranrunners-coach-mvp-v1')));
+  const key = Object.keys(st.done)[0];
+  const a = st.doneLog[key].actual;
+  expect(st.doneLog[key].src).toBe('gps');
+  expect(a.km).toBeGreaterThan(0.06);
+  expect(a.km).toBeLessThan(0.14);
+  expect(a.sec).toBeGreaterThan(10);
+  // مختصات ذخیره نمی‌شن و ثبت زنده پاک شده
+  expect(JSON.stringify(st)).not.toContain('35.7');
+  expect(await page.evaluate(() => localStorage.getItem('gaam-run-live'))).toBeNull();
+  // فرم «بعد از دویدن» با عددهای ثبت‌شده باز می‌شه؛ بعد از بستنش خط «ثبت‌شده» با منبع
+  const form = page.locator('[data-postrun-form="' + key + '"]');
+  await expect(form).toBeVisible();
+  await expect(form.locator('input[name=actKm]')).not.toHaveValue('');
+  await page.locator('[data-postrun-cancel]').first().click();
+  await expect(page.locator('.actual-line').first()).toContainText('با GPS گام');
+});

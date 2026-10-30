@@ -1612,6 +1612,43 @@
       from: 'from {name}'
     },
 
+    // GPS run recording
+    rec: {
+      title: 'Record with GPS',
+      entry: 'Record with GPS',
+      continue: 'Continue GPS recording',
+      notifTitle: 'Gaam',
+      notif: 'Recording your run',
+      start: 'Start',
+      pause: 'Pause',
+      resume: 'Resume',
+      finish: 'Finish',
+      paused: 'Paused; time and distance aren\'t counted.',
+      dist: 'Distance',
+      avg: 'Average pace',
+      cur: 'Current pace',
+      signal: { wait: 'Finding GPS…', weak: 'Weak GPS signal', good: 'Good GPS signal' },
+      webNote: 'In the browser, recording continues only while this page is open and the screen is on. The phone app keeps recording with the screen locked.',
+      bgNote: 'Recording continues with the screen locked or the app in the background. Locations aren\'t stored; only distance, time and splits.',
+      noCheckin: 'You haven\'t checked in today yet; better to do it before you start.',
+      recovered: 'A recording was left unfinished (the app was closed). Resume it or finish it.',
+      doneQ: 'Save this run?',
+      splits: 'Each km:',
+      save: 'Save',
+      back: 'Back',
+      discard: 'Discard',
+      discardSure: 'Sure? Tap again to discard',
+      discarded: 'Recording discarded',
+      tooShort: 'The distance is too short to save.',
+      saved: 'Run saved',
+      src: 'with Gaam GPS',
+      liveRun: 'Recording:',
+      livePause: 'Recording paused:',
+      settings: 'Location settings',
+      unavailable: 'This device or browser has no GPS.',
+      err: { denied: 'Location permission wasn\'t granted. Distance can\'t be measured without it.', unavailable: 'Location isn\'t available. Go outside or turn on the phone\'s GPS.' }
+    },
+
     backup: {
       title: 'Backup and transfer',
       hint: 'All your data (profile, plan, check-ins, workouts, health data, running form reports, photo and settings) in one file. Use it to move your data to another phone or browser, or to the next version of the app. The file contains health data; keep it somewhere safe and don\'t send it to anyone.',

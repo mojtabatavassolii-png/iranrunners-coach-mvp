@@ -8,6 +8,9 @@ mkdir -p smoke
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 # اجازه‌ی اعلان از قبل، تا پنجره‌ی اجازه جلوی صفحه رو نگیره
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS || true
+# اجازه‌ی موقعیت برای ثبت دویدن (پنجره‌ی سیستمی این‌جا زده نمی‌شه)
+adb shell pm grant $PKG android.permission.ACCESS_FINE_LOCATION || true
+adb shell pm grant $PKG android.permission.ACCESS_COARSE_LOCATION || true
 adb logcat -c
 adb shell am start -W -n $PKG/.MainActivity
 sleep 10

@@ -43,11 +43,11 @@ async function hash() { return page.evaluate(() => location.hash); }
   await step('اجرای نیتیو و افزونه‌ها', async () => {
     const info = await page.evaluate(() => ({
       native: !!(window.Capacitor && Capacitor.isNativePlatform()), kind: CoachPlatform.kind, origin: location.origin,
-      plugins: ['Preferences', 'LocalNotifications', 'Filesystem', 'Share', 'App', 'Health'].filter((n) => Capacitor.Plugins[n]),
+      plugins: ['Preferences', 'LocalNotifications', 'Filesystem', 'Share', 'App', 'Health', 'BackgroundGeolocation'].filter((n) => Capacitor.Plugins[n]),
       sw: CoachPlatform.sw.supported(), print: CoachPlatform.files.canPrint(), ua: navigator.userAgent
     }));
     must(info.native && info.kind === 'android', 'not native: ' + JSON.stringify(info));
-    must(info.plugins.length === 6, 'plugins: ' + info.plugins.join(','));
+    must(info.plugins.length === 7, 'plugins: ' + info.plugins.join(','));
     must(!info.sw && !info.print, 'sw/print should be off');
     return info.origin + ' · ' + info.plugins.join(', ') + ' · ' + (info.ua.match(/Chrome\/[\d.]+/) || [''])[0];
   });
@@ -109,6 +109,38 @@ async function hash() { return page.evaluate(() => location.hash); }
     must(await page.locator('#set-sync [data-health-connect]').count() === 1, 'no connect button');
     must(a.available, 'not available: ' + JSON.stringify(a));
     return JSON.stringify(a);
+  });
+
+  // ثبت با GPS: موقعیت با «adb emu geo fix» (هر ثانیه ۴ متر به شمال)؛ وسطش اپ به پس‌زمینه می‌ره (دکمه‌ی Home)
+  // و باید هم اعلان سرویس دیده بشه و هم مسافت در پس‌زمینه زیاد بشه
+  await step('GPS: ثبت دویدن، در پس‌زمینه هم، و ذخیره در جلسه‌ی امروز', async () => {
+    const M = 111195;
+    let lat = 35.7;
+    const fix = () => { lat += 4 / M; adb(`emu geo fix 51.4 ${lat.toFixed(7)}`); };
+    const live = () => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('gaam-run-live')).st.dist; } catch (e) { return null; } });
+    adb(`emu geo fix 51.4 ${lat}`);
+    await page.evaluate(() => { location.hash = '#record'; });
+    await page.locator('[data-rec="start"]').click();
+    for (let i = 0; i < 12; i++) { await wait(1000); fix(); }
+    await wait(5500); fix();
+    const fg = await live();
+    adb('shell input keyevent KEYCODE_HOME');
+    await wait(1500);
+    const notif = /app\.gaam\.run/.test(adb('shell dumpsys notification --noredact'));
+    for (let i = 0; i < 15; i++) { await wait(1000); fix(); }
+    adb('shell am start -n app.gaam.run/.MainActivity');
+    await wait(2500);
+    for (let i = 0; i < 6; i++) { await wait(1000); fix(); }
+    const all = await live();
+    must(fg > 20, 'foreground distance ' + fg);
+    must(all - fg > 35, 'background distance ' + fg + ' → ' + all);
+    must(notif, 'no foreground-service notification while in background');
+    await page.locator('[data-rec="finish"]').click();
+    await page.locator('[data-rec="save"]').click();
+    await page.waitForURL(/#plan/);
+    const log = await page.evaluate((k) => { const s = JSON.parse(localStorage.getItem(k)); const d = Object.keys(s.done)[0]; return s.doneLog[d]; }, STORE_KEY);
+    must(log && log.src === 'gps' && log.actual.km > 0.05, JSON.stringify(log));
+    return `پیش‌زمینه ${Math.round(fg)} m · کل ${Math.round(all)} m · ذخیره ${log.actual.km} km در ${log.actual.sec}s · اعلان سرویس: ${notif ? 'بله' : 'نه'}`;
   });
 
   await step('دکمه‌ی برگشت اندروید', async () => {

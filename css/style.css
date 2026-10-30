@@ -1978,3 +1978,27 @@ html.intro.intro-instant #app .login * , html.intro.intro-instant #app .login-la
 html.intro #app .login-import { opacity: 0; }
 .login-import-box { display: grid; gap: 10px; justify-items: center; width: 100%; }
 .login-import-box .actions { justify-content: center; width: 100%; }
+
+/* ثبت دویدن با GPS */
+.rec-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: var(--fs-xl); }
+.rec-target { font-size: var(--fs-lg); color: var(--text-secondary); font-weight: 700; }
+.rec-time { font-size: 4rem; font-weight: 900; line-height: 1.1; text-align: center; margin: var(--sp-5) 0 var(--sp-3); font-variant-numeric: tabular-nums; direction: ltr; }
+.rec-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); margin: 0 0 var(--sp-3); text-align: center; }
+.rec-stats > div { background: var(--surface-elevated); border-radius: 16px; padding: var(--sp-3) var(--sp-2); min-width: 0; }
+.rec-stats dt { font-size: var(--fs-sm); color: var(--text-secondary); }
+.rec-stats dd { margin: var(--sp-1) 0 0; }
+.rec-stats b { font-size: var(--fs-xl); font-weight: 800; font-variant-numeric: tabular-nums; }
+.rec-signal { text-align: center; font-size: var(--fs-sm); color: var(--text-secondary); }
+.rec-sig-good::before, .rec-sig-weak::before, .rec-sig-wait::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 6px; vertical-align: middle; background: var(--text-disabled); }
+.rec-sig-good::before { background: var(--success); }
+.rec-sig-weak::before { background: var(--warning); }
+.rec-actions { display: flex; gap: var(--sp-2); margin: var(--sp-4) 0 var(--sp-2); }
+.rec-actions .btn { flex: 1; }
+.rec-big { min-height: 56px; font-size: var(--fs-lg); }
+.rec-done { border-top: 1px solid var(--border); margin-top: var(--sp-4); padding-top: var(--sp-3); }
+.rec-entry { margin-bottom: var(--sp-2); }
+.rec-banner { display: flex; align-items: center; gap: var(--sp-3); text-decoration: none; color: var(--text); margin-bottom: var(--sp-3); }
+.rec-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--error); flex: none; animation: rec-pulse 1.4s ease-in-out infinite; }
+@keyframes rec-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .rec-dot { animation: none; } }
+@media (max-width: 360px) { .rec-time { font-size: 3.25rem; } .rec-stats b { font-size: var(--fs-lg); } }

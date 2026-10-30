@@ -9,6 +9,7 @@
     "ios": "npm run sync && cap open ios"
   },
   "dependencies": {
+    "@capacitor-community/background-geolocation": "1.2.26",
     "@capacitor/android": "8.5.3",
     "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.5.3",

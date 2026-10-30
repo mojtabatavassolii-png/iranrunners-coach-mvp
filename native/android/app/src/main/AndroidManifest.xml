@@ -28,11 +28,20 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- ثبت دویدن با GPS (@capacitor-community/background-geolocation): سرویس پیش‌زمینه با اعلان، فقط حین ثبت.
+             لازم نیست اپ‌های دیگه این سرویس رو صدا بزنن. -->
+        <service
+            android:name="com.equimaps.capacitor_background_geolocation.BackgroundGeolocationService"
+            android:exported="false"
+            tools:replace="android:exported" />
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- GPS لازمه برای ثبت دویدن، ولی اپ بدون اون هم کار می‌کنه (فیلتر فروشگاه نشه) -->
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" tools:replace="android:required" />
 
     <!-- سلامت (Health Connect): گام فقط تمرین‌ها رو می‌خونه. مسافت و کالری فقط چون افزونه مسافت تمرین رو
          با یک درخواست مشترک از این دو می‌گیره. بقیه‌ی مجوزهایی که افزونه‌ی @capgo/capacitor-health تعریف می‌کنه حذف می‌شن. -->

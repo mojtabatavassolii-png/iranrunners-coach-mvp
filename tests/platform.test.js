@@ -163,6 +163,11 @@ function fakeCap(prefs, opts) {
         { workoutType: 'running', duration: 1805.6, totalDistance: 5023, startDate: '2026-10-26T03:45:00Z', endDate: '2026-10-26T04:15:00Z', sourceName: 'Watch', platformId: 'uuid-1' },
         { workoutType: 'walking', duration: 900, startDate: '2026-10-27T03:45:00Z', endDate: '2026-10-27T04:00:00Z' }] }); },
       openHealthConnectSettings: function () { calls.push('hc-settings'); return ok(); }
+    },
+    BackgroundGeolocation: {
+      addWatcher: function (o, cb) { calls.push('watch:' + o.backgroundMessage); listeners.gps = cb; return ok('w1'); },
+      removeWatcher: function (o) { calls.push('unwatch:' + o.id); return ok(); },
+      openSettings: function () { calls.push('loc-settings'); return ok(); }
     }
   };
   return { isNativePlatform: function () { return true; }, getPlatform: function () { return 'android'; }, Plugins: Plugins, calls: calls, pending: function () { return pending; }, listeners: listeners };
@@ -191,6 +196,19 @@ runs.push(test('سلامت: وب نداره؛ نیتیو فقط خوندن تم�
     assert.ok(c.calls.indexOf('hc-settings') >= 0);
     return load({ capacitor: fakeCap({}, { healthDenied: true }) }).P.health.connect();
   }).then(function (ok) { assert.strictEqual(ok, false); });
+}));
+runs.push(test('GPS: نیتیو با سرویس پس‌زمینه؛ نقطه‌ها و خطای اجازه', function () {
+  var c = fakeCap({}), x = load({ capacitor: c }), pts = [], errs = [];
+  assert.strictEqual(x.P.gps.background(), true);
+  assert.strictEqual(load().P.gps.background(), false);
+  return x.P.gps.start(function (p) { pts.push(p); }, function (e) { errs.push(e); }, { title: 'گام', message: 'در حال ثبت دویدن' }).then(function (h) {
+    assert.ok(c.calls.indexOf('watch:در حال ثبت دویدن') >= 0);
+    c.listeners.gps({ latitude: 35.7, longitude: 51.4, accuracy: 6, time: 1000 });
+    c.listeners.gps(null, { code: 'NOT_AUTHORIZED' });
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(pts)), [{ lat: 35.7, lon: 51.4, acc: 6, t: 1000 }]);
+    assert.deepStrictEqual(errs, ['denied']);
+    return x.P.gps.stop(h);
+  }).then(function () { assert.ok(c.calls.indexOf('unwatch:w1') >= 0); });
 }));
 function tick() { return new Promise(function (r) { setImmediate(r); }); }
 
