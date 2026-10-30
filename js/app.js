@@ -1502,7 +1502,9 @@
   // پیام تطبیق با درد: ساده و محتاط، بدون تشخیص؛ سطح، ناحیه، هشدار ادامه/بدتر شدن و لینک به صفحه‌ی درد و آسیب
   function painBox(ad, inHealth) {
     var t0 = ad.recovering ? 'recovering' : ad.tier, cls = ad.tier === 'severe' ? 'alert-pain' : ad.tier === 'moderate' ? 'alert-adapt' : 'alert-note';
-    var where = ad.area ? T('health.area.' + ad.area) + (ad.where ? ' (' + ad.where + ')' : '') : ad.where;
+    // ثبت‌های قدیمی چک‌این فقط «کجا» دارن (گاهی کد ناحیه مثل knee) و شدت ندارن
+    var area = ad.area || (C.PAIN_AREAS.indexOf(ad.where) >= 0 ? ad.where : null);
+    var where = area ? T('health.area.' + area) + (ad.where && ad.where !== area ? ' (' + ad.where + ')' : '') : ad.where;
     var warn = [];
     if (ad.worse) warn.push(T('health.warn.worse'));
     if (ad.persistent) warn.push(T('health.warn.persistent'));
@@ -1510,7 +1512,7 @@
     if (ad.stale) warn.push(T('health.warn.stale'));
     return '<div class="alert ' + cls + ' pain-box" role="' + (ad.tier === 'severe' ? 'alert' : 'status') + '"><strong>' + esc(T('health.tierTitle.' + t0)) + '</strong>' +
       '<p class="pain-msg">' + esc(ad.message) + '</p>' +
-      (where ? '<p class="small">' + esc(fa(T('health.reported', { w: where, n: ad.level == null ? '—' : ad.level }))) + '</p>' : '') +
+      (where ? '<p class="small">' + esc(fa((ad.level == null ? T('health.reportedNoLevel', { w: where }) : T('health.reported', { w: where, n: ad.level })))) + '</p>' : '') +
       (warn.length ? '<ul class="small pain-warn">' + warn.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') +
       (ad.raceKept ? '<p class="small">' + esc(T('health.raceMild')) + '</p>' : '') +
       (inHealth ? '' : '<p class="small muted">' + esc(T('health.disclaimer')) + '</p><a class="linklike small" href="#health">' + esc(T('health.update')) + '</a>') + '</div>';
@@ -3365,7 +3367,8 @@
   function renderHome() {
     var p = state.profile, now = today(), key = C.dateKey(now);
     var base = C.sessionFor(p, now), ci = state.checkins[key];
-    var r = ci ? effectiveSession(base) : withCycle({ session: base, adaptation: null });
+    // مثل صفحه‌ی برنامه: دوره‌ی درد جاری حتی قبل از چک‌این امروز اعمال می‌شه (بدون چک‌این، تطبیق خستگی چیزی رو عوض نمی‌کنه)
+    var r = effectiveSession(base);
     // خانه: «تمرین امروز» (با پیام تطبیق امروز) و «چک‌این امروز»، و برای کاربر تازه چک‌لیست «شروع کار» زیرش؛ بقیه‌ی کارت‌ها در صفحه‌ی خودشون:
     // آمادگی، پیشرفت هفته و نکته‌های فیتنس/قدم‌ها → پیشرفت؛ چرخه → برنامه؛ نصب → پروفایل؛ اهداف و مسیر → مسابقه و اهداف
     void p;
@@ -3377,7 +3380,7 @@
   // تمرین امروز با تطبیق و چک‌این امروز (برای صفحه‌های دیگه که کارت‌های قبلی خانه رو نشون می‌دن)
   function todayState() {
     var now = today(), key = C.dateKey(now), base = C.sessionFor(state.profile, now), ci = state.checkins[key];
-    return { now: now, key: key, base: base, ci: ci, r: ci ? effectiveSession(base) : withCycle({ session: base, adaptation: null }) };
+    return { now: now, key: key, base: base, ci: ci, r: effectiveSession(base) };
   }
   // کارت اصلی بالای خانه: «تمرین امروز» و زیرش «چک‌این امروز»
   function homeToday(base, s, ci, key, r) {

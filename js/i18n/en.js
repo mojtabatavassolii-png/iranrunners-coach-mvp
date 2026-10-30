@@ -1270,6 +1270,7 @@
       tier: { none: 'No pain', mild: 'Mild', moderate: 'Moderate', severe: 'Severe' },
       tierTitle: { mild: 'Lighter training because of pain', moderate: 'No running today', severe: 'Running paused; see a specialist', recovering: 'Easing back after pain' },
       reported: 'Logged: {w} · pain {n}/10',
+      reportedNoLevel: 'Logged: {w}',
       warn: {
         worse: 'The pain is worse than last time; the plan is now one step more cautious.',
         persistent: 'The pain has continued for several days; the plan is now one step more cautious.',
