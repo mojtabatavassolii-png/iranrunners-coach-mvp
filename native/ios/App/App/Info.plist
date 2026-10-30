@@ -6,6 +6,8 @@
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Gaam reads your running and walking workouts from Apple Health to mark planned sessions as done, with their distance and time. Nothing leaves your device and Gaam never writes to Apple Health.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Gaam uses the camera only when you choose to record a running video for form analysis. The video is analysed on your device and is never uploaded.</string>
 	<key>NSMicrophoneUsageDescription</key>

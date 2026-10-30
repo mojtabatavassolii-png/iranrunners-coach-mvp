@@ -11,6 +11,7 @@
  * نسخه‌ی نیتیو (پایین فایل): Preferences، LocalNotifications، Filesystem و Share، و دکمه‌ی برگشت اندروید با App
  * - notify:  اجازه و نمایش اعلان، زمان‌بندی یادآوری
  * - sw:      سرویس‌ورکر (فقط وب)
+ * - health:  خوندن تمرین‌ها از Apple Health یا Health Connect (فقط نیتیو)
  * باید قبل از i18n.js و app.js بار بشه.
  */
 (function (root) {
@@ -162,6 +163,19 @@
     }
   };
 
+  // ---------- health ----------
+  // تمرین‌های ثبت‌شده در Apple Health (iOS) یا Health Connect (اندروید)، فقط خوندن. در وب وجود نداره.
+  // workouts(from, to) → [{ id, type, start, end, sec, km, source }]؛ type همون نام افزونه‌ست (running، walking، …)
+  var health = {
+    supported: function () { return false; },
+    available: function () { return Promise.resolve({ available: false, reason: 'web' }); },
+    connect: function () { return Promise.resolve(false); },
+    workouts: function () { return Promise.resolve([]); },
+    // تنظیمات اجازه‌ها: اندروید صفحه‌ی Health Connect؛ آیفون API نداره (تنظیمات ← سلامت ← دسترسی داده‌ها)
+    canOpenSettings: function () { return false; },
+    openSettings: function () { return Promise.resolve(); }
+  };
+
   var ready = Promise.resolve();
 
   // ---------- native (Capacitor) ----------
@@ -170,7 +184,7 @@
   if (isNative) {
     var plug = function (name) { return (cap.Plugins || {})[name]; };
     var noop = function () {};
-    var Prefs = plug('Preferences'), LN = plug('LocalNotifications'), FS = plug('Filesystem'), Share = plug('Share'), App = plug('App');
+    var Prefs = plug('Preferences'), LN = plug('LocalNotifications'), FS = plug('Filesystem'), Share = plug('Share'), App = plug('App'), Health = plug('Health');
 
     // ذخیره: localStorage همچنان منبع همگامه و هر نوشتن در Preferences (فایل نیتیو) هم کپی می‌شه.
     // اگه سیستم داده‌ی WebView رو پاک کرده باشه، شروع بعدی از Preferences برمی‌گرده و صفحه یک بار دوباره بار می‌شه.
@@ -253,6 +267,33 @@
     // چاپ در WebView اندروید و iOS کار نمی‌کنه
     files.canPrint = function () { return false; };
 
+    // سلامت (@capgo/capacitor-health). اندروید مسافت تمرین رو با یک درخواست مشترک مسافت و کالری می‌گیره،
+    // پس اون دو هم لازمن؛ آیفون مسافت رو از خود تمرین می‌ده. چیزی نوشته نمی‌شه.
+    if (Health) {
+      var READ = kind === 'android' ? ['workouts', 'distance', 'calories'] : ['workouts'];
+      health.supported = function () { return true; };
+      health.available = function () {
+        return Health.isAvailable().then(function (r) { return { available: !!(r && r.available), reason: r && r.reason }; },
+          function (e) { return { available: false, reason: e && e.message }; });
+      };
+      // true اگه اجازه‌ی تمرین داده شد. آیفون نمی‌گه کاربر اجازه‌ی خوندن داده یا نه (حریم خصوصی)؛ اون‌جا فقط خطا نبودن معنی داره.
+      health.connect = function () {
+        return Health.requestAuthorization({ read: READ, write: [] }).then(function (s) {
+          return kind === 'ios' || ((s && s.readAuthorized) || []).indexOf('workouts') >= 0;
+        });
+      };
+      health.workouts = function (from, to) {
+        return Health.queryWorkouts({ startDate: from.toISOString(), endDate: to.toISOString(), limit: 200, ascending: true }).then(function (r) {
+          return ((r && r.workouts) || []).map(function (w) {
+            return { id: w.platformId || (w.workoutType + '@' + w.startDate), type: w.workoutType, start: w.startDate, end: w.endDate,
+              sec: Math.round(Number(w.duration) || 0), km: w.totalDistance > 0 ? Math.round(w.totalDistance / 10) / 100 : null, source: w.sourceName || '' };
+          });
+        });
+      };
+      health.canOpenSettings = function () { return kind === 'android'; };
+      health.openSettings = function () { return kind === 'android' ? Health.openHealthConnectSettings().catch(noop) : Promise.resolve(); };
+    }
+
     // دکمه‌ی برگشت اندروید: صفحه‌ی قبلی اپ، و در اولین صفحه بستن اپ
     if (App) {
       App.addListener('backButton', function (e) { if (e && e.canGoBack) root.history.back(); else App.exitApp(); });
@@ -261,7 +302,7 @@
 
   root.CoachPlatform = {
     kind: kind, isNative: isNative, isIos: isIos, isStandalone: isStandalone, isTouch: isTouch,
-    store: store, session: session, files: files, notify: notify, sw: sw,
+    store: store, session: session, files: files, notify: notify, sw: sw, health: health,
     // آماده بودن داده‌ها (وب: بلافاصله؛ نیتیو: بعد از هماهنگی با Preferences)
     ready: function () { return ready; }
   };

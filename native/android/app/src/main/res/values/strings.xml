@@ -4,4 +4,6 @@
     <string name="title_activity_main">گام</string>
     <string name="package_name">app.gaam.run</string>
     <string name="custom_url_scheme">app.gaam.run</string>
+    <!-- صفحه‌ی حریم خصوصی که Health Connect در پنجره‌ی اجازه نشون می‌ده -->
+    <string name="health_connect_privacy_policy_url">https://mojtabatavassolii-png.github.io/iranrunners-coach-mvp/privacy.html</string>
 </resources>

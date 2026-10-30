@@ -223,3 +223,52 @@ test('پشتیبان: گرفتن فایل، حذف همه‌چیز و بازگر
   await expect(page.locator('#set-data .backup-err')).toBeVisible();
   await expect(page.locator('#set-data .backup-confirm')).toBeHidden();
 });
+
+// ---------- ۱۱. اتصال به Health Connect (اپ نیتیو با Capacitor ساختگی) ----------
+// افزونه‌های نیتیو در مرورگر نیستن؛ یک Capacitor ساختگی با یک دویدن امروز صبح و یک دوچرخه‌سواری
+test('سلامت (نیتیو ساختگی): اتصال، ثبت خودکار دویدن امروز، برداشتن و ثبت نشدن دوباره', async ({ page }) => {
+  await page.addInitScript(() => {
+    const ok = (v) => Promise.resolve(v), prefs = {}, now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 30);
+    window.__calls = [];
+    window.Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android', Plugins: {
+      Preferences: { keys: () => ok({ keys: Object.keys(prefs) }), get: (o) => ok({ value: prefs[o.key] }), set: (o) => { prefs[o.key] = o.value; return ok(); }, remove: (o) => { delete prefs[o.key]; return ok(); } },
+      Health: {
+        isAvailable: () => ok({ available: true }),
+        requestAuthorization: (o) => { __calls.push('auth'); return ok({ readAuthorized: o.read }); },
+        queryWorkouts: () => { __calls.push('query'); return ok({ workouts: [
+          { workoutType: 'running', duration: 1830, totalDistance: 5120, startDate: start.toISOString(), endDate: new Date(start.getTime() + 1830e3).toISOString(), platformId: 'w1', sourceName: 'Watch' },
+          { workoutType: 'cycling', duration: 3600, totalDistance: 20000, startDate: start.toISOString(), endDate: start.toISOString(), platformId: 'w2' }] }); },
+        openHealthConnectSettings: () => ok()
+      } } };
+  });
+  await onboard(page);
+  await page.evaluate(() => { location.hash = '#profile'; });
+  await expect(page.locator('a.list-row[data-set-open="sync"]')).toContainText('Health Connect');
+  await page.locator('a.list-row[data-set-open="sync"]').click();
+  await expect(page.locator('#set-sync')).toHaveAttribute('open', '');
+  await page.locator('[data-health-connect]').click();
+  await expect(page.locator('.toast').last()).toContainText('۱ تمرین از Health Connect ثبت شد');
+  await expect(page.locator('#set-sync [data-health-sync]')).toBeVisible();
+  await page.locator('#set-sync').scrollIntoViewIfNeeded();
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('iranrunners-coach-mvp-v1')));
+  const key = Object.keys(st.done)[0];
+  expect(Object.keys(st.done).length).toBe(1);
+  expect(st.doneLog[key].actual).toEqual({ sec: 1830, km: 5.12, start: '00:30' });
+  expect(st.doneLog[key].src).toBe('health');
+  // صفحه‌ی امروز: خط «ثبت‌شده» با منبع
+  await page.evaluate(() => { location.hash = '#home'; });
+  await page.locator('.hcard-today').scrollIntoViewIfNeeded();
+  await page.evaluate(() => { location.hash = '#plan'; });
+  await expect(page.locator('.actual-line').first()).toContainText('از Health Connect');
+  // برداشتن «انجام شد» و همگام‌سازی دوباره: همون تمرین برنمی‌گرده
+  await page.locator('[data-done="' + key + '"]').first().click();
+  await page.evaluate(() => { location.hash = '#settings'; });
+  await page.locator('#set-sync [data-health-sync]').click();
+  await expect(page.locator('.toast').last()).toContainText('تمرین تازه‌ای پیدا نشد');
+  const st2 = await page.evaluate(() => JSON.parse(localStorage.getItem('iranrunners-coach-mvp-v1')));
+  expect(st2.done[key]).toBeFalsy();
+  // قطع اتصال
+  await page.locator('#set-sync [data-health-off]').click();
+  await expect(page.locator('#set-sync [data-health-connect]')).toBeVisible();
+});

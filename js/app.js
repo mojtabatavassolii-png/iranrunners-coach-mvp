@@ -567,6 +567,91 @@
 
   // ---------- مسیریابی ----------
   var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, health: renderHealth, settings: renderSettings, plans: renderPlans, walkgoals: renderWalkGoals, progress: renderProgressPage, gait: renderGaitPage, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding };
+  // ---------- تمرین‌های Apple Health / Health Connect (فقط اپ نیتیو) ----------
+  // state.healthSync: { on, last (ISO), seen: { id تمرین: روز } }. موقع باز شدن اپ و برگشت به اون، ۱۴ روز اخیر خونده می‌شه
+  // و هر تمرین مناسب (C.healthMatches) جلسه‌ی همون روز رو «انجام شد» با عدد واقعی می‌زنه.
+  var HEALTH_DAYS = 14, healthBusy = false, healthMsg = '';
+  function healthName() { return P.kind === 'ios' ? 'Apple Health' : 'Health Connect'; }
+  function healthOn() { return P.health.supported() && !!(state.healthSync && state.healthSync.on); }
+  function healthTypeFor(k) {
+    if (!state.profile || k < state.profile.startDate) return 'none';
+    return loggable(effectiveSession(C.sessionFor(state.profile, C.parseDate(k))).session).type;
+  }
+  function hhmm(d) { return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  function healthSync(manual) {
+    if (!healthOn() || !state.profile || healthBusy) return Promise.resolve();
+    healthBusy = true;
+    var hs = state.healthSync, to = new Date(), from = new Date(to.getTime() - HEALTH_DAYS * 864e5);
+    return P.health.workouts(from, to).then(function (ws) {
+      hs.seen = hs.seen || {};
+      var m = C.healthMatches(ws, healthTypeFor, state.done, state.doneLog, hs.seen);
+      m.forEach(function (x) {
+        if (!x.fill) markDone(x.key);
+        var log = state.doneLog[x.key];
+        if (!log) return;
+        log.actual = C.healthActual(x.workout);
+        log.src = 'health';
+        hs.seen[x.workout.id] = x.key;
+      });
+      // فقط تمرین‌های بازه‌ی خوندن لازمن
+      var oldest = C.dateKey(new Date(from.getTime() - 2 * 864e5));
+      Object.keys(hs.seen).forEach(function (id) { if (hs.seen[id] < oldest) delete hs.seen[id]; });
+      hs.last = to.toISOString();
+      save();
+      if (m.length) showToast(fa(T('sync.added', { n: m.length, name: healthName() })));
+      else if (manual) showToast(T('sync.none'));
+      if (m.length || location.hash === '#settings') route();
+    }).catch(function (e) {
+      if (manual) showToast(T('sync.err'));
+      if (window.console) console.warn('health sync', e);
+    }).then(function () { healthBusy = false; });
+  }
+  function healthConnect() {
+    healthMsg = '';
+    return P.health.available().then(function (a) {
+      if (!a.available) { healthMsg = 'notAvail'; return; }
+      return P.health.connect().then(function (ok) {
+        if (!ok) { healthMsg = 'denied'; return; }
+        state.healthSync = { on: true, last: null, seen: (state.healthSync && state.healthSync.seen) || {} };
+        save();
+        return healthSync(true);
+      });
+    }).catch(function () { healthMsg = 'err'; }).then(function () { openSettings.sync = true; route(); });
+  }
+  function healthSection() {
+    var hs = state.healthSync || {}, on = healthOn(), nm = { name: healthName() };
+    var body = '<p class="small">' + esc(T('sync.intro', nm)) + '</p><p class="small muted">' + esc(T('sync.rules')) + '</p>';
+    if (healthMsg) body += '<p class="form-errors" role="alert">' + esc(T('sync.' + healthMsg, nm)) + '</p>';
+    if (on) {
+      var last = hs.last ? new Date(hs.last) : null;
+      body += '<p class="small"><b>' + esc(last ? fa(T('sync.last', { t: I.date(last, true) + ' ' + hhmm(last) })) : T('sync.never')) + '</b></p>' +
+        '<div class="actions"><button type="button" class="btn btn-primary" data-health-sync="1">' + esc(T('sync.now')) + '</button>' +
+        (P.health.canOpenSettings() ? '<button type="button" class="btn btn-outline" data-health-settings="1">' + esc(T('sync.settings')) + '</button>' : '') +
+        '<button type="button" class="btn btn-ghost" data-health-off="1">' + esc(T('sync.off')) + '</button></div>' +
+        (P.kind === 'ios' ? '<p class="small muted">' + esc(T('sync.iosNote')) + '</p>' : '');
+    } else {
+      body += '<div class="actions"><button type="button" class="btn btn-primary" data-health-connect="1">' + esc(T('sync.connect', nm)) + '</button></div>';
+    }
+    return setSection('sync', 'watch', T('sync.title', nm), esc(T(on ? 'sync.subOn' : 'sync.subOff')), body);
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return;
+    if (e.target.closest('[data-health-connect]')) { healthConnect(); return; }
+    if (e.target.closest('[data-health-sync]')) { healthSync(true); return; }
+    if (e.target.closest('[data-health-settings]')) { P.health.openSettings(); return; }
+    if (e.target.closest('[data-health-off]')) {
+      if (state.healthSync) state.healthSync.on = false;
+      save();
+      healthMsg = '';
+      showToast(T('sync.offDone', { name: healthName() }));
+      openSettings.sync = true;
+      route();
+    }
+  });
+  // اپ باز شد یا به اون برگشتیم
+  setTimeout(function () { healthSync(false); }, 2000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) healthSync(false); });
+
   function route() {
     var loginMode = !isEntered();
     document.body.classList.toggle('login-mode', loginMode);
@@ -1593,6 +1678,7 @@
     if (a.sec > 0) parts.push('<span dir="ltr">' + fa(C.formatDuration(a.sec)) + '</span>');
     var pace = C.actualPace(log);
     if (pace) parts.push(tt('post.actPace', { p: paceFmt(pace) }));
+    if (log.src === 'health') parts.push('<span class="muted">' + esc(T('sync.from', { name: healthName() })) + '</span>');
     return '<p class="actual-line"><b>' + esc(T('post.actRecorded')) + '</b> ' + parts.join(T('progress.sep')) + '</p>';
   }
   function postRunBlock(key, s, prefix) {
@@ -1817,13 +1903,14 @@
 
   // جزئیات کامل یک روز (مشترک بین نمای هفتگی و ماهانه)
   function dayPanel(rs, todayKey, labelledBy) {
-    var ss = rs.session, d = ss.date, ls = loggable(ss), canLog = d < todayKey || (d === todayKey && state.checkins[todayKey]);
+    // امروز بعد از چک‌این قابل ثبته، یا اگه قبلاً «انجام شد» خورده (مثلاً خودکار از Apple Health / Health Connect)
+    var ss = rs.session, d = ss.date, ls = loggable(ss), canLog = d < todayKey || (d === todayKey && !!(state.checkins[todayKey] || state.done[d]));
     return '<div class="day-panel" id="day-panel" role="tabpanel"' + (labelledBy ? ' aria-labelledby="' + labelledBy + '"' : '') + '>' +
       '<div class="day-panel-head"><div><p class="eyebrow">' + esc(ss.dayName) + ' ' + esc(faDate(d)) +
       (d === todayKey ? esc(T('week.todaySuffix')) : '') + '</p><h3>' + badge(ss.type, ss.label) + '</h3></div>' +
-      (d <= todayKey && ['rest', 'none', 'cancelled'].indexOf(ls.type) < 0 && (d < todayKey || state.checkins[todayKey]) ? doneButton(d, ls) : '') +
+      (d <= todayKey && ['rest', 'none', 'cancelled'].indexOf(ls.type) < 0 && canLog ? doneButton(d, ls) : '') +
       '</div>' +
-      (d === todayKey && !state.checkins[todayKey] && ['rest', 'none'].indexOf(ss.type) < 0 ?
+      (d === todayKey && !state.checkins[todayKey] && !state.done[d] && ['rest', 'none'].indexOf(ss.type) < 0 ?
         '<div class="checkin-cta"><p>' + esc(T('today.cta')) + '</p><a class="btn btn-primary" href="#checkin">' + esc(T('home.startCheckin')) + '</a></div>' : '') +
       (rs.adaptation ? adaptationBox(rs.adaptation, d) : '') + cycleBox(rs, d, todayKey, true) +
       (ss.type !== 'cancelled' ? sessionBody(ss, canLog && ls === ss ? { key: d, prefix: 'panel' } : {}) : '') +
@@ -5104,6 +5191,7 @@
         ['#settings', 'person', T('settingsPage.person'), T('settingsPage.personSub', { age: p.age, n: lv.level }), 'person'],
         // اپ نیتیو نصب لازم نداره
         P.isNative ? null : ['#settings', 'install', T('install.title'), T('install.short.' + installMode()), 'install'],
+        P.health.supported() ? ['#settings', 'watch', T('sync.title', { name: healthName() }), T(healthOn() ? 'sync.subOn' : 'sync.subOff'), 'sync'] : null,
         ['#settings', 'data', T('settingsPage.data'), T('profile.statsVal', { c: Object.keys(state.checkins).length, d: Object.keys(state.done).length }), 'data'],
         // صفحه‌ی عمومی حریم خصوصی و پشتیبانی (همون لینکی که در فروشگاه‌های اپ ثبت می‌شه)
         ['privacy.html' + (I.getLang() === 'en' ? '?lang=en' : ''), 'shield', T('profile.privacy'), T('profile.privacySub')]
@@ -5298,7 +5386,9 @@
       row('start', esc(faDate(p.startDate))) +
       row('stats', tt('profile.statsVal', { c: nCheck, d: nDone })) +
         '</dl>' + '<div class="level-strip">' + levelCard(lv, true) + '</div>' + warningsCard(C.profileWarnings(p, today()))) +
-      // ۵. داده‌ها
+      // ۵. سلامت (فقط اپ نیتیو)
+      (P.health.supported() ? healthSection() : '') +
+      // ۶. داده‌ها
       setSection('data', 'data', T('settingsPage.data'), tt('profile.statsVal', { c: nCheck, d: nDone }),
         '<div class="actions">' +
         '<button type="button" class="btn btn-outline" id="restart">' + esc(T('profile.restart')) + '</button>' +

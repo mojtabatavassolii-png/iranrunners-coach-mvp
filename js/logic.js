@@ -3048,6 +3048,46 @@
     return { from: fit.vdot, to: to, weeks: weeks, entry: { date: dateKey(today), distanceKm: 5, timeSec: Math.round(raceTimeFromVdot(to, 5)), kind: 'step' } };
   }
 
+  // ---------- تمرین‌های Apple Health / Health Connect → «انجام شد» ----------
+  // نوع تمرین ساعت/گوشی که برای هر جلسه حساب می‌شه: جلسه‌ی دویدن ← دویدن (بیرون، تردمیل، پیست)؛
+  // پیاده‌روی ← پیاده‌روی، کوه‌پیمایی یا دویدن؛ دویدن-پیاده‌روی (سطح ۰) ← هر دو.
+  var HEALTH_RUN = ['running', 'runningTreadmill', 'trackAndField'];
+  var HEALTH_WALK = ['walking', 'hiking'];
+  var HEALTH_MIN_SEC = 600; // زیر ۱۰ دقیقه (مثلاً گرم کردن جدا ثبت‌شده) حساب نمی‌شه
+  function healthFits(sessionType, workoutType) {
+    if (!sessionType || ['rest', 'none', 'cancelled'].indexOf(sessionType) >= 0) return false;
+    var run = HEALTH_RUN.indexOf(workoutType) >= 0, walk = HEALTH_WALK.indexOf(workoutType) >= 0;
+    if (WALK_TYPES.indexOf(sessionType) >= 0 || sessionType === 'walkrun' || sessionType === 'runwalk') return run || walk;
+    return run;
+  }
+  // workouts: [{ id, type, start (ISO), sec, km }]؛ typeFor(dateKey) → نوع جلسه‌ی همون روز؛
+  // done / logs: state.done و state.doneLog؛ seen: { id: dateKey } تمرین‌هایی که قبلاً استفاده شدن.
+  // خروجی: [{ key, workout, fill }] — fill یعنی روز قبلاً «انجام شد» خورده و فقط عدد واقعی نداره.
+  // در هر روز فقط طولانی‌ترین تمرین مناسب (یک دویدن ممکنه از ساعت و گوشی دو بار ثبت شده باشه؛ جمع زدن دوبله می‌کرد).
+  // تمرینی که قبلاً دیده شده دوباره ثبت نمی‌شه، حتی اگه کاربر «انجام شد» رو برداشته باشه.
+  function healthMatches(workouts, typeFor, done, logs, seen) {
+    done = done || {}; logs = logs || {}; seen = seen || {};
+    var best = {};
+    (workouts || []).forEach(function (w) {
+      if (!w || !w.start || seen[w.id] || !(w.sec >= HEALTH_MIN_SEC)) return;
+      var key = dateKey(new Date(w.start));
+      if (!healthFits(typeFor(key), w.type)) return;
+      if (!best[key] || w.sec > best[key].sec) best[key] = w;
+    });
+    return Object.keys(best).sort().map(function (key) {
+      var log = logs[key];
+      if (done[key]) return log && !log.actual ? { key: key, workout: best[key], fill: true } : null;
+      return { key: key, workout: best[key], fill: false };
+    }).filter(Boolean);
+  }
+  // عدد واقعی جلسه از تمرین (همون شکل فرم «ثبت عدد واقعی»): km، sec و ساعت شروع HH:MM به وقت محلی
+  function healthActual(w) {
+    var d = new Date(w.start), a = { sec: Math.round(w.sec) };
+    if (w.km > 0) a.km = Math.round(w.km * 100) / 100;
+    a.start = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    return a;
+  }
+
   var api = {
     LEVELS: LEVELS, EXPERIENCE: EXPERIENCE, TIER_INFO: TIER_INFO, PERIOD_LABELS: PERIOD_LABELS,
     RACE_DISTANCES: RACE_DISTANCES, RACE_LABELS: RACE_LABELS,
@@ -3078,7 +3118,8 @@
     planSuggestion: planSuggestion, goalPath: goalPath,
     isWalk: isWalk, walkGoalInfo: walkGoalInfo, walkPath: walkPath, walkLevelSuggestion: walkLevelSuggestion, walkWeeksTo: walkWeeksTo, WALK_GOALS: WALK_GOALS, WALK_EVENT_KM: WALK_EVENT_KM, daySteps: daySteps, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
     PACE_LEVEL: PACE_LEVEL, PLAN_NEEDS: PLAN_NEEDS, vdotStepWeeks: vdotStepWeeks,
-    analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS
+    analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS,
+    healthFits: healthFits, healthMatches: healthMatches, healthActual: healthActual, HEALTH_MIN_SEC: HEALTH_MIN_SEC
   };
   // متن‌هایی که به زبان فعلی بستگی دارن، موقع خوندن ترجمه می‌شن
   Object.defineProperty(api, 'DAY_NAMES', { enumerable: true, get: dayNames });

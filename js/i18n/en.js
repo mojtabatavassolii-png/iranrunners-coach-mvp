@@ -1589,6 +1589,29 @@
     },
 
     // ---------- Bottom navigation and home page ----------
+    // Apple Health / Health Connect ({name}); native app only
+    sync: {
+      title: 'Connect {name}',
+      subOn: 'Connected; watch and phone workouts are logged automatically',
+      subOff: 'Mark sessions done from your watch or phone',
+      intro: 'Runs and walks your watch or phone recorded in {name} mark that day\'s planned session as done, with the real distance, time and start time. Gaam only reads workouts, never writes to {name}, and no data leaves your phone.',
+      rules: 'Only workouts of 10 minutes or more, only on days with a session, and only the last 14 days. If you untick “done”, that workout isn\'t logged again.',
+      connect: 'Connect {name}',
+      now: 'Sync now',
+      off: 'Disconnect',
+      settings: 'Manage permissions',
+      last: 'Last sync: {t}',
+      never: 'Not synced yet',
+      iosNote: 'Permissions are in iPhone Settings → Health → Data Access & Devices → Gaam. Without permission, no workouts are found.',
+      offDone: 'Disconnected. To fully revoke access, use the {name} settings.',
+      notAvail: '{name} isn\'t available on this phone. On Android 13 and older, install the Health Connect app from Google Play.',
+      denied: 'Permission to read workouts wasn\'t granted.',
+      err: 'Sync failed. Try again.',
+      added: { one: '{n} workout logged from {name}', other: '{n} workouts logged from {name}' },
+      none: 'No new workouts found',
+      from: 'from {name}'
+    },
+
     backup: {
       title: 'Backup and transfer',
       hint: 'All your data (profile, plan, check-ins, workouts, health data, running form reports, photo and settings) in one file. Use it to move your data to another phone or browser, or to the next version of the app. The file contains health data; keep it somewhere safe and don\'t send it to anyone.',

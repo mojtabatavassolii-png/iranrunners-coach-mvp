@@ -1626,4 +1626,35 @@ test('سطح پیاده‌روی: یک توضیح با نتیجه‌ی نهای�
   assert.strictEqual(a.notes.length, 1);
   assert.ok(a.notes[0].indexOf('از سطح ' + a.level) >= 0, a.notes[0]);
 });
+test('سلامت: نوع تمرین ساعت برای هر جلسه', function () {
+  assert.ok(C.healthFits('easy', 'running'));
+  assert.ok(C.healthFits('long', 'runningTreadmill'));
+  assert.ok(!C.healthFits('easy', 'walking'));
+  assert.ok(!C.healthFits('easy', 'cycling'));
+  assert.ok(C.healthFits('walkBrisk', 'walking') && C.healthFits('walkLong', 'hiking') && C.healthFits('walkEasy', 'running'));
+  assert.ok(C.healthFits('walkrun', 'walking') && C.healthFits('walkrun', 'running'));
+  assert.ok(!C.healthFits('rest', 'running') && !C.healthFits('none', 'running') && !C.healthFits('cancelled', 'running'));
+});
+test('سلامت: انتخاب تمرین برای روزهای برنامه', function () {
+  var types = { '2026-10-26': 'easy', '2026-10-27': 'rest', '2026-10-28': 'tempo', '2026-10-29': 'long', '2026-10-30': 'easy' };
+  var typeFor = function (k) { return types[k] || 'none'; };
+  var at = function (k, h) { var p = k.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2], h, 15).toISOString(); };
+  var W = [
+    { id: 'a', type: 'running', start: at('2026-10-26', 7), sec: 1800, km: 5.02 },
+    { id: 'a2', type: 'running', start: at('2026-10-26', 7), sec: 1790, km: 5 },      // همون دویدن از منبع دوم
+    { id: 'b', type: 'running', start: at('2026-10-27', 7), sec: 1800, km: 5 },        // روز استراحت
+    { id: 'c', type: 'running', start: at('2026-10-28', 18), sec: 300, km: 1 },        // کوتاه‌تر از ۱۰ دقیقه
+    { id: 'd', type: 'cycling', start: at('2026-10-28', 19), sec: 3600, km: 20 },      // نوع دیگه
+    { id: 'e', type: 'running', start: at('2026-10-29', 6), sec: 5400, km: 15.5 },     // روز قبلاً «انجام شد» بدون عدد
+    { id: 'f', type: 'running', start: at('2026-10-30', 6), sec: 2400, km: 6 }         // کاربر قبلاً برش داشته
+  ];
+  var r = C.healthMatches(W, typeFor, { '2026-10-29': true }, { '2026-10-29': { type: 'long', km: 16 } }, { f: '2026-10-30' });
+  assert.deepStrictEqual(r.map(function (x) { return x.key + ':' + x.workout.id + ':' + x.fill; }), ['2026-10-26:a:false', '2026-10-29:e:true']);
+  // روز انجام‌شده با عدد واقعی دست نمی‌خوره
+  var r2 = C.healthMatches(W, typeFor, { '2026-10-29': true }, { '2026-10-29': { type: 'long', actual: { km: 15 } } }, {});
+  assert.deepStrictEqual(r2.map(function (x) { return x.key; }), ['2026-10-26', '2026-10-30']);
+  var a = C.healthActual(W[0]);
+  assert.deepStrictEqual(a, { sec: 1800, km: 5.02, start: '07:15' });
+  assert.deepStrictEqual(C.healthActual({ start: at('2026-10-26', 9), sec: 1200.4, km: null }), { sec: 1200, start: '09:15' });
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

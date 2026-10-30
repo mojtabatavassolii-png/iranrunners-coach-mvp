@@ -43,11 +43,11 @@ async function hash() { return page.evaluate(() => location.hash); }
   await step('اجرای نیتیو و افزونه‌ها', async () => {
     const info = await page.evaluate(() => ({
       native: !!(window.Capacitor && Capacitor.isNativePlatform()), kind: CoachPlatform.kind, origin: location.origin,
-      plugins: ['Preferences', 'LocalNotifications', 'Filesystem', 'Share', 'App'].filter((n) => Capacitor.Plugins[n]),
+      plugins: ['Preferences', 'LocalNotifications', 'Filesystem', 'Share', 'App', 'Health'].filter((n) => Capacitor.Plugins[n]),
       sw: CoachPlatform.sw.supported(), print: CoachPlatform.files.canPrint(), ua: navigator.userAgent
     }));
     must(info.native && info.kind === 'android', 'not native: ' + JSON.stringify(info));
-    must(info.plugins.length === 5, 'plugins: ' + info.plugins.join(','));
+    must(info.plugins.length === 6, 'plugins: ' + info.plugins.join(','));
     must(!info.sw && !info.print, 'sw/print should be off');
     return info.origin + ' · ' + info.plugins.join(', ') + ' · ' + (info.ua.match(/Chrome\/[\d.]+/) || [''])[0];
   });
@@ -99,6 +99,16 @@ async function hash() { return page.evaluate(() => location.hash); }
     });
     must(r.perm === 'granted' && r.n >= 1 && r.after === 0, JSON.stringify(r));
     return JSON.stringify(r);
+  });
+
+  // اجازه‌ی Health Connect پنجره‌ی سیستمی داره و این‌جا زده نمی‌شه؛ در دسترس بودن و نمایش بخش تنظیمات بررسی می‌شه
+  await step('Health Connect: در دسترس و بخش اتصال در تنظیمات', async () => {
+    const a = await page.evaluate(() => CoachPlatform.health.available());
+    await page.evaluate(() => { location.hash = '#settings'; });
+    await page.locator('#set-sync').waitFor();
+    must(await page.locator('#set-sync [data-health-connect]').count() === 1, 'no connect button');
+    must(a.available, 'not available: ' + JSON.stringify(a));
+    return JSON.stringify(a);
   });
 
   await step('دکمه‌ی برگشت اندروید', async () => {

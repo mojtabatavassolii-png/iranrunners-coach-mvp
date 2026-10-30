@@ -155,10 +155,43 @@ function fakeCap(prefs, opts) {
     },
     Filesystem: { writeFile: function (o) { calls.push('write:' + o.directory + ':' + o.path + ':' + o.data); return ok({ uri: 'file:///cache/' + o.path }); } },
     Share: { share: function (o) { calls.push('share:' + o.files[0]); return opts.shareCancel ? Promise.reject(new Error('Share canceled')) : ok(); } },
-    App: { addListener: function (n, fn) { listeners[n] = fn; }, exitApp: function () { calls.push('exit'); } }
+    App: { addListener: function (n, fn) { listeners[n] = fn; }, exitApp: function () { calls.push('exit'); } },
+    Health: {
+      isAvailable: function () { return ok({ available: true, platform: 'android' }); },
+      requestAuthorization: function (o) { calls.push('auth:' + o.read.join(',') + '|' + o.write.length); return ok({ readAuthorized: opts.healthDenied ? [] : o.read, readDenied: [] }); },
+      queryWorkouts: function (o) { calls.push('query:' + o.startDate.slice(0, 10) + '>' + o.endDate.slice(0, 10)); return ok({ workouts: [
+        { workoutType: 'running', duration: 1805.6, totalDistance: 5023, startDate: '2026-10-26T03:45:00Z', endDate: '2026-10-26T04:15:00Z', sourceName: 'Watch', platformId: 'uuid-1' },
+        { workoutType: 'walking', duration: 900, startDate: '2026-10-27T03:45:00Z', endDate: '2026-10-27T04:00:00Z' }] }); },
+      openHealthConnectSettings: function () { calls.push('hc-settings'); return ok(); }
+    }
   };
   return { isNativePlatform: function () { return true; }, getPlatform: function () { return 'android'; }, Plugins: Plugins, calls: calls, pending: function () { return pending; }, listeners: listeners };
 }
+runs.push(test('سلامت: وب نداره؛ نیتیو فقط خوندن تمرین، با مسافت به کیلومتر', function () {
+  var w = load().P;
+  assert.strictEqual(w.health.supported(), false);
+  var c = fakeCap({}), x = load({ capacitor: c });
+  assert.strictEqual(x.P.health.supported(), true);
+  return x.P.health.available().then(function (a) {
+    assert.strictEqual(a.available, true);
+    return x.P.health.connect();
+  }).then(function (ok) {
+    assert.strictEqual(ok, true);
+    // اندروید: مسافت و کالری فقط برای مسافت تمرین؛ هیچ نوشتنی
+    assert.ok(c.calls.indexOf('auth:workouts,distance,calories|0') >= 0);
+    return x.P.health.workouts(new Date('2026-10-20T00:00:00Z'), new Date('2026-10-30T00:00:00Z'));
+  }).then(function (ws) {
+    // آبجکت از context دیگه‌ی vm میاد؛ مقایسه با JSON
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(ws[0])), { id: 'uuid-1', type: 'running', start: '2026-10-26T03:45:00Z', end: '2026-10-26T04:15:00Z', sec: 1806, km: 5.02, source: 'Watch' });
+    assert.strictEqual(ws[1].id, 'walking@2026-10-27T03:45:00Z');
+    assert.strictEqual(ws[1].km, null);
+    assert.strictEqual(x.P.health.canOpenSettings(), true);
+    return x.P.health.openSettings();
+  }).then(function () {
+    assert.ok(c.calls.indexOf('hc-settings') >= 0);
+    return load({ capacitor: fakeCap({}, { healthDenied: true }) }).P.health.connect();
+  }).then(function (ok) { assert.strictEqual(ok, false); });
+}));
 function tick() { return new Promise(function (r) { setImmediate(r); }); }
 
 runs.push(test('نیتیو: نوشتن‌ها در Preferences هم کپی می‌شن؛ اگه داده‌ی WebView پاک شده باشه برمی‌گرده و یک بار reload', function () {
