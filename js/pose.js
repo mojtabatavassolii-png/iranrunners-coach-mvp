@@ -2,13 +2,13 @@
  * استخراج نقاط کلیدی بدن از ویدیو با MediaPipe Pose، کاملاً داخل مرورگر.
  * کتابخانه (js/vendor/mediapipe) و مدل (models/) از خود اپ بارگذاری می‌شن و فقط وقتی کاربر تحلیل رو شروع کنه؛
  * ویدیو هیچ‌وقت از دستگاه خارج نمی‌شه (CSP در index.html هم هر اتصال بیرونی رو می‌بنده).
- * خروجی: { w, h, duration, frames: [{ t, lm: [[x, y, visibility] × ۳۳] | null }] } برای js/gait.js
+ * خروجی: { w, h, duration, full, input: { w, h }, frames: [{ t, lm: [[x, y, visibility, z] × ۳۳] | null }] } برای js/gait.js
  */
 (function (root) {
   'use strict';
   var BASE = 'js/vendor/mediapipe/', MODEL = 'models/pose_landmarker_full.task';
   // نمونه‌برداری ثابت ۳۰ فریم در ثانیه (حداکثر ۱۲ ثانیه)
-  var MAX_SEC = 12, STEP = 1 / 30;
+  var MAX_SEC = 20, STEP = 1 / 30;
   var landmarker = null, loading = null, clock = 0;
 
   function abs(p) { return new URL(p, document.baseURI).href; }
@@ -88,18 +88,24 @@
       });
     }).then(function (l) { landmarker = l; return l; });
   }
-  // هر فریم (با نرخ فیلم تا ۶۰ در ثانیه، حداکثر ۱۲ ثانیه): جابه‌جایی روی ویدیو، کشیدن روی بوم و تشخیص بدن
-  function processVideo(file, onProgress) {
+  // بازه‌ی تحلیل به ثانیه‌ی واقعی (نه ثانیه‌ی فیلم): حدود ۱۰ ثانیه دویدن واقعی (بیش از ۲۰ گام)؛
+  // فیلم اسلوموشن ×k یعنی k برابر ثانیه‌ی فیلم، با سقف ۴۰ ثانیه‌ی فیلم (زمان پردازش روی گوشی)
+  var REAL_SEC = 10, MAX_SRC = 40, MAX_SIDE = 1280;
+  function windowSec(scale) { return scale > 1 ? Math.min(MAX_SRC, REAL_SEC * scale) : MAX_SEC; }
+  // هر فریم (هر ۱/۳۰ ثانیه‌ی فیلم): جابه‌جایی روی ویدیو، کشیدن روی بوم و تشخیص بدن
+  // opts: { timeScale: ضریب اسلوموشن (برای طول بازه)، from: ادامه از این ثانیه‌ی فیلم (اضافه کردن به فریم‌های قبلی) }
+  function processVideo(file, onProgress, opts) {
+    opts = opts || {};
     var lmk, v, cv, g, retried = false;
     return load().then(function (l) { lmk = l; return openVideo(file); }).then(function (video) {
       v = video;
-      var dur = Math.min(v.duration || 0, MAX_SEC);
+      var dur = Math.min(v.duration || 0, windowSec(opts.timeScale));
       if (!(dur > 0.5)) throw fail('short');
-      // اندازه‌ی کار: ضلع بزرگ حداکثر ۹۶۰px (دقت کافی، سرعت بیشتر)
-      var sc = Math.min(1, 960 / Math.max(v.videoWidth, v.videoHeight));
+      // اندازه‌ی ورودی MediaPipe: ضلع بزرگ حداکثر ۱۲۸۰px (پا و مچ در تصویر بزرگ‌تر، زاویه‌ها دقیق‌تر)
+      var sc = Math.min(1, MAX_SIDE / Math.max(v.videoWidth, v.videoHeight));
       cv = document.createElement('canvas'); cv.width = Math.round(v.videoWidth * sc); cv.height = Math.round(v.videoHeight * sc);
       g = cv.getContext('2d');
-      var n = Math.floor(dur / STEP), frames = [], i = 0;
+      var n = Math.floor(dur / STEP), frames = [], i = opts.from > 0 ? Math.ceil(opts.from / STEP - 1e-6) : 0, i0 = i;
       function detect() {
         clock += 34; // زمان‌های ارسالی به MediaPipe باید همیشه صعودی باشن (بین دو ویدیو هم)
         try { return Promise.resolve(lmk.detectForVideo(cv, clock)); } catch (e) {
@@ -110,16 +116,18 @@
         }
       }
       function next() {
-        if (i >= n) return { w: v.videoWidth, h: v.videoHeight, duration: dur, frames: frames, video: v };
+        // full: کل فیلم پردازش شد (برای پیشنهاد ادامه‌ی تحلیل بعد از تعیین ضریب اسلوموشن)
+        if (i >= n) return { w: v.videoWidth, h: v.videoHeight, duration: dur, full: dur >= (v.duration || 0) - STEP, frames: frames, video: v, input: { w: cv.width, h: cv.height } };
         var t = i * STEP + 0.001;
         return seek(v, t).then(function () {
           g.drawImage(v, 0, 0, cv.width, cv.height);
           return detect();
         }).then(function (r) {
           var p = r && r.landmarks && r.landmarks[0];
-          frames.push({ t: t, lm: p ? p.map(function (q) { return [q.x, q.y, q.visibility == null ? 1 : q.visibility]; }) : null });
+          // چهارمین عدد: عمق تخمینی MediaPipe (فقط برای تحلیل؛ پخش‌کننده فقط سه عدد اول رو می‌خونه)
+          frames.push({ t: t, lm: p ? p.map(function (q) { return [q.x, q.y, q.visibility == null ? 1 : q.visibility, q.z == null ? 0 : Math.round(q.z * 1e4) / 1e4]; }) : null });
           i++;
-          if (onProgress && i % 3 === 0) onProgress(i / n);
+          if (onProgress && (i - i0) % 3 === 0) onProgress((i - i0) / Math.max(1, n - i0));
           return next();
         });
       }
@@ -325,5 +333,5 @@
       record: record, draw: draw, debug: debug, destroy: destroy };
   }
 
-  root.CoachPose = { load: load, unload: unload, processVideo: processVideo, openVideo: openVideo, keyImage: keyImage, release: release, player: player, MAX_SEC: MAX_SEC };
+  root.CoachPose = { load: load, unload: unload, processVideo: processVideo, openVideo: openVideo, keyImage: keyImage, release: release, player: player, MAX_SEC: MAX_SEC, windowSec: windowSec };
 })(this);

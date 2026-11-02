@@ -15,7 +15,8 @@ function near(a, b, tol, what) { assert.ok(a != null && Math.abs(a - b) <= tol, 
 // ---------- دونده‌ی مصنوعی از کنار ----------
 // o: cadence، ic (فاصله‌ی مچ پا جلوتر از لگن در برخورد ÷ طول پا)، fsa (زاویه‌ی پا در برخورد)، elbow، neck، gaze، trunk، amp (نوسان لگن به px)، dir
 function sideRunner(o) {
-  o = Object.assign({ cadence: 175, ic: 0.12, fsa: 4, elbow: 90, neck: 10, gaze: 8, trunk: 7, amp: 14, dir: 1, fps: 30, dur: 10, asym: 0 }, o);
+  // icL: فاصله‌ی فرود پای چپ (دور از دوربین) اگه با راست فرق داره؛ arm: دامنه‌ی تاب دست (درجه)
+  o = Object.assign({ cadence: 175, ic: 0.12, fsa: 4, elbow: 90, neck: 10, gaze: 8, trunk: 7, amp: 14, dir: 1, fps: 30, dur: 10, asym: 0, arm: 35 }, o);
   var L = 200, l = L / 2, F = 0.26 * L, W = 1000, H = 800, ground = 700, x0 = 500, Hh = 0.9 * L;
   var Ts = 60 / o.cadence, T = 2 * Ts, st = 0.36, frames = [], truth = { kneeIc: [] };
   for (var k = 0; k * (1 / o.fps) < o.dur; k++) {
@@ -29,7 +30,7 @@ function sideRunner(o) {
     ['r', 'l'].forEach(function (side, si) {
       var stLen = st * (side === 'l' ? 1 + o.asym : 1);
       var ph = ((t / T + (si ? 0.5 : 0)) % 1 + 1) % 1, heel, alpha;
-      var xIC = x0 + o.dir * o.ic * L, xTO = x0 - o.dir * 0.42 * L;
+      var xIC = x0 + o.dir * (side === 'l' && o.icL != null ? o.icL : o.ic) * L, xTO = x0 - o.dir * 0.42 * L;
       if (ph < stLen) {
         var s = ph / stLen;
         alpha = s < 0.15 ? o.fsa * (1 - s / 0.15) : 0;
@@ -51,7 +52,7 @@ function sideRunner(o) {
       if (nx * o.dir < 0) { nx = -nx; ny = -ny; }
       var knee = { x: m.x + nx * hgt, y: m.y + ny * hgt };
       if (!si && ph < 0.001 + 1 / o.fps / T) truth.kneeIc.push(180 - G.angle3(hip, knee, ank));
-      var v = si ? 0.6 : 0.95, off = si ? 6 : -6;
+      var v = si ? 0.7 : 0.95, off = si ? 6 : -6;
       var S = side === 'l' ? { hip: P.lHip, knee: P.lKnee, ank: P.lAnk, heel: P.lHeel, toe: P.lToe } : { hip: P.rHip, knee: P.rKnee, ank: P.rAnk, heel: P.rHeel, toe: P.rToe };
       put(S.hip, { x: hip.x + off, y: hip.y }, v); put(S.knee, knee, v); put(S.ank, ank, v); put(S.heel, heel, v); put(S.toe, toe, v);
     });
@@ -59,7 +60,8 @@ function sideRunner(o) {
     var torso = 0.75 * L, sh = { x: hip.x + o.dir * torso * Math.sin(o.trunk * R), y: hip.y - torso * Math.cos(o.trunk * R) };
     var ear = { x: sh.x + o.dir * 0.32 * L * Math.sin(o.neck * R), y: sh.y - 0.32 * L * Math.cos(o.neck * R) };
     var nose = { x: ear.x + o.dir * 0.1 * L * Math.cos(o.gaze * R), y: ear.y + 0.1 * L * Math.sin(o.gaze * R) };
-    var swing = 35 * Math.sin(2 * Math.PI * t / T), ua = 0.36 * L, fa = 0.33 * L;
+    // دست راست در لحظه‌ی فرود پای راست عقبه (هم‌زمانی مخالف دست و پا)
+    var swing = o.arm * Math.cos(2 * Math.PI * t / T), ua = 0.36 * L, fa = 0.33 * L;
     var el = { x: sh.x + o.dir * ua * Math.sin(-swing * R), y: sh.y + ua * Math.cos(swing * R) };
     var fAng = (-swing + (180 - o.elbow)) * R;
     var wr = { x: el.x + o.dir * fa * Math.sin(fAng), y: el.y + fa * Math.cos(fAng) };
@@ -145,7 +147,9 @@ test('کنار: بیش‌گامی با فرود پاشنه و آهنگ پایی�
   var m = r.side.metrics;
   near(m.cadence, 152, 6, 'cadence');
   assert.strictEqual(m.strike, 'heel');
-  assert.strictEqual(find(r, 'cadence').status, 'warn');
+  // آهنگ گام فقط توصیفیه (مرز ثابت منبع‌دار نداره)؛ بازه‌ی نسبی ۵ تا ۱۰٪ بیشتر (Heiderscheit 2011) کنارش
+  assert.strictEqual(find(r, 'cadence').status, 'info');
+  near(find(r, 'cadence').plus5, m.cadence * 1.05, 1, 'plus5');
   assert.strictEqual(find(r, 'overstride').status, 'bad');
   assert.strictEqual(find(r, 'strike').status, 'info');
   assert.strictEqual(r.findings[0].status, 'bad');
@@ -172,13 +176,18 @@ test('پشت: افت لگن، زانوی رو به داخل و عبور دست �
   assert.ok(good.back.ok, JSON.stringify(good.back));
   near(good.back.metrics.pelvicL, 3, 1.5, 'pelvic L'); near(good.back.metrics.valgusR, 4, 2, 'valgus R');
   assert.strictEqual(find(good, 'pelvic').status, 'good');
-  assert.strictEqual(find(good, 'valgus').status, 'good');
+  // زانوی رو به داخل: فقط توصیفی (بازه‌ی منبع‌دار نداره)، ولی برای هر سمت جدا
+  assert.strictEqual(find(good, 'valgus').status, 'info');
+  assert.ok(find(good, 'valgus').sides.l.value != null && find(good, 'valgus').sides.r.value != null);
   assert.strictEqual(find(good, 'armCross').status, 'info');
   var bad = G.analyze({ back: backRunner({ dropL: 11, valgR: 18, armCross: true }).video });
   near(bad.back.metrics.pelvicL, 11, 2, 'pelvic L');
   near(bad.back.metrics.valgusR, 18, 3, 'valgus R');
   assert.strictEqual(find(bad, 'pelvic').status, 'bad');
-  assert.strictEqual(find(bad, 'valgus').status, 'bad');
+  assert.strictEqual(find(bad, 'valgus').status, 'info');
+  // افت لگن هر سمت جدا، با وضعیت خودش؛ اختلاف دو سمت فقط وقتی هر دو قابل‌اطمینانه
+  assert.strictEqual(find(bad, 'pelvic').sides.l.status, 'bad'); assert.strictEqual(find(bad, 'pelvic').sides.r.status, 'good');
+  assert.ok(find(bad, 'pelvic').sym > 5);
   assert.ok(find(bad, 'armCross').value > find(good, 'armCross').value);
   assert.ok(find(bad, 'sides').pelvicSym > 5, 'asymmetry measured');
 });
@@ -217,7 +226,9 @@ test('ریسک آسیب: از الگوهای حرکتی، با عامل‌هاش
   assert.ok(good.axes.performance >= 80 && good.axes.form >= 80, JSON.stringify(good.axes));
   var bad = G.analyze({ side: sideRunner({ cadence: 150, ic: 0.36, fsa: 16 }).video, back: backRunner({ dropL: 11, valgR: 16, cross: 1.1 }).video, heightCm: 175 });
   var rk = bad.risks.filter(function (r) { return r.id === 'runnersKnee'; })[0], sh = bad.risks.filter(function (r) { return r.id === 'shin'; })[0];
-  assert.strictEqual(rk.level, 'high'); assert.ok(rk.factors.indexOf('overstride') >= 0 && rk.factors.indexOf('valgus') >= 0, JSON.stringify(rk));
+  assert.strictEqual(rk.level, 'high'); assert.ok(rk.factors.indexOf('overstride') >= 0 && rk.factors.indexOf('pelvic') >= 0, JSON.stringify(rk));
+  // پارامترهای بدون بازه‌ی منبع‌دار (آهنگ گام، زانوی رو به داخل، عرض گام) عامل الگو حساب نمی‌شن
+  assert.ok(rk.factors.indexOf('valgus') < 0 && rk.factors.indexOf('cadence') < 0);
   assert.strictEqual(sh.level, 'high');
   assert.strictEqual(bad.axes.risk, 'high');
   assert.ok(bad.axes.performance < 75 && bad.axes.form < 75, JSON.stringify(bad.axes));
@@ -254,11 +265,10 @@ test('یک یافته‌ی تنها کافی نیست: حداقل دو عامل 
   var ach = two.risks.filter(function (x) { return x.id === 'achilles'; })[0];
   assert.ok(ach.level !== 'low' && ach.factors.length >= 2, JSON.stringify(ach));
 });
-test('شرایط دویدن: حد پایین معمول کادنس با سرعت بالا می‌ره', function () {
+test('شرایط دویدن: آهنگ گام فقط توصیفی، با شرایط همون فیلم', function () {
   var v = sideRunner({ cadence: 163 }).video;
-  assert.strictEqual(find(G.analyze({ side: v, heightCm: 175, condition: 'easy' }), 'cadence').status, 'info');
-  var iv = G.analyze({ side: v, heightCm: 175, condition: 'interval' });
-  assert.strictEqual(find(iv, 'cadence').status, 'warn'); assert.strictEqual(iv.condition, 'interval');
+  ['easy', 'interval'].forEach(function (c) { var f = find(G.analyze({ side: v, heightCm: 175, condition: c }), 'cadence'); assert.strictEqual(f.status, 'info'); assert.strictEqual(f.cond, c); });
+  assert.strictEqual(G.analyze({ side: v, heightCm: 175, condition: 'interval' }).condition, 'interval');
   assert.strictEqual(G.analyze({ side: v, heightCm: 175, condition: 'xyz' }).condition, 'easy');
 });
 test('سطح اطمینان: دید کم → بدون عدد؛ ۶۰ فریم → برخورد مطمئن', function () {
@@ -293,7 +303,7 @@ test('شرایط دویدن جدا برای هر فیلم؛ هر یافته ما
   var cs = r.findings.filter(function (f) { return f.id === 'cadence'; });
   var sc = cs.filter(function (f) { return f.view === 'side'; })[0], bc = cs.filter(function (f) { return f.view === 'back'; })[0];
   near(bc.value, 163, 8, 'back cadence');
-  assert.strictEqual(sc.status, 'info'); assert.strictEqual(bc.status, 'warn'); assert.strictEqual(bc.cond, 'interval');
+  assert.strictEqual(sc.status, 'info'); assert.strictEqual(bc.status, 'info'); assert.strictEqual(sc.cond, 'easy'); assert.strictEqual(bc.cond, 'interval');
   r.findings.forEach(function (f) { assert.ok(f.view === 'side' || f.view === 'back', f.id); });
   ['pelvic', 'valgus', 'crossover', 'trunkLat', 'armCross', 'sides'].forEach(function (id) {
     assert.ok(r.findings.some(function (f) { return f.id === id && f.view === 'back'; }), id); });
@@ -352,7 +362,8 @@ test('نوع فرود: درصد هر نوع از همه‌ی گام‌ها، ه�
     var m = G.analyze({ side: sideRunner({ fsa: c[0], fps: 120, dur: 4 }).video, heightCm: 175 }).side.metrics;
     assert.strictEqual(m.strike, c[1], 'fsa ' + c[0]);
     assert.strictEqual(m.strikes[c[1]], 100);
-    assert.ok(m.strikes.n >= 10, 'steps ' + m.strikes.n);
+    // فقط پای نزدیک به دوربین (پای دور جدا و غیرقابل‌اطمینان)
+    assert.ok(m.strikes.n >= 5, 'steps ' + m.strikes.n);
     m.strikes.steps.forEach(function (s) { assert.strictEqual(s.type, c[1]); assert.ok(s.t >= 0 && (s.foot === 'l' || s.foot === 'r')); near(s.fsa, c[0], 3, 'step fsa'); });
     // ۳۰ فریم: پا در کمتر از یک فریم صاف می‌شه، پس زاویه‌ی بعضی گام‌ها کمتر دیده می‌شه؛ نوع غالب درسته و جمع درصدها ۱۰۰
     var m30 = G.analyze({ side: sideRunner({ fsa: c[0] }).video, heightCm: 175 }).side.metrics;
@@ -378,5 +389,80 @@ test('دوربین متحرک و جابه‌جا شدن برچسب چپ و را�
   near(m.cadence, 172, 4, 'cadence');
   assert.strictEqual(m.strike, 'heel');
   assert.ok(m.strikes.heel >= 80, 'heel % ' + m.strikes.heel);
+});
+
+// ---------- دوطرفه: هر پارامتر برای هر سمت بدن ----------
+var PAIRS = [[11, 12], [13, 14], [15, 16], [7, 8], [23, 24], [25, 26], [27, 28], [29, 30], [31, 32]];
+// فیلم از طرف دیگه: دونده به چپ می‌دوه و سمت چپ بدنش نزدیک دوربینه (برچسب همه‌ی نقاط چپ و راست جابه‌جا)
+function otherSide(o) {
+  var x = sideRunner(Object.assign({}, o, { dir: -1, ic: o.icL != null ? o.icL : o.ic, icL: o.ic }));
+  x.video.frames.forEach(function (f) { PAIRS.forEach(function (a) { var t = f.lm[a[0]]; f.lm[a[0]] = f.lm[a[1]]; f.lm[a[1]] = t; }); });
+  return x;
+}
+test('دوطرفه: سمت نزدیک با عدد، سمت دور «غیرقابل‌اطمینان» با دلیل؛ تقارن فقط با دو سمت قابل‌اطمینان', function () {
+  var r = G.analyze({ side: sideRunner({ icL: 0.3 }).video, heightCm: 175 });
+  assert.strictEqual(r.side.near, 'r');
+  var k = find(r, 'kneeIc');
+  assert.strictEqual(k.sides.r.status, 'good'); assert.strictEqual(k.sides.l.status, 'na'); assert.strictEqual(k.sides.l.why, 'farSide');
+  assert.strictEqual(k.sym, undefined);
+  assert.strictEqual(find(r, 'elbow').sides.l.why, 'farSide'); assert.strictEqual(find(r, 'strike').sides.l.why, 'farSide');
+  // محل فرود پای دور: فقط جای مچ پا لازمه → حداکثر «تخمینی»، با عدد درست همون پا
+  var o = find(r, 'overstride');
+  near(o.sides.r.value, 0.12 + 0.057, 0.04, 'near overstride'); near(o.sides.l.value, 0.3 + 0.057, 0.05, 'far overstride');
+  assert.strictEqual(o.sides.l.conf, 'est');
+  assert.ok(o.sym > 0.1, 'sym ' + o.sym);
+});
+test('دو فیلم از کنار (دو طرف): هر سمت از فیلم خودش، با تقارن', function () {
+  var a = sideRunner({ ic: 0.12, icL: 0.3 }), b = otherSide({ ic: 0.12, icL: 0.3 });
+  var r = G.analyze({ side: a.video, side2: b.video, heightCm: 175, conditions: { side: 'easy', side2: 'easy' } });
+  assert.ok(r.side.both && r.side2 && r.side2.near === 'l', JSON.stringify(r.failed));
+  var k = find(r, 'kneeIc');
+  assert.ok(k.sides.l.status !== 'na' && k.sides.r.status !== 'na', JSON.stringify(k.sides));
+  assert.ok(k.sym != null);
+  near(find(r, 'overstride').sides.l.value, 0.357, 0.05, 'left from second video');
+  assert.strictEqual(find(r, 'elbow').sides.l.status, 'info');
+  // فیلم دوم از همون طرف = هم‌زاویه
+  var d = G.analyze({ side: a.video, side2: sideRunner({}).video, heightCm: 175 });
+  assert.deepStrictEqual(d.failed, [{ src: 'side2', reason: 'sameView' }]);
+});
+test('برچسب‌های MediaPipe که دنبال پای جلویی می‌رن: سمت هر گام از هم‌زمانی دست و پا', function () {
+  var x = sideRunner({ ic: 0.1, icL: 0.32, fps: 60, dur: 8 });
+  // برچسب «چپ» همیشه روی پای جلویی (رفتار واقعی MediaPipe در نمای کنار)
+  x.video.frames.forEach(function (f) {
+    if (f.lm[29][0] < f.lm[30][0]) [[23, 24], [25, 26], [27, 28], [29, 30], [31, 32]].forEach(function (a) { var t = f.lm[a[0]]; f.lm[a[0]] = f.lm[a[1]]; f.lm[a[1]] = t; });
+  });
+  var o = find(G.analyze({ side: x.video, heightCm: 175 }), 'overstride');
+  near(o.sides.r.value, 0.157, 0.04, 'right'); near(o.sides.l.value, 0.377, 0.05, 'left');
+  // بدون تاب دست: سمت گام‌ها نامعلوم → عدد پا با برچسب چپ یا راست منتشر نمی‌شه
+  var u = G.analyze({ side: sideRunner({ arm: 0 }).video, heightCm: 175 });
+  assert.ok(u.side.metrics.sideUnsure);
+  assert.strictEqual(find(u, 'kneeIc').status, 'na'); assert.strictEqual(find(u, 'kneeIc').why, 'sideUnknown');
+  assert.ok(find(u, 'cadence').status === 'info', 'cadence still measured');
+});
+test('گام‌های نامعتبر جدا کنار می‌رن: دوربین مورب و پرش نقطه', function () {
+  var x = sideRunner({ dur: 10 });
+  // ۳ ثانیه‌ی اول دونده مورب به دوربین (شونه‌ها پهن دیده می‌شن)
+  x.video.frames.forEach(function (f) { if (f.t < 3) { f.lm[11][0] -= 0.06; f.lm[12][0] += 0.06; } });
+  var r = G.analyze({ side: x.video, heightCm: 175 });
+  assert.ok(r.side.quality.dropped.angle >= 3, JSON.stringify(r.side.quality));
+  assert.strictEqual(find(r, 'kneeIc').sides.r.status, 'good');
+  // پرش یک‌فریمی مچ پا: اصلاح می‌شه و عدد عوض نمی‌شه
+  var y = sideRunner({}), base = G.analyze({ side: y.video, heightCm: 175 }).side.metrics.kneeIc;
+  y.video.frames.forEach(function (f, i) { if (i % 23 === 7) f.lm[28] = [f.lm[28][0] + 0.15, f.lm[28][1] - 0.1, f.lm[28][2]]; });
+  near(G.analyze({ side: y.video, heightCm: 175 }).side.metrics.kneeIc, base, 3, 'knee with jumps');
+});
+test('اسلوموشن: اطمینان سر و تنه با زمان واقعی (نه تعداد فریم)', function () {
+  var x = sideRunner({ fps: 240, dur: 5 });
+  x.video.frames.forEach(function (f) { f.t *= 8; });
+  var r = G.analyze({ side: x.video, heightCm: 175, timeScale: { side: 8 } });
+  assert.strictEqual(find(r, 'trunk').conf, 'sure'); assert.strictEqual(find(r, 'head').conf, 'sure');
+  assert.strictEqual(find(r, 'kneeIc').sides.r.conf, 'sure');
+});
+test('حدهای انتشار قابل تنظیم‌ان', function () {
+  var v = sideRunner({}).video, old = G.PUBLISH.kneeIc.est;
+  G.PUBLISH.kneeIc.est = 100;
+  try { var k = find(G.analyze({ side: v, heightCm: 175 }), 'kneeIc'); assert.strictEqual(k.status, 'na'); assert.strictEqual(k.why, 'fewSteps'); }
+  finally { G.PUBLISH.kneeIc.est = old; }
+  assert.notStrictEqual(find(G.analyze({ side: v, heightCm: 175 }), 'kneeIc').status, 'na');
 });
 console.log(passed + ' تست تحلیل دویدن موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

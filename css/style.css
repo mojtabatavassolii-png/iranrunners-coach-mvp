@@ -1151,6 +1151,11 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .gi-warn .gi-chip { color: var(--warning); }
 .gi-bad .gi-chip { color: var(--primary); }
 .gi-val { font-weight: 700; }
+/* پارامترهای دوطرفه: یک خط برای هر سمت بدن */
+.gi-sides { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 4px; }
+.gi-sides li { font-weight: 600; }
+.gi-sides li.gs-na { font-weight: 400; color: var(--text-secondary); }
+.gi-sym { margin: 2px 0 6px; }
 .gait-methods > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--primary); font-weight: 600; }
 .gait-hist { list-style: none; margin: 0; padding: 0; }
 .gait-hist li { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--border); min-height: 44px; }

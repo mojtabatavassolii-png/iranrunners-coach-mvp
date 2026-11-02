@@ -1,7 +1,9 @@
 /*
  * تحلیل بیومکانیک دویدن از روی نقاط کلیدی بدن (خروجی خام MediaPipe Pose)؛ کاملاً محلی و بدون هیچ سرویس بیرونی.
- * ورودی هر فیلم: { w, h, frames: [{ t: ثانیه, lm: [[x, y, visibility] × ۳۳] (نرمال‌شده ۰ تا ۱) یا null }] }
- * خروجی: عددها (زاویه‌ها، آهنگ گام، ...) و یافته‌ها با وضعیت good / warn / bad؛ متن‌ها در دیکشنری‌ها (gait.*).
+ * ورودی هر فیلم: { w, h, input: { w, h } اندازه‌ی تصویر داده‌شده به MediaPipe، frames: [{ t: ثانیه, lm: [[x, y, visibility, z?] × ۳۳] (نرمال‌شده ۰ تا ۱) یا null }] }
+ * خروجی: عددها (زاویه‌ها، آهنگ گام، ...) برای هر سمت بدن جدا (bi: { پارامتر: { l, r } } با عدد، اطمینان، تعداد گام، انحراف معیار و دلیل)،
+ * و یافته‌ها با وضعیت good / warn / bad / info / na؛ متن‌ها در دیکشنری‌ها (gait.*). حدهای انتشار هر عدد در PUBLISH.
+ * One Euro filter: Casiez 2012 (CHI).
  *
  * مرجع‌ها (جزئیات، قدرت شواهد و نحوه‌ی بیان در گزارش تخصصی؛ gait.expert.* در دیکشنری‌ها):
  *  - روش دوبعدی و زاویه‌ی ساق/زانو در برخورد: Souza 2016 (PM&R Clin N Am)
@@ -78,31 +80,65 @@
   // درصد اختلاف چپ و راست؛ tol = اختلافی که از دقت اندازه‌گیری کمتره (مثلاً یک فریم ویدیو) نادیده گرفته می‌شه
   function symIndex(a, b, tol) { return a == null || b == null || !(a + b) ? null : Math.max(0, Math.abs(a - b) - (tol || 0)) / ((Math.abs(a) + Math.abs(b)) / 2) * 100; }
 
-  // فریم‌ها به پیکسل، با پر کردن فاصله‌های کوتاه و صاف کردن (میانگین ۳ فریمی)
+  // فیلتر One Euro (Casiez 2012) برای یک سری عددی: لرزش در حرکت آهسته کم می‌شه و در حرکت سریع (مثل پا در فاز پرواز) تأخیر کم می‌مونه
+  // rate: نمونه در ثانیه (زمان واقعی)، minCut: فرکانس قطع پایه (هرتز)، beta: حساسیت به سرعت (واحد سری بر ثانیه)
+  function oneEuro(y, rate, minCut, beta) {
+    var out = new Array(y.length), xp = null, dxp = 0;
+    var alpha = function (fc) { var tau = 1 / (2 * Math.PI * fc), te = 1 / rate; return 1 / (1 + tau / te); };
+    for (var i = 0; i < y.length; i++) {
+      if (y[i] == null) { out[i] = null; xp = null; dxp = 0; continue; }
+      if (xp == null) { xp = y[i]; out[i] = xp; continue; }
+      var dx = (y[i] - xp) * rate, ad = alpha(1);
+      dxp = ad * dx + (1 - ad) * dxp;
+      var a = alpha(minCut + beta * Math.abs(dxp));
+      xp = a * y[i] + (1 - a) * xp;
+      out[i] = xp;
+    }
+    return out;
+  }
+  // فریم‌ها به پیکسل:
+  //  raw: نقاط خام، فقط با اصلاح «پرش» (نقطه‌ای که در یک یا دو فریم بیش از ربع طول پا از همسایه‌هاش دور می‌شه، با میانه‌ی همسایه‌ها جایگزین می‌شه)
+  //  pts: همون نقاط با فیلتر One Euro (برای زاویه‌های پیوسته)؛ jump[i]: مفاصلی که در فریم i پرش داشتن
   // scale: ضریب اسلوموشن (۸ = هر ثانیه‌ی فیلم یک‌هشتم ثانیه‌ی واقعیه)؛ همه‌ی زمان‌های تحلیل به ثانیه‌ی واقعی
+  // عدد چهارم هر نقطه (اگه باشه): عمق تخمینی MediaPipe (منفی = نزدیک‌تر به دوربین)، هم‌مقیاس x
   function prepare(video, scale) {
     scale = scale > 0 ? scale : 1;
     var W = video.w || 1, H = video.h || 1, F = video.frames || [];
     var raw = F.map(function (f) {
       if (!f || !f.lm) return null;
-      return f.lm.map(function (p) { return { x: p[0] * W, y: p[1] * H, v: p[2] == null ? 1 : p[2] }; });
+      return f.lm.map(function (p) { return { x: p[0] * W, y: p[1] * H, v: p[2] == null ? 1 : p[2], z: p[3] == null ? null : p[3] * W }; });
     });
-    var n = raw.length, out = [];
-    for (var i = 0; i < n; i++) {
-      if (!raw[i]) { out.push(null); continue; }
-      var pts = raw[i].map(function (p, k) {
-        var sx = 0, sy = 0, c = 0;
-        for (var j = i - 1; j <= i + 1; j++) if (raw[j]) { sx += raw[j][k].x; sy += raw[j][k].y; c++; }
-        return { x: sx / c, y: sy / c, v: p.v };
-      });
-      out.push(pts);
-    }
+    var n = raw.length;
     var dt = (F.length > 1 ? (F[F.length - 1].t - F[0].t) / (F.length - 1) : 1 / 30) / scale;
+    // طول پا برای مقیاس آستانه‌ها
+    var Ls = raw.map(function (p) { return p ? (dist(p[P.lHip], p[P.lKnee]) + dist(p[P.lKnee], p[P.lAnk]) + dist(p[P.rHip], p[P.rKnee]) + dist(p[P.rKnee], p[P.rAnk])) / 2 : null; });
+    var Lg = median(Ls) || Math.max(W, H) / 4;
+    var jump = raw.map(function () { return null; }), clean = raw.map(function (p) { return p ? p.map(function (q) { return { x: q.x, y: q.y, v: q.v, z: q.z }; }) : null; });
+    for (var i = 0; i < n; i++) {
+      if (!raw[i]) continue;
+      for (var k = 0; k < 33; k++) {
+        var xs = [], ys = [];
+        for (var j = i - 2; j <= i + 2; j++) if (j !== i && raw[j]) { xs.push(raw[j][k].x); ys.push(raw[j][k].y); }
+        if (xs.length < 3) continue;
+        var mx = median(xs), my = median(ys);
+        if (Math.hypot(raw[i][k].x - mx, raw[i][k].y - my) > 0.25 * Lg) { clean[i][k].x = mx; clean[i][k].y = my; (jump[i] = jump[i] || []).push(k); }
+      }
+    }
+    // One Euro روی مختصات نسبت به طول پا (پارامترها برای دویدن: فرکانس قطع پایه‌ی ۷ هرتز تا نوسان لگن و افت لگن کم‌دامنه نشن)
+    var rate = 1 / dt, pts = clean.map(function (p) { return p ? p.map(function (q) { return { x: q.x, y: q.y, v: q.v, z: q.z }; }) : null; });
+    for (var k2 = 0; k2 < 33; k2++) {
+      ['x', 'y'].forEach(function (ax) {
+        var y = oneEuro(clean.map(function (p) { return p ? p[k2][ax] / Lg : null; }), rate, 7, 2);
+        for (var i2 = 0; i2 < n; i2++) if (pts[i2]) pts[i2][k2][ax] = y[i2] * Lg;
+      });
+    }
     // نرخ فریم مؤثر (در زمان واقعی): نمونه‌برداری، ولی نه بیشتر از نرخ فریم خود فیلم (فریم‌های تکراری دقت زمانی نمی‌دن)
     var fps = Math.round(Math.min(1 / dt, (video.fps || Infinity) * scale));
+    // اندازه‌ی تصویری که به MediaPipe داده شده (برای اندازه‌ی پا به پیکسل)؛ گزارش‌های قبلی: حداکثر ۹۶۰
+    var inp = video.input && video.input.w ? video.input : { w: W * Math.min(1, 960 / Math.max(W, H)), h: H * Math.min(1, 960 / Math.max(W, H)) };
     // t: زمان واقعی؛ tv: زمان خود فیلم (برای پیدا کردن فریم در ویدیو)
-    return { pts: out, raw: raw, t: F.map(function (f) { return f ? f.t / scale : null; }), tv: F.map(function (f) { return f ? f.t : null; }),
-      dt: dt, fps: fps, scale: scale, w: W, h: H, n: n };
+    return { pts: pts, raw: clean, jump: jump, t: F.map(function (f) { return f ? f.t / scale : null; }), tv: F.map(function (f) { return f ? f.t : null; }),
+      dt: dt, fps: fps, scale: scale, w: W, h: H, n: n, L: Lg, inScale: inp.w / W, hasZ: raw.some(function (p) { return p && p[P.lHip].z != null && p[P.lHip].z !== 0; }) };
   }
   function vis(p, ids) { return mean(ids.map(function (k) { return p[k].v; })); }
   // میانگین دیده‌شدن مفاصل در فریم‌های مشخص (یا همه‌ی فریم‌ها)
@@ -200,7 +236,10 @@
     var peaks = extrema(sep, Math.max(0.06, 0.35 * span(sep)), 1), toes = extrema(rear, Math.max(0.06, 0.35 * span(rear)), -1);
     var per = stepPeriod(sep), gap = [];
     for (var k = 1; k < peaks.length; k++) gap.push(peaks[k] - peaks[k - 1]);
-    var T = per ? per.lag : median(gap) || 8, w = Math.max(2, Math.round(0.25 * T));
+    // دو پای متفاوت (عدم تقارن): خودهمبستگی ممکنه یک چرخه‌ی کامل (دو گام) رو بگیره؛ با فاصله‌ی قله‌ها کنترل می‌شه
+    var gm0 = median(gap);
+    if (per && gm0 && per.lag / gm0 > 1.7 && per.lag / gm0 < 2.3) per = { lag: per.lag / 2, r: per.r, stride: true };
+    var T = per ? per.lag : gm0 || 8, w = Math.max(2, Math.round(0.25 * T));
     // پایین‌ترین نقطه‌ی پای جلویی (پیکسل، y رو به پایین)
     // نسبت به لگن و تقسیم بر طول پا، تا نزدیک شدن دونده به دوربین یا کج شدن دوربین «پایین آمدن» حساب نشه
     // پای جلویی هر فریم از روی هندسه (نه برچسب)، تا جابه‌جا شدن برچسب‌ها برخورد اشتباه نسازه
@@ -211,18 +250,24 @@
       // پای جلویی در لحظه‌ی بیشترین فاصله = پایی که داره فرود میاد؛ برخورد کمی قبل یا بعد از این لحظه‌ست
       var s = lead[pk];
       if (!s) return;
-      var a = Math.max(0, pk - Math.max(2, Math.round(0.3 * T))), b = Math.min(n - 2, pk + Math.max(2, Math.round(0.4 * T))), vmax = 0, m = -1, ic = pk;
-      // سرعت پایین آمدن (فریم به فریم بعدی)
-      var vf = function (i) { var y0 = low(i), y1 = low(i + 1); return y0 == null || y1 == null ? null : y1 - y0; };
-      for (var i2 = a; i2 <= b; i2++) { var v = vf(i2); if (v != null && v > vmax) { vmax = v; m = i2; } }
-      if (m >= 0 && vmax > 0.004) {
-        // «روی زمین»: نزدیک سطح پا در فریم‌های بعد از قله
-        var after = []; for (var i3 = m; i3 <= b + 1; i3++) after.push(low(i3));
-        after = [pct(after, 0.8)];
-        var yG = median(after);
-        for (var i4 = m; i4 <= b; i4++) {
-          var v4 = vf(i4), y4 = low(i4);
-          if (v4 != null && v4 <= 0.2 * vmax && y4 != null && (yG == null || y4 >= yG - 0.03)) { ic = i4; break; }
+      var a = Math.max(0, pk - Math.max(2, Math.round(0.3 * T))), b = Math.min(n - 1, pk + Math.max(2, Math.round(0.4 * T))), ic = pk;
+      // لحظه‌ی برخورد = اولین فریمی که پایین‌ترین نقطه‌ی پای جلویی به «خط زمین» می‌رسه. خط زمین = پایین‌ترین نقطه‌ی پاها در همین
+      // گام (صدک ۹۰ در فریم‌های اطراف، y مطلق تصویر). چند صدم ثانیه‌ی دور برخورد، حرکت عمودی دوربین ناچیزه؛ برخلاف روش‌های
+      // نسبت به لگن، بالا و پایین رفتن خود لگن در فاز تماس اینجا اثری نداره.
+      var lowAbs = function (i, any) {
+        var p = D.raw[i]; if (!p) return null;
+        var yl = Math.max(p[P.lHeel].y, p[P.lToe].y), yr = Math.max(p[P.rHeel].y, p[P.rToe].y);
+        return any ? Math.max(yl, yr) : (fr(i) === 'l' ? yl : yr);
+      };
+      var gw = []; for (var g0 = a; g0 <= Math.min(n - 1, pk + Math.round(0.5 * T)); g0++) gw.push(lowAbs(g0, true));
+      var gY = pct(gw, 0.9), tol = 0.04 * (Lloc[pk] || D.L);
+      if (gY != null) for (var i4 = a; i4 <= b; i4++) { var y4 = lowAbs(i4); if (y4 != null && y4 >= gY - tol) { ic = i4; break; } }
+      // داخل این نوار، لحظه‌ی دقیق: اولین فریمی که پا در ۲۰ میلی‌ثانیه‌ی بعد (زمان واقعی) دیگه پایین‌تر نمی‌ره (کمتر از ۲٪ طول پا، بیشتر از لرزش نقاط)
+      if (gY != null && ic !== pk) {
+        var kf = Math.max(1, Math.round(0.02 / D.dt)), Lk = Lloc[ic] || D.L;
+        for (var i5 = ic; i5 <= Math.min(b, ic + Math.round(0.15 * T)); i5++) {
+          var ya = lowAbs(i5), yb = lowAbs(Math.min(n - 1, i5 + kf));
+          if (ya != null && yb != null && yb - ya <= 0.02 * Lk) { ic = i5; break; }
         }
       }
       // دو قله‌ی نزدیک که به یک برخورد رسیدن: یک گام
@@ -319,41 +364,72 @@
     return out;
   }
 
-  // ---------- نوع فرود پا برای هر گام ----------
+  // ---------- انتشار عدد: هر پارامتر، هر سمت بدن ----------
+  // عدد هر پارامتر از «گام‌های قابل‌قبول» (یا چرخه‌های گام) به دست میاد و فقط وقتی منتشر می‌شه که از این حدها رد بشه؛ قابل تنظیم:
+  //  est / sure: حداقل تعداد گام برای «تخمینی» / «مطمئن»
+  //  sdEst / sdSure: حداکثر پراکندگی بین گام‌ها (انحراف معیار، بعد از حذف گام‌های دورافتاده) — پراکندگی زیاد یعنی خطای نقاط، نه تفاوت واقعی گام‌ها
+  //  floor: کمترین انحراف مقاوم برای حذف دورافتاده‌ها (تا گام‌های تقریباً یکسان بی‌دلیل حذف نشن)
+  //  cap: بالاترین سطح ممکن برای این پارامتر (محدودیت ذاتی روش)
+  var PUBLISH = {
+    vis: { est: 0.6, sure: 0.8 },
+    kneeIc: { est: 3, sure: 6, sdEst: 8, sdSure: 5, floor: 2 },
+    overstride: { est: 3, sure: 6, sdEst: 0.08, sdSure: 0.05, floor: 0.02 },
+    shank: { est: 3, sure: 6, sdEst: 6, sdSure: 4, floor: 1.5 },
+    peakKnee: { est: 3, sure: 6, sdEst: 8, sdSure: 5, floor: 2, cap: 'est' },
+    strike: { est: 3, sure: 6, footEst: 40, footSure: 70 },
+    gct: { est: 3, sure: 6, sdEst: 50, sdSure: 25, floor: 8 },
+    elbow: { est: 3, sure: 6, sdEst: 15, sdSure: 8, floor: 3 },
+    head: { est: 3, sure: 6, sdEst: 8, sdSure: 5, floor: 2 },
+    trunk: { est: 3, sure: 6, sdEst: 5, sdSure: 3, floor: 1 },
+    cadence: { est: 4, sure: 8 },
+    pelvic: { est: 3, sure: 6, sdEst: 4, sdSure: 2.5, floor: 1 },
+    valgus: { est: 3, sure: 6, sdEst: 7, sdSure: 4, floor: 1.5 },
+    // قبول هر گام: نسبت پهنای شونه به تنه در لحظه‌ی برخورد (دوربین عمود بر مسیر)، اختلاف طول پا با میانه
+    stepView: 0.5, stepLeg: 0.18
+  };
+  function stdev(a) { var m = mean(a); return a.length < 2 ? null : Math.sqrt(a.reduce(function (s, x) { return s + (x - m) * (x - m); }, 0) / (a.length - 1)); }
+  function finite(a) { return a.filter(function (x) { return x != null && isFinite(x); }); }
+  // حذف گام‌های دورافتاده: بیش از ۳ برابر انحراف مقاوم (MAD × ۱٫۴۸۲۶) از میانه
+  function dropOutliers(a, floor) {
+    var v = finite(a);
+    if (v.length < 4) return v;
+    var m = median(v), s = Math.max(1.4826 * median(v.map(function (x) { return Math.abs(x - m); })), floor || 0);
+    return s ? v.filter(function (x) { return Math.abs(x - m) <= 3 * s; }) : v;
+  }
+  function minConf(a, b) { return !b ? a : !a ? b : CONF[a] <= CONF[b] ? a : b; }
+  // vals: مقدار هر گام؛ visv: میانگین دیده‌شدن مفاصل لازم؛ o: { cap, why (اجبار به غیرقابل‌اطمینان با این دلیل)، dec }
+  function publish(id, vals, visv, o) {
+    o = o || {};
+    var R0 = PUBLISH[id], v = dropOutliers(vals, R0.floor), n = v.length, sd = stdev(v), val = median(v), c, why = null;
+    if (o.why) { c = 'low'; why = o.why; }
+    else if (val == null || n < R0.est) { c = 'low'; why = 'fewSteps'; }
+    else if (visv != null && visv < PUBLISH.vis.est) { c = 'low'; why = 'unseen'; }
+    else if (R0.sdEst != null && sd != null && sd > R0.sdEst) { c = 'low'; why = 'spread'; }
+    else c = n >= R0.sure && (visv == null || visv >= PUBLISH.vis.sure) && (R0.sdSure == null || sd == null || sd <= R0.sdSure) ? 'sure' : 'est';
+    c = minConf(minConf(c, R0.cap), o.cap);
+    if (c === 'low' && !why) why = o.capWhy || 'fewSteps';
+    var d = o.dec == null ? 1 : o.dec, r = function (x) { return x == null ? null : Math.round(x * Math.pow(10, d)) / Math.pow(10, d); };
+    return { v: r(val), conf: c, why: why, n: n, sd: r(sd) };
+  }
+
+  // ---------- نوع فرود پا ----------
   // زاویه‌ی پا (خط پاشنه تا پنجه نسبت به افق؛ مثبت = پنجه بالاتر) در لحظه‌ی برخورد، منهای زاویه‌ی همون پا وقتی وسط فاز تماس صاف روی زمینه
-  // (معادل کالیبراسیون ایستاده در Altman & Davis 2012؛ نقطه‌های پاشنه و پنجه‌ی MediaPipe دقیقاً روی کف کفش نیستن)
+  // (معادل کالیبراسیون ایستاده در Altman & Davis 2012؛ نقطه‌های پاشنه و پنجه‌ی MediaPipe دقیقاً روی کف کفش نیستن).
+  // پای روی زمین وسط فاز تماس از هندسه پیدا می‌شه (پایی که پایین‌تره)، نه از برچسب چپ و راست MediaPipe.
   function footAngle(p, s) { return Math.atan2(p[s.heel].y - p[s.toe].y, Math.abs(p[s.toe].x - p[s.heel].x)) * DEG; }
-  function strikes(D, C2) {
-    var steps = [], cal = {};
-    var calib = function (foot, i) {
-      var st = C2[foot].stance.filter(function (x) { return x[0] === i; })[0];
-      if (!st) return null;
-      var len = st[1] - st[0], a = [];
-      for (var f = st[0] + Math.round(0.25 * len); f <= st[0] + Math.round(0.5 * len); f++) if (D.pts[f]) a.push(footAngle(D.pts[f], SIDES[foot]));
-      return median(a);
-    };
-    C2.all.forEach(function (x) { var c = calib(x.foot, x.i); if (c != null) (cal[x.foot] = cal[x.foot] || []).push(c); });
-    // طول پا (پاشنه تا پنجه) در تصویری که به MediaPipe داده می‌شه (حداکثر ۹۶۰ پیکسل؛ js/pose.js)
-    var sc = Math.min(1, 960 / Math.max(D.w, D.h));
-    var footLen = function (p, s) { return dist(p[s.heel], p[s.toe]); };
-    var lenMed = { l: median(D.raw.map(function (p) { return p ? footLen(p, SIDES.l) : null; })), r: median(D.raw.map(function (p) { return p ? footLen(p, SIDES.r) : null; })) };
-    var skipped = 0;
-    C2.all.forEach(function (x) {
-      var p = D.raw[x.i], s = SIDES[x.foot];
-      // پاشنه، پنجه و مچ همون پا باید در لحظه‌ی برخورد دیده بشن، و طول پا نزدیک طول معمولش باشه (نه نقطه‌ی جابه‌جاشده)
-      if (!p || Math.min(p[s.heel].v, p[s.toe].v, p[s.ank].v) < 0.6 || Math.abs(footLen(p, s) / (lenMed[x.foot] || 1) - 1) > 0.35) { skipped++; return; }
-      var c = calib(x.foot, x.i);
-      if (c == null) c = median(cal[x.foot] || []) || 0;
-      var a = footAngle(p, s) - c;
-      var type = a > REF.fsaHeel ? 'heel' : a < REF.fsaFore ? 'fore' : 'mid';
-      steps.push({ t: Math.round(D.t[x.i] * 1000) / 1000, foot: x.foot, fsa: round1(a), type: type,
-        // نزدیک مرز دو دسته (کمتر از ۲ درجه): خطای چند درجه‌ای نقاط می‌تونه دسته رو عوض کنه
-        border: Math.min(Math.abs(a - REF.fsaHeel), Math.abs(a - REF.fsaFore)) < 2, v: round1(Math.min(p[s.heel].v, p[s.toe].v, p[s.ank].v)) });
-    });
-    var n = steps.length, cnt = { heel: 0, mid: 0, fore: 0 };
+  function footLen(p, s) { return dist(p[s.heel], p[s.toe]); }
+  function lowerTrack(p) { return Math.max(p[P.lHeel].y, p[P.lToe].y) >= Math.max(p[P.rHeel].y, p[P.rToe].y) ? 'l' : 'r'; }
+  function stanceFlat(D, x) {
+    if (x.to == null) return null;
+    var len = x.to - x.i, a = [];
+    for (var f = x.i + Math.round(0.25 * len); f <= x.i + Math.round(0.5 * len); f++) { var p = D.raw[f]; if (p) a.push(footAngle(p, SIDES[lowerTrack(p)])); }
+    return median(a);
+  }
+  function strikeType(a) { return a > REF.fsaHeel ? 'heel' : a < REF.fsaFore ? 'fore' : 'mid'; }
+  function strikeSummary(steps) {
+    var n = steps.length, cnt = { heel: 0, mid: 0, fore: 0 }, pc = { heel: 0, mid: 0, fore: 0 };
     steps.forEach(function (x) { cnt[x.type]++; });
     // درصدها با جمع دقیق ۱۰۰ (بزرگ‌ترین باقی‌مانده)
-    var pc = { heel: 0, mid: 0, fore: 0 };
     if (n) {
       var ks = ['heel', 'mid', 'fore'], left = 100;
       ks.forEach(function (k) { pc[k] = Math.floor(cnt[k] / n * 100); left -= pc[k]; });
@@ -362,144 +438,210 @@
     var fsa = round1(median(steps.map(function (x) { return x.fsa; })));
     var type = n ? ['heel', 'mid', 'fore'].sort(function (a, b) { return cnt[b] - cnt[a]; })[0] : null;
     // تساوی تعداد: دسته‌ی میانه‌ی زاویه‌ها
-    if (n && ['heel', 'mid', 'fore'].filter(function (k) { return cnt[k] === cnt[type]; }).length > 1) type = fsa > REF.fsaHeel ? 'heel' : fsa < REF.fsaFore ? 'fore' : 'mid';
-    var footPx = Math.round(median([lenMed.l, lenMed.r]) * sc);
-    return { fsa: fsa, type: type, vis: mean(steps.map(function (x) { return x.v; })), footPx: footPx,
-      summary: { n: n, skipped: skipped, footPx: footPx, heel: pc.heel, mid: pc.mid, fore: pc.fore, border: steps.filter(function (x) { return x.border; }).length, steps: steps } };
+    if (n && ['heel', 'mid', 'fore'].filter(function (k) { return cnt[k] === cnt[type]; }).length > 1) type = strikeType(fsa);
+    return { n: n, fsa: fsa, type: type, heel: pc.heel, mid: pc.mid, fore: pc.fore, border: steps.filter(function (x) { return x.border; }).length };
   }
 
   // ---------- فیلم از کنار ----------
+  // هر گام: پای فرودآمده از هندسه (پای جلویی در لحظه‌ی برخورد)، و سمت آناتومیک (چپ یا راست) از یکی‌درمیون بودن گام‌ها،
+  // نه از برچسب MediaPipe (که در نمای کنار معمولاً دنبال «پای جلویی» می‌ره). کدوم گروه از گام‌ها پای نزدیک به دوربینه:
+  // عمق تخمینی (z)، طول پا در تصویر (پای نزدیک کمی بزرگ‌تره) و دیده‌شدن، با هم.
+  // سمت نزدیک آناتومیک: دونده‌ای که در تصویر به راست می‌دوه سمت راست بدنش رو به دوربینه (و برعکس)؛ اگه دیده‌شدن بالاتنه
+  // واضحاً خلافش رو بگه (فیلم آینه‌ای دوربین جلو)، دیده‌شدن ملاکه.
   function analyzeSide(video, heightCm, scale) {
-    var D = prepare(video, scale), q = { frames: D.n, valid: validRate(D), fps: D.fps, scale: D.scale };
+    var D = prepare(video, scale), q = { frames: D.n, valid: validRate(D), fps: D.fps, scale: D.scale, realSec: round1(D.n * D.dt) };
     if (q.valid < 0.5) return { ok: false, reason: 'noPerson', quality: q };
     var view = viewRatio(D);
     if (view != null && view > 0.55) return { ok: false, reason: 'notSide', quality: q };
-    // سمت نزدیک به دوربین: دیده‌شدن بیشتر
-    var visL = mean(D.pts.map(function (p) { return p ? vis(p, [P.lHip, P.lKnee, P.lAnk, P.lEl]) : null; }));
-    var visR = mean(D.pts.map(function (p) { return p ? vis(p, [P.rHip, P.rKnee, P.rAnk, P.rEl]) : null; }));
-    var nearK = visR > visL ? 'r' : 'l', near = SIDES[nearK];
-    // جهت دویدن در تصویر: پنجه جلوتر از پاشنه
     var dir = median(D.pts.map(function (p) { return p ? (p[P.lToe].x - p[P.lHeel].x) + (p[P.rToe].x - p[P.rHeel].x) : null; })) >= 0 ? 1 : -1;
-    var L = legLen(D, near);
+    var visUp = function (k) { var s = SIDES[k]; return mean(D.raw.map(function (p) { return p ? vis(p, [s.sh, s.el, s.wr, s.ear]) : null; })); };
+    var vuL = visUp('l'), vuR = visUp('r');
+    var nearK = Math.abs(vuL - vuR) > 0.15 ? (vuR > vuL ? 'r' : 'l') : (dir > 0 ? 'r' : 'l'), farK = nearK === 'l' ? 'r' : 'l', near = SIDES[nearK];
+    var L = D.L;
     if (!L) return { ok: false, reason: 'noPerson', quality: q };
     var C2 = sideContacts(D, dir), A = C2.all;
     q.steps = A.length;
-    // دو پا: گام‌ها یکی‌درمیون مال یک پان (زوج و فرد)، که به برچسب چپ و راست MediaPipe بستگی نداره؛ برچسب گاهی برای مدت طولانی
-    // دنبال «پای جلویی» می‌ره نه پای واقعی. فقط اگه گامی جا افتاده باشه (فاصله‌ی نامنظم) از برچسب‌ها استفاده می‌شه.
+    if (A.length < 2) return { ok: false, reason: 'fewSteps', quality: q };
     var gp = [];
     for (var a0 = 1; a0 < A.length; a0++) gp.push(A[a0].i - A[a0 - 1].i);
-    var gm = median(gp), regular = gp.every(function (g) { return g >= 0.6 * gm && g <= 1.5 * gm; });
-    var legVis = function (G0) { return mean(G0.map(function (x) { var p = D.raw[x.i], sd = SIDES[x.foot]; return p ? vis(p, [sd.hip, sd.knee, sd.ank]) : null; })); };
-    var g0, g1;
-    if (regular) { g0 = A.filter(function (x, k) { return k % 2 === 0; }); g1 = A.filter(function (x, k) { return k % 2 === 1; }); }
-    else { g0 = A.filter(function (x) { return x.foot === nearK; }); g1 = A.filter(function (x) { return x.foot !== nearK; }); }
-    if (regular && (legVis(g1) || 0) > (legVis(g0) || 0)) { var tg = g0; g0 = g1; g1 = tg; }
-    var grp = function (G0) { return { ic: G0.map(function (x) { return x.i; }), legs: G0, stance: G0.filter(function (x) { return x.to != null; }).map(function (x) { return [x.i, x.to]; }) }; };
-    var cN = grp(g0), cF = grp(g1);
-    if (cN.ic.length < 2) return { ok: false, reason: 'fewSteps', quality: q };
-    var m = {};
-    // برخورد پای نزدیک (نقاط پایی که در اون لحظه فرود اومده)
-    var kneeIc = [], shank = [], over = [];
-    // لحظه‌ی برخورد از فریم خام (صاف کردن، فریم قبل از برخورد رو هم قاطی می‌کنه)
-    cN.legs.forEach(function (x) {
-      var p = D.raw[x.i] || D.pts[x.i], sd = SIDES[x.foot];
-      if (!p) return;
-      kneeIc.push(180 - angle3(p[sd.hip], p[sd.knee], p[sd.ank]));
-      shank.push(Math.atan2((p[sd.ank].x - p[sd.knee].x) * dir, p[sd.ank].y - p[sd.knee].y) * DEG);
-      over.push((p[sd.ank].x - p[sd.hip].x) * dir / L);
+    var T = C2.period ? C2.period.lag : median(gp);
+    // ۱. یکی‌درمیون: شماره‌ی هر گام از فاصله تا گام قبلی ÷ زمان یک گام (گام جاافتاده = فاصله‌ی دوبرابر)؛ فاصله‌ی نامعلوم = شروع بخش تازه
+    var seg = 0, slot = 0;
+    A.forEach(function (x, k) {
+      if (k) {
+        var g = (x.i - A[k - 1].i) / T, r = Math.round(g);
+        if (!r || Math.abs(g - r) > 0.3) { seg++; slot = 0; } else slot += r;
+      }
+      x.seg = seg; x.par = slot % 2;
+      // پای جلویی در لحظه‌ی برخورد (برچسب همون مجموعه‌ی نقاط، نه سمت بدن)
+      var p = D.raw[x.i];
+      x.tr = p ? ((p[P.lHeel].x - p[P.rHeel].x) * dir >= 0 ? 'l' : 'r') : null;
     });
-    m.kneeIc = round1(median(kneeIc));
-    m.shank = round1(median(shank));
-    m.overstride = Math.round(median(over) * 100) / 100;
-    // نوع فرود برای هر گام (هر دو پا، هر جا پاشنه و پنجه و مچ دیده می‌شن)
-    var ST = strikes(D, C2);
-    m.strikes = ST.summary; m.fsa = ST.fsa; m.strike = ST.type;
-    // حداکثر خم شدن زانو در فاز تماس پای نزدیک
-    var peak = cN.legs.filter(function (x) { return x.to != null; }).map(function (x) {
-      var mx = null, sd = SIDES[x.foot];
-      for (var f = x.i; f <= x.to; f++) { var p = D.pts[f]; if (p) { var a = 180 - angle3(p[sd.hip], p[sd.knee], p[sd.ank]); if (mx == null || a > mx) mx = a; } }
-      return mx;
+    // ۲. قبول هر گام: دوربین عمود بر مسیر، بدون پرش نقطه، طول پای فرودآمده نزدیک معمول
+    var legOf = function (p, s) { return dist(p[s.hip], p[s.knee]) + dist(p[s.knee], p[s.ank]); };
+    var dropped = { angle: 0, jump: 0, leg: 0 };
+    A.forEach(function (x) {
+      var p = D.raw[x.i];
+      if (!p || !x.tr) { x.bad = 'jump'; return; }
+      var s = SIDES[x.tr];
+      // زاویه‌ی دوربین: میانه‌ی یک چرخه‌ی کامل (دو گام) دور برخورد، چون پهنای ظاهری شونه با چرخش طبیعی تنه در هر گام عوض می‌شه
+      var vrs = [];
+      for (var f0 = Math.max(0, x.i - Math.round(T)); f0 <= Math.min(D.n - 1, x.i + Math.round(T)); f0++) {
+        var q2 = D.pts[f0]; if (!q2) continue;
+        var trl = dist({ x: (q2[P.lSh].x + q2[P.rSh].x) / 2, y: (q2[P.lSh].y + q2[P.rSh].y) / 2 }, { x: (q2[P.lHip].x + q2[P.rHip].x) / 2, y: (q2[P.lHip].y + q2[P.rHip].y) / 2 });
+        if (trl) vrs.push(Math.abs(q2[P.lSh].x - q2[P.rSh].x) / trl);
+      }
+      var vr = median(vrs);
+      // پرش نقطه‌های لگن، زانو یا مچ همون پا = گام کنار می‌ره؛ پرش پاشنه یا پنجه فقط نوع فرود همون گام رو حذف می‌کنه
+      var jumpIn = function (ks) { return [x.i - 1, x.i, x.i + 1].some(function (i) { return D.jump[i] && D.jump[i].some(function (k) { return ks.indexOf(k) >= 0; }); }); };
+      var js = jumpIn([s.hip, s.knee, s.ank]);
+      x.footJump = jumpIn([s.heel, s.toe]);
+      // طول پای فرودآمده نسبت به اندازه‌ی محلی دونده (دونده ممکنه به دوربین نزدیک یا ازش دور بشه)
+      x.lr = legOf(p, s) / (median(D.raw.slice(Math.max(0, x.i - Math.round(T)), x.i + Math.round(T) + 1).map(function (q4) { return q4 ? (legOf(q4, SIDES.l) + legOf(q4, SIDES.r)) / 2 : null; })) || L);
+      if (vr != null && vr > PUBLISH.stepView) x.bad = 'angle';
+      else if (js) x.bad = 'jump';
+      // دست سمت نزدیک در لحظه‌ی برخورد (هم‌زمانی مخالف دست و پا در دویدن: وقتی پای راست فرود میاد، دست راست عقبه).
+      // برچسب دست‌ها برخلاف پاها قابل‌اعتماده (صورت و بالاتنه جهت بدن رو مشخص می‌کنن). مثبت = دست نزدیک جلوتر از شونه
+      var q3 = D.pts[x.i] || p;
+      x.arm = (((q3[near.el].x + q3[near.wr].x) / 2) - q3[near.sh].x) * dir / L;
     });
-    m.peakKnee = round1(median(peak));
-    // آهنگ گام از برخوردهای هر دو پا، با زمان واقعی
-    var all = A.map(function (x) { return x.i; });
-    var cad = cadenceOf(D, all, C2.period);
-    m.cadence = cad.cadence; m.steps = cad.steps; m.span = cad.span; m.timeScale = D.scale;
-    if (cad.suggest) m.slowSuggest = cad.suggest;
-    // زمان تماس با زمین و تقارن زمان‌بندی
-    var gct = function (c) { return median(c.stance.map(function (s) { return (s[1] - s[0] + 1) * D.dt * 1000; })); };
-    m.gctNear = Math.round(gct(cN)); m.gctFar = cF.ic.length >= 2 ? Math.round(gct(cF)) : null;
-    var stepNF = [], stepFN = [];
-    cN.ic.forEach(function (i) {
-      var nextF = cF.ic.filter(function (j) { return j > i; })[0];
-      if (nextF != null) {
-        var nextN = cN.ic.filter(function (j) { return j > nextF; })[0];
-        stepNF.push((nextF - i) * D.dt);
-        if (nextN != null) stepFN.push((nextN - nextF) * D.dt);
+    // طول پای فرودآمده دور از میانه‌ی همه‌ی برخوردها = نقطه‌ی جابه‌جاشده (پای فرودآمده معمولاً بازه، پس با میانه‌ی خودش مقایسه می‌شه)
+    var lrMed = median(A.map(function (x) { return x.lr; }));
+    A.forEach(function (x) { if (!x.bad && x.lr != null && lrMed && Math.abs(x.lr / lrMed - 1) > PUBLISH.stepLeg) x.bad = 'leg'; if (x.bad) dropped[x.bad]++; });
+    // ۳. در هر بخش، گروه زوج یا فردی که دست نزدیکش موقع فرود عقب‌تره = پای نزدیک.
+    // (عمق تخمینی MediaPipe و طول پا در تصویر هم بررسی شدن ولی در فیلم واقعی فقط دنبال برچسب خود MediaPipe می‌رفتن؛ استفاده نمی‌شن.)
+    // اختلاف کمتر از ۰٫۰۸ طول پا بین دو گروه = سمت گام‌ها نامعلوم → عددهای پا بدون سمت منتشر نمی‌شن
+    var unsure = false;
+    for (var sg = 0; sg <= seg; sg++) {
+      var arm = [0, 1].map(function (par) { return mean(A.filter(function (x) { return x.seg === sg && x.par === par; }).map(function (x) { return x.arm; })); });
+      var nearPar = (arm[0] == null ? 0 : arm[0]) <= (arm[1] == null ? 0 : arm[1]) ? 0 : 1;
+      if (arm[0] == null || arm[1] == null || Math.abs(arm[0] - arm[1]) < 0.08) unsure = true;
+      A.forEach(function (x) { if (x.seg === sg) x.side = x.par === nearPar ? nearK : farK; });
+    }
+    var good = A.filter(function (x) { return !x.bad; });
+    q.used = good.length; q.dropped = dropped;
+    // ۴. اندازه‌ها برای هر گام، با نقاط پای فرودآمده (خام، بدون صاف کردن؛ صاف کردن فریم قبل از برخورد رو هم قاطی می‌کنه)
+    var sc = D.inScale;
+    var footMed = median(D.raw.map(function (p) { return p ? Math.max(footLen(p, SIDES.l), footLen(p, SIDES.r)) : null; }));
+    var footPx = footMed == null ? null : Math.round(footMed * sc);
+    var flat = finite(good.map(function (x) { return stanceFlat(D, x); }));
+    var flatCal = median(flat) || 0;
+    good.forEach(function (x) {
+      var p = D.raw[x.i], s = SIDES[x.tr];
+      x.kneeIc = 180 - angle3(p[s.hip], p[s.knee], p[s.ank]);
+      x.shank = Math.atan2((p[s.ank].x - p[s.knee].x) * dir, p[s.ank].y - p[s.knee].y) * DEG;
+      var hx = (p[P.lHip].x + p[P.rHip].x) / 2;
+      x.over = (p[s.ank].x - hx) * dir / L;
+      x.vis = vis(p, [s.hip, s.knee, s.ank]);
+      // زاویه‌ی پا: پاشنه، پنجه و مچ دیده بشن و طول پا نزدیک معمول باشه
+      var fv = Math.min(p[s.heel].v, p[s.toe].v, p[s.ank].v);
+      if (!x.footJump && fv >= 0.6 && footMed && Math.abs(footLen(p, s) / footMed - 1) <= 0.35) {
+        var c = stanceFlat(D, x);
+        x.fsa = footAngle(p, s) - (c == null ? flatCal : c);
+        x.fv = fv;
+      }
+      if (x.to != null) {
+        // حداکثر خم شدن زانو در فاز تماس: پای روی زمین در هر فریم (پایین‌تر)
+        var mx = null;
+        // فقط ۶۰٪ اول فاز تماس (حداکثر خم شدن نزدیک وسط تماسه؛ انتهای فاز با تشخیص جدا شدن پا ممکنه به فاز پرواز برسه)
+        for (var f = x.i; f <= x.i + Math.round(0.6 * (x.to - x.i)); f++) { var q2 = D.pts[f]; if (q2) { var t2 = SIDES[lowerTrack(q2)], a2 = 180 - angle3(q2[t2.hip], q2[t2.knee], q2[t2.ank]); if (mx == null || a2 > mx) mx = a2; } }
+        x.peak = mx;
+        x.gct = (x.to - x.i + 1) * D.dt * 1000;
       }
     });
-    m.stepSym = stepNF.length && stepFN.length ? round1(symIndex(median(stepNF), median(stepFN), D.dt)) : null;
-    m.gctSym = m.gctFar ? round1(symIndex(m.gctNear, m.gctFar, D.dt * 1000)) : null;
-    // سر، نگاه، تنه، آرنج و دست‌ها (سمت نزدیک، کل فیلم)
-    var neck = [], gaze = [], trunk = [], elbow = [], swing = [];
-    D.pts.forEach(function (p) {
-      if (!p) return;
-      var sh = p[near.sh], ear = p[near.ear], hip = p[near.hip];
-      neck.push(Math.atan2((ear.x - sh.x) * dir, sh.y - ear.y) * DEG);
-      gaze.push(Math.atan2(p[P.nose].y - ear.y, Math.abs(p[P.nose].x - ear.x)) * DEG);
-      trunk.push(Math.atan2((sh.x - hip.x) * dir, hip.y - sh.y) * DEG);
-      elbow.push(angle3(sh, p[near.el], p[near.wr]));
-      swing.push((p[near.wr].x - sh.x) * dir / (dist(sh, hip) || 1));
+    // ۵. آهنگ گام از همه‌ی برخوردها (هر دو پا)، با زمان واقعی
+    var all = A.map(function (x) { return x.i; });
+    var cad = cadenceOf(D, all, C2.period);
+    var m = { cadence: cad.cadence, steps: cad.steps, span: cad.span, timeScale: D.scale };
+    if (cad.suggest) m.slowSuggest = cad.suggest;
+    var timeOk = cad.valid, icCap = D.fps >= 60 ? null : 'est';
+    // ۶. هر پارامتر برای هر سمت
+    var bi = {}, sideSteps = function (k) { return good.filter(function (x) { return x.side === k; }); };
+    var forSide = function (k) {
+      var S0 = sideSteps(k), isFar = k === farK, vv = mean(S0.map(function (x) { return x.vis; }));
+      // سمت گام‌ها نامعلوم: هیچ عددی برای پا با برچسب چپ یا راست منتشر نمی‌شه
+      var farLow = unsure ? { why: 'sideUnknown' } : isFar ? { why: 'farSide' } : {};
+      var legX = unsure ? { why: 'sideUnknown' } : {};
+      var st = S0.filter(function (x) { return x.fsa != null; }).map(function (x) {
+        return { t: Math.round(D.t[x.i] * 1000) / 1000, foot: k, fsa: round1(x.fsa), type: strikeType(x.fsa),
+          border: Math.min(Math.abs(x.fsa - REF.fsaHeel), Math.abs(x.fsa - REF.fsaFore)) < 2, v: round1(x.fv) };
+      });
+      var ss = strikeSummary(st), R0 = PUBLISH.strike;
+      var strikeWhy = unsure ? 'sideUnknown' : isFar ? 'farSide' : footPx != null && footPx < R0.footEst ? 'footSmall' : null;
+      var sp = publish('kneeIc', st.map(function (x) { return x.fsa; }), mean(st.map(function (x) { return x.v; })), { why: strikeWhy, cap: minConf(footPx >= R0.footSure ? null : 'est', ss.border / (ss.n || 1) > 0.5 ? 'est' : icCap) });
+      if (!strikeWhy && ss.n < R0.est) { sp.conf = 'low'; sp.why = 'fewSteps'; }
+      return {
+        kneeIc: publish('kneeIc', S0.map(function (x) { return x.kneeIc; }), vv, Object.assign({ cap: icCap }, farLow)),
+        overstride: publish('overstride', S0.map(function (x) { return x.over; }), vv, Object.assign({ cap: minConf(icCap, isFar ? 'est' : null), dec: 2 }, legX)),
+        shank: publish('shank', S0.map(function (x) { return x.shank; }), vv, Object.assign({ cap: minConf(icCap, isFar ? 'est' : null) }, legX)),
+        peakKnee: publish('peakKnee', S0.map(function (x) { return x.peak; }), vv, farLow),
+        // زمان تماس فقط به جای پا نیاز داره: برای پای دور حد دیده‌شدن اعمال نمی‌شه (حداکثر «تخمینی»)
+        gct: publish('gct', S0.map(function (x) { return x.gct; }), isFar ? null : vv, Object.assign(timeOk ? { cap: D.fps >= 100 ? (isFar ? 'est' : null) : 'est', dec: 0 } : { why: 'slow', dec: 0 }, legX)),
+        strike: { v: ss.fsa, type: ss.type, conf: sp.conf, why: sp.why, n: ss.n, sd: round1(stdev(st.map(function (x) { return x.fsa; }))), pct: { heel: ss.heel, mid: ss.mid, fore: ss.fore }, border: ss.border, steps: st }
+      };
+    };
+    var bl = { l: forSide('l'), r: forSide('r') };
+    ['kneeIc', 'overstride', 'shank', 'peakKnee', 'gct', 'strike'].forEach(function (id) { bi[id] = { l: bl.l[id], r: bl.r[id] }; });
+    // ۷. بالاتنه، هر چرخه‌ی گام یک عدد (میانه‌ی فریم‌های بین دو برخورد): آرنج هر سمت، سر و تنه
+    var cyc = [];
+    for (var c0 = 1; c0 < A.length; c0++) if (A[c0].bad !== 'angle' && A[c0 - 1].bad !== 'angle') cyc.push([A[c0 - 1].i, A[c0].i]);
+    var perCycle = function (fn) { return cyc.map(function (cc) { var v = []; for (var f = cc[0]; f < cc[1]; f++) { var p = D.pts[f]; if (p) v.push(fn(p)); } return median(v); }); };
+    var visCyc = function (ids) { return visAt(D, ids); };
+    bi.elbow = {};
+    ['l', 'r'].forEach(function (k) {
+      var s = SIDES[k];
+      bi.elbow[k] = publish('elbow', perCycle(function (p) { return angle3(p[s.sh], p[s.el], p[s.wr]); }), visCyc([s.sh, s.el, s.wr]), Object.assign({ dec: 0 }, k === farK ? { why: 'farSide' } : {}));
     });
-    m.neck = round1(median(neck)); m.gaze = round1(median(gaze)); m.trunk = round1(median(trunk));
-    m.elbow = Math.round(median(elbow));
+    var hd = publish('head', perCycle(function (p) { return Math.atan2((p[near.ear].x - p[near.sh].x) * dir, p[near.sh].y - p[near.ear].y) * DEG; }), visCyc([near.ear, near.sh, P.nose]));
+    var tk = publish('trunk', perCycle(function (p) { return Math.atan2((p[near.sh].x - p[near.hip].x) * dir, p[near.hip].y - p[near.sh].y) * DEG; }), visCyc([near.sh, near.hip]));
+    var gaze = median(perCycle(function (p) { return Math.atan2(p[P.nose].y - p[near.ear].y, Math.abs(p[P.nose].x - p[near.ear].x)) * DEG; }));
+    var swing = [];
+    D.pts.forEach(function (p) { if (p) swing.push((p[near.wr].x - p[near.sh].x) * dir / (dist(p[near.sh], p[near.hip]) || 1)); });
+    // ۸. فیلدهای قبلی گزارش (سمت نزدیک)، برای گزارش‌های ذخیره‌شده و کارت‌ها
+    var nb = function (id) { return bi[id][nearK]; };
+    m.kneeIc = nb('kneeIc').v; m.shank = nb('shank').v; m.overstride = nb('overstride').v; m.peakKnee = nb('peakKnee').v;
+    m.gctNear = nb('gct').v; m.gctFar = bi.gct[farK].conf !== 'low' ? bi.gct[farK].v : null;
+    var ns = nb('strike');
+    m.fsa = ns.v; m.strike = ns.type;
+    m.strikes = { n: ns.n, footPx: footPx, heel: ns.pct.heel, mid: ns.pct.mid, fore: ns.pct.fore, border: ns.border, steps: ns.steps.concat(bi.strike[farK].steps), reason: ns.why };
+    m.neck = hd.v; m.gaze = round1(gaze); m.trunk = tk.v; m.elbow = nb('elbow').v;
     m.armSwing = Math.round(((pct(swing, 0.95) || 0) - (pct(swing, 0.05) || 0)) * 100) / 100;
+    // تقارن زمان‌بندی: زمان گام نزدیک→دور و دور→نزدیک (فقط از گام‌های پشت‌سرهم با سمت معلوم)
+    var stepNF = [], stepFN = [];
+    for (var k3 = 1; k3 < A.length; k3++) {
+      var g3 = (A[k3].i - A[k3 - 1].i) * D.dt;
+      if (A[k3].seg !== A[k3 - 1].seg || Math.round((A[k3].i - A[k3 - 1].i) / T) !== 1) continue;
+      (A[k3 - 1].side === nearK ? stepNF : stepFN).push(g3);
+    }
+    m.stepSym = stepNF.length >= 3 && stepFN.length >= 3 ? round1(symIndex(median(stepNF), median(stepFN), D.dt)) : null;
+    m.gctSym = m.gctFar != null && m.gctNear != null ? round1(symIndex(m.gctNear, m.gctFar, D.dt * 1000)) : null;
     // نوسان عمودی لگن (به سانتی‌متر، با قد کاربر)
     var hy = D.pts.map(function (p) { return p ? (p[P.lHip].y + p[P.rHip].y) / 2 : null; });
     var amp = [];
     for (var k = 1; k < all.length; k++) {
-      var seg = hy.slice(all[k - 1], all[k] + 1).filter(function (v) { return v != null; });
-      if (seg.length > 2) amp.push(Math.max.apply(null, seg) - Math.min.apply(null, seg));
+      var sgm = hy.slice(all[k - 1], all[k] + 1).filter(function (v) { return v != null; });
+      // نسبت به طول پای همون لحظه (دونده ممکنه به دوربین نزدیک یا ازش دور بشه)
+      var Lh = median(D.raw.slice(all[k - 1], all[k] + 1).map(function (q4) { return q4 ? (legOf(q4, SIDES.l) + legOf(q4, SIDES.r)) / 2 : null; })) || L;
+      if (sgm.length > 2) amp.push((Math.max.apply(null, sgm) - Math.min.apply(null, sgm)) / Lh);
     }
-    var ampPx = median(amp);
-    m.vo = heightCm && ampPx != null ? round1(ampPx / L * LEG_RATIO * heightCm) : null;
-    // سطح اطمینان هر عدد: دیده‌شدن مفاصل لازم، تعداد برخوردها، نرخ فریم و محدودیت ذاتی خود پارامتر
-    var legIds = [near.hip, near.knee, near.ank, near.heel, near.toe];
-    // دیده‌شدن پایی که در هر برخورد فرود اومده
-    var landVis = function (G0) { return mean(G0.map(function (x) { var p = D.raw[x.i], sd = SIDES[x.foot]; return p ? vis(p, [sd.hip, sd.knee, sd.ank, sd.heel, sd.toe]) : null; })); };
-    var icVis = landVis(cN.legs), nIC = cN.ic.length, fps = D.fps;
-    var minFr = function (sec) { return Math.round(sec * fps); };
-    var fv = landVis(cF.legs);
-    // لحظه‌ی برخورد در فیلم کمتر از ۶۰ فریم تا ۱ فریم (۱۷ تا ۳۳ میلی‌ثانیه) جابه‌جا می‌شه → حداکثر «تخمینی»
-    var icCap = fps >= 60 ? 'sure' : 'est';
-    // زمان فیلم واقعی نیست (آهنگ گام خارج از بازه‌ی دویدن، مثلاً اسلوموشن بدون ضریب): هر عدد زمانی غیرقابل‌اطمینانه
-    var timeOk = cad.valid;
-    // برای نوع فرود، هر گام قابل‌خوندن (هر دو پا) یک نمونه‌ست؛ کمتر از ۳ گام = غیرقابل‌اطمینان
-    var stN = m.strikes.n, stBorder = stN && m.strikes.border / stN > 0.5;
-    // پای کوچیک در تصویر: خطای چندپیکسلی نقطه‌ها چند درجه خطای زاویه می‌ده (۳ پیکسل روی پای ۳۰ پیکسلی ≈ ۶°)،
-    // در حالی که فاصله‌ی دسته‌ها کمتر از ۱۰ درجه‌ست → غیرقابل‌اطمینان
-    var footSmall = ST.footPx != null && ST.footPx < FOOT_MIN_PX;
-    if (footSmall) m.strikes.reason = 'footSmall';
-    else if (stN < 3) m.strikes.reason = 'fewSteps';
+    var ampL = median(amp);
+    // حداقل ۶ گام برای نوسان عمودی (یک گام کوتاه یا بلندتر عدد رو جابه‌جا نکنه)
+    m.vo = heightCm && ampL != null && amp.length >= 6 ? round1(ampL * LEG_RATIO * heightCm) : null;
+    // تقارن هر پارامتر: فقط وقتی هر دو سمت قابل‌اطمینانه
+    m.bi = bi; m.near = nearK; m.sideUnsure = unsure || undefined;
     m.conf = {
-      kneeIc: conf(icVis, nIC, 6, 3, icCap), overstride: conf(icVis, nIC, 6, 3, icCap),
-      strike: footSmall ? 'low' : conf(ST.vis, stN, 6, 3, stBorder ? 'est' : icCap),
-      // زاویه‌های حداکثری در MediaPipe خطای بیشتری دارن
-      peakKnee: conf(visAt(D, legIds), nIC, 6, 3, 'est'),
-      cadence: timeOk ? conf(visAt(D, [P.lHeel, P.rHeel, P.lToe, P.rToe], all), Math.max(all.length, cad.cycles || 0), 8, 4, cad.agree ? null : 'est') : 'low',
-      // زمان تماس: دقت زمانی ±۱ فریم؛ زیر ۱۰۰ فریم در ثانیه حداکثر «تخمینی»، زیر ۲۵ غیرقابل‌اطمینان
-      gct: fps < 25 || !timeOk ? 'low' : conf(icVis, nIC, 6, 3, fps >= 100 ? 'sure' : 'est'),
-      // نوسان عمودی: به قد واردشده و ثابت بودن دوربین بستگی داره → حداکثر «تخمینی»
-      vo: m.vo == null ? 'low' : conf(visAt(D, [P.lHip, P.rHip]), all.length, 8, 4, 'est'),
-      // پای دور معمولاً کمتر دیده می‌شه؛ برای زمان برخوردش فقط جای پا لازمه، پس حد دیده‌شدنش پایین‌تره
-      timing: cF.ic.length >= 3 && fv >= 0.5 ? conf(icVis, Math.min(nIC, cF.ic.length), 6, 3, 'est') : 'low',
-      head: conf(visAt(D, [near.ear, near.sh, P.nose]), D.pts.filter(Boolean).length, minFr(2), minFr(0.7)),
-      trunk: conf(visAt(D, [near.sh, near.hip]), D.pts.filter(Boolean).length, minFr(2), minFr(0.7)),
-      elbow: conf(visAt(D, [near.sh, near.el, near.wr]), D.pts.filter(Boolean).length, minFr(2), minFr(0.7))
+      kneeIc: nb('kneeIc').conf, overstride: minConf(nb('overstride').conf, nb('shank').conf), strike: ns.conf, peakKnee: nb('peakKnee').conf, gct: nb('gct').conf,
+      cadence: timeOk ? (cad.steps >= PUBLISH.cadence.sure && cad.agree ? 'sure' : cad.steps >= PUBLISH.cadence.est ? 'est' : 'low') : 'low',
+      vo: m.vo == null ? 'low' : 'est',
+      timing: m.stepSym != null ? 'est' : 'low',
+      head: hd.conf, trunk: tk.conf, elbow: nb('elbow').conf
     };
+    m.why = { head: hd.why, trunk: tk.why, cadence: timeOk ? (cad.steps < PUBLISH.cadence.est ? 'fewSteps' : null) : (m.slowSuggest ? 'slow' : 'range'), timing: m.stepSym == null ? 'fewSteps' : null, vo: m.vo != null ? null : heightCm ? 'fewSteps' : 'noHeight' };
+    m.headN = hd; m.trunkN = tk;
     // فریم نمونه برای نمایش: برخورد پای نزدیک وسط فیلم
-    var key = cN.ic[Math.floor(cN.ic.length / 2)];
-    return { ok: true, view: 'side', near: nearK, dir: dir, metrics: m, quality: q, keyFrame: key, keyT: D.tv[key], ic: cN.ic };
+    var nIc = good.filter(function (x) { return x.side === nearK; }).map(function (x) { return x.i; });
+    var key = nIc.length ? nIc[Math.floor(nIc.length / 2)] : all[Math.floor(all.length / 2)];
+    return { ok: true, view: 'side', near: nearK, dir: dir, metrics: m, quality: q, keyFrame: key, keyT: D.tv[key], ic: all };
   }
 
   // ---------- فیلم از پشت ----------
@@ -532,7 +674,7 @@
       });
       // پرونیشن عمداً سنجیده نمی‌شه: نقطه‌ی پاشنه‌ی MediaPipe معادل خط وسط پاشنه نیست و
       // پرونیشن در مطالعه‌ی آینده‌نگر (Nielsen 2014) با آسیب مرتبط نبود
-      return { drop: median(drop), valgus: median(valg), crossover: mean(cross) };
+      return { drop: median(drop), valgus: median(valg), crossover: mean(cross), dropA: drop, valgA: valg };
     }
     var sl = stanceMetrics(cL, SIDES.l, SIDES.r), sr = stanceMetrics(cR, SIDES.r, SIDES.l);
     m.pelvicL = round1(sl.drop); m.pelvicR = round1(sr.drop);
@@ -581,62 +723,102 @@
       cadence: cad.valid ? conf(visAt(D, [P.lHeel, P.rHeel, P.lToe, P.rToe], ics), ics.length, 8, 4, cad.agree ? null : 'est') : 'low',
       sides: conf(visAt(D, [P.lHip, P.rHip, P.lKnee, P.rKnee, P.lAnk, P.rAnk], all), nSt, 6, 3, 'est')
     };
+    // هر سمت جدا: افت لگن در فاز تماس همون پا (لگن سمت مقابل پایین میاد) و زاویه‌ی زانوی همون پا
+    var legVis = function (k, c) { var s = SIDES[k]; return visAt(D, [P.lHip, P.rHip, s.knee, s.ank], midStance(c)); };
+    m.bi = {
+      pelvic: { l: publish('pelvic', sl.dropA, legVis('l', cL)), r: publish('pelvic', sr.dropA, legVis('r', cR)) },
+      valgus: { l: publish('valgus', sl.valgA, legVis('l', cL), { cap: 'est' }), r: publish('valgus', sr.valgA, legVis('r', cR), { cap: 'est' }) }
+    };
+    ['pelvic', 'valgus'].forEach(function (id) {
+      var u = id === 'pelvic' ? 'pelvic' : 'valgus';
+      m[u + 'L'] = m.bi[id].l.conf === 'low' ? null : m.bi[id].l.v; m[u + 'R'] = m.bi[id].r.conf === 'low' ? null : m.bi[id].r.v;
+      m.conf[id] = ['l', 'r'].map(function (k) { return m.bi[id][k].conf; }).reduce(function (a, b) { return CONF[a] >= CONF[b] ? a : b; });
+    });
+    m.pelvicSym = m.pelvicL != null && m.pelvicR != null ? round1(Math.abs(m.pelvicL - m.pelvicR)) : null;
+    m.valgusSym = m.valgusL != null && m.valgusR != null ? round1(Math.abs(m.valgusL - m.valgusR)) : null;
     var key = midStance(cR)[0];
     return { ok: true, view: 'back', metrics: m, quality: q, keyFrame: key, keyT: D.tv[key] };
   }
 
   // ---------- قواعد: عدد → وضعیت ----------
-  // وضعیت‌ها: good = در محدوده‌ی معمول، warn = کمی بیرون، bad = بیرون از محدوده‌ی معمول (فقط برای پارامترهایی که
-  // بازه‌ی مرجع قابل دفاع دارن)؛ info = فقط توصیفی (بازه‌ی معتبر یا شواهد کافی نداره)؛ na = غیرقابل‌اطمینان (عدد داده نمی‌شه)
+  // وضعیت‌ها: good = در محدوده‌ی معمول، warn = کمی بیرون، bad = بیرون از محدوده‌ی معمول — فقط برای پارامترهایی که مقایسه‌ی
+  // منتشرشده دارن (زانو و ساق در برخورد: Souza 2016، Bramah 2018؛ افت لگن: Bramah 2018)؛ info = فقط توصیفی (بازه‌ای که از
+  // مقاله‌ی مشخصی اومده باشه نداره)؛ na = غیرقابل‌اطمینان (عدد داده نمی‌شه، با دلیل)
   function band(v, r) { return v == null ? null : v <= r.good ? 'good' : v <= r.warn ? 'warn' : 'bad'; }
   function range(v, r) { return v == null ? null : v >= r.lo && v <= r.hi ? 'good' : v >= r.warnLo && v <= r.warnHi ? 'warn' : 'bad'; }
   function worst(a, b) { var o = { good: 0, warn: 1, bad: 2 }; return a == null ? b : b == null ? a : o[a] >= o[b] ? a : b; }
-  // شرایط دویدن روی برداشت از بعضی عددها اثر داره (کادنس، زمان تماس، شیب تنه، نوع فرود)
-  // هر یافته مال یک نما (view) ـه و با شرایط دویدنِ همون فیلم سنجیده می‌شه
+  // هر یافته مال یک نما (view) ـه. پارامترهای دوطرفه برای هر سمت بدن جدا: sides: { l, r } هر کدوم با عدد، اطمینان و وضعیت خودش
+  // (یا na با دلیل)؛ sym: اختلاف دو سمت، فقط وقتی هر دو قابل‌اطمینانه. وضعیت کلی = بیرون‌ترین سمت قابل‌اطمینان.
   function findings(side, back, cond, condBack) {
     var ok = function (c) { return CONDITIONS.indexOf(c) >= 0 ? c : 'easy'; };
     var cS = ok(cond), cB = ok(condBack || cond);
     var F = [], view = 'side';
     var add = function (id, area, status, value, c, extra) {
       if (!status) return;
-      // غیرقابل‌اطمینان: یافته می‌مونه (تا کاربر بدونه سنجیده نشد) ولی بدون عدد و بدون وضعیت
-      if (c === 'low') F.push({ id: id, view: view, area: area, status: 'na', value: null, conf: 'low', why: extra && extra.why || null });
-      else F.push(Object.assign({ id: id, view: view, area: area, status: status, value: value, conf: c || 'est' }, extra || {}));
+      if (c === 'low' || value == null) F.push({ id: id, view: view, area: area, status: 'na', value: null, conf: 'low', why: extra && extra.why || null });
+      else F.push(Object.assign({ id: id, view: view, area: area, status: status, value: value, conf: c || 'est' }, extra || {}, { why: null }));
     };
-    // آهنگ گام خارج از بازه‌ی دویدن = زمان فیلم واقعی نیست (اسلوموشن): بدون عدد، با دلیل
-    var cadence = function (v, c, cond, mm) { if (v != null) add('cadence', 'cadence', v < REF.cadence[cond] ? 'warn' : 'info', v, c, { floor: REF.cadence[cond], cond: cond, why: v < CAD_OK.lo || v > CAD_OK.hi ? (mm.slowSuggest ? 'slow' : 'range') : null }); };
+    var bil = function (id, area, per, nearK, judge, ext) {
+      if (!per) return;
+      var sides = {}, st = [], vals = {};
+      ['l', 'r'].forEach(function (k) {
+        var b = per[k];
+        if (!b) return;
+        if (b.conf === 'low' || b.v == null) { sides[k] = { status: 'na', conf: 'low', value: null, why: b.why || null }; return; }
+        var s0 = judge ? judge(b.v, k) || 'info' : 'info';
+        sides[k] = Object.assign({ status: s0, conf: b.conf, value: b.v, n: b.n, sd: b.sd }, ext ? ext(k) : {});
+        st.push(s0); vals[k] = b.v;
+      });
+      var good = ['l', 'r'].filter(function (k) { return sides[k] && sides[k].status !== 'na'; });
+      if (!good.length) {
+        var w = (sides[nearK] || {}).why || (sides.l || {}).why || (sides.r || {}).why || null;
+        F.push({ id: id, view: view, area: area, status: 'na', value: null, conf: 'low', why: w, sides: sides });
+        return;
+      }
+      var status = st.filter(function (x) { return x !== 'info'; }).reduce(function (a, b) { return worst(a, b); }, null) || 'info';
+      // متن کلی از سمتی که وضعیت کلی رو ساخته (بیرون‌ترین سمت)، وگرنه سمت نزدیک به دوربین
+      var worstK = good.filter(function (k) { return sides[k].status === status; })[0];
+      var main = status !== 'info' && worstK ? worstK : good.indexOf(nearK) >= 0 ? nearK : good[0];
+      var f = Object.assign({ id: id, view: view, area: area, status: status, value: sides[main].value, conf: sides[main].conf, main: main, sides: sides }, ext ? ext(main) : {});
+      if (good.length === 2) f.sym = round1(Math.abs(vals.l - vals.r));
+      F.push(f);
+    };
+    // آهنگ گام: فقط توصیفی (مرز ثابتی از پژوهش نداره؛ به سرعت و قد بستگی داره). Heiderscheit 2011: افزایش ۵ تا ۱۰٪ نسبت به آهنگ
+    // خود دونده بار زانو و لگن رو کم کرد؛ همین بازه‌ی نسبی (نه عدد ثابت) کنار عدد گفته می‌شه.
+    var cadence = function (mm, c, cnd) {
+      var v = mm.cadence, why = mm.why && mm.why.cadence || (v != null && (v < CAD_OK.lo || v > CAD_OK.hi) ? (mm.slowSuggest ? 'slow' : 'range') : null);
+      if (v == null && !why) return;
+      add('cadence', 'cadence', 'info', why ? null : v, why ? 'low' : c, { cond: cnd, why: why, plus5: v && Math.round(v * 1.05), plus10: v && Math.round(v * 1.1) });
+    };
     if (side && side.ok) {
-      var m = side.metrics, C = m.conf || {}, cond = cS;
-      add('overstride', 'knee', worst(band(m.overstride, REF.overstride), band(m.shank, REF.shank)), m.overstride, C.overstride, { shank: m.shank });
-      add('kneeIc', 'knee', range(m.kneeIc, REF.kneeIc), m.kneeIc, C.kneeIc, { form: m.kneeIc < REF.kneeIc.lo ? 'straight' : m.kneeIc > REF.kneeIc.hi ? 'bent' : 'ok' });
-      cadence(m.cadence, C.cadence, cond, m);
-      if (m.peakKnee != null) add('peakKnee', 'knee', 'info', m.peakKnee, C.peakKnee);
-      var S0 = m.strikes;
-      if (m.strike || C.strike) add('strike', 'foot', 'info', m.fsa, m.strike ? C.strike : 'low', { strike: m.strike, pct: S0 ? { heel: S0.heel, mid: S0.mid, fore: S0.fore } : null, n: S0 ? S0.n : null,
-        why: S0 && S0.reason ? S0.reason : null, px: S0 ? S0.footPx : null });
-      if (m.gctNear != null) add('gct', 'timing', 'info', m.gctNear, C.gct, { far: m.gctFar });
-      if (m.vo != null || C.vo) add('vo', 'bounce', 'info', m.vo, m.vo == null ? 'low' : C.vo);
-      add('trunk', 'trunk', 'info', m.trunk, C.trunk, { lean: m.trunk < REF.trunk.lo ? 'back' : m.trunk > REF.trunk.hi ? 'forward' : 'ok' });
-      add('head', 'head', 'info', m.neck, C.head, { gaze: m.gaze, look: m.gaze > REF.gaze.hi ? 'down' : m.gaze < REF.gaze.lo ? 'up' : 'ahead' });
-      add('elbow', 'arms', 'info', m.elbow, C.elbow, { bend: m.elbow > REF.elbow.hi ? 'straight' : m.elbow < REF.elbow.lo ? 'tight' : 'ok' });
+      var m = side.metrics, C = m.conf || {}, nk = side.near || m.near || 'r', B0 = m.bi || {};
+      var shankOk = function (k) { var b = B0.shank && B0.shank[k]; return b && b.conf !== 'low' ? b.v : null; };
+      bil('overstride', 'knee', B0.overstride, nk, function (v, k) { return worst(band(v, REF.overstride), band(shankOk(k), REF.shank)); }, function (k) { return { shank: shankOk(k) }; });
+      bil('kneeIc', 'knee', B0.kneeIc, nk, function (v) { return range(v, REF.kneeIc); }, function (k) { var v = B0.kneeIc[k].v; return { form: v < REF.kneeIc.lo ? 'straight' : v > REF.kneeIc.hi ? 'bent' : 'ok' }; });
+      cadence(m, C.cadence, cS);
+      bil('strike', 'foot', B0.strike, nk, null, function (k) { var b = B0.strike[k]; return { strike: b.type, pct: b.pct, n: b.n, px: m.strikes ? m.strikes.footPx : null }; });
+      bil('peakKnee', 'knee', B0.peakKnee, nk);
+      bil('gct', 'timing', B0.gct, nk);
+      if (m.vo != null || C.vo) add('vo', 'bounce', 'info', m.vo, m.vo == null ? 'low' : C.vo, { why: m.vo == null ? (m.why && m.why.vo) || 'noHeight' : null });
+      add('trunk', 'trunk', 'info', m.trunk, C.trunk, { lean: m.trunk < REF.trunk.lo ? 'back' : m.trunk > REF.trunk.hi ? 'forward' : 'ok', why: m.why && m.why.trunk });
+      add('head', 'head', 'info', m.neck, C.head, { gaze: m.gaze, look: m.gaze > REF.gaze.hi ? 'down' : m.gaze < REF.gaze.lo ? 'up' : 'ahead', why: m.why && m.why.head });
+      bil('elbow', 'arms', B0.elbow, nk, null, function (k) { var v = B0.elbow[k].v; return { bend: v > REF.elbow.hi ? 'straight' : v < REF.elbow.lo ? 'tight' : 'ok' }; });
       if (m.stepSym != null || m.gctSym != null) add('timing', 'symmetry', 'info', round1(Math.max(m.stepSym || 0, m.gctSym || 0)), C.timing);
     }
     if (back && back.ok) {
       view = 'back';
-      var b = back.metrics, B = b.conf || {};
-      cadence(b.cadence, B.cadence, cB, b);
-      if (b.trunkLat != null) add('trunkLat', 'trunk', 'info', b.trunkLat, B.trunkLat);
-      var pd = Math.max(b.pelvicL || 0, b.pelvicR || 0);
-      add('pelvic', 'pelvis', band(pd, REF.pelvic), round1(pd), B.pelvic, { left: b.pelvicL, right: b.pelvicR });
-      var vg = Math.max(b.valgusL || 0, b.valgusR || 0);
-      add('valgus', 'kneeIn', band(vg, REF.valgus), round1(vg), B.valgus, { left: b.valgusL, right: b.valgusR });
-      add('crossover', 'foot', b.crossover > REF.crossover ? 'warn' : 'good', b.crossover, B.crossover);
-      add('armCross', 'arms', 'info', b.armCross, B.armCross);
-      if (b.armSym != null) add('armSym', 'arms', 'info', b.armSym, B.armSym);
-      add('sides', 'symmetry', 'info', round1(b.gctSym), B.sides, { pelvicSym: b.pelvicSym, valgusSym: b.valgusSym });
+      var b = back.metrics, BB = b.bi || {};
+      cadence(b, (b.conf || {}).cadence, cB);
+      if (b.trunkLat != null) add('trunkLat', 'trunk', 'info', b.trunkLat, b.conf.trunkLat);
+      bil('pelvic', 'pelvis', BB.pelvic, 'l', function (v) { return band(v, REF.pelvic); });
+      bil('valgus', 'kneeIn', BB.valgus, 'l');
+      add('crossover', 'foot', 'info', b.crossover, b.conf.crossover);
+      add('armCross', 'arms', 'info', b.armCross, b.conf.armCross);
+      if (b.armSym != null) add('armSym', 'arms', 'info', b.armSym, b.conf.armSym);
+      add('sides', 'symmetry', 'info', round1(b.gctSym), b.conf.sides, { pelvicSym: b.pelvicSym, valgusSym: b.valgusSym });
     }
     // ترتیب: بیرون از محدوده‌ی معمول → کمی بیرون → معمول → توصیفی → غیرقابل‌اطمینان؛ در هر گروه به ترتیب اهمیت
-    var ORDER = ['pelvic', 'overstride', 'kneeIc', 'cadence', 'valgus', 'crossover', 'strike', 'peakKnee', 'gct', 'vo', 'trunk', 'trunkLat', 'timing', 'sides', 'armCross', 'armSym', 'elbow', 'head'];
+    var ORDER = ['cadence', 'strike', 'overstride', 'kneeIc', 'elbow', 'head', 'trunk', 'pelvic', 'valgus', 'crossover', 'peakKnee', 'gct', 'vo', 'trunkLat', 'timing', 'sides', 'armCross', 'armSym'];
     var S = { bad: 0, warn: 1, good: 2, info: 3, na: 4 };
     F.sort(function (a, b) { return S[a.status] - S[b.status] || ORDER.indexOf(a.id) - ORDER.indexOf(b.id); });
     return F;
@@ -690,45 +872,57 @@
     }
     return a;
   }
-  // input: { side, back: خروجی js/pose.js، heightCm، conditions: { side, back } شرایط دویدنِ هر فیلم (کلید = خونه‌ای که فیلم توش گذاشته شده)
-  //   (یا condition برای هر دو)، load: { acute, chronic } کیلومتر در هفته،
-  //   timeScale: { side, back } ضریب اسلوموشن هر فیلم (کلید = خونه؛ ۱ یا خالی = زمان واقعی) }
+  // دو فیلم از کنار، از دو طرف دونده: هر سمت بدن از فیلمی گرفته می‌شه که اون سمت نزدیک دوربینه
+  function mergeSides(a, b) {
+    var m = Object.assign({}, a.metrics), mb = b.metrics, bi = {};
+    Object.keys(m.bi || {}).forEach(function (id) {
+      bi[id] = {};
+      ['l', 'r'].forEach(function (k) { bi[id][k] = k === b.near && mb.bi && mb.bi[id] ? mb.bi[id][k] : m.bi[id][k]; });
+    });
+    m.bi = bi;
+    var g = bi.gct && bi.gct[b.near];
+    m.gctFar = g && g.conf !== 'low' ? g.v : null;
+    m.gctSym = m.gctFar != null && m.gctNear != null ? round1(symIndex(m.gctNear, m.gctFar, 1000 / Math.max(a.quality.fps || 30, b.quality.fps || 30))) : m.gctSym;
+    m.second = { src: b.src, near: b.near, quality: b.quality, cadence: mb.cadence };
+    return Object.assign({}, a, { metrics: m, both: true });
+  }
+  // input: { side, side2 (اختیاری: فیلم دوم از کنار، از طرف دیگه‌ی دونده)، back: خروجی js/pose.js، heightCm،
+  //   conditions: { side, side2, back } شرایط دویدنِ هر فیلم (کلید = خونه‌ای که فیلم توش گذاشته شده) (یا condition برای همه)،
+  //   load: { acute, chronic } کیلومتر در هفته، timeScale: { side, side2, back } ضریب اسلوموشن هر فیلم (۱ یا خالی = زمان واقعی) }
   function analyze(input) {
     var ts = input.timeScale || {};
-    var A = input.side ? classify(input.side, input.heightCm, 'side', ts.side) : null;
-    var B = input.back ? classify(input.back, input.heightCm, 'back', ts.back) : null;
-    if (A) A.src = 'side';
-    if (B) B.src = 'back';
-    var side = null, back = null;
-    // هر نتیجه‌ی موفق در جای زاویه‌ی واقعی خودش؛ دو فیلم با یک زاویه → اولی حساب می‌شه
-    [A, B].forEach(function (r) {
-      if (!r || !r.ok) return;
+    var res = ['side', 'side2', 'back'].filter(function (k) { return input[k]; }).map(function (k) {
+      var r = classify(input[k], input.heightCm, k === 'back' ? 'back' : 'side', ts[k]);
+      r.src = k;
+      return r;
+    });
+    var side = null, side2 = null, back = null;
+    // هر نتیجه‌ی موفق در جای زاویه‌ی واقعی خودش؛ دو فیلم از کنار فقط اگه از دو طرف مختلف باشن با هم ترکیب می‌شن
+    res.forEach(function (r) {
+      if (!r.ok) return;
       if (r.view === 'side' && !side) side = r;
+      else if (r.view === 'side' && !side2 && r.near !== side.near) side2 = r;
       else if (r.view === 'back' && !back) back = r;
       else r.dup = true;
     });
-    // فیلم‌هایی که تحلیل نشدن با دلیلشون (برای نمایش به کاربر)
-    var failed = [A, B].filter(function (r) { return r && (!r.ok || r.dup); }).map(function (r) {
-      return { src: r.src, reason: r.dup ? 'sameView' : r.reason };
-    });
+    var failed = res.filter(function (r) { return !r.ok || r.dup; }).map(function (r) { return { src: r.src, reason: r.dup ? 'sameView' : r.reason }; });
     var okc = function (c) { return CONDITIONS.indexOf(c) >= 0 ? c : null; };
     var cs = input.conditions || {};
-    // شرایط هر نما از فیلمی که اون نما رو داده (اگه فیلم «کنار» در واقع از پشت بود، برچسبش با خودش می‌ره)
     var conds = { side: side ? okc(cs[side.src]) || okc(input.condition) || 'easy' : null, back: back ? okc(cs[back.src]) || okc(input.condition) || 'easy' : null };
     var cond = conds.side || conds.back || 'easy';
-    var F = findings(side, back, conds.side || cond, conds.back || cond);
+    var sideM = side && side2 ? mergeSides(side, side2) : side;
+    var F = findings(sideM, back, conds.side || cond, conds.back || cond);
     var R = risks(F);
     // بار تمرینی فقط «زمینه»ست (شواهد نسبت بار حاد به مزمن خودش محل بحثه) و سطح الگوها رو عوض نمی‌کنه
     var ld = input.load, load = ld && ld.chronic > 0 ? { acute: ld.acute, chronic: ld.chronic, ratio: Math.round(ld.acute / ld.chronic * 100) / 100 } : null;
     if (load) load.high = load.ratio >= 1.5;
     var J = F.filter(judged);
-    return { side: side, back: back, failed: failed, findings: F, risks: R, condition: cond, conditions: conds, load: load,
-      axes: { performance: axisScore(F, AXIS.performance), form: axisScore(F, AXIS.form),
-        risk: R.length ? R[0].level : null },
+    return { side: sideM, side2: side2, back: back, failed: failed, findings: F, risks: R, condition: cond, conditions: conds, load: load,
+      axes: { performance: axisScore(F, AXIS.performance), form: axisScore(F, AXIS.form), risk: R.length ? R[0].level : null },
       score: J.length ? Math.round(J.reduce(function (s, f) { return s + (f.status === 'good' ? 1 : f.status === 'warn' ? 0.5 : 0); }, 0) / J.length * 100) : null };
   }
 
-  var api = { analyze: analyze, cadenceOf: cadenceOf, CAD_OK: CAD_OK, analyzeSide: analyzeSide, analyzeBack: analyzeBack, findings: findings, risks: risks, axisScore: axisScore, judged: judged,
+  var api = { PUBLISH: PUBLISH, analyze: analyze, cadenceOf: cadenceOf, CAD_OK: CAD_OK, analyzeSide: analyzeSide, analyzeBack: analyzeBack, findings: findings, risks: risks, axisScore: axisScore, judged: judged,
     AXIS: AXIS, INJURIES: INJURIES, REF: REF, CONDITIONS: CONDITIONS, P: P, angle3: angle3 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CoachGait = api;
