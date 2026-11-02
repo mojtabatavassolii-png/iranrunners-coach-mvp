@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; media-src 'self' blob:; img-src 'self' blob: data:">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>برچسب‌زنی گام</title>
+<meta name="color-scheme" content="dark light">
+<!--
+  ابزار داخلی برای ساخت مجموعه‌ی آزمایش تحلیل دویدن (به اپ لینک نشده).
+  ویدیو فقط روی همین دستگاه باز می‌شه و جایی فرستاده نمی‌شه؛ خروجی فقط یک فایل کوچک JSON از برچسب‌هاست:
+  لحظه‌ی تماس هر گام، پای چپ یا راست، نوع فرود، و (اختیاری) جای دقیق مفاصل در چند فریم برای سنجیدن خطای زاویه‌ها.
+-->
+<style>
+@font-face { font-family: "Vazirmatn"; src: url("../public/fonts/vazirmatn-variable.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+:root { color-scheme: dark; --bg: #121214; --surface: #1C1C20; --surface-2: #2A2A30; --border: #34343B; --text: #F5F2EC; --text-2: #A0A0A8;
+  --primary: #D8C4A0; --on-primary: #121214; --error: #E07A6B; --l: #8AA9D6; --r: #E3B261; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { color-scheme: light; --bg: #F5F2EC; --surface: #FFFDF9; --surface-2: #ECE7DE; --border: #DAD3C7;
+  --text: #121214; --text-2: #5C5C64; --primary: #7A5E2C; --on-primary: #FFFFFF; --error: #A63D30; --l: #2F5E9E; --r: #8A5E0E; } }
+:root[data-theme="dark"] { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.7 "Vazirmatn", system-ui, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 16px; padding-bottom: 80px; }
+h1 { font-size: 1.3rem; margin: 0 0 4px; }
+h2 { font-size: 1.05rem; margin: 18px 0 8px; }
+p.hint, .muted { color: var(--text-2); font-size: .9rem; margin: 4px 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px; margin: 12px 0; }
+button, select, input[type=text] { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; min-height: 44px; }
+button { cursor: pointer; }
+button.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); font-weight: 700; }
+button.on { outline: 3px solid var(--primary); }
+button:disabled { opacity: .45; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+select, input[type=text] { width: 100%; min-width: 0; }
+@media (max-width: 520px) { #meta .grid3 { grid-template-columns: 1fr; } }
+label.field { display: grid; gap: 4px; font-size: .9rem; color: var(--text-2); }
+.stage { position: relative; background: #000; border-radius: 12px; overflow: hidden; touch-action: manipulation; width: 100%; aspect-ratio: 16 / 9; margin: 0 auto; }
+.stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.time { font-variant-numeric: tabular-nums; direction: ltr; text-align: center; }
+input[type=range] { width: 100%; }
+ol.marks { padding: 0 18px 0 0; margin: 6px 0; }
+ol.marks li { padding: 4px 0; border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tag-l { color: var(--l); font-weight: 700; } .tag-r { color: var(--r); font-weight: 700; }
+.link { background: none; border: 0; color: var(--error); padding: 4px 8px; min-height: 32px; }
+.pick { display: block; text-align: center; padding: 14px; border: 2px dashed var(--border); border-radius: 12px; cursor: pointer; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<main>
+<h1>برچسب‌زنی گام (ابزار آزمایش)</h1>
+<p class="hint">ویدیو فقط روی همین گوشی باز می‌شه و جایی فرستاده نمی‌شه. خروجی فقط یک فایل کوچک از برچسب‌هاست که برای سنجیدن دقت تحلیل استفاده می‌شه.</p>
+
+<section class="card">
+  <label class="pick">انتخاب ویدیو<input type="file" accept="video/*" id="file" class="sr"></label>
+  <p class="muted" id="fname"></p>
+</section>
+
+<section class="card" id="meta" hidden>
+  <h2>مشخصات این ویدیو</h2>
+  <div class="grid3">
+    <label class="field">نما
+      <select id="view"><option value="">انتخاب کن</option><option value="side-right">کنار؛ دونده در تصویر به راست می‌دوه</option><option value="side-left">کنار؛ دونده به چپ می‌دوه</option><option value="back">پشت</option><option value="front">جلو</option><option value="oblique">مورب</option></select></label>
+    <label class="field">ضریب اسلوموشن
+      <select id="slow"><option value="1">عادی</option><option value="2">×۲</option><option value="4">×۴ (۱۲۰ فریم)</option><option value="8">×۸ (۲۴۰ فریم)</option></select></label>
+    <label class="field">دونده
+      <input type="text" id="runner" placeholder="مثلاً نفر ۱"></label>
+  </div>
+  <div class="grid3" style="margin-top:8px">
+    <label class="field">دوربین
+      <select id="cam"><option value="">—</option><option value="tripod">ثابت (سه‌پایه)</option><option value="hand">دستی، ثابت نگه داشته</option><option value="pan">دنبال‌کننده (چرخش)</option></select></label>
+    <label class="field">محیط
+      <select id="env"><option value="">—</option><option value="treadmill">تردمیل</option><option value="out">بیرون</option><option value="track">پیست</option></select></label>
+    <label class="field">نور
+      <select id="light"><option value="">—</option><option value="good">خوب</option><option value="low">کم</option><option value="back">نور از پشت</option></select></label>
+  </div>
+  <label class="field" style="margin-top:8px">توضیح (اختیاری)<input type="text" id="note"></label>
+</section>
+
+<section class="card" id="player" hidden>
+  <div class="stage" id="stage"><video id="v" playsinline muted preload="auto"></video><canvas id="cv"></canvas></div>
+  <input type="range" id="seek" min="0" max="1000" value="0" aria-label="جابه‌جایی در ویدیو">
+  <p class="time" id="time">0.000 s</p>
+  <div class="grid4">
+    <button id="b5" aria-label="۵ فریم عقب">⟫ ۵</button><button id="b1" aria-label="یک فریم عقب">› ۱</button>
+    <button id="f1" aria-label="یک فریم جلو">۱ ‹</button><button id="f5" aria-label="۵ فریم جلو">۵ ⟪</button>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <button id="play">پخش آهسته</button>
+    <label class="field" style="flex:1">گام هر فریم
+      <select id="step"><option value="0.0333333">۱/۳۰ ثانیه</option><option value="0.0166667" selected>۱/۶۰ ثانیه</option><option value="0.0083333">۱/۱۲۰ ثانیه</option></select></label>
+  </div>
+
+  <h2>۱. لحظه‌ی تماس پا با زمین</h2>
+  <p class="hint">فریم‌به‌فریم جلو برو تا اولین فریمی که پا زمین رو لمس می‌کنه. اگه مطمئن نیستی کدوم پاست یا نوع فرود معلوم نیست، «نامشخص» بزن؛ برچسب نامطمئن از برچسب اشتباه بهتره.</p>
+  <div class="grid3"><button data-foot="l" class="tag-l">پای چپ</button><button data-foot="r" class="tag-r">پای راست</button><button data-foot="?">پا نامشخص</button></div>
+  <div class="grid4" style="margin-top:8px"><button data-strike="heel">پاشنه</button><button data-strike="mid">میان‌پا</button><button data-strike="fore">جلوی پا</button><button data-strike="?">نامشخص</button></div>
+  <button class="primary" id="addIc" style="width:100%;margin-top:8px">ثبت تماس در همین فریم</button>
+
+  <h2>۲. جای مفاصل (اختیاری)</h2>
+  <p class="hint">در لحظه‌ی تماس، به ترتیب روی این نقطه‌ها بزن: لگن، زانو، مچ پا، پاشنه، نوک پا (همون پایی که فرود اومده). برای دقت بیشتر، اول با دو انگشت تصویر رو بزرگ کن. این برای سنجیدن خطای زاویه‌ی زانو و پاست.</p>
+  <div class="row"><button id="kpStart">شروع علامت‌گذاری</button><span class="muted" id="kpHint"></span><button id="kpUndo" class="link">برگرداندن آخرین نقطه</button></div>
+
+  <h2>برچسب‌ها</h2>
+  <ol class="marks" id="marks"></ol>
+  <p class="muted" id="summary"></p>
+  <div class="row"><button class="primary" id="export">ذخیره یا اشتراک فایل برچسب‌ها</button><button id="clear" class="link">پاک کردن همه</button></div>
+</section>
+</main>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var v = $('v'), cv = $('cv'), g = cv.getContext('2d');
+  var file = null, key = null, sel = { foot: null, strike: null }, kp = null;
+  var data = { v: 1, video: null, meta: {}, marks: [], points: [] };
+  var KP = ['لگن', 'زانو', 'مچ پا', 'پاشنه', 'نوک پا'], KPK = ['hip', 'knee', 'ank', 'heel', 'toe'];
+  var fa = function (s) { return String(s).replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); };
+  var STRIKE = { heel: 'پاشنه', mid: 'میان‌پا', fore: 'جلوی پا', '?': 'نوع نامشخص' }, FOOT = { l: 'چپ', r: 'راست', '?': 'پا نامشخص' };
+  function store() { try { if (key) localStorage.setItem(key, JSON.stringify(data)); } catch (e) { /* بدون ذخیره هم کار می‌کنه */ } }
+  function restore() { try { var s = key && localStorage.getItem(key); if (s) data = JSON.parse(s); } catch (e) { /* */ } }
+  $('file').addEventListener('change', function (e) {
+    file = e.target.files && e.target.files[0];
+    if (!file) return;
+    key = 'gaam-label:' + file.name + ':' + file.size;
+    data = { v: 1, video: { name: file.name, size: file.size }, meta: {}, marks: [], points: [] };
+    restore();
+    if (v.src) URL.revokeObjectURL(v.src);
+    v.src = URL.createObjectURL(file);
+    $('fname').textContent = file.name;
+    $('meta').hidden = false; $('player').hidden = false;
+    ['view', 'slow', 'runner', 'cam', 'env', 'light', 'note'].forEach(function (k) { $(k).value = data.meta[k] != null ? data.meta[k] : ($(k).tagName === 'SELECT' ? $(k).options[0].value : ''); });
+    render();
+  });
+  ['view', 'slow', 'runner', 'cam', 'env', 'light', 'note'].forEach(function (k) { $(k).addEventListener('change', function () { data.meta[k] = $(k).value; store(); }); });
+  v.addEventListener('loadedmetadata', function () {
+    data.video.duration = v.duration; data.video.w = v.videoWidth; data.video.h = v.videoHeight;
+    cv.width = v.videoWidth; cv.height = v.videoHeight;
+    // اندازه‌ی کادر با نسبت خود ویدیو و حداکثر ۶۵٪ ارتفاع صفحه (ویدیوی عمودی دکمه‌ها رو از صفحه بیرون نکنه)
+    var ratio = v.videoWidth / v.videoHeight, st = $('stage');
+    st.style.aspectRatio = v.videoWidth + ' / ' + v.videoHeight; st.style.width = 'min(100%, ' + (65 * ratio).toFixed(1) + 'vh)';
+    v.currentTime = 0.001; draw();
+  });
+  function step() { return Number($('step').value) || 1 / 60; }
+  function go(t) { v.pause(); v.currentTime = Math.max(0, Math.min(v.duration || 0, t)); }
+  v.addEventListener('seeked', draw); v.addEventListener('timeupdate', draw);
+  $('b1').onclick = function () { go(v.currentTime - step()); }; $('f1').onclick = function () { go(v.currentTime + step()); };
+  $('b5').onclick = function () { go(v.currentTime - 5 * step()); }; $('f5').onclick = function () { go(v.currentTime + 5 * step()); };
+  $('seek').addEventListener('input', function () { go($('seek').value / 1000 * (v.duration || 0)); });
+  $('play').onclick = function () { if (v.paused) { v.playbackRate = 0.25; v.play(); $('play').textContent = 'توقف'; } else { v.pause(); $('play').textContent = 'پخش آهسته'; } };
+  function draw() {
+    $('time').textContent = v.currentTime.toFixed(3) + ' s';
+    if (v.duration) $('seek').value = Math.round(v.currentTime / v.duration * 1000);
+    g.clearRect(0, 0, cv.width, cv.height);
+    var r = Math.max(4, cv.width / 160);
+    data.points.concat(kp ? [kp] : []).forEach(function (P) {
+      if (Math.abs(P.t - v.currentTime) > 0.004) return;
+      var col = P.foot === 'l' ? '#5B8FD8' : '#E3A23A';
+      KPK.forEach(function (k, i) { var q = P.pts[k]; if (!q) return; g.fillStyle = col; g.beginPath(); g.arc(q[0] * cv.width, q[1] * cv.height, r, 0, 7); g.fill();
+        var nx = P.pts[KPK[i + 1]]; if (nx && i < 3) { g.strokeStyle = col; g.lineWidth = r / 2; g.beginPath(); g.moveTo(q[0] * cv.width, q[1] * cv.height); g.lineTo(nx[0] * cv.width, nx[1] * cv.height); g.stroke(); } });
+    });
+  }
+  document.querySelectorAll('[data-foot]').forEach(function (b) { b.onclick = function () { sel.foot = b.dataset.foot; document.querySelectorAll('[data-foot]').forEach(function (x) { x.classList.toggle('on', x === b); }); }; });
+  document.querySelectorAll('[data-strike]').forEach(function (b) { b.onclick = function () { sel.strike = b.dataset.strike; document.querySelectorAll('[data-strike]').forEach(function (x) { x.classList.toggle('on', x === b); }); }; });
+  $('addIc').onclick = function () {
+    if (!sel.foot || !sel.strike) { alert('اول پا و نوع فرود رو انتخاب کن (یا «نامشخص»).'); return; }
+    data.marks.push({ t: Math.round(v.currentTime * 1000) / 1000, foot: sel.foot, strike: sel.strike });
+    data.marks.sort(function (a, b) { return a.t - b.t; });
+    store(); render();
+  };
+  $('kpStart').onclick = function () {
+    if (!sel.foot || sel.foot === '?') { alert('اول پای چپ یا راست رو انتخاب کن.'); return; }
+    kp = { t: Math.round(v.currentTime * 1000) / 1000, foot: sel.foot, pts: {} }; kpNext();
+    // تصویر باید جلوی چشم باشه تا روی مفاصل بزنی
+    $('stage').scrollIntoView({ block: 'center' });
+  };
+  function kpNext() {
+    if (!kp) { $('kpHint').textContent = ''; return; }
+    var i = KPK.filter(function (k) { return kp.pts[k]; }).length;
+    if (i >= KPK.length) { data.points.push(kp); kp = null; store(); render(); $('kpHint').textContent = 'ثبت شد'; return; }
+    $('kpHint').textContent = 'بزن روی: ' + KP[i] + ' (پای ' + FOOT[kp.foot] + ')';
+    draw();
+  }
+  cv.addEventListener('click', function (e) {
+    if (!kp) return;
+    var b = cv.getBoundingClientRect(), i = KPK.filter(function (k) { return kp.pts[k]; }).length;
+    kp.pts[KPK[i]] = [Math.round((e.clientX - b.left) / b.width * 1e4) / 1e4, Math.round((e.clientY - b.top) / b.height * 1e4) / 1e4];
+    kpNext();
+  });
+  $('kpUndo').onclick = function () { if (!kp) return; var have = KPK.filter(function (k) { return kp.pts[k]; }); if (have.length) delete kp.pts[have[have.length - 1]]; kpNext(); };
+  function render() {
+    var ol = $('marks'); ol.innerHTML = '';
+    data.marks.forEach(function (m, i) {
+      var li = document.createElement('li');
+      li.innerHTML = '<span>' + fa(m.t.toFixed(3)) + ' ث</span><span class="tag-' + (m.foot === '?' ? '' : m.foot) + '">' + FOOT[m.foot] + '</span><span>' + STRIKE[m.strike] + '</span>';
+      var go1 = document.createElement('button'); go1.className = 'link'; go1.style.color = 'inherit'; go1.textContent = 'رفتن'; go1.onclick = function () { go(m.t); };
+      var del = document.createElement('button'); del.className = 'link'; del.textContent = 'حذف'; del.onclick = function () { data.marks.splice(i, 1); store(); render(); };
+      li.appendChild(go1); li.appendChild(del); ol.appendChild(li);
+    });
+    data.points.forEach(function (P, i) {
+      var li = document.createElement('li');
+      li.innerHTML = '<span>' + fa(P.t.toFixed(3)) + ' ث</span><span>مفاصل پای ' + FOOT[P.foot] + '</span>';
+      var del = document.createElement('button'); del.className = 'link'; del.textContent = 'حذف'; del.onclick = function () { data.points.splice(i, 1); store(); render(); };
+      li.appendChild(del); ol.appendChild(li);
+    });
+    var c = { heel: 0, mid: 0, fore: 0 }; data.marks.forEach(function (m) { if (c[m.strike] != null) c[m.strike]++; });
+    $('summary').textContent = fa(data.marks.length) + ' تماس (پاشنه ' + fa(c.heel) + '، میان‌پا ' + fa(c.mid) + '، جلوی پا ' + fa(c.fore) + ')، ' + fa(data.points.length) + ' فریم با مفاصل';
+    draw();
+  }
+  $('clear').onclick = function () { if (confirm('همه‌ی برچسب‌های این ویدیو پاک بشه؟')) { data.marks = []; data.points = []; store(); render(); } };
+  $('export').onclick = function () {
+    data.exportedAt = new Date().toISOString();
+    var name = 'labels-' + (file ? file.name.replace(/\.[^.]+$/, '') : 'video') + '.json';
+    var blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+    var f = new File([blob], name, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: name }).catch(function () { dl(blob, name); }); }
+    else dl(blob, name);
+  };
+  function dl(blob, name) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+})();
+</script>
+</body>
+</html>
