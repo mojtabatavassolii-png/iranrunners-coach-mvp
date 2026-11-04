@@ -8,7 +8,7 @@
   'use strict';
   var BASE = 'js/vendor/mediapipe/', MODEL = 'models/pose_landmarker_full.task';
   // نمونه‌برداری ثابت ۳۰ فریم در ثانیه (حداکثر ۱۲ ثانیه)
-  var MAX_SEC = 20, STEP = 1 / 30;
+  var MAX_SEC = 10, STEP = 1 / 30;
   var engine = null, loading = null, clock = 0;
 
   function abs(p) { return new URL(p, document.baseURI).href; }
@@ -113,7 +113,7 @@
       });
     });
   }
-  // بازه‌ی تحلیل به ثانیه‌ی واقعی (نه ثانیه‌ی فیلم): حدود ۱۰ ثانیه دویدن واقعی (بیش از ۲۰ گام)؛
+  // بازه‌ی تحلیل به ثانیه‌ی واقعی (نه ثانیه‌ی فیلم): حدود ۱۰ ثانیه دویدن واقعی (۲۵ تا ۳۰ گام، برای همه‌ی اندازه‌گیری‌ها کافی)؛
   // فیلم اسلوموشن ×k یعنی k برابر ثانیه‌ی فیلم، با سقف ۴۰ ثانیه‌ی فیلم (زمان پردازش روی گوشی)
   var REAL_SEC = 10, MAX_SRC = 40, MAX_SIDE = 1280;
   function windowSec(scale) { return scale > 1 ? Math.min(MAX_SRC, REAL_SEC * scale) : MAX_SEC; }
@@ -131,10 +131,14 @@
       cv = document.createElement('canvas'); cv.width = Math.round(v.videoWidth * sc); cv.height = Math.round(v.videoHeight * sc);
       g = cv.getContext('2d');
       var n = Math.floor(dur / STEP), frames = [], i = opts.from > 0 ? Math.ceil(opts.from / STEP - 1e-6) : 0, i0 = i;
+      // اسلوموشن ×۴ و بیشتر: هر ۱/۳۰ ثانیه‌ی فیلم یعنی ۱۲۰ تا ۲۴۰ فریم در ثانیه‌ی واقعی؛ تشخیص یکی‌درمیون (هنوز حداقل ۶۰ تا ۱۲۰ در ثانیه)
+      // و فریم‌های بین با درون‌یابی پر می‌شن (بدون جابه‌جایی روی ویدیو) تا هر ۱/۳۰ ثانیه همچنان یک فریم باشه (پخش‌کننده همین رو می‌خواد)
+      var every = opts.timeScale >= 4 ? 2 : 1;
       function next() {
         // full: کل فیلم پردازش شد (برای پیشنهاد ادامه‌ی تحلیل بعد از تعیین ضریب اسلوموشن)
-        if (i >= n) return { w: v.videoWidth, h: v.videoHeight, duration: dur, full: dur >= (v.duration || 0) - STEP, frames: frames, video: v, input: { w: cv.width, h: cv.height }, engine: en.name };
+        if (i >= n) { fillSkipped(frames); return { w: v.videoWidth, h: v.videoHeight, duration: dur, full: dur >= (v.duration || 0) - STEP, frames: frames, video: v, input: { w: cv.width, h: cv.height }, engine: en.name, backend: en.backend || null }; }
         var t = i * STEP + 0.001;
+        if (every > 1 && (i - i0) % every && i < n - 1) { frames.push({ t: t, lm: null, skip: true }); i++; return next(); }
         return seek(v, t).then(function () {
           g.drawImage(v, 0, 0, cv.width, cv.height);
           return en.detect(cv);
@@ -149,6 +153,16 @@
     }).catch(function (e) { if (v) release(v); throw e.code ? e : fail('video', e); });
   }
 
+  // فریم‌های رد شده: میانگین وزنی دو فریم تشخیص‌داده‌شده‌ی دو طرف (اگه یکی نبود، بدون نقطه)
+  function fillSkipped(F) {
+    for (var i = 0; i < F.length; i++) {
+      if (!F[i].skip) continue;
+      var a = i - 1, b = i + 1;
+      while (b < F.length && F[b].skip) b++;
+      var A = a >= 0 ? F[a].lm : null, B = b < F.length ? F[b].lm : null, w = (i - a) / (b - a);
+      F[i] = { t: F[i].t, lm: A && B ? A.map(function (p, k) { var q = B[k]; return [p[0] + (q[0] - p[0]) * w, p[1] + (q[1] - p[1]) * w, Math.min(p[2], q[2]), p[3] == null ? 0 : p[3]]; }) : null };
+    }
+  }
   // تصویر فریم نمونه با اسکلت و زاویه‌ی مورد نظر (برای گزارش)
   // رنگ‌های بوم از متغیرهای css/theme.css (بوم var() نمی‌فهمه، پس مقدارشون خونده می‌شه)؛ a = شفافیت اختیاری
   function tok(name, a) {

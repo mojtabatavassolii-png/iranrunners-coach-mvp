@@ -21,17 +21,55 @@
   function abs(p) { return new URL(p, document.baseURI).href; }
   function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 
+  // پردازنده‌ی گرافیکی (WebGPU، مثلاً سافاری iOS 26) اگه باشه، وگرنه CPU (WebAssembly). هر دستگاه فقط یکی از دو نسخه‌ی
+  // ONNX Runtime رو دانلود می‌کنه. ?gpu=0 در آدرس برای مقایسه CPU رو اجباری می‌کنه.
+  function gpuAdapter() {
+    if (!navigator.gpu || /[?&]gpu=0\b/.test(location.search)) return Promise.resolve(null);
+    // مدل نیم‌دقت (float16) روی پردازنده‌ی گرافیکی به قابلیت shader-f16 نیاز داره؛ بدونش خروجی خالی می‌ده
+    return navigator.gpu.requestAdapter().then(function (a) { return a && a.features && a.features.has('shader-f16') ? a : null; }).catch(function () { return null; });
+  }
   function create() {
-    return import(abs(ORT + 'ort.wasm.min.mjs')).then(function (m) {
-      var ort = m.InferenceSession ? m : m.default;
-      ort.env.wasm.wasmPaths = abs(ORT);
-      // چندنخی به crossOriginIsolated نیاز داره (سرآیندهایی که GitHub Pages نمی‌ده)
-      ort.env.wasm.numThreads = 1;
-      var o = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
-      return Promise.all([ort.InferenceSession.create(abs(DET), o), ort.InferenceSession.create(abs(POSE), o)]).then(function (s) { return engine(ort, s[0], s[1]); });
+    return gpuAdapter().then(function (adapter) {
+      return import(abs(ORT + (adapter ? 'ort.webgpu.min.mjs' : 'ort.wasm.min.mjs'))).then(function (m) {
+        var ort = m.InferenceSession ? m : m.default;
+        ort.env.wasm.wasmPaths = abs(ORT);
+        // چندنخی به crossOriginIsolated نیاز داره (سرآیندهایی که GitHub Pages نمی‌ده)
+        ort.env.wasm.numThreads = 1;
+        var opt = function (ep) { return { executionProviders: [ep], graphOptimizationLevel: 'all' }; };
+        // تشخیص آدم (۸ بیتی، هر ۱۵ فریم یک بار) همیشه روی CPU؛ مدل نقاط اول روی پردازنده‌ی گرافیکی، اگه نشد CPU
+        var ep = adapter ? 'webgpu' : 'wasm';
+        // پشت‌سرهم، نه هم‌زمان: ساختن هم‌زمان دو مدل، WebAssembly رو دو بار راه می‌اندازه و نسخه‌ی WebGPU خطا می‌ده
+        var det;
+        return ort.InferenceSession.create(abs(DET), opt('wasm')).then(function (d) {
+          det = d;
+          return ort.InferenceSession.create(abs(POSE), opt(ep)).catch(function (e) {
+            if (ep === 'wasm') throw e;
+            if (root.console) console.warn('rtmpose webgpu', e);
+            ep = 'wasm'; return ort.InferenceSession.create(abs(POSE), opt('wasm'));
+          });
+        }).then(function (pose) {
+          // یک اجرای آزمایشی: اگه پردازنده‌ی گرافیکی خروجی معتبر نداد (خطای بی‌صدای WebGPU)، همون مدل روی CPU
+          return ep === 'wasm' ? pose : selfTest(ort, pose).then(function (ok) {
+            if (ok) return pose;
+            if (root.console) console.warn('rtmpose webgpu: invalid output, using wasm');
+            ep = 'wasm'; try { pose.release(); } catch (e) { /* */ }
+            return ort.InferenceSession.create(abs(POSE), opt('wasm'));
+          });
+        }).then(function (pose) { var en = engine(ort, det, pose); en.backend = ep; return en; });
+      });
     });
   }
 
+  function selfTest(ort, s) {
+    var x = new Float32Array(3 * PW * PH);
+    for (var i = 0; i < x.length; i++) x[i] = Math.sin(i * 0.37);
+    var feeds = {}; feeds[s.inputNames[0]] = new ort.Tensor('float32', x, [1, 3, PH, PW]);
+    return s.run(feeds).then(function (o) {
+      var d = o[s.outputNames[0]].data, lo = Infinity, hi = -Infinity;
+      for (var j = 0; j < d.length; j++) { if (!isFinite(d[j])) return false; lo = Math.min(lo, d[j]); hi = Math.max(hi, d[j]); }
+      return hi - lo > 1e-3;
+    }).catch(function () { return false; });
+  }
   function engine(ort, sDet, sPose) {
     var dc = canvas(DS, DS), pc = canvas(PW, PH), dx = dc.getContext('2d', { willReadFrequently: true }), px = pc.getContext('2d', { willReadFrequently: true });
     var box = null, n = 0;

@@ -1,4 +1,6 @@
-ONNX Runtime Web 1.20.1 (onnxruntime-web، npm) — فقط نسخه‌ی WebAssembly (ort.wasm.min.mjs و ort-wasm-simd-threaded.*)
+ONNX Runtime Web 1.20.1 (onnxruntime-web، npm) — دو نسخه، هر دستگاه فقط یکی رو دانلود می‌کنه:
+  - ort.webgpu.min.mjs و ort-wasm-simd-threaded.jsep.*: پردازنده‌ی گرافیکی (WebGPU با shader-f16)، با CPU به‌عنوان پشتیبان
+  - ort.wasm.min.mjs و ort-wasm-simd-threaded.{mjs,wasm}: فقط CPU (WebAssembly)
 مجوز: MIT — Copyright (c) Microsoft Corporation. https://github.com/microsoft/onnxruntime/blob/main/LICENSE
 همه‌ی فایل‌ها از خود اپ بارگذاری می‌شن؛ هیچ درخواستی به سرور بیرونی فرستاده نمی‌شه.
 

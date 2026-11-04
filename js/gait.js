@@ -157,10 +157,17 @@
       while (b < y.length && y[b] == null && b - a <= 3) b++;
       if (y[a] != null && b < y.length && y[b] != null && b - a <= 3) for (var q2 = a + 1; q2 < b; q2++) y[q2] = y[a] + (y[b] - y[a]) * (q2 - a) / (b - a);
     }
-    var ground = pct(y, 0.92);
-    if (ground == null) return { ic: [], stance: [] };
-    var thr = ground - 0.06 * L;
-    var on = y.map(function (v) { return v != null && v >= thr; });
+    if (pct(y, 0.92) == null) return { ic: [], stance: [] };
+    // خط زمین محلی (حدود یک ثانیه‌ی واقعی دور هر فریم) و طول پای محلی: دونده‌ای که از دوربین دور یا بهش نزدیک می‌شه در تصویر
+    // بالا یا پایین می‌ره و کوچیک یا بزرگ می‌شه؛ با یک خط زمین برای کل فیلم، بیشتر برخوردها زیر آستانه نمی‌رسیدن
+    var half = Math.max(8, Math.round(0.5 / (D.dt || 1 / 30)));
+    var Lf = D.pts.map(function (p) { return p ? (dist(p[s.hip], p[s.knee]) + dist(p[s.knee], p[s.ank])) : null; });
+    var on = y.map(function (v, i) {
+      if (v == null) return false;
+      var a = Math.max(0, i - half), b = Math.min(y.length, i + half + 1);
+      var g = pct(y.slice(a, b), 0.92), Li = median(Lf.slice(a, b)) || L;
+      return g != null && v >= g - 0.06 * Li;
+    });
     var ic = [], stance = [];
     for (var i = 1; i < on.length; i++) {
       if (on[i] && !on[i - 1] && y[i - 1] != null) {
