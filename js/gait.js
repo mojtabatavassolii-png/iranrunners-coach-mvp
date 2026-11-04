@@ -314,8 +314,18 @@
     for (; k < ac.length - 1; k++) {
       if (ac[k] == null || ac[k - 1] == null || ac[k + 1] == null) continue;
       if (ac[k] >= ac[k - 1] && ac[k] >= ac[k + 1] && ac[k] >= 0.5) {
-        var den = ac[k - 1] - 2 * ac[k] + ac[k + 1], off = den ? 0.5 * (ac[k - 1] - ac[k + 1]) / den : 0;
-        return { lag: k + Math.max(-0.5, Math.min(0.5, off)), r: Math.round(ac[k] * 100) / 100 };
+        // این قله ممکنه یک چرخه‌ی کامل (دو گام) باشه، اگه قله‌ی گام ضعیف‌تر از حد بوده (نقاط پرنوسان، یا دو پای متفاوت):
+        // وسط این فاصله هم قله‌ی مثبت داره (گام‌های چپ و راست شبیه هم‌ان). در فیلم درست یا اسلوموشن، نصف یک گام
+        // همبستگی منفی داره، پس این بررسی آهنگ واقعی رو نصف یا دوبرابر نمی‌کنه.
+        var h0 = Math.round(k / 2), hb = -1;
+        for (var j = Math.max(2, h0 - 2); j <= h0 + 2 && j < ac.length - 1; j++) {
+          if (ac[j] != null && ac[j - 1] != null && ac[j + 1] != null && ac[j] >= ac[j - 1] && ac[j] >= ac[j + 1] && ac[j] >= 0.25 && (hb < 0 || ac[j] > ac[hb])) hb = j;
+        }
+        var q = hb > 0 ? hb : k;
+        var den = ac[q - 1] - 2 * ac[q] + ac[q + 1], off = den ? 0.5 * (ac[q - 1] - ac[q + 1]) / den : 0;
+        var res = { lag: q + Math.max(-0.5, Math.min(0.5, off)), r: Math.round(ac[q] * 100) / 100 };
+        if (hb > 0) res.fromStride = true;
+        return res;
       }
     }
     return null;
@@ -351,9 +361,12 @@
     if (per && per.lag) { exact = 60 / (per.lag * D.dt); out.method = 'period'; out.r = per.r; out.cycles = Math.floor(D.pts.filter(Boolean).length / per.lag); }
     else if (gaps.length >= 2) { exact = 60 / median(gaps); out.method = 'ic'; }
     else return out;
+    // فقط از فاصله‌ی برخوردها (بدون خودهمبستگی) و دوبرابر بازه‌ی ممکن: احتمالاً هر گام دو بار شمرده شده (نقاط پرنوسان پا)؛
+    // نصفش در بازه باشه → همون، با حداکثر اطمینان «تخمینی» (فیلم تندشده‌ی دویدن خیلی نادره)
+    if (out.method === 'ic' && exact > CAD_OK.hi && exact / 2 >= CAD_OK.lo && exact / 2 <= CAD_OK.hi) { exact /= 2; out.method = 'ic-half'; out.fromIc = Math.round(exact); }
     out.cadence = Math.round(exact);
     // دو روش با هم نمی‌خونن (بیش از ۱۵٪ اختلاف) → حداکثر «تخمینی»
-    out.agree = out.fromIc == null || Math.abs(out.fromIc - out.cadence) / out.cadence <= 0.15;
+    out.agree = out.method !== 'ic-half' && (out.fromIc == null || Math.abs(out.fromIc - out.cadence) / out.cadence <= 0.15);
     out.valid = out.cadence >= CAD_OK.lo && out.cadence <= CAD_OK.hi;
     // زمان فیلم واقعی فرض شده ولی عدد غیرممکنه: ضریب اسلوموشنی که عدد رو به بازه‌ی دویدن (۱۴۰ تا ۲۱۰) می‌بره؛
     // ضریب‌ها دوبرابر هم‌ان و این بازه کمتر از دوبرابره، پس حداکثر یک ضریب جواب می‌ده
@@ -922,7 +935,7 @@
       score: J.length ? Math.round(J.reduce(function (s, f) { return s + (f.status === 'good' ? 1 : f.status === 'warn' ? 0.5 : 0); }, 0) / J.length * 100) : null };
   }
 
-  var api = { PUBLISH: PUBLISH, analyze: analyze, cadenceOf: cadenceOf, CAD_OK: CAD_OK, analyzeSide: analyzeSide, analyzeBack: analyzeBack, findings: findings, risks: risks, axisScore: axisScore, judged: judged,
+  var api = { stepPeriod: stepPeriod, PUBLISH: PUBLISH, analyze: analyze, cadenceOf: cadenceOf, CAD_OK: CAD_OK, analyzeSide: analyzeSide, analyzeBack: analyzeBack, findings: findings, risks: risks, axisScore: axisScore, judged: judged,
     AXIS: AXIS, INJURIES: INJURIES, REF: REF, CONDITIONS: CONDITIONS, P: P, angle3: angle3 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CoachGait = api;

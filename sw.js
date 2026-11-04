@@ -5,14 +5,14 @@
  * - بقیه (آیکون‌ها، فونت وزیرمتن روی خود سایت): کش و به‌روزرسانی در پس‌زمینه.
  * با هر انتشار، VERSION و نسخه‌ی فایل‌ها در index.html با هم بالا می‌رن (تست این هماهنگی رو بررسی می‌کنه).
  */
-var VERSION = '103';
+var VERSION = '104';
 var CACHE = 'coach-v' + VERSION;
 // صبر حداکثر برای شبکه موقع باز کردن صفحه، قبل از نشون دادن نسخه‌ی کش‌شده
 var NAV_WAIT = 1500;
 // فایل‌های بزرگ تحلیل دویدن (MediaPipe و مدل، حدود ۳۵ مگابایت): کش جدا و ماندگار، فقط بعد از اولین استفاده؛
 // با انتشار نسخه‌ی تازه‌ی اپ پاک نمی‌شن. با عوض شدن نسخه‌ی MediaPipe، این اسم عوض می‌شه.
 var BIG_CACHE = 'coach-mp-1.1.1';
-function isBig(url) { return url.pathname.indexOf('/js/vendor/mediapipe/') >= 0 || url.pathname.indexOf('/models/') >= 0; }
+function isBig(url) { return url.pathname.indexOf('/js/vendor/mediapipe/') >= 0 || url.pathname.indexOf('/js/vendor/onnxruntime/') >= 0 || url.pathname.indexOf('/models/') >= 0; }
 var SHELL = [
   './',
   'index.html',
@@ -31,6 +31,7 @@ var SHELL = [
   'js/platform.js?v=' + VERSION,
   'js/splash.js?v=' + VERSION,
   'js/gait.js?v=' + VERSION,
+  'js/rtmpose.js?v=' + VERSION,
   'js/pose.js?v=' + VERSION,
   'js/track.js?v=' + VERSION,
   'js/hr.js?v=' + VERSION,

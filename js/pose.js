@@ -1,6 +1,6 @@
 /*
- * استخراج نقاط کلیدی بدن از ویدیو با MediaPipe Pose، کاملاً داخل مرورگر.
- * کتابخانه (js/vendor/mediapipe) و مدل (models/) از خود اپ بارگذاری می‌شن و فقط وقتی کاربر تحلیل رو شروع کنه؛
+ * استخراج نقاط کلیدی بدن از ویدیو، کاملاً داخل مرورگر: RTMPose-m (js/rtmpose.js) و اگه روی این دستگاه بارگذاری نشد، MediaPipe Pose.
+ * کتابخانه‌ها (js/vendor) و مدل‌ها (models/) از خود اپ بارگذاری می‌شن و فقط وقتی کاربر تحلیل رو شروع کنه؛
  * ویدیو هیچ‌وقت از دستگاه خارج نمی‌شه (CSP در index.html هم هر اتصال بیرونی رو می‌بنده).
  * خروجی: { w, h, duration, full, input: { w, h }, frames: [{ t, lm: [[x, y, visibility, z] × ۳۳] | null }] } برای js/gait.js
  */
@@ -9,13 +9,21 @@
   var BASE = 'js/vendor/mediapipe/', MODEL = 'models/pose_landmarker_full.task';
   // نمونه‌برداری ثابت ۳۰ فریم در ثانیه (حداکثر ۱۲ ثانیه)
   var MAX_SEC = 20, STEP = 1 / 30;
-  var landmarker = null, loading = null, clock = 0;
+  var engine = null, loading = null, clock = 0;
 
   function abs(p) { return new URL(p, document.baseURI).href; }
+  // تحلیلگر: { name, detect(بوم) → Promise<۳۳ نقطه | null>، reset، close }. اول RTMPose؛ اگه نشد (مثلاً مرورگر قدیمی)، MediaPipe.
+  // ?pose=mp در آدرس برای مقایسه MediaPipe رو اجباری می‌کنه.
   function load() {
-    if (landmarker) return Promise.resolve(landmarker);
+    if (engine) return Promise.resolve(engine);
     if (loading) return loading;
-    loading = import(abs(BASE + 'vision_bundle.mjs')).then(function (mp) {
+    var forceMp = /[?&]pose=mp\b/.test(location.search);
+    loading = (root.CoachRtm && !forceMp ? root.CoachRtm.create().catch(function (e) { if (root.console) console.warn('rtmpose', e); return mpEngine(); }) : mpEngine())
+      .then(function (en) { engine = en; return en; }, function (e) { loading = null; throw e; });
+    return loading;
+  }
+  function mpEngine() {
+    return import(abs(BASE + 'vision_bundle.mjs')).then(function (mp) {
       return mp.FilesetResolver.forVisionTasks(abs(BASE + 'wasm')).then(function (fs) {
         var opts = function (delegate) {
           return { baseOptions: { modelAssetPath: abs(MODEL), delegate: delegate }, runningMode: 'VIDEO', numPoses: 1,
@@ -24,16 +32,34 @@
         // GPU اگه باشه؛ وگرنه CPU
         return mp.PoseLandmarker.createFromOptions(fs, opts('GPU')).catch(function () { return mp.PoseLandmarker.createFromOptions(fs, opts('CPU')); });
       });
-    }).then(function (lm) { landmarker = lm; return lm; }, function (e) { loading = null; throw e; });
-    return loading;
+    }).then(function (lm) {
+      var retried = false;
+      var map = function (r) { var p = r && r.landmarks && r.landmarks[0];
+        // چهارمین عدد: عمق تخمینی MediaPipe (فقط برای تحلیل؛ پخش‌کننده فقط سه عدد اول رو می‌خونه)
+        return p ? p.map(function (q) { return [q.x, q.y, q.visibility == null ? 1 : q.visibility, q.z == null ? 0 : Math.round(q.z * 1e4) / 1e4]; }) : null; };
+      return {
+        name: 'mediapipe-full',
+        reset: function () {},
+        detect: function (cv) {
+          clock += 34; // زمان‌های ارسالی به MediaPipe باید همیشه صعودی باشن (بین دو ویدیو هم)
+          try { return Promise.resolve(map(lm.detectForVideo(cv, clock))); } catch (e) {
+            // پردازنده‌ی گرافیکی بعضی گوشی‌ها: یک بار دیگه با CPU
+            if (retried) return Promise.reject(fail('detect', e));
+            retried = true;
+            return recreateCpu().then(function (l) { lm = l; clock += 34; return map(lm.detectForVideo(cv, clock)); }).catch(function (e2) { throw fail('detect', e2); });
+          }
+        },
+        close: function () { try { lm.close(); } catch (e) { /* */ } }
+      };
+    });
   }
 
   // آزاد کردن کامل تحلیلگر (گرافیک WebGL و حافظه‌ی WebAssembly)؛ بار بعد از کش دوباره ساخته می‌شه.
   // روی آیفون نگه داشتنش بعد از تحلیل، حافظه‌ی صفحه رو پر می‌کرد و بقیه‌ی صفحه‌ها کشیده نمی‌شدن.
   function unload() {
-    var l = landmarker;
-    landmarker = null; loading = null;
-    if (l) { try { l.close(); } catch (e) { /* */ } }
+    var en = engine;
+    engine = null; loading = null;
+    if (en) en.close();
   }
   function once(el, ev, ms) {
     return new Promise(function (res, rej) {
@@ -80,13 +106,12 @@
     }).catch(function (e) { throw fail('seek', e); });
   }
   function recreateCpu() {
-    landmarker = null; loading = null;
     return import(abs(BASE + 'vision_bundle.mjs')).then(function (mp) {
       return mp.FilesetResolver.forVisionTasks(abs(BASE + 'wasm')).then(function (fs) {
         return mp.PoseLandmarker.createFromOptions(fs, { baseOptions: { modelAssetPath: abs(MODEL), delegate: 'CPU' }, runningMode: 'VIDEO', numPoses: 1,
           minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
       });
-    }).then(function (l) { landmarker = l; return l; });
+    });
   }
   // بازه‌ی تحلیل به ثانیه‌ی واقعی (نه ثانیه‌ی فیلم): حدود ۱۰ ثانیه دویدن واقعی (بیش از ۲۰ گام)؛
   // فیلم اسلوموشن ×k یعنی k برابر ثانیه‌ی فیلم، با سقف ۴۰ ثانیه‌ی فیلم (زمان پردازش روی گوشی)
@@ -96,8 +121,8 @@
   // opts: { timeScale: ضریب اسلوموشن (برای طول بازه)، from: ادامه از این ثانیه‌ی فیلم (اضافه کردن به فریم‌های قبلی) }
   function processVideo(file, onProgress, opts) {
     opts = opts || {};
-    var lmk, v, cv, g, retried = false;
-    return load().then(function (l) { lmk = l; return openVideo(file); }).then(function (video) {
+    var en, v, cv, g;
+    return load().then(function (e) { en = e; en.reset(); return openVideo(file); }).then(function (video) {
       v = video;
       var dur = Math.min(v.duration || 0, windowSec(opts.timeScale));
       if (!(dur > 0.5)) throw fail('short');
@@ -106,26 +131,15 @@
       cv = document.createElement('canvas'); cv.width = Math.round(v.videoWidth * sc); cv.height = Math.round(v.videoHeight * sc);
       g = cv.getContext('2d');
       var n = Math.floor(dur / STEP), frames = [], i = opts.from > 0 ? Math.ceil(opts.from / STEP - 1e-6) : 0, i0 = i;
-      function detect() {
-        clock += 34; // زمان‌های ارسالی به MediaPipe باید همیشه صعودی باشن (بین دو ویدیو هم)
-        try { return Promise.resolve(lmk.detectForVideo(cv, clock)); } catch (e) {
-          // پردازنده‌ی گرافیکی بعضی گوشی‌ها: یک بار دیگه با CPU
-          if (retried) return Promise.reject(fail('detect', e));
-          retried = true;
-          return recreateCpu().then(function (l) { lmk = l; clock += 34; return lmk.detectForVideo(cv, clock); }).catch(function (e2) { throw fail('detect', e2); });
-        }
-      }
       function next() {
         // full: کل فیلم پردازش شد (برای پیشنهاد ادامه‌ی تحلیل بعد از تعیین ضریب اسلوموشن)
-        if (i >= n) return { w: v.videoWidth, h: v.videoHeight, duration: dur, full: dur >= (v.duration || 0) - STEP, frames: frames, video: v, input: { w: cv.width, h: cv.height } };
+        if (i >= n) return { w: v.videoWidth, h: v.videoHeight, duration: dur, full: dur >= (v.duration || 0) - STEP, frames: frames, video: v, input: { w: cv.width, h: cv.height }, engine: en.name };
         var t = i * STEP + 0.001;
         return seek(v, t).then(function () {
           g.drawImage(v, 0, 0, cv.width, cv.height);
-          return detect();
-        }).then(function (r) {
-          var p = r && r.landmarks && r.landmarks[0];
-          // چهارمین عدد: عمق تخمینی MediaPipe (فقط برای تحلیل؛ پخش‌کننده فقط سه عدد اول رو می‌خونه)
-          frames.push({ t: t, lm: p ? p.map(function (q) { return [q.x, q.y, q.visibility == null ? 1 : q.visibility, q.z == null ? 0 : Math.round(q.z * 1e4) / 1e4]; }) : null });
+          return en.detect(cv);
+        }).then(function (lm) {
+          frames.push({ t: t, lm: lm });
           i++;
           if (onProgress && (i - i0) % 3 === 0) onProgress((i - i0) / Math.max(1, n - i0));
           return next();

@@ -3633,6 +3633,7 @@
     var meta = [[T(X + 'date'), faDate(r.date)],
       [T(X + 'condition'), ['side', 'back'].filter(function (v) { return cd[v]; }).map(function (v) { return T(X + 'views.' + v) + ': ' + T('gait.cond.' + cd[v]); }).join(T('progress.sep')) || T(X + 'noData')],
       [T(X + 'height'), state.profile && state.profile.heightCm ? fa(state.profile.heightCm + ' ' + T(X + 'cm')) : T(X + 'noData')]];
+    if (r.engine) meta.push([T(X + 'engine'), r.engine === 'rtmpose-m' ? 'RTMPose-m (Halpe26)' : r.engine === 'mediapipe-full' ? 'MediaPipe Pose (full)' : r.engine]);
     [['side', r.qSide], ['side2', r.qSide2], ['back', r.qBack]].forEach(function (q) {
       if (!q[1]) return;
       var v = q[1];
@@ -3945,7 +3946,8 @@
       // v: ۲ = گزارش با سطح اطمینان، شرایط دویدن و قاعده‌ی تازه‌ی الگوهای آسیب
       // v: ۳ = هر یافته مال یک نما، شرایط دویدن جدا برای هر فیلم
       // v: ۴ = هر پارامتر برای هر سمت بدن جدا (sides)، دلیل هر «غیرقابل‌اطمینان»، فقط بازه‌های منبع‌دار قضاوت می‌شن
-      var rep = Object.assign({ id: 'g' + Date.now().toString(36), v: 4, date: C.dateKey(today()), at: new Date().toISOString() }, gaitRepFields(r), args.timeScale.side > 1 || args.timeScale.side2 > 1 || args.timeScale.back > 1 ? { timeScale: Object.assign({}, args.timeScale) } : {});
+      // engine: مدل تشخیص بدن که واقعاً استفاده شد (rtmpose-m، یا mediapipe-full اگه اون روی دستگاه بارگذاری نشد)
+      var rep = Object.assign({ id: 'g' + Date.now().toString(36), v: 4, date: C.dateKey(today()), at: new Date().toISOString(), engine: (data[slots[0]] || {}).engine || null }, gaitRepFields(r), args.timeScale.side > 1 || args.timeScale.side2 > 1 || args.timeScale.back > 1 ? { timeScale: Object.assign({}, args.timeScale) } : {});
       // تصویر فریم کلیدی از ویدیوی خود هر زاویه (هر خونه‌ای که کاربر گذاشته)
       var shots = [];
       if (r.side) {

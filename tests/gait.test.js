@@ -465,4 +465,22 @@ test('حدهای انتشار قابل تنظیم‌ان', function () {
   finally { G.PUBLISH.kneeIc.est = old; }
   assert.notStrictEqual(find(G.analyze({ side: v, heightCm: 175 }), 'kneeIc').status, 'na');
 });
+
+test('آهنگ گام نصف یا دوبرابر نمی‌شه: قله‌ی ضعیف گام در برابر چرخه‌ی کامل', function () {
+  // سیگنال فاصله‌ی دو پا با دو گام نامساوی (یک پا دامنه‌ی کمتر) و نویز: قله‌ی خودهمبستگی گام زیر ۰٫۵ می‌مونه
+  var seed = 3, rnd = function () { seed = (seed * 16807) % 2147483647; return seed / 2147483647 - 0.5; };
+  var y = [], T = 10;
+  for (var i = 0; i < 300; i++) { var ph = (i % (2 * T)) / T, step = Math.floor(ph); y.push(Math.abs(Math.sin(Math.PI * (ph - step))) * (step ? 0.6 : 1) + rnd() * 0.4); }
+  var p = G.stepPeriod(y);
+  near(p.lag, T, 0.6, 'step lag, not stride'); assert.strictEqual(p.fromStride, true);
+  // سیگنال منظم: همون گام، بدون تغییر (اسلوموشن هم همین‌طور: نصف گام همبستگی منفی داره)
+  var z = []; for (var j = 0; j < 300; j++) z.push(Math.abs(Math.sin(Math.PI * j / 24)));
+  var q = G.stepPeriod(z); near(q.lag, 24, 0.6, 'regular'); assert.ok(!q.fromStride);
+});
+test('فقط برخوردها و دوبرابر بازه‌ی ممکن: نصف، با اطمینان حداکثر تخمینی', function () {
+  var D = { t: [], dt: 1 / 30, scale: 1, pts: [] };
+  for (var i = 0; i < 20; i++) D.t.push(i * 0.2);
+  var o = G.cadenceOf(D, D.t.map(function (x, i) { return i; }));
+  assert.strictEqual(o.cadence, 150); assert.strictEqual(o.method, 'ic-half'); assert.strictEqual(o.agree, false);
+});
 console.log(passed + ' تست تحلیل دویدن موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));
