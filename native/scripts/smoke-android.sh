@@ -32,6 +32,13 @@ grep -E "Capacitor|chromium|AndroidRuntime|app.gaam.run" smoke/logcat-full.txt >
 echo "--- native errors (logcat) ---"
 # (خط‌های فراخوانی افزونه‌ها کنار گذاشته می‌شن؛ مقدار ذخیره‌ها رو دارن)
 grep -E "FATAL|AndroidRuntime|Capacitor.*(Error|rejected)|E Capacitor|BackgroundGeolocation|Failed to foreground" smoke/logcat-full.txt | grep -v "methodData" | tail -40 || true
+# مرگ پردازش اپ یا WebView (کمبود حافظه، کرش رندرر، کشته شدن توسط سیستم): در لاگ خود اجرا، چون اسکرین‌شات‌ها همیشه در دسترس نیستن
+echo "--- process / WebView deaths ---"
+grep -E "lowmemorykiller|lmkd|am_kill|has died|Killing [0-9]+:app.gaam.run|signal 9|OutOfMemory|Renderer process|render process|chromium.*(FATAL|crash|Crash)|ANR in app.gaam.run|am_anr|am_crash|Fatal signal" smoke/logcat-full.txt | tail -40 || true
+echo "--- WebView console errors ---"
+grep -E "chromium.*(Uncaught|Error|error)|Console.*(Error|error)" smoke/logcat-full.txt | tail -20 || true
+echo "--- memory ---"
+timeout 20 adb shell cat /proc/meminfo | head -4 || true
 echo "--- current activity ---"
 timeout 20 adb shell dumpsys activity activities | grep -E "topResumedActivity|mResumedActivity" || true
 exit $status
