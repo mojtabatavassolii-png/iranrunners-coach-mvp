@@ -134,7 +134,12 @@
       // اسلوموشن ×۴ و بیشتر: هر ۱/۳۰ ثانیه‌ی فیلم یعنی ۱۲۰ تا ۲۴۰ فریم در ثانیه‌ی واقعی؛ تشخیص یکی‌درمیون (هنوز حداقل ۶۰ تا ۱۲۰ در ثانیه)
       // و فریم‌های بین با درون‌یابی پر می‌شن (بدون جابه‌جایی روی ویدیو) تا هر ۱/۳۰ ثانیه همچنان یک فریم باشه (پخش‌کننده همین رو می‌خواد)
       var every = opts.timeScale >= 4 ? 2 : 1;
-      var result = function () { fillSkipped(frames); return { w: v.videoWidth, h: v.videoHeight, duration: dur, full: dur >= (v.duration || 0) - STEP, frames: frames, video: v, input: { w: cv.width, h: cv.height }, engine: en.name, backend: en.backend || null, read: readMode }; };
+      // اندازه‌گیری برای عیب‌یابی سرعت روی گوشی (در نسخه‌ی تخصصی گزارش): زمان کل، زمان مدل، روش خوندن فریم‌ها
+      var tStart = performance.now(), modelMs = 0, nDet = 0, fallback = null;
+      var timed = { detect: function (c) { var a = performance.now(); return en.detect(c).then(function (lm) { modelMs += performance.now() - a; nDet++; return lm; }); } };
+      var result = function () { fillSkipped(frames); return { w: v.videoWidth, h: v.videoHeight, duration: dur, full: dur >= (v.duration || 0) - STEP, frames: frames, video: v, input: { w: cv.width, h: cv.height }, engine: en.name, backend: en.backend || null,
+        perf: { read: readMode, fallback: fallback, totalS: Math.round((performance.now() - tStart) / 100) / 10, frames: nDet,
+          modelMs: nDet ? Math.round(modelMs / nDet) : null, otherMs: nDet ? Math.round((performance.now() - tStart - modelMs) / nDet) : null } }; };
       var readMode = 'seek';
       // روش قبلی: جابه‌جایی روی ویدیو برای هر فریم (کند، ولی همه‌جا کار می‌کنه)
       function next() {
@@ -144,7 +149,7 @@
         if (every > 1 && (i - i0) % every && i < n - 1) { frames.push({ t: t, lm: null, skip: true }); i++; return next(); }
         return seek(v, t).then(function () {
           g.drawImage(v, 0, 0, cv.width, cv.height);
-          return en.detect(cv);
+          return timed.detect(cv);
         }).then(function (lm) {
           frames.push({ t: t, lm: lm });
           i++;
@@ -155,7 +160,7 @@
       // روش سریع: پخش خود ویدیو (بی‌صدا و پنهان) و برداشتن فریم‌ها هم‌زمان با پخش؛ تکه‌تکه، تا اجرای مدل جلوی پخش رو نگیره
       // و فریمی جا نیفته. اگه مرورگر requestVideoFrameCallback نداشت یا پخش گیر کرد، همون روش قبلی از اول.
       if (v.requestVideoFrameCallback && !/[?&]frames=seek\b/.test(location.search)) {
-        return byPlayback(v, en, cv, i0, n, every, dur, onProgress).then(function (res) {
+        return byPlayback(v, timed, cv, i0, n, every, dur, onProgress).then(function (res) {
           readMode = 'play';
           for (var k = i0; k < n; k++) {
             var hit = Object.prototype.hasOwnProperty.call(res, k);
@@ -164,6 +169,7 @@
           return result();
         }, function (e) {
           if (root.console) console.warn('playback capture, falling back to seek', e);
+          fallback = String(e && e.message || e).slice(0, 80);
           en.reset(); frames = []; i = i0;
           return next();
         });

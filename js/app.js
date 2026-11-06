@@ -3633,6 +3633,11 @@
     var meta = [[T(X + 'date'), faDate(r.date)],
       [T(X + 'condition'), ['side', 'back'].filter(function (v) { return cd[v]; }).map(function (v) { return T(X + 'views.' + v) + ': ' + T('gait.cond.' + cd[v]); }).join(T('progress.sep')) || T(X + 'noData')],
       [T(X + 'height'), state.profile && state.profile.heightCm ? fa(state.profile.heightCm + ' ' + T(X + 'cm')) : T(X + 'noData')]];
+    (r.perf || []).forEach(function (p) {
+      meta.push([T(X + 'perf') + ' (' + T(X + 'views.' + (p.slot === 'back' ? 'back' : p.slot === 'side2' ? 'side2' : 'side')) + ')',
+        fa(T(X + 'perfV', { s: p.totalS, n: p.frames, m: p.modelMs == null ? '—' : p.modelMs, o: p.otherMs == null ? '—' : p.otherMs })) + T('progress.sep') + T(X + 'read.' + (p.read === 'play' ? 'play' : 'seek')) +
+        (p.fallback ? ' (' + p.fallback + ')' : '') + (r.appV ? T('progress.sep') + 'v' + r.appV : '')]);
+    });
     if (r.engine) meta.push([T(X + 'engine'), (r.engine === 'rtmpose-m' ? 'RTMPose-m (Halpe26)' : r.engine === 'mediapipe-full' ? 'MediaPipe Pose (full)' : r.engine) + (r.backend ? ' · ' + (r.backend === 'webgpu' ? 'GPU' : 'CPU') : '')]);
     [['side', r.qSide], ['side2', r.qSide2], ['back', r.qBack]].forEach(function (q) {
       if (!q[1]) return;
@@ -3947,7 +3952,9 @@
       // v: ۳ = هر یافته مال یک نما، شرایط دویدن جدا برای هر فیلم
       // v: ۴ = هر پارامتر برای هر سمت بدن جدا (sides)، دلیل هر «غیرقابل‌اطمینان»، فقط بازه‌های منبع‌دار قضاوت می‌شن
       // engine: مدل تشخیص بدن که واقعاً استفاده شد (rtmpose-m، یا mediapipe-full اگه اون روی دستگاه بارگذاری نشد)
-      var rep = Object.assign({ id: 'g' + Date.now().toString(36), v: 4, date: C.dateKey(today()), at: new Date().toISOString(), engine: (data[slots[0]] || {}).engine || null, backend: (data[slots[0]] || {}).backend || null }, gaitRepFields(r), args.timeScale.side > 1 || args.timeScale.side2 > 1 || args.timeScale.back > 1 ? { timeScale: Object.assign({}, args.timeScale) } : {});
+      var rep = Object.assign({ id: 'g' + Date.now().toString(36), v: 4, date: C.dateKey(today()), at: new Date().toISOString(), engine: (data[slots[0]] || {}).engine || null, backend: (data[slots[0]] || {}).backend || null,
+        // زمان‌بندی تحلیل برای عیب‌یابی سرعت روی گوشی (فقط در نسخه‌ی تخصصی)
+        perf: slots.map(function (k) { var p = data[k] && data[k].perf; return p ? Object.assign({ slot: k }, p) : null; }).filter(Boolean), appV: ASSET_V }, gaitRepFields(r), args.timeScale.side > 1 || args.timeScale.side2 > 1 || args.timeScale.back > 1 ? { timeScale: Object.assign({}, args.timeScale) } : {});
       // تصویر فریم کلیدی از ویدیوی خود هر زاویه (هر خونه‌ای که کاربر گذاشته)
       var shots = [];
       if (r.side) {

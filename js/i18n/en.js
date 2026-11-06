@@ -1102,6 +1102,7 @@
         sub: 'For a physiotherapist or sports doctor: raw values, confidence, reference range and source for each parameter.',
         print: 'Print / save as PDF',
         meta: 'Analysis details', date: 'Date', condition: 'Run type', height: 'Height entered', cm: 'cm', video: 'Video', fps: 'Effective frame rate', frames: 'Frames', valid: 'Frames with a detected body', steps: 'Foot contacts', scale: 'Time factor', near: 'Side nearer the camera',
+        perf: 'Analysis time', perfV: '{s} s, {n} frames; per frame: model {m} ms, other {o} ms', read: { play: 'frames read by playing the video', seek: 'frames read by seeking' },
         engine: 'Body model', nSd: '{n} steps, SD {sd}', footPx: 'foot length in picture {px} px', used: '{n} usable steps', realSec: '{n} s real time',
         cadDetail: '{n} contacts in {s} s real time · time factor ×{k}', cadSlow: 'if slow motion ×{k}: about {c}', strikeN: '{n} steps · foot length in picture {px} px', left: 'left', right: 'right',
         cols: { param: 'Parameter', view: 'View', value: 'Raw value', conf: 'Confidence', ref: 'Reference range', src: 'Source', ev: 'Evidence' },
