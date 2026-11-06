@@ -117,6 +117,19 @@
     // طول پا برای مقیاس آستانه‌ها
     var Ls = raw.map(function (p) { return p ? (dist(p[P.lHip], p[P.lKnee]) + dist(p[P.lKnee], p[P.lAnk]) + dist(p[P.rHip], p[P.rKnee]) + dist(p[P.rKnee], p[P.rAnk])) / 2 : null; });
     var Lg = median(Ls) || Math.max(W, H) / 4;
+    // جابه‌جا شدن برچسب پای چپ و راست بین دو فریم (مدل در نمای کنار وقتی دو پا از هم رد می‌شن گاهی برچسب‌ها رو عوض می‌کنه):
+    // اگه با عوض کردن دو پا فاصله تا فریم قبل خیلی کمتر بشه (کمتر از ۶۰٪)، برگردون. وگرنه هر جابه‌جایی «پرش نقطه» دیده می‌شد
+    // و گام همون لحظه کنار می‌رفت (در یک ویدیوی کوتاه از کنار، ۸ جابه‌جایی در ۱۰۱ فریم و ۴ گام از ۷ کنار رفته)
+    var LEGS = [[P.lHip, P.rHip], [P.lKnee, P.rKnee], [P.lAnk, P.rAnk], [P.lHeel, P.rHeel], [P.lToe, P.rToe]], swaps = 0, prev = null;
+    raw.forEach(function (p) {
+      if (!p) return;
+      if (prev) {
+        var keep = 0, sw = 0;
+        LEGS.slice(1).forEach(function (a) { keep += dist(p[a[0]], prev[a[0]]) + dist(p[a[1]], prev[a[1]]); sw += dist(p[a[0]], prev[a[1]]) + dist(p[a[1]], prev[a[0]]); });
+        if (sw < 0.6 * keep) { LEGS.forEach(function (a) { var t = p[a[0]]; p[a[0]] = p[a[1]]; p[a[1]] = t; }); swaps++; }
+      }
+      prev = p;
+    });
     var jump = raw.map(function () { return null; }), clean = raw.map(function (p) { return p ? p.map(function (q) { return { x: q.x, y: q.y, v: q.v, z: q.z }; }) : null; });
     for (var i = 0; i < n; i++) {
       if (!raw[i]) continue;
@@ -142,7 +155,7 @@
     var inp = video.input && video.input.w ? video.input : { w: W * Math.min(1, 960 / Math.max(W, H)), h: H * Math.min(1, 960 / Math.max(W, H)) };
     // t: زمان واقعی؛ tv: زمان خود فیلم (برای پیدا کردن فریم در ویدیو)
     return { pts: pts, raw: clean, jump: jump, t: F.map(function (f) { return f ? f.t / scale : null; }), tv: F.map(function (f) { return f ? f.t : null; }),
-      dt: dt, fps: fps, scale: scale, w: W, h: H, n: n, L: Lg, inScale: inp.w / W, hasZ: raw.some(function (p) { return p && p[P.lHip].z != null && p[P.lHip].z !== 0; }) };
+      dt: dt, fps: fps, scale: scale, w: W, h: H, n: n, L: Lg, swaps: swaps, inScale: inp.w / W, hasZ: raw.some(function (p) { return p && p[P.lHip].z != null && p[P.lHip].z !== 0; }) };
   }
   function vis(p, ids) { return mean(ids.map(function (k) { return p[k].v; })); }
   // میانگین دیده‌شدن مفاصل در فریم‌های مشخص (یا همه‌ی فریم‌ها)
@@ -394,25 +407,28 @@
   //  sdEst / sdSure: حداکثر پراکندگی بین گام‌ها (انحراف معیار، بعد از حذف گام‌های دورافتاده) — پراکندگی زیاد یعنی خطای نقاط، نه تفاوت واقعی گام‌ها
   //  floor: کمترین انحراف مقاوم برای حذف دورافتاده‌ها (تا گام‌های تقریباً یکسان بی‌دلیل حذف نشن)
   //  cap: بالاترین سطح ممکن برای این پارامتر (محدودیت ذاتی روش)
+  // حداقل گام برای «تخمینی»: ۲ (دونده‌ای که از جلوی دوربین رد می‌شه حدود ۴ ثانیه در کادره، یعنی ۲ تا ۴ گام برای هر پا)؛
+  // «مطمئن» همچنان ۶ گام و پراکندگی کم
   var PUBLISH = {
     vis: { est: 0.6, sure: 0.8 },
-    kneeIc: { est: 3, sure: 6, sdEst: 8, sdSure: 5, floor: 2 },
-    overstride: { est: 3, sure: 6, sdEst: 0.08, sdSure: 0.05, floor: 0.02 },
-    shank: { est: 3, sure: 6, sdEst: 6, sdSure: 4, floor: 1.5 },
-    peakKnee: { est: 3, sure: 6, sdEst: 8, sdSure: 5, floor: 2, cap: 'est' },
-    strike: { est: 3, sure: 6, footEst: 40, footSure: 70 },
-    gct: { est: 3, sure: 6, sdEst: 50, sdSure: 25, floor: 8 },
-    elbow: { est: 3, sure: 6, sdEst: 15, sdSure: 8, floor: 3 },
-    head: { est: 3, sure: 6, sdEst: 8, sdSure: 5, floor: 2 },
-    trunk: { est: 3, sure: 6, sdEst: 5, sdSure: 3, floor: 1 },
+    kneeIc: { est: 2, sure: 6, sdEst: 8, sdSure: 5, floor: 2 },
+    overstride: { est: 2, sure: 6, sdEst: 0.08, sdSure: 0.05, floor: 0.02 },
+    shank: { est: 2, sure: 6, sdEst: 6, sdSure: 4, floor: 1.5 },
+    peakKnee: { est: 2, sure: 6, sdEst: 8, sdSure: 5, floor: 2, cap: 'est' },
+    // طول پا در تصویر تحلیل (پیکسل): از ۳۰ «تخمینی» (یک پیکسل خطا حدود ۲ درجه در زاویه‌ی پا؛ مرز پاشنه ۸ درجه‌ست)، از ۷۰ «مطمئن»
+    strike: { est: 2, sure: 6, footEst: 30, footSure: 70 },
+    gct: { est: 2, sure: 6, sdEst: 50, sdSure: 25, floor: 8 },
+    elbow: { est: 2, sure: 6, sdEst: 15, sdSure: 8, floor: 3 },
+    head: { est: 2, sure: 6, sdEst: 8, sdSure: 5, floor: 2 },
+    trunk: { est: 2, sure: 6, sdEst: 5, sdSure: 3, floor: 1 },
     cadence: { est: 4, sure: 8 },
-    pelvic: { est: 3, sure: 6, sdEst: 4, sdSure: 2.5, floor: 1 },
-    valgus: { est: 3, sure: 6, sdEst: 7, sdSure: 4, floor: 1.5 },
+    pelvic: { est: 2, sure: 6, sdEst: 4, sdSure: 2.5, floor: 1 },
+    valgus: { est: 2, sure: 6, sdEst: 7, sdSure: 4, floor: 1.5 },
     // همیشه حداکثر «تخمینی»: از ویدیوی دوبعدی فقط شاخص غیرمستقیم‌ان
-    ankleDf: { est: 3, sure: 6, sdEst: 8, sdSure: 5, floor: 2, cap: 'est' },
-    rearfoot: { est: 3, sure: 6, sdEst: 8, sdSure: 5, floor: 2, cap: 'est' },
-    gaze: { est: 3, sure: 6, sdEst: 10, sdSure: 6, floor: 2, cap: 'est' },
-    armCross: { est: 3, sure: 6, sdEst: 35, sdSure: 20, floor: 5 },
+    ankleDf: { est: 2, sure: 6, sdEst: 8, sdSure: 5, floor: 2, cap: 'est' },
+    rearfoot: { est: 2, sure: 6, sdEst: 8, sdSure: 5, floor: 2, cap: 'est' },
+    gaze: { est: 2, sure: 6, sdEst: 10, sdSure: 6, floor: 2, cap: 'est' },
+    armCross: { est: 2, sure: 6, sdEst: 35, sdSure: 20, floor: 5 },
     // قبول هر گام: نسبت پهنای شونه به تنه در لحظه‌ی برخورد (دوربین عمود بر مسیر)، اختلاف طول پا با میانه
     stepView: 0.5, stepLeg: 0.18
   };
@@ -534,7 +550,9 @@
       // طول پای فرودآمده نسبت به اندازه‌ی محلی دونده (دونده ممکنه به دوربین نزدیک یا ازش دور بشه)
       x.lr = legOf(p, s) / (median(D.raw.slice(Math.max(0, x.i - Math.round(T)), x.i + Math.round(T) + 1).map(function (q4) { return q4 ? (legOf(q4, SIDES.l) + legOf(q4, SIDES.r)) / 2 : null; })) || L);
       if (vr != null && vr > PUBLISH.stepView) x.bad = 'angle';
-      else if (js) x.bad = 'jump';
+      // پرش نقطه‌ی لگن، زانو یا مچ: نقطه از قبل با میانه‌ی فریم‌های همسایه جایگزین شده؛ گام نگه داشته می‌شه (در ویدیوی کوتاه
+      // هر گام مهمه) ولی عددهای اون سمت حداکثر «تخمینی»
+      else if (js) x.jumped = true;
       // دست سمت نزدیک در لحظه‌ی برخورد (هم‌زمانی مخالف دست و پا در دویدن: وقتی پای راست فرود میاد، دست راست عقبه).
       // برچسب دست‌ها برخلاف پاها قابل‌اعتماده (صورت و بالاتنه جهت بدن رو مشخص می‌کنن). مثبت = دست نزدیک جلوتر از شونه
       var q3 = D.pts[x.i] || p;
@@ -617,10 +635,9 @@
     var bi = {}, sideSteps = function (k) { return good.filter(function (x) { return x.side === k; }); };
     var forSide = function (k) {
       var S0 = sideSteps(k), isFar = k === farK, vv = mean(S0.map(function (x) { return x.vis; }));
-      // سمت گام‌ها نامعلوم: هیچ عددی برای پا با برچسب چپ یا راست منتشر نمی‌شه
-      // پای دور از دوربین: خط‌هاش در تصویر دیده می‌شن ولی نیمه‌پنهان‌ان؛ عدد منتشر می‌شه، حداکثر «تخمینی»
-      // سمت گام‌ها از برچسب مدل یا حدسی: عددها منتشر می‌شن ولی حداکثر «تخمینی»
-      var sideCap = sideBy === 'arms' ? null : 'est';
+      // پای دور از دوربین: خط‌هاش در تصویر دیده می‌شن ولی نیمه‌پنهان‌ان؛ عدد منتشر می‌شه، حداکثر «تخمینی».
+      // همین‌طور وقتی سمت گام‌ها از برچسب مدل یا حدسیه، یا گامی با نقطه‌ی پرش‌کرده (اصلاح‌شده) در عددها هست
+      var sideCap = sideBy === 'arms' && !S0.some(function (x) { return x.jumped; }) ? null : 'est';
       var farLow = isFar || sideCap ? { cap: 'est' } : {};
       var legX = sideCap ? { cap: 'est' } : {};
       var st = S0.filter(function (x) { return x.fsa != null; }).map(function (x) {
@@ -701,7 +718,7 @@
     // حداقل ۶ گام برای نوسان عمودی (یک گام کوتاه یا بلندتر عدد رو جابه‌جا نکنه)
     m.vo = heightCm && ampL != null && amp.length >= 6 ? round1(ampL * LEG_RATIO * heightCm) : null;
     // تقارن هر پارامتر: فقط وقتی هر دو سمت قابل‌اطمینانه
-    m.bi = bi; m.near = nearK; m.sideUnsure = unsure || undefined; m.sideBy = sideBy;
+    m.bi = bi; m.near = nearK; m.sideUnsure = unsure || undefined; m.sideBy = sideBy; m.realSec = q.realSec;
     m.conf = {
       kneeIc: nb('kneeIc').conf, overstride: minConf(nb('overstride').conf, nb('shank').conf), strike: ns.conf, peakKnee: nb('peakKnee').conf, gct: nb('gct').conf,
       cadence: timeOk ? (cad.steps >= PUBLISH.cadence.sure && cad.agree ? 'sure' : cad.steps >= PUBLISH.cadence.est ? 'est' : 'low') : 'low',
@@ -1072,6 +1089,11 @@
       var f = Object.assign({ id: id, view: FACTOR_VIEW[id], kind: kind, marks: marks.map(function (x) { return Object.assign({ k: x.k }, x.m); }) }, extra || {});
       f.status = ok.length ? 'ok' : 'na';
       if (!ok.length) f.why = (marks.filter(function (x) { return x.m.why; })[0] || { m: {} }).m.why || 'fewSteps';
+      // گام کم در ویدیوی کوتاه از کنار: دلیل مشخص با مدت ویدیو (هر پا حداقل ۳ گام واضح لازمه)
+      if (f.view === 'side' && sm && sm.realSec != null && sm.realSec < 6) {
+        if (!ok.length && f.why === 'fewSteps') { f.why = 'shortVideo'; f.secs = sm.realSec; }
+        f.marks.forEach(function (m) { if (m.conf === 'low' && m.why === 'fewSteps') { m.why = 'shortVideo'; m.secs = sm.realSec; } });
+      }
       // وضعیت کلی = بیرون‌ترین سمت قابل‌اطمینان؛ اطمینان کلی = بالاترین (نشانگرها هر کدوم اطمینان خودشون رو دارن)
       if (ok.length) {
         var Z = { good: 0, warn: 1, bad: 2 };
@@ -1104,6 +1126,15 @@
     }));
     // ۵. فرود پا: محل فرود (فاصله‌ی مچ پا جلوی لگن و زاویه‌ی ساق) روی گیج؛ نوع فرود (پاشنه، میان‌پا، جلوپا) فقط برچسب
     var oMap = oneMap(REF.overstride, 0.45), sMap = oneMap(REF.shank, 20);
+    // نوع فرود از همه‌ی گام‌های هر دو پا، وقتی هیچ پایی به‌تنهایی کافی نبود (ویدیوی کوتاه یا پای کوچیک در تصویر):
+    // زاویه‌ی دقیق پا پرنوسانه ولی دسته (پاشنه، میان‌پا، جلوی پا) پایدارتره؛ حداقل ۲ گام و ۷۵٪ هم‌نوع، «تخمینی»
+    var pooledStrike = function (types) {
+      var st = sm && sm.strikes && sm.strikes.steps;
+      if (Object.keys(types).length || !st || st.length < 2 || (sm.strikes.footPx != null && sm.strikes.footPx < PUBLISH.strike.footEst)) return {};
+      var c = {}; st.forEach(function (x) { c[x.type] = (c[x.type] || 0) + 1; });
+      var top = Object.keys(c).sort(function (a, b) { return c[b] - c[a]; })[0];
+      return c[top] / st.length >= 0.75 ? { strikes: [top], strikePooled: { type: top, n: st.length } } : {};
+    };
     var types = {};
     add('landing', 'one', ['l', 'r'].map(function (k) {
       var a = mark(sm, 'overstride', k, oMap, 'one', 'side'), b = mark(sm, 'shank', k, sMap, 'one', 'side'), w = worse(a, b);
@@ -1111,7 +1142,7 @@
       if (st && st.conf !== 'low' && st.type) { w.strike = st.type; w.strikeConf = st.conf; types[st.type] = 1; }
       w.over = a.conf === 'low' ? null : a.v; w.shank = b.conf === 'low' ? null : b.v;
       return { k: k, m: w };
-    }), Object.assign({ strikes: Object.keys(types) }, sg));
+    }), Object.assign({ strikes: Object.keys(types) }, sg, pooledStrike(types)));
     // ۷. زاویه‌ی آرنج
     var eMap = twoMap(REF.elbow, 30, 170);
     add('elbow', 'two', ['l', 'r'].map(function (k) { return { k: k, m: mark(sm, 'elbow', k, eMap, 'two', 'side') }; }));

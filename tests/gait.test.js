@@ -443,11 +443,14 @@ test('برچسب‌های MediaPipe که دنبال پای جلویی می‌ر�
   y.video.frames.forEach(function (f) {
     if (f.lm[29][0] < f.lm[30][0]) [[23, 24], [25, 26], [27, 28], [29, 30], [31, 32]].forEach(function (a) { var t = f.lm[a[0]]; f.lm[a[0]] = f.lm[a[1]]; f.lm[a[1]] = t; });
   });
+  // جابه‌جا شدن برچسب‌ها بین فریم‌ها برگردونده می‌شه (پیوستگی حرکت)، پس برچسب مدل دوباره یکدسته و سمت از برچسب مدل میاد
   var g = G.analyze({ side: y.video, heightCm: 175 });
-  assert.ok(g.side.metrics.sideUnsure); assert.strictEqual(g.side.metrics.sideBy, 'guess');
+  assert.strictEqual(g.side.metrics.sideBy, 'model'); assert.ok(!g.side.metrics.sideUnsure);
   var gk = find(g, 'kneeIc');
   assert.notStrictEqual(gk.status, 'na'); assert.ok(['l', 'r'].every(function (k) { return gk.sides[k].conf !== 'sure'; }));
-  assert.ok(G.factors(g.side.metrics, null, 'easy').filter(function (f) { return f.id === 'knee'; })[0].sideGuess);
+  // سمت حدسی (نه دست‌ها نه برچسب مدل): گیج‌ها پرچم «چپ/راست نامطمئن» دارن
+  var gm = Object.assign({}, g.side.metrics, { sideBy: 'guess' });
+  assert.ok(G.factors(gm, null, 'easy').filter(function (f) { return f.id === 'knee'; })[0].sideGuess);
   assert.ok(find(u, 'cadence').status === 'info', 'cadence still measured');
 });
 test('گام‌های نامعتبر جدا کنار می‌رن: دوربین مورب و پرش نقطه', function () {

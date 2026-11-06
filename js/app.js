@@ -3589,15 +3589,15 @@
     var tags = [];
     if (na) tags.push(T(F0 + 'na'));
     else if (est) tags.push(T(F0 + 'est'));
-    if (!na && f.id === 'landing' && f.strikes && f.strikes.length) tags.push(f.strikes.map(function (k) { return T('gait.strikeName.' + k); }).join(' / '));
+    if (f.id === 'landing' && f.strikes && f.strikes.length) tags.push(f.strikes.map(function (k) { return T('gait.strikeName.' + k); }).join(' / ') + (f.strikePooled ? ' (' + T(F0 + 'est') + ')' : ''));
     if (!na && f.id === 'head' && f.look) tags.push(T(F0 + 'look', { l: T('gait.look.' + f.look) }));
     if (!na && f.sideGuess) tags.push(T(F0 + 'sideGuess'));
     // متن بازشونده: این فاکتور چیه، وضعیت هر سمت، و یک جمله‌ی توصیفی (بدون تشخیص)
     var body = '<p>' + esc(T(K + 'what')) + '</p>';
-    if (na) body += '<p>' + esc(T(F0 + 'naWhy.' + (f.why || 'fewSteps'))) + '</p>';
+    if (na) body += '<p>' + esc(fa(T(F0 + 'naWhy.' + (f.why || 'fewSteps'), { s: f.secs }))) + '</p>';
     else {
       if (two) body += '<ul class="gf-sides">' + f.marks.map(function (m) {
-        var z = m.conf === 'low' ? T(F0 + 'naWhy.' + (m.why || 'fewSteps')) : T(F0 + 'zone.' + m.zone) + (m.conf === 'est' ? ' (' + T(F0 + 'est') + ')' : '');
+        var z = m.conf === 'low' ? fa(T(F0 + 'naWhy.' + (m.why || 'fewSteps'), { s: m.secs })) : T(F0 + 'zone.' + m.zone) + (m.conf === 'est' ? ' (' + T(F0 + 'est') + ')' : '');
         return '<li>' + esc(T(F0 + 'sideLine', { s: T('gait.sideName.' + m.k), z: z })) + '</li>';
       }).join('') + '</ul>';
       var worst = ok.filter(function (m) { return m.zone === f.zone; })[0] || ok[0], key = gaitFactorKey(f, worst);
@@ -3607,6 +3607,7 @@
       if (key !== 'good') body += '<p class="gf-how"><b>' + esc(T(F0 + 'howLabel')) + '</b>' + esc(T(K + 'fix.' + key)) + '</p>';
       if (f.id === 'landing') {
         var sts = f.marks.filter(function (m) { return m.strike; }).map(function (m) { return T('gait.sideName.' + m.k) + ' ' + T('gait.strikeName.' + m.strike) + (m.strikeConf === 'est' ? ' (' + T(F0 + 'est') + ')' : ''); });
+        if (!sts.length && f.strikePooled) sts.push(fa(T(F0 + 'strikeBoth', { s: T('gait.strikeName.' + f.strikePooled.type), n: f.strikePooled.n })));
         if (sts.length) body += '<p>' + esc(T(F0 + 'strikeLine', { list: sts.join(T('progress.sep')) })) + '</p>';
         body += '<p class="small muted">' + esc(T(F0 + 'strikeNote')) + '</p>';
       }

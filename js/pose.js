@@ -115,7 +115,9 @@
   }
   // بازه‌ی تحلیل به ثانیه‌ی واقعی (نه ثانیه‌ی فیلم): حدود ۱۰ ثانیه دویدن واقعی (۲۵ تا ۳۰ گام، برای همه‌ی اندازه‌گیری‌ها کافی)؛
   // فیلم اسلوموشن ×k یعنی k برابر ثانیه‌ی فیلم، با سقف ۴۰ ثانیه‌ی فیلم (زمان پردازش روی گوشی)
-  var REAL_SEC = 10, MAX_SRC = 40, MAX_SIDE = 1280;
+  // ضلع بزرگ تصویر تحلیل: RTMPose فقط برش دور دونده رو به مدل می‌ده، پس تصویر بزرگ‌تر برای دونده‌ی کوچیک در کادر (دور از
+  // دوربین) پیکسل بیشتری روی پا می‌ذاره بدون اینکه کار مدل بیشتر بشه؛ MediaPipe کل تصویر رو کوچیک می‌کنه، پس ۱۲۸۰ کافیه
+  var REAL_SEC = 10, MAX_SRC = 40, MAX_SIDE = 1280, MAX_SIDE_RTM = 1920;
   function windowSec(scale) { return scale > 1 ? Math.min(MAX_SRC, REAL_SEC * scale) : MAX_SEC; }
   // هر فریم (هر ۱/۳۰ ثانیه‌ی فیلم): جابه‌جایی روی ویدیو، کشیدن روی بوم و تشخیص بدن
   // opts: { timeScale: ضریب اسلوموشن (برای طول بازه)، from: ادامه از این ثانیه‌ی فیلم (اضافه کردن به فریم‌های قبلی) }
@@ -127,14 +129,16 @@
       var dur = Math.min(v.duration || 0, windowSec(opts.timeScale));
       if (!(dur > 0.5)) throw fail('short');
       // اندازه‌ی ورودی MediaPipe: ضلع بزرگ حداکثر ۱۲۸۰px (پا و مچ در تصویر بزرگ‌تر، زاویه‌ها دقیق‌تر)
-      var sc = Math.min(1, MAX_SIDE / Math.max(v.videoWidth, v.videoHeight));
+      var sc = Math.min(1, (en.name === 'rtmpose-m' ? MAX_SIDE_RTM : MAX_SIDE) / Math.max(v.videoWidth, v.videoHeight));
       cv = document.createElement('canvas'); cv.width = Math.round(v.videoWidth * sc); cv.height = Math.round(v.videoHeight * sc);
       g = cv.getContext('2d');
       var n = Math.floor(dur / STEP), frames = [], i = opts.from > 0 ? Math.ceil(opts.from / STEP - 1e-6) : 0, i0 = i;
       // مدل یکی‌درمیون (۱۵ فریم در ثانیه‌ی فیلم؛ در اسلوموشن ×۴ و بیشتر ۶۰ تا ۱۲۰ در ثانیه‌ی واقعی) و فریم‌های بین با درون‌یابی
       // پر می‌شن تا هر ۱/۳۰ ثانیه همچنان یک فریم باشه (پخش‌کننده همین رو می‌خواد). روی آیفون مدل ۸۰٪ زمان تحلیل بود؛
       // در مجموعه‌ی آزمایش آهنگ گام و زاویه‌ها با تحلیل همه‌ی فریم‌ها فرقی نکرد. ?every=1 برای مقایسه همه‌ی فریم‌ها.
-      var every = /[?&]every=1\b/.test(location.search) ? 1 : 2;
+      // ویدیوی کوتاه (تا ۶ ثانیه، مثلاً دونده‌ای که از جلوی دوربین رد می‌شه): همه‌ی فریم‌ها، تا هیچ لحظه‌ی فرودی جا نیفته
+      // (زمان تحلیل برای ویدیوی کوتاه کمه)
+      var every = /[?&]every=1\b/.test(location.search) || (dur <= 6 && !(opts.timeScale >= 4)) ? 1 : 2;
       // اندازه‌گیری برای عیب‌یابی سرعت روی گوشی (در نسخه‌ی تخصصی گزارش): زمان کل، زمان مدل، روش خوندن فریم‌ها
       var tStart = performance.now(), modelMs = 0, nDet = 0, fallback = null;
       var timed = { detect: function (c) { var a = performance.now(); return en.detect(c).then(function (lm) { modelMs += performance.now() - a; nDet++; return lm; }); } };
@@ -185,7 +189,9 @@
   // پخش و برداشت تکه‌ای: تا BATCH فریم (هر ۱/۳۰ ثانیه‌ی فیلم یکی، در اسلوموشن یکی‌درمیون) در حین پخش روی بوم‌های جدا کشیده می‌شن،
   // بعد پخش مکث می‌کنه و مدل روی همون‌ها اجرا می‌شه، بعد پخش ادامه. خروجی: { شماره‌ی خونه‌ی ۱/۳۰: نقاط }؛ خونه‌ای که فریمش
   // در پخش جا افتاد (کم پیش میاد) خالی می‌مونه و با درون‌یابی پر می‌شه.
-  var BATCH = 16, STALL_MS = 5000;
+  // تعداد بوم‌های برداشته‌شده قبل از اجرای مدل: حافظه‌ی بوم‌ها روی گوشی محدوده، پس برای تصویر بزرگ‌تر از ۱۲۸۰ کمتر (حدود ۶۰ مگابایت)
+  var BATCH = 16, STALL_MS = 5000, PLAY_SLOW = /[?&]slow=([\d.]+)/.test(location.search) ? +RegExp.$1 : 0.5;
+  function batchFor(cv) { return cv.width * cv.height > 1280 * 720 * 1.1 ? 8 : BATCH; }
   // حالت آزمایشی دسته‌ای: یک بار ?batch=1 در آدرس روشنش می‌کنه (و می‌مونه، چون ورود به حساب ممکنه آدرس رو عوض کنه)، ?batch=0 خاموش
   function batchOn() {
     var m = /[?&]batch=([01])\b/.exec(location.search);
@@ -195,6 +201,7 @@
   function byPlayback(v, en, cv, i0, n, every, dur, onProgress) {
     return new Promise(function (resolve, reject) {
       var pool = [], buf = [], res = {}, last = -1, done = false, working = false, timer = 0, count = 0;
+      var nBatch = batchFor(cv);
       var total = Math.max(1, Math.ceil((n - i0) / every));
       function canvas() { var c = pool.pop(); if (!c) { c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; } return c; }
       function watchdog() { clearTimeout(timer); timer = setTimeout(function () { if (!done && !working) fin(new Error('stall')); }, STALL_MS); }
@@ -238,7 +245,7 @@
           buf.push({ s: slot, c: c });
         }
         watchdog();
-        if (buf.length >= BATCH) {
+        if (buf.length >= nBatch) {
           v.pause();
           process(function () { if (done) return; watchdog(); v.requestVideoFrameCallback(onFrame); var pl = v.play(); if (pl && pl.catch) pl.catch(function (e) { fin(e); }); });
           return;
@@ -246,7 +253,8 @@
         v.requestVideoFrameCallback(onFrame);
       }
       v.addEventListener('ended', onEnd);
-      v.muted = true; v.playbackRate = 1;
+      // ویدیوی کوتاه (تا ۶ ثانیه): پخش با سرعت کمتر تا هیچ فریمی جا نیفته (هر فریم مهمه؛ چند ثانیه بیشتر طول می‌کشه)
+      v.muted = true; v.playbackRate = dur - i0 * STEP <= 6 ? PLAY_SLOW : 1;
       seek(v, Math.max(0, i0 * STEP) + 0.001).then(function () {
         v.requestVideoFrameCallback(onFrame);
         watchdog();
