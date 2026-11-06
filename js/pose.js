@@ -336,12 +336,14 @@
     var d = Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y);
     return d ? Math.acos(Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / d))) * 180 / Math.PI : null;
   }
-  function tag(g, text, x, y, W, color) {
+  // toLeft: برچسب سمت چپ نقطه (x لبه‌ی راست برچسب)، تا برچسب دو سمت بدن روی هم نیفتن
+  function tag(g, text, x, y, W, color, toLeft) {
     // جهت متن بوم از صفحه (راست‌به‌چپ) ارث می‌بره و متن از جعبه‌ش جدا می‌افته؛ همیشه چپ‌به‌راست با تراز چپ
     // جهت متن بر اساس خود برچسب (فارسی راست‌به‌چپ تا علامت درجه درست بیفته)؛ تراز «left» مطلقه
     g.direction = /[\u0600-\u06FF]/.test(text) ? 'rtl' : 'ltr'; g.textAlign = 'left';
     g.font = '700 ' + Math.round(Math.max(13, W / 34)) + 'px Vazirmatn, sans-serif';
     var w = g.measureText(text).width + 12, h = Math.round(Math.max(20, W / 22));
+    if (toLeft) x -= w;
     x = Math.max(4, Math.min(W - w - 4, x)); y = Math.max(4, y);
     g.fillStyle = tok('--bg', 0.82); g.fillRect(x, y, w, h);
     g.fillStyle = color || tok('--text'); g.fillText(text, x + 6, y + h * 0.72);
@@ -368,7 +370,7 @@
       var v = angleAt(lm, a.k[0], a.k[1], a.k[2], W, H);
       if (v == null) return;
       var val = a.flex ? 180 - v : v, q = pt(a.k[1]);
-      tag(g, a.label + ' ' + o.digits(Math.round(val)) + '°', q[0] + r * 2, q[1] - r * 4, W, a.bad ? COL.bad : TXT);
+      tag(g, a.label + ' ' + o.digits(Math.round(val)) + '°', a.left ? q[0] - r * 2 : q[0] + r * 2, a.left ? q[1] + r : q[1] - r * 4, W, a.bad ? COL.bad : TXT, a.left);
     });
     // از پشت: خط لگن و خط افق برای دیدن افت لگن
     if (o.back && on('pelvis')) {
@@ -447,7 +449,10 @@
       nDraw++;
       if (!overlay) return;
       if (lm) drawOverlay(g, lm, W, H, o);
-      if (o.strikes && o.strikes.some(function (s) { return Math.abs(s - t) < 0.05; })) tag(g, o.labels.strike, 8, 8, W, tok('--warning'));
+      // لحظه‌ی فرود: با نوع فرود همون گام اگه اندازه‌گیری شده (پاشنه، میان‌پا، جلوی پا)
+      var sm = o.strikeMarks && o.strikeMarks.filter(function (s) { return Math.abs(s.t - t) < 0.05; })[0];
+      if (sm) tag(g, sm.label, 8, 8, W, tok('--warning'));
+      else if (o.strikes && o.strikes.some(function (s) { return Math.abs(s - t) < 0.05; })) tag(g, o.labels.strike, 8, 8, W, tok('--warning'));
     }
     function loop() {
       if (dead) return;

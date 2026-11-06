@@ -2053,6 +2053,9 @@ html.intro #app .login-import { opacity: 0; }
 .gf-tag { font-size: 0.75em; padding: 1px 8px; border-radius: 10px; background: var(--primary-soft); color: var(--primary); }
 .gf-more { background: var(--surface-elevated); border-radius: 10px; padding: 8px 12px; margin: 0 0 12px; font-size: 0.92em; line-height: 1.75; }
 .gf-more p { margin: 4px 0; }
+.gf-verdict { margin-top: 6px; }
+.gf-v-good b { color: var(--success); } .gf-v-warn b { color: var(--warning); } .gf-v-bad b { color: var(--error); }
+.gf-how { border-inline-start: 3px solid var(--primary); padding-inline-start: 8px; }
 .gf-sides { margin: 4px 0; padding-inline-start: 18px; }
 .gf-legend { display: flex; flex-wrap: wrap; gap: 14px; padding-top: 10px; border-top: 1px solid var(--border); margin-bottom: 0; }
 .gf-legend span { display: inline-flex; align-items: center; gap: 6px; }

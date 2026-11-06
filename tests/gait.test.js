@@ -282,7 +282,7 @@ test('سطح اطمینان: دید کم → بدون عدد؛ ۶۰ فریم →
   }
   var h = G.analyze({ side: sideRunner({ fps: 60 }).video, heightCm: 175 });
   assert.strictEqual(h.side.quality.fps, 60);
-  assert.strictEqual(find(h, 'kneeIc').conf, 'sure');
+  assert.strictEqual(find(h, 'kneeIc').sides[h.side.near].conf, 'sure');
   assert.strictEqual(find(h, 'gct').conf, 'est');
   // نرخ فریم خود فیلم (۳۰) با نمونه‌برداری ۶۰: فریم‌های تکراری دقت نمی‌دن
   var dup = sideRunner({ fps: 60 }).video; dup.fps = 30;
@@ -399,13 +399,13 @@ function otherSide(o) {
   x.video.frames.forEach(function (f) { PAIRS.forEach(function (a) { var t = f.lm[a[0]]; f.lm[a[0]] = f.lm[a[1]]; f.lm[a[1]] = t; }); });
   return x;
 }
-test('دوطرفه: سمت نزدیک با عدد، سمت دور «غیرقابل‌اطمینان» با دلیل؛ تقارن فقط با دو سمت قابل‌اطمینان', function () {
+test('دوطرفه: سمت نزدیک مطمئن، سمت دور هم با عدد ولی حداکثر «تخمینی»', function () {
   var r = G.analyze({ side: sideRunner({ icL: 0.3 }).video, heightCm: 175 });
   assert.strictEqual(r.side.near, 'r');
   var k = find(r, 'kneeIc');
-  assert.strictEqual(k.sides.r.status, 'good'); assert.strictEqual(k.sides.l.status, 'na'); assert.strictEqual(k.sides.l.why, 'farSide');
-  assert.strictEqual(k.sym, undefined);
-  assert.strictEqual(find(r, 'elbow').sides.l.why, 'farSide'); assert.strictEqual(find(r, 'strike').sides.l.why, 'farSide');
+  assert.strictEqual(k.sides.r.status, 'good'); assert.notStrictEqual(k.sides.l.status, 'na'); assert.strictEqual(k.sides.l.conf, 'est');
+  assert.ok(k.sym != null);
+  assert.notStrictEqual(find(r, 'elbow').sides.l.conf, 'sure'); assert.notStrictEqual(find(r, 'strike').sides.l.conf, 'sure');
   // محل فرود پای دور: فقط جای مچ پا لازمه → حداکثر «تخمینی»، با عدد درست همون پا
   var o = find(r, 'overstride');
   near(o.sides.r.value, 0.12 + 0.057, 0.04, 'near overstride'); near(o.sides.l.value, 0.3 + 0.057, 0.05, 'far overstride');

@@ -3596,8 +3596,16 @@
         var z = m.conf === 'low' ? T(F0 + 'naWhy.' + (m.why || 'fewSteps')) : T(F0 + 'zone.' + m.zone) + (m.conf === 'est' ? ' (' + T(F0 + 'est') + ')' : '');
         return '<li>' + esc(T(F0 + 'sideLine', { s: T('gait.sideName.' + m.k), z: z })) + '</li>';
       }).join('') + '</ul>';
-      var worst = ok.filter(function (m) { return m.zone === f.zone; })[0] || ok[0];
-      body += '<p>' + esc(T(K + gaitFactorKey(f, worst))) + '</p>';
+      var worst = ok.filter(function (m) { return m.zone === f.zone; })[0] || ok[0], key = gaitFactorKey(f, worst);
+      // نتیجه: خوبه یا نیاز به اصلاح؛ توضیح؛ و اگه لازمه، چطور اصلاح بشه
+      body = '<p class="gf-verdict gf-v-' + f.zone + '"><b>' + esc(T(F0 + 'verdict.' + f.zone)) + '</b></p>' + body;
+      body += '<p>' + esc(T(K + key)) + '</p>';
+      if (key !== 'good') body += '<p class="gf-how"><b>' + esc(T(F0 + 'howLabel')) + '</b>' + esc(T(K + 'fix.' + key)) + '</p>';
+      if (f.id === 'landing') {
+        var sts = f.marks.filter(function (m) { return m.strike; }).map(function (m) { return T('gait.sideName.' + m.k) + ' ' + T('gait.strikeName.' + m.strike) + (m.strikeConf === 'est' ? ' (' + T(F0 + 'est') + ')' : ''); });
+        if (sts.length) body += '<p>' + esc(T(F0 + 'strikeLine', { list: sts.join(T('progress.sep')) })) + '</p>';
+        body += '<p class="small muted">' + esc(T(F0 + 'strikeNote')) + '</p>';
+      }
       if (est) body += '<p class="small muted">' + esc(T(F0 + 'estNote')) + '</p>';
     }
     var sub = T(K + 'sub');
@@ -3946,7 +3954,14 @@
       if (res.view === 'side') {
         var n = res.near === 'l' ? 0 : 1, hip = 23 + n, knee = 25 + n, ank = 27 + n, sh = 11 + n, el = 13 + n, wr = 15 + n;
         if (bad('kneeIc') || bad('overstride')) o.bad.push(knee, ank);
-        o.angles = [{ k: [hip, knee, ank], label: T('gait.anim.knee'), flex: true, bad: bad('kneeIc'), layer: 'knee' }, { k: [sh, el, wr], label: T('gait.anim.elbow'), layer: 'elbow' }];
+        // زانو و آرنج هر دو سمت (خط‌های سمت دور هم در تصویر دیده می‌شن)، با حرف سمت
+        var sl = function (i) { return ' ' + T('gait.f.' + (i ? 'sideR' : 'sideL')); }, fn = 1 - n;
+        o.angles = [{ k: [hip, knee, ank], label: T('gait.anim.knee') + sl(n), flex: true, bad: bad('kneeIc'), layer: 'knee' },
+          { k: [23 + fn, 25 + fn, 27 + fn], label: T('gait.anim.knee') + sl(fn), flex: true, layer: 'knee', left: true },
+          { k: [sh, el, wr], label: T('gait.anim.elbow') + sl(n), layer: 'elbow' }, { k: [11 + fn, 13 + fn, 15 + fn], label: T('gait.anim.elbow') + sl(fn), layer: 'elbow', left: true }];
+        // نوع فرود هر گام (از زاویه‌ی خط پاشنه تا نوک پا) روی همون فریم برخورد
+        var ms = res.metrics || {}, scl = ms.timeScale || 1;
+        o.strikeMarks = ((ms.strikes && ms.strikes.steps) || []).map(function (x) { return { t: x.t * scl, label: T('gait.anim.strike') + ': ' + T('gait.strikeName.' + x.type) + sl(x.foot === 'r' ? 1 : 0) }; });
         o.strikes = (res.ic || []).map(function (i) { return L.data.frames[i] && L.data.frames[i].t; }).filter(function (t) { return t != null; });
       } else {
         o.back = true; o.pelvisBad = bad('pelvic');

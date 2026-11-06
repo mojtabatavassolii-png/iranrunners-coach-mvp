@@ -605,18 +605,19 @@
     var forSide = function (k) {
       var S0 = sideSteps(k), isFar = k === farK, vv = mean(S0.map(function (x) { return x.vis; }));
       // سمت گام‌ها نامعلوم: هیچ عددی برای پا با برچسب چپ یا راست منتشر نمی‌شه
-      var farLow = unsure ? { why: 'sideUnknown' } : isFar ? { why: 'farSide' } : {};
+      // پای دور از دوربین: خط‌هاش در تصویر دیده می‌شن ولی نیمه‌پنهان‌ان؛ عدد منتشر می‌شه، حداکثر «تخمینی»
+      var farLow = unsure ? { why: 'sideUnknown' } : isFar ? { cap: 'est' } : {};
       var legX = unsure ? { why: 'sideUnknown' } : {};
       var st = S0.filter(function (x) { return x.fsa != null; }).map(function (x) {
         return { t: Math.round(D.t[x.i] * 1000) / 1000, foot: k, fsa: round1(x.fsa), type: strikeType(x.fsa),
           border: Math.min(Math.abs(x.fsa - REF.fsaHeel), Math.abs(x.fsa - REF.fsaFore)) < 2, v: round1(x.fv) };
       });
       var ss = strikeSummary(st), R0 = PUBLISH.strike;
-      var strikeWhy = unsure ? 'sideUnknown' : isFar ? 'farSide' : footPx != null && footPx < R0.footEst ? 'footSmall' : null;
-      var sp = publish('kneeIc', st.map(function (x) { return x.fsa; }), mean(st.map(function (x) { return x.v; })), { why: strikeWhy, cap: minConf(footPx >= R0.footSure ? null : 'est', ss.border / (ss.n || 1) > 0.5 ? 'est' : icCap) });
+      var strikeWhy = unsure ? 'sideUnknown' : footPx != null && footPx < R0.footEst ? 'footSmall' : null;
+      var sp = publish('kneeIc', st.map(function (x) { return x.fsa; }), mean(st.map(function (x) { return x.v; })), { why: strikeWhy, cap: minConf(minConf(footPx >= R0.footSure ? null : 'est', ss.border / (ss.n || 1) > 0.5 ? 'est' : icCap), isFar ? 'est' : null) });
       if (!strikeWhy && ss.n < R0.est) { sp.conf = 'low'; sp.why = 'fewSteps'; }
       return {
-        kneeIc: publish('kneeIc', S0.map(function (x) { return x.kneeIc; }), vv, Object.assign({ cap: icCap }, farLow)),
+        kneeIc: publish('kneeIc', S0.map(function (x) { return x.kneeIc; }), vv, Object.assign({}, farLow, { cap: minConf(icCap, farLow.cap) })),
         overstride: publish('overstride', S0.map(function (x) { return x.over; }), vv, Object.assign({ cap: minConf(icCap, isFar ? 'est' : null), dec: 2 }, legX)),
         shank: publish('shank', S0.map(function (x) { return x.shank; }), vv, Object.assign({ cap: minConf(icCap, isFar ? 'est' : null) }, legX)),
         peakKnee: publish('peakKnee', S0.map(function (x) { return x.peak; }), vv, farLow),
@@ -636,7 +637,7 @@
     bi.elbow = {};
     ['l', 'r'].forEach(function (k) {
       var s = SIDES[k];
-      bi.elbow[k] = publish('elbow', perCycle(function (p) { return angle3(p[s.sh], p[s.el], p[s.wr]); }), visCyc([s.sh, s.el, s.wr]), Object.assign({ dec: 0 }, k === farK ? { why: 'farSide' } : {}));
+      bi.elbow[k] = publish('elbow', perCycle(function (p) { return angle3(p[s.sh], p[s.el], p[s.wr]); }), visCyc([s.sh, s.el, s.wr]), Object.assign({ dec: 0 }, k === farK ? { cap: 'est' } : {}));
     });
     var hd = publish('head', perCycle(function (p) { return Math.atan2((p[near.ear].x - p[near.sh].x) * dir, p[near.sh].y - p[near.ear].y) * DEG; }), visCyc([near.ear, near.sh, P.nose]));
     var tk = publish('trunk', perCycle(function (p) { return Math.atan2((p[near.sh].x - p[near.hip].x) * dir, p[near.hip].y - p[near.sh].y) * DEG; }), visCyc([near.sh, near.hip]));
