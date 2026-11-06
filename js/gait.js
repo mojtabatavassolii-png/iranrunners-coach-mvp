@@ -654,11 +654,20 @@
       var s = SIDES[k];
       bi.elbow[k] = publish('elbow', perCycle(function (p) { return angle3(p[s.sh], p[s.el], p[s.wr]); }), visCyc([s.sh, s.el, s.wr]), Object.assign({ dec: 0 }, k === farK ? { cap: 'est' } : {}));
     });
-    var hd = publish('head', perCycle(function (p) { return Math.atan2((p[near.ear].x - p[near.sh].x) * dir, p[near.sh].y - p[near.ear].y) * DEG; }), visCyc([near.ear, near.sh, P.nose]));
+    // سر و گردن: خط وسط دو شونه تا وسط دو گوش نسبت به عمود (مثبت = سر جلوتر). نقطه‌ی یک شونه با تاب دست جلو و عقب می‌ره و
+    // خط یک شونه تا یک گوش در هر فریم تا ۱۸ درجه جابه‌جا می‌شد (پراکندگی زیاد → «قابل ارزیابی نبود»)؛ وسط دو شونه این رو خنثی می‌کنه
+    var mid2 = function (p, a, b) { return { x: (p[a].x + p[b].x) / 2, y: (p[a].y + p[b].y) / 2 }; };
+    var headAng = function (p) { var sh = mid2(p, P.lSh, P.rSh), ea = mid2(p, P.lEar, P.rEar); return Math.atan2((ea.x - sh.x) * dir, sh.y - ea.y) * DEG; };
+    var hd = publish('head', perCycle(headAng), visCyc([near.ear, near.sh]));
     var tk = publish('trunk', perCycle(function (p) { return Math.atan2((p[near.sh].x - p[near.hip].x) * dir, p[near.hip].y - p[near.sh].y) * DEG; }), visCyc([near.sh, near.hip]));
     var gaze = median(perCycle(function (p) { return Math.atan2(p[P.nose].y - p[near.ear].y, Math.abs(p[P.nose].x - p[near.ear].x)) * DEG; }));
     // جهت نگاه: خط گوش تا چشم سمت نزدیک (مثبت = پایین)؛ مدلی که چشم نداره (دیده‌شدن صفر) → غیرقابل‌اطمینان
-    var gz = publish('gaze', perCycle(function (p) { return p[near.eye].v < 0.3 ? null : Math.atan2(p[near.eye].y - p[near.ear].y, Math.abs(p[near.eye].x - p[near.ear].x) || 1e-6) * DEG; }), visCyc([near.ear, near.eye]));
+    // جهت نگاه (جهت سر): خط گوش سمت نزدیک تا نوک بینی نسبت به افق (مثبت = پایین). خط گوش تا چشم و نقاط سمت دور در
+    // آزمایش ناپایدار بودن (چشم تا ۲۵ درجه بالاتر از گوش، پراکندگی ۱۰ تا ۲۵ درجه)؛ گوش نزدیک تا بینی ۴ درجه
+    var gz = publish('gaze', perCycle(function (p) {
+      if (Math.min(p[near.ear].v, p[P.nose].v) < 0.5) return null;
+      return Math.atan2(p[P.nose].y - p[near.ear].y, Math.abs(p[P.nose].x - p[near.ear].x) || 1e-6) * DEG;
+    }), visCyc([near.ear, P.nose]));
     var swing = [];
     D.pts.forEach(function (p) { if (p) swing.push((p[near.wr].x - p[near.sh].x) * dir / (dist(p[near.sh], p[near.hip]) || 1)); });
     // ۸. فیلدهای قبلی گزارش (سمت نزدیک)، برای گزارش‌های ذخیره‌شده و کارت‌ها
@@ -1021,8 +1030,9 @@
   // conf: sure = نشانگر پر، est = توخالی و «تخمینی»، low = بدون نشانگر («قابل ارزیابی نبود») با دلیل.
   // ورودی: معیارهای ذخیره‌شده‌ی نمای کنار و پشت (همون r.side / r.back گزارش) و شرایط دویدن؛ پس برای گزارش‌های قبلی هم کار می‌کنه
   // (فاکتورهایی که اون موقع اندازه‌گیری نمی‌شدن: why = 'old').
-  var FACTOR_IDS = ['cadence', 'knee', 'pelvis', 'pronation', 'landing', 'achilles', 'elbow', 'head', 'arms'];
-  var FACTOR_VIEW = { cadence: 'both', knee: 'side', pelvis: 'back', pronation: 'back', landing: 'side', achilles: 'side', elbow: 'side', head: 'side', arms: 'back' };
+  // کشش آشیل به درخواست کاربر از گزارش حذف شد (بیشترین خم مچ پا هنوز حساب می‌شه ولی جایی نشون داده نمی‌شه)
+  var FACTOR_IDS = ['cadence', 'knee', 'pelvis', 'pronation', 'landing', 'elbow', 'head', 'arms'];
+  var FACTOR_VIEW = { cadence: 'both', knee: 'side', pelvis: 'back', pronation: 'back', landing: 'side', elbow: 'side', head: 'side', arms: 'back' };
   function pw(v, m) {
     if (v <= m[0][0]) return m[0][1];
     for (var i = 1; i < m.length; i++) if (v <= m[i][0]) return m[i - 1][1] + (m[i][1] - m[i - 1][1]) * (v - m[i - 1][0]) / (m[i][0] - m[i - 1][0]);
@@ -1102,9 +1112,6 @@
       w.over = a.conf === 'low' ? null : a.v; w.shank = b.conf === 'low' ? null : b.v;
       return { k: k, m: w };
     }), Object.assign({ strikes: Object.keys(types) }, sg));
-    // ۶. کشش آشیل (غیرمستقیم: خم مچ پا به بالا در فاز تماس)؛ همیشه حداکثر «تخمینی»
-    var aMap = twoMap(REF.ankleDf, 0, 45);
-    add('achilles', 'two', ['l', 'r'].map(function (k) { return { k: k, m: mark(sm, 'ankleDf', k, aMap, 'two', 'side') }; }), sg);
     // ۷. زاویه‌ی آرنج
     var eMap = twoMap(REF.elbow, 30, 170);
     add('elbow', 'two', ['l', 'r'].map(function (k) { return { k: k, m: mark(sm, 'elbow', k, eMap, 'two', 'side') }; }));

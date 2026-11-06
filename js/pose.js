@@ -391,14 +391,17 @@
     var deg = function (x) { return o.digits(Math.round(x)) + '°'; };
     if (!o.back) {
       var sh = 11 + n, ear = 7 + n, eye = n ? 5 : 2, knee = 25 + n, ank = 27 + n, heel = 29 + n, toe = 31 + n;
-      if (L.head && seen(sh) && seen(ear)) {
-        var s0 = pt(sh), e0 = pt(ear), len = Math.hypot(e0[0] - s0[0], e0[1] - s0[1]);
+      // همون روش گزارش: خط وسط دو شونه تا وسط دو گوش با عمود، و جهت سر از گوش سمت نزدیک تا بینی
+      if (L.head && seen(11) && seen(12) && seen(7) && seen(8)) {
+        var s0 = [(lm[11][0] + lm[12][0]) / 2 * W, (lm[11][1] + lm[12][1]) / 2 * H], e0 = [(lm[7][0] + lm[8][0]) / 2 * W, (lm[7][1] + lm[8][1]) / 2 * H];
+        var len = Math.hypot(e0[0] - s0[0], e0[1] - s0[1]);
+        g.strokeStyle = tok('--warning'); g.lineWidth = 2.5; g.beginPath(); g.moveTo(s0[0], s0[1]); g.lineTo(e0[0], e0[1]); g.stroke();
         dash(s0, [s0[0], s0[1] - len * 1.2]);
         var neck = Math.atan2(Math.abs(e0[0] - s0[0]), s0[1] - e0[1]) * 180 / Math.PI;
         tag(g, o.labels.neck + ' ' + deg(neck), e0[0] + r * 2, e0[1] - r * 5, W, TXT);
-        if (seen(eye)) {
-          var y0 = pt(eye), dx = y0[0] - e0[0], dy = y0[1] - e0[1], d = Math.hypot(dx, dy) || 1;
-          dash(y0, [y0[0] + dx / d * len * 1.5, y0[1] + dy / d * len * 1.5]);
+        if (seen(ear) && seen(0)) {
+          var a0 = pt(ear), n0 = pt(0), dx = n0[0] - a0[0], dy = n0[1] - a0[1], d = Math.hypot(dx, dy) || 1;
+          dash(n0, [n0[0] + dx / d * len * 1.5, n0[1] + dy / d * len * 1.5]);
         }
       }
       if (L.foot && seen(knee) && seen(ank) && seen(heel) && seen(toe)) {

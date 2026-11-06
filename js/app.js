@@ -3445,7 +3445,7 @@
   // شرایط دویدنِ هر فیلم (الزامی، جدا برای هر خونه)؛ با عوض شدن فیلم پاک می‌شه
   var gaitConds = { side: null, side2: null, back: null };
   // لایه‌های زاویه روی ویدیو (برای همه‌ی پخش‌کننده‌های یک نما)؛ پیش‌فرض همون زاویه‌هایی که قبلاً نشون داده می‌شد
-  var GAIT_LAYERS = { side: ['knee', 'elbow', 'head', 'foot'], back: ['pelvis', 'kneeIn', 'heel', 'arms'] };
+  var GAIT_LAYERS = { side: ['knee', 'elbow', 'head'], back: ['pelvis', 'kneeIn', 'heel', 'arms'] };
   var gaitLayers = { side: { knee: true, elbow: true, head: false, foot: false }, back: { pelvis: true, kneeIn: false, heel: false, arms: false } };
   // سرعت فیلم (اختیاری، قبل از تحلیل): ۱ = عادی، ۴ یا ۸ = اسلوموشن
   var gaitSpeeds = { side: 1, side2: 1, back: 1 };

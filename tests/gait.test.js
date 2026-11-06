@@ -509,8 +509,8 @@ test('۹ فاکتور: گیج، اطمینان، تخمینی همیشگی و ن
   assert.strictEqual(by.knee.marks[1].zone, 'bad'); assert.ok(by.knee.marks[1].pos < 0.2); assert.strictEqual(by.knee.marks[0].zone, 'good');
   // فرود جلوتر از بدن در پای راست؛ برچسب نوع فرود فقط از سمت قابل‌اطمینان
   assert.strictEqual(by.landing.marks[1].zone, 'bad'); assert.deepStrictEqual(by.landing.strikes, ['heel']);
-  // آشیل: یک سمت تخمینی، سمت دیگه دلیل داره
-  assert.strictEqual(by.achilles.conf, 'est'); assert.strictEqual(by.achilles.marks[1].why, 'farSide');
+  // کشش آشیل از گزارش حذف شده
+  assert.strictEqual(by.achilles, undefined); assert.strictEqual(F.length, 8);
   // بدون ویدیوی پشت: لگن، پرونیشن و دست‌ها «قابل ارزیابی نبود» با دلیل
   ['pelvis', 'pronation', 'arms'].forEach(function (id) { assert.strictEqual(by[id].status, 'na'); assert.strictEqual(by[id].why, 'noBack'); });
   assert.strictEqual(by.head.look, 'ahead');
