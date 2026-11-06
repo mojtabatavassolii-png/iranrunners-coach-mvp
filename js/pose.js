@@ -134,9 +134,12 @@
       // اسلوموشن ×۴ و بیشتر: هر ۱/۳۰ ثانیه‌ی فیلم یعنی ۱۲۰ تا ۲۴۰ فریم در ثانیه‌ی واقعی؛ تشخیص یکی‌درمیون (هنوز حداقل ۶۰ تا ۱۲۰ در ثانیه)
       // و فریم‌های بین با درون‌یابی پر می‌شن (بدون جابه‌جایی روی ویدیو) تا هر ۱/۳۰ ثانیه همچنان یک فریم باشه (پخش‌کننده همین رو می‌خواد)
       var every = opts.timeScale >= 4 ? 2 : 1;
+      var result = function () { fillSkipped(frames); return { w: v.videoWidth, h: v.videoHeight, duration: dur, full: dur >= (v.duration || 0) - STEP, frames: frames, video: v, input: { w: cv.width, h: cv.height }, engine: en.name, backend: en.backend || null, read: readMode }; };
+      var readMode = 'seek';
+      // روش قبلی: جابه‌جایی روی ویدیو برای هر فریم (کند، ولی همه‌جا کار می‌کنه)
       function next() {
         // full: کل فیلم پردازش شد (برای پیشنهاد ادامه‌ی تحلیل بعد از تعیین ضریب اسلوموشن)
-        if (i >= n) { fillSkipped(frames); return { w: v.videoWidth, h: v.videoHeight, duration: dur, full: dur >= (v.duration || 0) - STEP, frames: frames, video: v, input: { w: cv.width, h: cv.height }, engine: en.name, backend: en.backend || null }; }
+        if (i >= n) return result();
         var t = i * STEP + 0.001;
         if (every > 1 && (i - i0) % every && i < n - 1) { frames.push({ t: t, lm: null, skip: true }); i++; return next(); }
         return seek(v, t).then(function () {
@@ -149,10 +152,84 @@
           return next();
         });
       }
+      // روش سریع: پخش خود ویدیو (بی‌صدا و پنهان) و برداشتن فریم‌ها هم‌زمان با پخش؛ تکه‌تکه، تا اجرای مدل جلوی پخش رو نگیره
+      // و فریمی جا نیفته. اگه مرورگر requestVideoFrameCallback نداشت یا پخش گیر کرد، همون روش قبلی از اول.
+      if (v.requestVideoFrameCallback && !/[?&]frames=seek\b/.test(location.search)) {
+        return byPlayback(v, en, cv, i0, n, every, dur, onProgress).then(function (res) {
+          readMode = 'play';
+          for (var k = i0; k < n; k++) {
+            var hit = Object.prototype.hasOwnProperty.call(res, k);
+            frames.push({ t: k * STEP + 0.001, lm: hit ? res[k] : null, skip: !hit });
+          }
+          return result();
+        }, function (e) {
+          if (root.console) console.warn('playback capture, falling back to seek', e);
+          en.reset(); frames = []; i = i0;
+          return next();
+        });
+      }
       return next();
     }).catch(function (e) { if (v) release(v); throw e.code ? e : fail('video', e); });
   }
 
+  // پخش و برداشت تکه‌ای: تا BATCH فریم (هر ۱/۳۰ ثانیه‌ی فیلم یکی، در اسلوموشن یکی‌درمیون) در حین پخش روی بوم‌های جدا کشیده می‌شن،
+  // بعد پخش مکث می‌کنه و مدل روی همون‌ها اجرا می‌شه، بعد پخش ادامه. خروجی: { شماره‌ی خونه‌ی ۱/۳۰: نقاط }؛ خونه‌ای که فریمش
+  // در پخش جا افتاد (کم پیش میاد) خالی می‌مونه و با درون‌یابی پر می‌شه.
+  var BATCH = 16, STALL_MS = 5000;
+  function byPlayback(v, en, cv, i0, n, every, dur, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var pool = [], buf = [], res = {}, last = -1, done = false, working = false, timer = 0, count = 0;
+      var total = Math.max(1, Math.ceil((n - i0) / every));
+      function canvas() { var c = pool.pop(); if (!c) { c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; } return c; }
+      function watchdog() { clearTimeout(timer); timer = setTimeout(function () { if (!done && !working) fin(new Error('stall')); }, STALL_MS); }
+      function fin(err) {
+        if (done) return;
+        done = true; clearTimeout(timer); v.pause(); v.removeEventListener('ended', onEnd);
+        if (err) { reject(err); return; }
+        process(function () { resolve(res); });
+      }
+      function onEnd() { fin(); }
+      // مدل روی فریم‌های برداشته‌شده، یکی‌یکی؛ cb بعد از تموم شدن
+      function process(cb) {
+        working = true;
+        var q = buf; buf = [];
+        (function step() {
+          if (!q.length) { working = false; cb(); return; }
+          var it = q.shift();
+          en.detect(it.c).then(function (lm) {
+            res[it.s] = lm; pool.push(it.c); count++;
+            if (onProgress && count % 3 === 0) onProgress(Math.min(1, count / total));
+            step();
+          }, function (e) { done = true; clearTimeout(timer); v.pause(); reject(e); });
+        })();
+      }
+      function onFrame(now, meta) {
+        if (done) return;
+        var mt = meta && meta.mediaTime != null ? meta.mediaTime : v.currentTime, slot = Math.round((mt - 0.001) / STEP);
+        if (mt >= dur - 1e-3 || slot >= n) { fin(); return; }
+        if (slot >= i0 && slot > last && (slot - i0) % every === 0) {
+          last = slot;
+          var c = canvas(); c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+          buf.push({ s: slot, c: c });
+        }
+        watchdog();
+        if (buf.length >= BATCH) {
+          v.pause();
+          process(function () { if (done) return; watchdog(); v.requestVideoFrameCallback(onFrame); var pl = v.play(); if (pl && pl.catch) pl.catch(function (e) { fin(e); }); });
+          return;
+        }
+        v.requestVideoFrameCallback(onFrame);
+      }
+      v.addEventListener('ended', onEnd);
+      v.muted = true; v.playbackRate = 1;
+      seek(v, Math.max(0, i0 * STEP) + 0.001).then(function () {
+        v.requestVideoFrameCallback(onFrame);
+        watchdog();
+        var pl = v.play();
+        if (pl && pl.catch) pl.catch(function (e) { fin(e); });
+      }, function (e) { fin(e); });
+    });
+  }
   // فریم‌های رد شده: میانگین وزنی دو فریم تشخیص‌داده‌شده‌ی دو طرف (اگه یکی نبود، بدون نقطه)
   function fillSkipped(F) {
     for (var i = 0; i < F.length; i++) {
