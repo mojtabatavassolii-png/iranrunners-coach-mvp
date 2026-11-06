@@ -127,11 +127,12 @@ async function hash() { return page.evaluate(() => location.hash); }
     await page.evaluate(() => { location.hash = '#record'; });
     await page.locator('[data-rec="start"]').click();
     await page.locator('[data-rec="finish"]').waitFor();
-    // اولین نقطه‌ی موقعیت: شبیه‌ساز زیر فشار حافظه گاهی چند ثانیه‌ی اول موقعیتی تحویل نمی‌ده (v106: صفر نقطه، v109: ۶ نقطه و ۲۰ متر).
-    // تا رسیدن اولین نقطه (حداکثر ۲۰ ثانیه) هر ثانیه یک موقعیت تازه؛ شمارش مسافت پیش‌زمینه بعد از اون شروع می‌شه
+    // اولین نقطه‌ی موقعیت: شبیه‌ساز زیر فشار حافظه گاهی چند ثانیه‌ی اول موقعیتی تحویل نمی‌ده (v106: صفر نقطه، v109: ۶ نقطه و ۲۰ متر)،
+    // و اگه سرویس‌های گوگل همون لحظه از کار بیفتن تا راه افتادن دوباره‌شون (v110). تا رسیدن اولین نقطه (حداکثر ۴۵ ثانیه)
+    // هر ثانیه یک موقعیت تازه؛ شمارش مسافت پیش‌زمینه بعد از اون شروع می‌شه
     let warm = 0;
-    while (warm < 20 && !((await live()).n >= 1)) { await wait(1000); fix(); warm++; }
-    must((await live()).n >= 1, 'no first location within 20s');
+    while (warm < 45 && !((await live()).n >= 1)) { await wait(1000); fix(); warm++; }
+    must((await live()).n >= 1, 'no first location within 45s');
     for (let i = 0; i < 12; i++) { await wait(1000); fix(); }
     await wait(5500); fix();
     const fg = await live();

@@ -27,15 +27,15 @@ ffmpeg -loglevel error -y -i ../tests/e2e/synthetic-clip.mp4 -c:v libvpx -b:v 1M
 npm i --no-save --no-audit --no-fund playwright-core@1.63.0 >/dev/null
 node scripts/smoke-android.js
 status=$?
-# شبیه‌ساز زیر فشار حافظه گاهی سرویس‌های گوگل (com.google.android.gms) رو می‌بنده و اندروید اپ رو هم چون به فونت‌های
-# اون وابسته‌ست می‌کشه («depends on provider … in dying proc com.google.android.gms»؛ v108). فقط در همین حالت،
-# یک بار دیگه از اول با داده‌ی خالی؛ هر شکست دیگه (کرش اپ، خطای تست) همون‌طور رد می‌شه.
-if [ $status -ne 0 ] && timeout 60 adb logcat -d | grep -qE "Killing [0-9]+:$PKG/.*dying proc com\.google\.android\.gms"; then
-  echo "::warning::App was killed because Google Play services died on the emulator; running the smoke test once more"
+# شبیه‌ساز زیر فشار حافظه گاهی سرویس‌های گوگل (com.google.android.gms) رو وسط تست می‌بنده: یا اندروید اپ رو هم می‌کشه
+# (چون WebView به فونت‌های اون وابسته‌ست؛ v108)، یا موقعیت GPS تا راه افتادن دوباره‌ش نمی‌رسه (v110). فقط وقتی تست رد شده
+# و همین از کار افتادن در لاگ هست، یک بار دیگه از اول با داده‌ی خالی؛ اگه اجرای دوم هم رد بشه، بیلد قرمز می‌مونه.
+if [ $status -ne 0 ] && timeout 60 adb logcat -d | grep -qE "Process com\.google\.android\.gms(\.persistent)? \(pid [0-9]+\) has died|Killing [0-9]+:$PKG/.*dying proc com\.google\.android\.gms"; then
+  echo "::warning::Google Play services died on the emulator during the smoke test; running it once more"
   mkdir -p smoke/attempt1
   cp smoke/result.md smoke/attempt1/ 2>/dev/null || true
   timeout 60 adb logcat -d > smoke/attempt1/logcat-full.txt || true
-  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then printf '\n> اجرای اول: اپ به خاطر از کار افتادن سرویس‌های گوگل روی شبیه‌ساز بسته شد؛ اجرای دوم:\n\n' >> "$GITHUB_STEP_SUMMARY"; fi
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then printf '\n> اجرای اول رد شد و سرویس‌های گوگل وسط تست روی شبیه‌ساز از کار افتادن؛ اجرای دوم:\n\n' >> "$GITHUB_STEP_SUMMARY"; fi
   adb uninstall $PKG || true
   prepare
   node scripts/smoke-android.js
