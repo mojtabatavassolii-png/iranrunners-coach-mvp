@@ -3636,7 +3636,7 @@
     (r.perf || []).forEach(function (p) {
       meta.push([T(X + 'perf') + ' (' + T(X + 'views.' + (p.slot === 'back' ? 'back' : p.slot === 'side2' ? 'side2' : 'side')) + ')',
         fa(T(X + 'perfV', { s: p.totalS, n: p.frames, m: p.modelMs == null ? '—' : p.modelMs, o: p.otherMs == null ? '—' : p.otherMs })) + T('progress.sep') + T(X + 'read.' + (p.read === 'play' ? 'play' : 'seek')) +
-        (p.fallback ? ' (' + p.fallback + ')' : '') + (r.appV ? T('progress.sep') + 'v' + r.appV : '')]);
+        (p.fallback ? ' (' + p.fallback + ')' : '') + (p.batch ? T('progress.sep') + fa(T(X + 'batch', { b: p.batch.batched, r: p.batch.redo })) : '') + (r.appV ? T('progress.sep') + 'v' + r.appV : '')]);
     });
     if (r.engine) meta.push([T(X + 'engine'), (r.engine === 'rtmpose-m' ? 'RTMPose-m (Halpe26)' : r.engine === 'mediapipe-full' ? 'MediaPipe Pose (full)' : r.engine) + (r.backend ? ' · ' + (r.backend === 'webgpu' ? 'GPU' : 'CPU') : '')]);
     [['side', r.qSide], ['side2', r.qSide2], ['back', r.qBack]].forEach(function (q) {

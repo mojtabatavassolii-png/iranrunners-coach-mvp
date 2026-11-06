@@ -131,15 +131,19 @@
       cv = document.createElement('canvas'); cv.width = Math.round(v.videoWidth * sc); cv.height = Math.round(v.videoHeight * sc);
       g = cv.getContext('2d');
       var n = Math.floor(dur / STEP), frames = [], i = opts.from > 0 ? Math.ceil(opts.from / STEP - 1e-6) : 0, i0 = i;
-      // اسلوموشن ×۴ و بیشتر: هر ۱/۳۰ ثانیه‌ی فیلم یعنی ۱۲۰ تا ۲۴۰ فریم در ثانیه‌ی واقعی؛ تشخیص یکی‌درمیون (هنوز حداقل ۶۰ تا ۱۲۰ در ثانیه)
-      // و فریم‌های بین با درون‌یابی پر می‌شن (بدون جابه‌جایی روی ویدیو) تا هر ۱/۳۰ ثانیه همچنان یک فریم باشه (پخش‌کننده همین رو می‌خواد)
-      var every = opts.timeScale >= 4 ? 2 : 1;
+      // مدل یکی‌درمیون (۱۵ فریم در ثانیه‌ی فیلم؛ در اسلوموشن ×۴ و بیشتر ۶۰ تا ۱۲۰ در ثانیه‌ی واقعی) و فریم‌های بین با درون‌یابی
+      // پر می‌شن تا هر ۱/۳۰ ثانیه همچنان یک فریم باشه (پخش‌کننده همین رو می‌خواد). روی آیفون مدل ۸۰٪ زمان تحلیل بود؛
+      // در مجموعه‌ی آزمایش آهنگ گام و زاویه‌ها با تحلیل همه‌ی فریم‌ها فرقی نکرد. ?every=1 برای مقایسه همه‌ی فریم‌ها.
+      var every = /[?&]every=1\b/.test(location.search) ? 1 : 2;
       // اندازه‌گیری برای عیب‌یابی سرعت روی گوشی (در نسخه‌ی تخصصی گزارش): زمان کل، زمان مدل، روش خوندن فریم‌ها
       var tStart = performance.now(), modelMs = 0, nDet = 0, fallback = null;
       var timed = { detect: function (c) { var a = performance.now(); return en.detect(c).then(function (lm) { modelMs += performance.now() - a; nDet++; return lm; }); } };
+      // آزمایشی: چند فریم با هم در یک اجرای مدل (js/rtmpose.js)
+      if (en.detectBatch && batchOn()) timed.detectBatch = function (cs) { var a = performance.now(); return en.detectBatch(cs).then(function (r) { modelMs += performance.now() - a; nDet += cs.length; return r; }); };
       var result = function () { fillSkipped(frames); return { w: v.videoWidth, h: v.videoHeight, duration: dur, full: dur >= (v.duration || 0) - STEP, frames: frames, video: v, input: { w: cv.width, h: cv.height }, engine: en.name, backend: en.backend || null,
         perf: { read: readMode, fallback: fallback, totalS: Math.round((performance.now() - tStart) / 100) / 10, frames: nDet,
-          modelMs: nDet ? Math.round(modelMs / nDet) : null, otherMs: nDet ? Math.round((performance.now() - tStart - modelMs) / nDet) : null } }; };
+          modelMs: nDet ? Math.round(modelMs / nDet) : null, otherMs: nDet ? Math.round((performance.now() - tStart - modelMs) / nDet) : null,
+          every: every, batch: timed.detectBatch && readMode === 'play' && en.stats ? en.stats() : null } }; };
       var readMode = 'seek';
       // روش قبلی: جابه‌جایی روی ویدیو برای هر فریم (کند، ولی همه‌جا کار می‌کنه)
       function next() {
@@ -182,6 +186,12 @@
   // بعد پخش مکث می‌کنه و مدل روی همون‌ها اجرا می‌شه، بعد پخش ادامه. خروجی: { شماره‌ی خونه‌ی ۱/۳۰: نقاط }؛ خونه‌ای که فریمش
   // در پخش جا افتاد (کم پیش میاد) خالی می‌مونه و با درون‌یابی پر می‌شه.
   var BATCH = 16, STALL_MS = 5000;
+  // حالت آزمایشی دسته‌ای: یک بار ?batch=1 در آدرس روشنش می‌کنه (و می‌مونه، چون ورود به حساب ممکنه آدرس رو عوض کنه)، ?batch=0 خاموش
+  function batchOn() {
+    var m = /[?&]batch=([01])\b/.exec(location.search);
+    try { if (m) { if (m[1] === '1') localStorage.setItem('gaam-pose-batch', '1'); else localStorage.removeItem('gaam-pose-batch'); } return localStorage.getItem('gaam-pose-batch') === '1'; }
+    catch (e) { return !!m && m[1] === '1'; }
+  }
   function byPlayback(v, en, cv, i0, n, every, dur, onProgress) {
     return new Promise(function (resolve, reject) {
       var pool = [], buf = [], res = {}, last = -1, done = false, working = false, timer = 0, count = 0;
@@ -195,10 +205,19 @@
         process(function () { resolve(res); });
       }
       function onEnd() { fin(); }
-      // مدل روی فریم‌های برداشته‌شده، یکی‌یکی؛ cb بعد از تموم شدن
+      // مدل روی فریم‌های برداشته‌شده، یکی‌یکی (یا در حالت آزمایشی دسته‌ای همه با هم)؛ cb بعد از تموم شدن
       function process(cb) {
         working = true;
         var q = buf; buf = [];
+        if (en.detectBatch && q.length) {
+          en.detectBatch(q.map(function (it) { return it.c; })).then(function (r) {
+            q.forEach(function (it, j) { res[it.s] = r[j]; pool.push(it.c); });
+            count += q.length;
+            if (onProgress) onProgress(Math.min(1, count / total));
+            working = false; cb();
+          }, function (e) { done = true; clearTimeout(timer); v.pause(); reject(e); });
+          return;
+        }
         (function step() {
           if (!q.length) { working = false; cb(); return; }
           var it = q.shift();
