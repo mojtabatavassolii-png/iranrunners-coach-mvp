@@ -52,7 +52,8 @@
   // ---------- سطح اطمینان هر اندازه‌گیری ----------
   // sure = اندازه‌گیری مطمئن، est = تخمینی، low = غیرقابل‌اطمینان (عدد نشون داده نمی‌شه)
   // v: میانگین «دیده‌شدن» مفاصل لازم (۰ تا ۱)، n: تعداد نمونه (برخورد یا فریم)، cap: بالاترین سطح ممکن برای این پارامتر
-  var CONF = { sure: 2, est: 1, low: 0 };
+  // unsure: فقط در گیج‌های ۸ فاکتور؛ عدد بین گام‌ها پراکنده بود ولی میانه نشون داده می‌شه با برچسب «نامطمئن»
+  var CONF = { sure: 2, est: 1, unsure: 0.5, low: 0 };
   function conf(v, n, nSure, nEst, cap) {
     var c = v != null && v >= 0.8 && n >= nSure ? 'sure' : v != null && v >= 0.6 && n >= nEst ? 'est' : 'low';
     return cap && CONF[cap] < CONF[c] ? cap : c;
@@ -1067,11 +1068,14 @@
       if (!m) return low(view === 'side' ? 'noSide' : 'noBack');
       var b = m.bi && m.bi[id] && m.bi[id][k];
       if (!b) return low(m.bi ? 'old' : 'old');
-      if (b.conf === 'low' || b.v == null) return low(b.why);
+      // پراکندگی زیاد بین گام‌ها: میانه‌ی گام‌ها با برچسب «نامطمئن» (به جای «قابل ارزیابی نبود»)، همراه با انحراف معیار
+      var unsure = b.conf === 'low' && b.why === 'spread' && b.v != null;
+      if ((b.conf === 'low' && !unsure) || b.v == null) return low(b.why);
       var p = pw(b.v, map);
-      return { conf: b.conf, v: b.v, n: b.n, sd: b.sd, pos: Math.round(p * 1000) / 1000, zone: zoneOf(kind, p) };
+      return { conf: unsure ? 'unsure' : b.conf, v: b.v, n: b.n, sd: b.sd, pos: Math.round(p * 1000) / 1000, zone: zoneOf(kind, p) };
     };
-    var one = function (v, c, why, map, kind) {
+    var one = function (v, c, why, map, kind, sd) {
+      if (v != null && c === 'low' && why === 'spread') { var pu = pw(v, map); return { conf: 'unsure', v: v, sd: sd, pos: Math.round(pu * 1000) / 1000, zone: zoneOf(kind, pu) }; }
       if (v == null || c === 'low' || !c) return low(why);
       var p = pw(v, map);
       return { conf: c, v: v, pos: Math.round(p * 1000) / 1000, zone: zoneOf(kind, p) };
@@ -1148,7 +1152,7 @@
     add('elbow', 'two', ['l', 'r'].map(function (k) { return { k: k, m: mark(sm, 'elbow', k, eMap, 'two', 'side') }; }));
     // ۸. سر و گردن (جلو بودن سر، روی گیج) و جهت نگاه (برچسب)
     var hMap = oneMap(REF.neck, 45);
-    var hd = sm ? (sm.headN ? one(sm.headN.v, sm.headN.conf, sm.headN.why, hMap, 'one') : one(sm.neck, sm.conf && sm.conf.head, sm.why && sm.why.head, hMap, 'one')) : low('noSide');
+    var hd = sm ? (sm.headN ? one(sm.headN.v, sm.headN.conf, sm.headN.why, hMap, 'one', sm.headN.sd) : one(sm.neck, sm.conf && sm.conf.head, sm.why && sm.why.head, hMap, 'one')) : low('noSide');
     var gz = sm && sm.gazeN && sm.gazeN.conf !== 'low' ? sm.gazeN.v : null;
     add('head', 'one', [{ k: null, m: hd }], { gaze: gz, look: gz == null ? null : gz > REF.gaze.hi ? 'down' : gz < REF.gaze.lo ? 'up' : 'ahead' });
     // ۹. عبور دست‌ها از خط وسط بدن (از پشت)؛ دامنه‌ی تاب جلو و عقب از کنار فقط در گزارش تخصصی

@@ -3579,7 +3579,8 @@
   }
   function gaitFactorKey(f, m) { return f.kind === 'two' ? (m.zone === 'good' ? 'good' : m.pos < 0.5 ? 'lo' : 'hi') : m.zone === 'good' ? 'good' : 'high'; }
   function gaitFactorRow(f) {
-    var F0 = 'gait.f.', K = F0 + f.id + '.', na = f.status === 'na', est = !na && f.conf === 'est';
+    // unsure: عدد بین گام‌ها پراکنده بود؛ میانه نشون داده می‌شه با برچسب «نامطمئن»
+    var F0 = 'gait.f.', K = F0 + f.id + '.', na = f.status === 'na', unsure = !na && f.conf === 'unsure', est = !na && (f.conf === 'est' || unsure);
     var ok = f.marks.filter(function (m) { return m.conf !== 'low'; }), two = f.marks.length > 1;
     var marks = ok.map(function (m, i) {
       // دو نشانگر روی هم (مثلاً هر دو صفر): دومی کمی جابه‌جا تا هر دو دیده بشن
@@ -3588,6 +3589,7 @@
     }).join('');
     var tags = [];
     if (na) tags.push(T(F0 + 'na'));
+    else if (unsure) tags.push(T(F0 + 'unsure'));
     else if (est) tags.push(T(F0 + 'est'));
     if (f.id === 'landing' && f.strikes && f.strikes.length) tags.push(f.strikes.map(function (k) { return T('gait.strikeName.' + k); }).join(' / ') + (f.strikePooled ? ' (' + T(F0 + 'est') + ')' : ''));
     if (!na && f.id === 'head' && f.look) tags.push(T(F0 + 'look', { l: T('gait.look.' + f.look) }));
@@ -3597,12 +3599,12 @@
     if (na) body += '<p>' + esc(fa(T(F0 + 'naWhy.' + (f.why || 'fewSteps'), { s: f.secs }))) + '</p>';
     else {
       if (two) body += '<ul class="gf-sides">' + f.marks.map(function (m) {
-        var z = m.conf === 'low' ? fa(T(F0 + 'naWhy.' + (m.why || 'fewSteps'), { s: m.secs })) : T(F0 + 'zone.' + m.zone) + (m.conf === 'est' ? ' (' + T(F0 + 'est') + ')' : '');
+        var z = m.conf === 'low' ? fa(T(F0 + 'naWhy.' + (m.why || 'fewSteps'), { s: m.secs })) : T(F0 + 'zone.' + m.zone) + (m.conf === 'est' ? ' (' + T(F0 + 'est') + ')' : m.conf === 'unsure' ? ' (' + T(F0 + 'unsure') + ')' : '');
         return '<li>' + esc(T(F0 + 'sideLine', { s: T('gait.sideName.' + m.k), z: z })) + '</li>';
       }).join('') + '</ul>';
       var worst = ok.filter(function (m) { return m.zone === f.zone; })[0] || ok[0], key = gaitFactorKey(f, worst);
       // نتیجه: خوبه یا نیاز به اصلاح؛ توضیح؛ و اگه لازمه، چطور اصلاح بشه
-      body = '<p class="gf-verdict gf-v-' + f.zone + '"><b>' + esc(T(F0 + 'verdict.' + f.zone)) + '</b></p>' + body;
+      body = '<p class="gf-verdict gf-v-' + f.zone + '"><b>' + esc(T(F0 + 'verdict.' + f.zone)) + '</b>' + (unsure ? ' <span class="small muted">(' + esc(T(F0 + 'unsure')) + ')</span>' : '') + '</p>' + body;
       body += '<p>' + esc(T(K + key)) + '</p>';
       if (key !== 'good') body += '<p class="gf-how"><b>' + esc(T(F0 + 'howLabel')) + '</b>' + esc(T(K + 'fix.' + key)) + '</p>';
       if (f.id === 'landing') {
@@ -3611,6 +3613,9 @@
         if (sts.length) body += '<p>' + esc(T(F0 + 'strikeLine', { list: sts.join(T('progress.sep')) })) + '</p>';
         body += '<p class="small muted">' + esc(T(F0 + 'strikeNote')) + '</p>';
       }
+      // پراکندگی: چقدر عدد بین گام‌ها فرق داشت (بیشترین انحراف معیار بین سمت‌های نامطمئن)
+      var usd = f.marks.filter(function (m) { return m.conf === 'unsure' && m.sd != null; }).map(function (m) { return m.sd; });
+      if (usd.length) body += '<p class="small muted">' + esc(fa(T(F0 + 'unsureNote', { sd: Math.max.apply(null, usd), u: f.id === 'landing' ? T(F0 + 'unitLeg') : '°' }))) + '</p>';
       if (f.sideGuess) body += '<p class="small muted">' + esc(T(F0 + 'sideGuessNote')) + '</p>';
       if (est) body += '<p class="small muted">' + esc(T(F0 + 'estNote')) + '</p>';
     }
@@ -3629,7 +3634,7 @@
   }
   // جدول تخصصی ۹ فاکتور: عدد هر سمت با اطمینان، تعداد گام و انحراف معیار؛ نما، روش، بازه، منبع و محدودیت
   function gaitFactorExpertHtml(FX) {
-    var X = 'gait.f.x.', E = 'gait.expert.';
+    var X = 'gait.f.x.', E = 'gait.expert.', F0x = 'gait.f.';
     var cell = function (f, m) {
       var lab = m.k ? T(E + (m.k === 'l' ? 'left' : 'right')) + ': ' : '';
       if (m.conf === 'low') return lab + T('gait.conf.low') + ' (' + T('gait.f.naWhy.' + (m.why || 'fewSteps')).replace(/[.؛].*$/, '') + ')';
@@ -3638,7 +3643,7 @@
       if (f.id === 'pronation') { if (m.valgus != null) extra.push(T(X + 'sub.valgus', { n: m.valgus })); if (m.rearfoot != null) extra.push(T(X + 'sub.rearfoot', { n: m.rearfoot })); }
       if (f.id === 'landing') { if (m.over != null) extra.push(T(X + 'sub.over', { n: m.over })); if (m.shank != null) extra.push(T(X + 'sub.shank', { n: m.shank })); if (m.strike) extra.push(T(X + 'sub.strike', { s: T('gait.strikeName.' + m.strike) })); }
       var main = f.id === 'pronation' || f.id === 'landing' ? extra.join('، ') : m.v + u;
-      return fa(lab + main + ' (' + T('gait.conf.' + m.conf) + (m.n != null ? T('progress.sep') + T(E + 'nSd', { n: m.n, sd: m.sd == null ? '—' : m.sd }) : '') + ')');
+      return fa(lab + main + ' (' + (m.conf === 'unsure' ? T(F0x + 'unsure') : T('gait.conf.' + m.conf)) + (m.n != null ? T('progress.sep') + T(E + 'nSd', { n: m.n, sd: m.sd == null ? '—' : m.sd }) : '') + ')');
     };
     var rows = FX.map(function (f) {
       var P0 = X + f.id + '.', vals = f.marks.map(function (m) { return cell(f, m); }).join(' · ');
