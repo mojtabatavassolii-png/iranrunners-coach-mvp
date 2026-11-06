@@ -433,10 +433,21 @@ test('برچسب‌های MediaPipe که دنبال پای جلویی می‌ر�
   });
   var o = find(G.analyze({ side: x.video, heightCm: 175 }), 'overstride');
   near(o.sides.r.value, 0.157, 0.04, 'right'); near(o.sides.l.value, 0.377, 0.05, 'left');
-  // بدون تاب دست: سمت گام‌ها نامعلوم → عدد پا با برچسب چپ یا راست منتشر نمی‌شه
-  var u = G.analyze({ side: sideRunner({ arm: 0 }).video, heightCm: 175 });
-  assert.ok(u.side.metrics.sideUnsure);
-  assert.strictEqual(find(u, 'kneeIc').status, 'na'); assert.strictEqual(find(u, 'kneeIc').why, 'sideUnknown');
+  // بدون تاب دست، برچسب‌های آناتومیک مدل (RTMPose): سمت از برچسب مدل، عددها حداکثر «تخمینی»
+  var u = G.analyze({ side: sideRunner({ arm: 0, icL: 0.3 }).video, heightCm: 175 });
+  assert.strictEqual(u.side.metrics.sideBy, 'model'); assert.ok(!u.side.metrics.sideUnsure);
+  var uk = find(u, 'overstride');
+  assert.strictEqual(uk.sides.r.conf, 'est'); near(uk.sides.l.value, 0.3, 0.06, 'left from model labels');
+  // بدون تاب دست و با برچسب «پای جلویی» (MediaPipe): دو پا باز هم جدا اندازه‌گیری می‌شن ولی اسم سمت‌ها حدسیه
+  var y = sideRunner({ arm: 0, ic: 0.1, icL: 0.32 });
+  y.video.frames.forEach(function (f) {
+    if (f.lm[29][0] < f.lm[30][0]) [[23, 24], [25, 26], [27, 28], [29, 30], [31, 32]].forEach(function (a) { var t = f.lm[a[0]]; f.lm[a[0]] = f.lm[a[1]]; f.lm[a[1]] = t; });
+  });
+  var g = G.analyze({ side: y.video, heightCm: 175 });
+  assert.ok(g.side.metrics.sideUnsure); assert.strictEqual(g.side.metrics.sideBy, 'guess');
+  var gk = find(g, 'kneeIc');
+  assert.notStrictEqual(gk.status, 'na'); assert.ok(['l', 'r'].every(function (k) { return gk.sides[k].conf !== 'sure'; }));
+  assert.ok(G.factors(g.side.metrics, null, 'easy').filter(function (f) { return f.id === 'knee'; })[0].sideGuess);
   assert.ok(find(u, 'cadence').status === 'info', 'cadence still measured');
 });
 test('گام‌های نامعتبر جدا کنار می‌رن: دوربین مورب و پرش نقطه', function () {

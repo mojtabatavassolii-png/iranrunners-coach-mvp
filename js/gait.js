@@ -546,11 +546,24 @@
     // ۳. در هر بخش، گروه زوج یا فردی که دست نزدیکش موقع فرود عقب‌تره = پای نزدیک.
     // (عمق تخمینی MediaPipe و طول پا در تصویر هم بررسی شدن ولی در فیلم واقعی فقط دنبال برچسب خود MediaPipe می‌رفتن؛ استفاده نمی‌شن.)
     // اختلاف کمتر از ۰٫۰۸ طول پا بین دو گروه = سمت گام‌ها نامعلوم → عددهای پا بدون سمت منتشر نمی‌شن
-    var unsure = false;
+    // اگه دست‌ها کمک نکردن (دست جلوی بدن یا در جیب، تاب کم): برچسب چپ و راست خود مدل برای پای فرودآمده، اگه در هر گروه
+    // یکدست باشه (RTMPose برخلاف MediaPipe معمولاً برچسب آناتومیک رو نگه می‌داره). اگه اون هم نشد، دو پا باز هم جدا
+    // اندازه‌گیری می‌شن (یکی‌درمیون بودن گام‌ها قطعیه) ولی اسم چپ و راست ممکنه جابه‌جا باشه: sideGuess، همه حداکثر «تخمینی».
+    var unsure = false, sideBy = 'arms';
     for (var sg = 0; sg <= seg; sg++) {
       var arm = [0, 1].map(function (par) { return mean(A.filter(function (x) { return x.seg === sg && x.par === par; }).map(function (x) { return x.arm; })); });
       var nearPar = (arm[0] == null ? 0 : arm[0]) <= (arm[1] == null ? 0 : arm[1]) ? 0 : 1;
-      if (arm[0] == null || arm[1] == null || Math.abs(arm[0] - arm[1]) < 0.08) unsure = true;
+      if (arm[0] == null || arm[1] == null || Math.abs(arm[0] - arm[1]) < 0.08) {
+        var vote = [0, 1].map(function (par) {
+          var g = A.filter(function (x) { return x.seg === sg && x.par === par && x.tr; });
+          return g.length >= 2 ? g.filter(function (x) { return x.tr === 'l'; }).length / g.length : null;
+        });
+        var firm = function (v) { return v != null && (v >= 0.75 || v <= 0.25); };
+        if (firm(vote[0]) && firm(vote[1]) && (vote[0] > 0.5) !== (vote[1] > 0.5)) {
+          nearPar = (vote[0] > 0.5 ? 'l' : 'r') === nearK ? 0 : 1;
+          if (sideBy === 'arms') sideBy = 'model';
+        } else { unsure = true; sideBy = 'guess'; }
+      }
       A.forEach(function (x) { if (x.seg === sg) x.side = x.par === nearPar ? nearK : farK; });
     }
     var good = A.filter(function (x) { return !x.bad; });
@@ -606,15 +619,17 @@
       var S0 = sideSteps(k), isFar = k === farK, vv = mean(S0.map(function (x) { return x.vis; }));
       // سمت گام‌ها نامعلوم: هیچ عددی برای پا با برچسب چپ یا راست منتشر نمی‌شه
       // پای دور از دوربین: خط‌هاش در تصویر دیده می‌شن ولی نیمه‌پنهان‌ان؛ عدد منتشر می‌شه، حداکثر «تخمینی»
-      var farLow = unsure ? { why: 'sideUnknown' } : isFar ? { cap: 'est' } : {};
-      var legX = unsure ? { why: 'sideUnknown' } : {};
+      // سمت گام‌ها از برچسب مدل یا حدسی: عددها منتشر می‌شن ولی حداکثر «تخمینی»
+      var sideCap = sideBy === 'arms' ? null : 'est';
+      var farLow = isFar || sideCap ? { cap: 'est' } : {};
+      var legX = sideCap ? { cap: 'est' } : {};
       var st = S0.filter(function (x) { return x.fsa != null; }).map(function (x) {
         return { t: Math.round(D.t[x.i] * 1000) / 1000, foot: k, fsa: round1(x.fsa), type: strikeType(x.fsa),
           border: Math.min(Math.abs(x.fsa - REF.fsaHeel), Math.abs(x.fsa - REF.fsaFore)) < 2, v: round1(x.fv) };
       });
       var ss = strikeSummary(st), R0 = PUBLISH.strike;
-      var strikeWhy = unsure ? 'sideUnknown' : footPx != null && footPx < R0.footEst ? 'footSmall' : null;
-      var sp = publish('kneeIc', st.map(function (x) { return x.fsa; }), mean(st.map(function (x) { return x.v; })), { why: strikeWhy, cap: minConf(minConf(footPx >= R0.footSure ? null : 'est', ss.border / (ss.n || 1) > 0.5 ? 'est' : icCap), isFar ? 'est' : null) });
+      var strikeWhy = footPx != null && footPx < R0.footEst ? 'footSmall' : null;
+      var sp = publish('kneeIc', st.map(function (x) { return x.fsa; }), mean(st.map(function (x) { return x.v; })), { why: strikeWhy, cap: minConf(minConf(footPx >= R0.footSure ? null : 'est', ss.border / (ss.n || 1) > 0.5 ? 'est' : icCap), isFar || sideCap ? 'est' : null) });
       if (!strikeWhy && ss.n < R0.est) { sp.conf = 'low'; sp.why = 'fewSteps'; }
       return {
         kneeIc: publish('kneeIc', S0.map(function (x) { return x.kneeIc; }), vv, Object.assign({}, farLow, { cap: minConf(icCap, farLow.cap) })),
@@ -677,7 +692,7 @@
     // حداقل ۶ گام برای نوسان عمودی (یک گام کوتاه یا بلندتر عدد رو جابه‌جا نکنه)
     m.vo = heightCm && ampL != null && amp.length >= 6 ? round1(ampL * LEG_RATIO * heightCm) : null;
     // تقارن هر پارامتر: فقط وقتی هر دو سمت قابل‌اطمینانه
-    m.bi = bi; m.near = nearK; m.sideUnsure = unsure || undefined;
+    m.bi = bi; m.near = nearK; m.sideUnsure = unsure || undefined; m.sideBy = sideBy;
     m.conf = {
       kneeIc: nb('kneeIc').conf, overstride: minConf(nb('overstride').conf, nb('shank').conf), strike: ns.conf, peakKnee: nb('peakKnee').conf, gct: nb('gct').conf,
       cadence: timeOk ? (cad.steps >= PUBLISH.cadence.sure && cad.agree ? 'sure' : cad.steps >= PUBLISH.cadence.est ? 'est' : 'low') : 'low',
@@ -1063,7 +1078,9 @@
     add('cadence', 'one', [{ k: null, m: cv }], { from: cv === cb && bm ? 'back' : 'side', floor: fl, cond: cd });
     // ۲. زاویه‌ی زانو در لحظه‌ی فرود (بیشترین خم در فاز تماس در گزارش تخصصی)
     var kMap = twoMap(REF.kneeIc, 0, 50);
-    add('knee', 'two', ['l', 'r'].map(function (k) { return { k: k, m: mark(sm, 'kneeIc', k, kMap, 'two', 'side') }; }));
+    // سمت گام‌ها حدسی (نه دست‌ها کمک کردن نه برچسب مدل): عددها واقعی‌ان ولی چپ و راست ممکنه جابه‌جا باشه
+    var sg = sm && sm.sideBy === 'guess' ? { sideGuess: true } : {};
+    add('knee', 'two', ['l', 'r'].map(function (k) { return { k: k, m: mark(sm, 'kneeIc', k, kMap, 'two', 'side') }; }), sg);
     // ۳. افتادگی لگن (سمت مقابل، در فاز تماس هر پا)
     var pMap = oneMap(REF.pelvic, 12);
     add('pelvis', 'one', ['l', 'r'].map(function (k) { return { k: k, m: mark(bm, 'pelvic', k, pMap, 'one', 'back') }; }));
@@ -1084,10 +1101,10 @@
       if (st && st.conf !== 'low' && st.type) { w.strike = st.type; w.strikeConf = st.conf; types[st.type] = 1; }
       w.over = a.conf === 'low' ? null : a.v; w.shank = b.conf === 'low' ? null : b.v;
       return { k: k, m: w };
-    }), { strikes: Object.keys(types) });
+    }), Object.assign({ strikes: Object.keys(types) }, sg));
     // ۶. کشش آشیل (غیرمستقیم: خم مچ پا به بالا در فاز تماس)؛ همیشه حداکثر «تخمینی»
     var aMap = twoMap(REF.ankleDf, 0, 45);
-    add('achilles', 'two', ['l', 'r'].map(function (k) { return { k: k, m: mark(sm, 'ankleDf', k, aMap, 'two', 'side') }; }));
+    add('achilles', 'two', ['l', 'r'].map(function (k) { return { k: k, m: mark(sm, 'ankleDf', k, aMap, 'two', 'side') }; }), sg);
     // ۷. زاویه‌ی آرنج
     var eMap = twoMap(REF.elbow, 30, 170);
     add('elbow', 'two', ['l', 'r'].map(function (k) { return { k: k, m: mark(sm, 'elbow', k, eMap, 'two', 'side') }; }));

@@ -3591,6 +3591,7 @@
     else if (est) tags.push(T(F0 + 'est'));
     if (!na && f.id === 'landing' && f.strikes && f.strikes.length) tags.push(f.strikes.map(function (k) { return T('gait.strikeName.' + k); }).join(' / '));
     if (!na && f.id === 'head' && f.look) tags.push(T(F0 + 'look', { l: T('gait.look.' + f.look) }));
+    if (!na && f.sideGuess) tags.push(T(F0 + 'sideGuess'));
     // متن بازشونده: این فاکتور چیه، وضعیت هر سمت، و یک جمله‌ی توصیفی (بدون تشخیص)
     var body = '<p>' + esc(T(K + 'what')) + '</p>';
     if (na) body += '<p>' + esc(T(F0 + 'naWhy.' + (f.why || 'fewSteps'))) + '</p>';
@@ -3609,6 +3610,7 @@
         if (sts.length) body += '<p>' + esc(T(F0 + 'strikeLine', { list: sts.join(T('progress.sep')) })) + '</p>';
         body += '<p class="small muted">' + esc(T(F0 + 'strikeNote')) + '</p>';
       }
+      if (f.sideGuess) body += '<p class="small muted">' + esc(T(F0 + 'sideGuessNote')) + '</p>';
       if (est) body += '<p class="small muted">' + esc(T(F0 + 'estNote')) + '</p>';
     }
     var sub = T(K + 'sub');
