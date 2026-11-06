@@ -3438,6 +3438,9 @@
   // تحلیل فرم دویدن: MediaPipe Pose داخل گوشی (js/pose.js) → قواعد اختصاصی (js/gait.js) → گزارش
   // ویدیو فقط در حافظه‌ی همین صفحه می‌مونه؛ فقط عددها و دو تصویر کوچک ذخیره می‌شن.
   // =====================================================================
+  // نسخه‌ی تازه‌ی اپ آماده‌ست ولی بارگذاری دوباره تا تموم شدن کار با تحلیل ویدیو عقب افتاده
+  var swPending = false;
+  function gaitHold() { return !!(gaitBusy || gaitLive || gaitFiles.side || gaitFiles.side2 || gaitFiles.back) && gaitShown(); }
   var gaitFiles = { side: null, side2: null, back: null }, gaitBusy = null, gaitError = null, GAIT_KEEP = 5, gaitJustDone = false;
   // شرایط دویدنِ هر فیلم (الزامی، جدا برای هر خونه)؛ با عوض شدن فیلم پاک می‌شه
   var gaitConds = { side: null, side2: null, back: null };
@@ -3763,6 +3766,8 @@
     var html = '<section class="card gait-report" id="gait-report"><h2>' + esc(T('gait.report')) + '</h2><p class="small muted">' + esc(faDate(r.date)) + '</p>';
     // گزارش کاربر فقط ۹ فاکتور (گیج)؛ عددها، الگوهای آسیب و بقیه‌ی اندازه‌ها در نسخه‌ی تخصصی
     var FX = gaitFactors(r);
+    // میان‌بر به ویدیوی تحلیل با اسکلت (فقط در همین نشست)
+    if (live && live.inputs && Object.keys(live.inputs).length) html += '<button type="button" class="btn btn-outline btn-block gait-jump" data-gait-jump="1">' + esc(T('gait.toVideo')) + '</button>';
     if (FX) html += gaitFactorsHtml(FX);
     // سه محور (فقط گزارش‌هایی که فاکتور نمی‌شه براشون ساخت): سهم موارد در محدوده‌ی معمول (فقط پارامترهای دارای بازه‌ی مرجع) و الگوهای مرتبط با آسیب
     // هیچ اندازه‌گیری قابل‌اطمینانی نبود: به‌جای کارت‌های خالی، صریح بگو قابل ارزیابی نیست و چطور فیلم بهتری بگیره
@@ -3780,7 +3785,10 @@
     if (r.sideReason) fails.push({ src: 'side', reason: r.sideReason });
     if (r.backReason) fails.push({ src: 'back', reason: r.backReason });
     fails.forEach(function (x) { html += '<p class="alert alert-adapt">' + esc(T('gait.' + x.src)) + ': ' + esc(T('gait.reason.' + x.reason)) + '</p>'; });
-    html += '<p class="small gait-edu">' + esc(T('gait.disclaimer')) + '</p></section>';
+    html += '<p class="small gait-edu">' + esc(T('gait.disclaimer')) + '</p>' +
+      // حذف همین گزارش (و بقیه، برای چند بار امتحان کردن)؛ حذف همه با دو بار زدن
+      '<div class="gait-del-row"><button type="button" class="btn btn-ghost" data-gait-del="' + esc(r.id) + '">' + esc(T('gait.delThis')) + '</button>' +
+      ((state.gaitReports || []).length > 1 ? '<button type="button" class="btn btn-ghost" data-gait-del-all="1">' + esc(T('gait.delAll')) + '</button>' : '') + '</div></section>';
     // دو بخش جدا: تحلیل نمای کنار و تحلیل نمای پشت؛ هر کدوم ویدیوی خودش (در همین نشست) یا تصویر کلیدی، و زیرش
     // فقط یافته‌هایی که از همون نما اندازه‌گیری شدن
     var conds = gaitConditions(r);
@@ -4153,7 +4161,17 @@
       return;
     }
     var d = e.target.closest('[data-gait-del]');
-    if (d) { state.gaitReports = (state.gaitReports || []).filter(function (r) { return r.id !== d.dataset.gaitDel; }); save(); renderGait(); }
+    if (d) {
+      if (gaitLive && gaitLive.id === d.dataset.gaitDel) releaseGaitLive();
+      state.gaitReports = (state.gaitReports || []).filter(function (r) { return r.id !== d.dataset.gaitDel; }); save(); renderGait(); return;
+    }
+    var da = e.target.closest('[data-gait-del-all]');
+    if (da) {
+      if (da.dataset.armed !== '1') { da.dataset.armed = '1'; da.textContent = T('gait.delAllSure'); return; }
+      releaseGaitLive(); state.gaitReports = []; save(); renderGait(); showToast(T('gait.delAllDone')); window.scrollTo(0, 0); return;
+    }
+    var j = e.target.closest('[data-gait-jump]');
+    if (j) { var pl = app.querySelector('.gait-player'); if (pl) pl.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   });
 
   // =====================================================================
@@ -6039,6 +6057,7 @@
     // نسخه‌ی تازه: سرویس‌ورکر جدید خودش فعال می‌شه (skipWaiting + clients.claim) و صفحه یک بار دوباره بار می‌شه.
     // بار اول نصب (صفحه هنوز کنترل‌کننده نداشته) نیازی به بارگذاری دوباره نیست.
     var swHadController = !!navigator.serviceWorker.controller, swReloading = false;
+    window.addEventListener('hashchange', function () { if (swPending && !gaitHold()) { swPending = false; swReloading = true; location.reload(); } });
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (!swHadController || swReloading) { swHadController = true; return; }
       try {
@@ -6049,6 +6068,9 @@
         // اگه معرفی هنوز در حال اجراست، بعد از بارگذاری دوباره از اول پخش بشه
         if (document.getElementById('splash')) P.session.remove('gaam-intro');
       } catch (e) { /* */ }
+      // وسط تحلیل ویدیو یا وقتی ویدیوی تحلیل (فقط در حافظه‌ی همین نشست) یا فیلم انتخاب‌شده هست، بارگذاری دوباره همه‌ش رو
+      // از بین می‌بره (مثلاً برگشت از انتخاب فیلم در iOS نسخه‌ی تازه رو فعال می‌کنه): تا ترک صفحه‌ی تحلیل صبر کن
+      if (gaitHold()) { swPending = true; return; }
       swReloading = true;
       location.reload();
     });

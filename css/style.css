@@ -2066,3 +2066,7 @@ html.intro #app .login-import { opacity: 0; }
 .gp-layer { min-height: 36px; padding: 4px 12px; border-radius: 18px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 0.85em; cursor: pointer; }
 .gp-layer[aria-pressed="true"] { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); font-weight: 600; }
 @media print { .gf-more { display: block; } .gp-layers { display: none; } }
+/* حذف گزارش تحلیل (این یکی یا همه) و میان‌بر به ویدیوی تحلیل */
+.gait-del-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; margin-top: 8px; }
+.gait-del-row .btn { min-height: 44px; color: var(--error); }
+.gait-jump { margin: 8px 0 4px; }

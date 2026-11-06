@@ -1209,6 +1209,7 @@
           sides: { n: 'L/R asymmetry', en: 'L/R asymmetry (GCT, pelvic drop, knee)', u: '% / °', ref: 'Descriptive only', src: '—', ev: 'weak' }
         }
       },
+      delThis: 'Delete this report', delAll: 'Delete all reports', delAllSure: 'Sure? Tap again to delete all', delAllDone: 'All analysis reports deleted.', toVideo: 'Watch the analysis video with skeleton and angles',
       history: 'Previous analyses',
       histRow: '{s}% within the usual range',
       histNone: 'Could not be assessed',
