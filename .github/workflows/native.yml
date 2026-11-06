@@ -25,11 +25,11 @@ jobs:
       run:
         working-directory: native
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
@@ -38,7 +38,7 @@ jobs:
       - name: Build debug APK
         working-directory: native/android
         run: ./gradlew --no-daemon assembleDebug
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gaam-android-debug
           path: native/android/app/build/outputs/apk/debug/app-debug.apk
@@ -62,7 +62,7 @@ jobs:
           disable-animations: true
           working-directory: native
           script: bash scripts/smoke-android.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: gaam-android-smoke
@@ -76,8 +76,8 @@ jobs:
       run:
         working-directory: native
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Copy the web app and sync Capacitor

@@ -49,8 +49,8 @@ jobs:
       BASE_URL: https://mojtabatavassolii-png.github.io/iranrunners-coach-mvp/
       MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
       - name: Install Playwright and browsers
@@ -76,14 +76,14 @@ jobs:
           echo "SUBJECT=$(cat out/subject.txt)" >> "$GITHUB_ENV"
       - name: Save results for the next comparison
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-results
           path: tests/e2e/out/results.json
           retention-days: 14
       - name: Save report, screenshots and traces
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-report
           path: |
