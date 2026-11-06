@@ -127,6 +127,11 @@ async function hash() { return page.evaluate(() => location.hash); }
     await page.evaluate(() => { location.hash = '#record'; });
     await page.locator('[data-rec="start"]').click();
     await page.locator('[data-rec="finish"]').waitFor();
+    // اولین نقطه‌ی موقعیت: شبیه‌ساز زیر فشار حافظه گاهی چند ثانیه‌ی اول موقعیتی تحویل نمی‌ده (v106: صفر نقطه، v109: ۶ نقطه و ۲۰ متر).
+    // تا رسیدن اولین نقطه (حداکثر ۲۰ ثانیه) هر ثانیه یک موقعیت تازه؛ شمارش مسافت پیش‌زمینه بعد از اون شروع می‌شه
+    let warm = 0;
+    while (warm < 20 && !((await live()).n >= 1)) { await wait(1000); fix(); warm++; }
+    must((await live()).n >= 1, 'no first location within 20s');
     for (let i = 0; i < 12; i++) { await wait(1000); fix(); }
     await wait(5500); fix();
     const fg = await live();
@@ -142,7 +147,7 @@ async function hash() { return page.evaluate(() => location.hash); }
     for (let i = 0; i < 6; i++) { await wait(1000); fix(); }
     await wait(5500);
     const all = await live();
-    const diag = `نقطه‌ها: پیش‌زمینه ${fg.n}، بعد از پس‌زمینه ${bg.n}، آخر ${all.n} · مسافت ${Math.round(fg.d)}→${Math.round(bg.d)}→${Math.round(all.d)} m · اعلان: ${notif} · سرویس پیش‌زمینه: ${fgs}`;
+    const diag = `اولین نقطه بعد از ${warm}s · نقطه‌ها: پیش‌زمینه ${fg.n}، بعد از پس‌زمینه ${bg.n}، آخر ${all.n} · مسافت ${Math.round(fg.d)}→${Math.round(bg.d)}→${Math.round(all.d)} m · اعلان: ${notif} · سرویس پیش‌زمینه: ${fgs}`;
     console.log('GPS ' + diag);
     must(fg.d > 20, 'foreground: ' + diag);
     must(bg.d - fg.d > 35, 'background: ' + diag);
