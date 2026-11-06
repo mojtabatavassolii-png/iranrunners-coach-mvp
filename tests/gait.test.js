@@ -483,4 +483,37 @@ test('فقط برخوردها و دوبرابر بازه‌ی ممکن: نصف،
   var o = G.cadenceOf(D, D.t.map(function (x, i) { return i; }));
   assert.strictEqual(o.cadence, 150); assert.strictEqual(o.method, 'ic-half'); assert.strictEqual(o.agree, false);
 });
+
+test('۹ فاکتور: گیج، اطمینان، تخمینی همیشگی و نمای لازم', function () {
+  var b = function (v, c) { return { v: v, conf: c || 'sure', n: 8, sd: 1 }; };
+  var sm = { cadence: 172, conf: { cadence: 'sure' }, why: {}, headN: b(12), gazeN: b(5, 'est'), armSwing: 0.8,
+    bi: { kneeIc: { l: b(20), r: b(3) }, overstride: { l: b(0.1), r: b(0.4) }, shank: { l: b(3), r: b(4) }, strike: { l: { v: 12, type: 'heel', conf: 'est' }, r: { conf: 'low' } },
+      ankleDf: { l: b(22, 'est'), r: { conf: 'low', why: 'farSide' } }, elbow: { l: b(90), r: b(150) } } };
+  var F = G.factors(sm, null, 'easy'), by = {};
+  F.forEach(function (f) { by[f.id] = f; });
+  assert.deepStrictEqual(F.map(function (f) { return f.id; }), G.FACTOR_IDS);
+  // آهنگ گام بالای حد ایزی (۱۶۰) → سبز
+  assert.strictEqual(by.cadence.zone, 'good');
+  // زانوی صاف (۳ درجه) → بیرون از بازه، سمت پایین گیج دوطرفه
+  assert.strictEqual(by.knee.marks[1].zone, 'bad'); assert.ok(by.knee.marks[1].pos < 0.2); assert.strictEqual(by.knee.marks[0].zone, 'good');
+  // فرود جلوتر از بدن در پای راست؛ برچسب نوع فرود فقط از سمت قابل‌اطمینان
+  assert.strictEqual(by.landing.marks[1].zone, 'bad'); assert.deepStrictEqual(by.landing.strikes, ['heel']);
+  // آشیل: یک سمت تخمینی، سمت دیگه دلیل داره
+  assert.strictEqual(by.achilles.conf, 'est'); assert.strictEqual(by.achilles.marks[1].why, 'farSide');
+  // بدون ویدیوی پشت: لگن، پرونیشن و دست‌ها «قابل ارزیابی نبود» با دلیل
+  ['pelvis', 'pronation', 'arms'].forEach(function (id) { assert.strictEqual(by[id].status, 'na'); assert.strictEqual(by[id].why, 'noBack'); });
+  assert.strictEqual(by.head.look, 'ahead');
+  // پشت: پرونیشن حتی با اندازه‌گیری مطمئن، حداکثر تخمینی
+  var bm = { cadence: 150, conf: { cadence: 'est' }, bi: { pelvic: { l: b(9), r: b(2) }, valgus: { l: b(2), r: b(3) }, rearfoot: { l: b(4), r: b(15) }, armCross: { l: b(0), r: b(40) } } };
+  var F2 = G.factors(null, bm, 'tempo'), b2 = {};
+  F2.forEach(function (f) { b2[f.id] = f; });
+  assert.strictEqual(b2.pronation.conf, 'est'); assert.strictEqual(b2.pronation.marks[1].zone, 'bad');
+  assert.strictEqual(b2.pelvis.marks[0].zone, 'bad'); assert.strictEqual(b2.arms.marks[1].zone, 'bad');
+  // آهنگ گام کم برای تمپو (حد ۱۶۵) و نمای کنار نیست → از پشت
+  assert.strictEqual(b2.cadence.zone, 'bad'); assert.strictEqual(b2.cadence.from, 'back');
+  assert.strictEqual(b2.knee.why, 'noSide');
+  // گزارش قدیمی (بدون جدول دوطرفه): «قابل ارزیابی نبود»، نه خطا
+  var F3 = G.factors({ cadence: 170, conf: { cadence: 'est' } }, null, 'easy');
+  assert.strictEqual(F3.filter(function (f) { return f.id === 'knee'; })[0].why, 'old');
+});
 console.log(passed + ' تست تحلیل دویدن موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

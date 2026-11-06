@@ -14,8 +14,8 @@
   var ORT = 'js/vendor/onnxruntime/', POSE = 'models/rtmpose-m-halpe26-fp16.onnx', DET = 'models/yolox-tiny-humanart-int8.onnx';
   var PW = 192, PH = 256, DS = 416, DET_EVERY = 15;
   var MEAN = [123.675, 116.28, 103.53], STD = [58.395, 57.12, 57.375];
-  // Halpe26 → شماره‌ی نقطه در MediaPipe
-  var MAP = { 0: 0, 3: 7, 4: 8, 5: 11, 6: 12, 7: 13, 8: 14, 9: 15, 10: 16, 11: 23, 12: 24, 13: 25, 14: 26, 15: 27, 16: 28, 24: 29, 25: 30 };
+  // Halpe26 → شماره‌ی نقطه در MediaPipe (چشم‌ها برای جهت نگاه)
+  var MAP = { 0: 0, 1: 2, 2: 5, 3: 7, 4: 8, 5: 11, 6: 12, 7: 13, 8: 14, 9: 15, 10: 16, 11: 23, 12: 24, 13: 25, 14: 26, 15: 27, 16: 28, 24: 29, 25: 30 };
   // اطمینان SimCC مثل «دیده‌شدن» MediaPipe کالیبره نیست: ۰٫۵ و بیشتر = کاملاً دیده‌شده (همون فرض آزمایش)
   var VIS = 0.5;
   function abs(p) { return new URL(p, document.baseURI).href; }
@@ -219,8 +219,8 @@
       Object.keys(MAP).forEach(function (h) { var p = kp[h]; lm[MAP[h]] = [p[0] / W, p[1] / H, v(p[2]), 0]; });
       // نوک پا = وسط شست و انگشت کوچک (مثل foot_index در MediaPipe)
       [[31, 20, 22], [32, 21, 23]].forEach(function (a) { var b = kp[a[1]], c = kp[a[2]]; lm[a[0]] = [(b[0] + c[0]) / 2 / W, (b[1] + c[1]) / 2 / H, v(Math.min(b[2], c[2])), 0]; });
-      // نقطه‌هایی که این مدل نداره (چشم، دهان، انگشت‌های دست): همون جای بینی یا مچ دست، با دیده‌شدن صفر
-      [1, 2, 3, 4, 5, 6, 9, 10].forEach(function (k) { lm[k] = [lm[0][0], lm[0][1], 0, 0]; });
+      // نقطه‌هایی که این مدل نداره (گوشه‌های چشم، دهان، انگشت‌های دست): همون جای بینی یا مچ دست، با دیده‌شدن صفر
+      [1, 3, 4, 6, 9, 10].forEach(function (k) { lm[k] = [lm[0][0], lm[0][1], 0, 0]; });
       [17, 19, 21].forEach(function (k) { lm[k] = [lm[15][0], lm[15][1], 0, 0]; });
       [18, 20, 22].forEach(function (k) { lm[k] = [lm[16][0], lm[16][1], 0, 0]; });
       return lm;

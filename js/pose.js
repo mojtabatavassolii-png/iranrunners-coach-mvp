@@ -362,19 +362,66 @@
       g.lineWidth = 2; g.strokeStyle = bad ? TXT : (LEFT[k] ? COL.l : COL.r); g.stroke();
     }
     // زاویه‌های زنده (مثلاً خم زانو و آرنج سمت نزدیک)
+    var on = function (k) { return !o.layers || !k || !!o.layers[k]; };
     (o.angles || []).forEach(function (a) {
+      if (!on(a.layer)) return;
       var v = angleAt(lm, a.k[0], a.k[1], a.k[2], W, H);
       if (v == null) return;
       var val = a.flex ? 180 - v : v, q = pt(a.k[1]);
       tag(g, a.label + ' ' + o.digits(Math.round(val)) + '°', q[0] + r * 2, q[1] - r * 4, W, a.bad ? COL.bad : TXT);
     });
     // از پشت: خط لگن و خط افق برای دیدن افت لگن
-    if (o.back) {
+    if (o.back && on('pelvis')) {
       var l = pt(23), rr = pt(24), cx = (l[0] + rr[0]) / 2, cy = (l[1] + rr[1]) / 2, hw = Math.abs(rr[0] - l[0]) * 0.9;
       g.setLineDash([6, 5]); g.strokeStyle = tok('--text', 0.8); g.lineWidth = 1.5;
       g.beginPath(); g.moveTo(cx - hw, cy); g.lineTo(cx + hw, cy); g.stroke(); g.setLineDash([]);
       var tilt = Math.atan2(rr[1] - l[1], Math.abs(rr[0] - l[0]) || 1) * 180 / Math.PI;
       tag(g, o.labels.pelvis + ' ' + o.digits(Math.abs(Math.round(tilt))) + '°', cx + hw + 6, cy - 12, W, o.pelvisBad ? COL.bad : TXT);
+    }
+    if (o.layers) drawLayers(g, lm, W, H, o, pt, r);
+  }
+  // لایه‌های زاویه‌ی اضافه (قابل روشن و خاموش کردن، فقط نمایش؛ همون نقاط همون فریم):
+  //  کنار: head = خط شونه تا گوش با خط عمود و جهت نگاه (گوش تا چشم)، foot = خم مچ پا (ساق و پا)
+  //  پشت: kneeIn = خط لگن تا مچ پا و زاویه‌ی زانو، heel = ادامه‌ی خط ساق تا پاشنه، arms = خط وسط بدن برای عبور دست‌ها
+  function drawLayers(g, lm, W, H, o, pt, r) {
+    var TXT = tok('--text'), seen = function (k) { return lm[k] && lm[k][2] >= 0.3; }, n = o.near === 'l' ? 0 : 1, L = o.layers;
+    var dash = function (a, b) { g.setLineDash([6, 5]); g.strokeStyle = tok('--text', 0.8); g.lineWidth = 1.5; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); g.setLineDash([]); };
+    var deg = function (x) { return o.digits(Math.round(x)) + '°'; };
+    if (!o.back) {
+      var sh = 11 + n, ear = 7 + n, eye = n ? 5 : 2, knee = 25 + n, ank = 27 + n, heel = 29 + n, toe = 31 + n;
+      if (L.head && seen(sh) && seen(ear)) {
+        var s0 = pt(sh), e0 = pt(ear), len = Math.hypot(e0[0] - s0[0], e0[1] - s0[1]);
+        dash(s0, [s0[0], s0[1] - len * 1.2]);
+        var neck = Math.atan2(Math.abs(e0[0] - s0[0]), s0[1] - e0[1]) * 180 / Math.PI;
+        tag(g, o.labels.neck + ' ' + deg(neck), e0[0] + r * 2, e0[1] - r * 5, W, TXT);
+        if (seen(eye)) {
+          var y0 = pt(eye), dx = y0[0] - e0[0], dy = y0[1] - e0[1], d = Math.hypot(dx, dy) || 1;
+          dash(y0, [y0[0] + dx / d * len * 1.5, y0[1] + dy / d * len * 1.5]);
+        }
+      }
+      if (L.foot && seen(knee) && seen(ank) && seen(heel) && seen(toe)) {
+        var K = pt(knee), A = pt(ank), He = pt(heel), To = pt(toe), ux = K[0] - A[0], uy = K[1] - A[1], fx = To[0] - He[0], fy = To[1] - He[1];
+        var dd = Math.hypot(ux, uy) * Math.hypot(fx, fy);
+        if (dd) tag(g, o.labels.ankle + ' ' + deg(90 - Math.acos(Math.max(-1, Math.min(1, (ux * fx + uy * fy) / dd))) * 180 / Math.PI), A[0] + r * 2, A[1] + r, W, TXT);
+      }
+      return;
+    }
+    [0, 1].forEach(function (m) {
+      var hip = 23 + m, knee = 25 + m, ank = 27 + m, heel = 29 + m;
+      if (L.kneeIn && seen(hip) && seen(knee) && seen(ank)) {
+        var Hp = pt(hip), K = pt(knee), A = pt(ank);
+        dash(Hp, A);
+        var a3 = angleAt(lm, hip, knee, ank, W, H);
+        if (a3 != null) tag(g, deg(180 - a3), K[0] + (m ? r * 2 : -r * 9), K[1], W, TXT);
+      }
+      if (L.heel && seen(knee) && seen(ank) && seen(heel)) {
+        var K2 = pt(knee), A2 = pt(ank), He = pt(heel), t = (He[1] - A2[1]) / ((A2[1] - K2[1]) || 1);
+        dash(A2, [A2[0] + (A2[0] - K2[0]) * (t + 0.6), A2[1] + (A2[1] - K2[1]) * (t + 0.6)]);
+      }
+    });
+    if (L.arms && seen(11) && seen(12) && seen(23) && seen(24)) {
+      var mx = (lm[11][0] + lm[12][0]) / 2 * W, top = Math.min(lm[11][1], lm[12][1]) * H, bot = Math.max(lm[23][1], lm[24][1]) * H;
+      dash([mx, top - (bot - top) * 0.15], [mx, bot]);
     }
   }
   function pickMime() {
@@ -420,6 +467,8 @@
     }
     function setRate(r) { rate = r; video.playbackRate = r; }
     function setOverlay(on) { overlay = !!on; draw(); }
+    // لایه‌های زاویه (فقط نمایش): { knee, elbow, head, foot, pelvis, kneeIn, heel, arms }
+    function setLayers(L) { o.layers = Object.assign({}, L); draw(); }
     function finish() {
       var r = rec; rec = null; pause();
       if (r && r.state !== 'inactive') r.stop();
@@ -459,7 +508,7 @@
       dead = true; canvas.width = canvas.height = 1;
     }
     return { video: video, play: play, pause: pause, toggle: function () { if (playing) pause(); else play(); return playing; }, step: step,
-      setRate: setRate, rate: function () { return rate; }, isPlaying: function () { return playing; }, setOverlay: setOverlay,
+      setRate: setRate, rate: function () { return rate; }, isPlaying: function () { return playing; }, setOverlay: setOverlay, setLayers: setLayers,
       record: record, draw: draw, debug: debug, destroy: destroy };
   }
 
