@@ -145,9 +145,12 @@ async function hash() { return page.evaluate(() => location.hash); }
     adb('shell am start -n app.gaam.run/.MainActivity');
     await wait(6000);
     const bg = await live();
-    for (let i = 0; i < 6; i++) { await wait(1000); fix(); }
+    // بعد از برگشت: تا ۱۵ ثانیه موقعیت تازه تا مسافت بیش از ۱۰ متر زیاد بشه (شبیه‌ساز زیر فشار حافظه بعضی موقعیت‌ها رو دیر یا
+    // اصلاً تحویل نمی‌ده؛ v115: ۶ موقعیت = ۲۴ متر فرستاده شد و ۸ متر رسید). ذخیره‌ی وضعیت در اپ هر ۵ ثانیه‌ست
+    let all = bg;
+    for (let i = 0; i < 15 && !(all.d - bg.d > 10); i++) { await wait(1000); fix(); if (i >= 5 && i % 2) all = await live(); }
     await wait(5500);
-    const all = await live();
+    all = await live();
     const diag = `اولین نقطه بعد از ${warm}s · نقطه‌ها: پیش‌زمینه ${fg.n}، بعد از پس‌زمینه ${bg.n}، آخر ${all.n} · مسافت ${Math.round(fg.d)}→${Math.round(bg.d)}→${Math.round(all.d)} m · اعلان: ${notif} · سرویس پیش‌زمینه: ${fgs}`;
     console.log('GPS ' + diag);
     must(fg.d > 20, 'foreground: ' + diag);

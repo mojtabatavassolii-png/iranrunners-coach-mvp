@@ -36,6 +36,13 @@ if [ $status -ne 0 ] && timeout 60 adb logcat -d | grep -qE "Process com\.google
   cp smoke/result.md smoke/attempt1/ 2>/dev/null || true
   timeout 60 adb logcat -d > smoke/attempt1/logcat-full.txt || true
   if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then printf '\n> اجرای اول رد شد و سرویس‌های گوگل وسط تست روی شبیه‌ساز از کار افتادن؛ اجرای دوم:\n\n' >> "$GITHUB_STEP_SUMMARY"; fi
+  # بعد از از کار افتادن سرویس‌های گوگل خود اندروید ناپایداره (v115: حذف برنامه سرویس package رو از کار انداخت و نصب دوباره نشد)؛
+  # پس شبیه‌ساز از اول راه‌اندازی می‌شه و بعد نصب تازه
+  timeout 30 adb reboot || true
+  timeout 180 adb wait-for-device || true
+  for i in $(seq 1 90); do [ "$(timeout 10 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break; sleep 2; done
+  for i in $(seq 1 30); do timeout 10 adb shell service check package 2>/dev/null | grep -q ': found' && break; sleep 2; done
+  sleep 5
   adb uninstall $PKG || true
   prepare
   node scripts/smoke-android.js
