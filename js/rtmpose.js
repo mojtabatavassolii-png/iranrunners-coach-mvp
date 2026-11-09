@@ -70,6 +70,43 @@
       return hi - lo > 1e-3;
     }).catch(function () { return false; });
   }
+  // CLAHE روی روشنایی (Y)، همون الگوریتم OpenCV: هیستوگرام هر کاشی با سقف clip×مساحت/۲۵۶، اضافه‌ها پخش بین همه‌ی خونه‌ها،
+  // جدول تبدیل از توزیع تجمعی، و درون‌یابی دوخطی بین چهار کاشی نزدیک. تغییر روشنایی به هر سه کانال اضافه می‌شه (رنگ عوض نمی‌شه).
+  // win: [x0, y0, x1, y1] فقط این قسمت تبدیل می‌شه (هیستوگرام‌ها از کل تصویر)
+  function clahe(d, w, h, nx, ny, clip, win) {
+    var n = w * h, Y = new Uint8Array(n), i, x, y, b;
+    for (i = 0; i < n; i++) Y[i] = (77 * d[4 * i] + 150 * d[4 * i + 1] + 29 * d[4 * i + 2]) >> 8;
+    var tw = w / nx, th = h / ny, lut = new Float32Array(nx * ny * 256), hist = new Int32Array(256);
+    for (var ty = 0; ty < ny; ty++) {
+      for (var tx = 0; tx < nx; tx++) {
+        var xa = Math.round(tx * tw), xb = Math.round((tx + 1) * tw), ya = Math.round(ty * th), yb = Math.round((ty + 1) * th);
+        var area = Math.max(1, (xb - xa) * (yb - ya));
+        hist.fill(0);
+        for (y = ya; y < yb; y++) for (x = xa; x < xb; x++) hist[Y[y * w + x]]++;
+        var lim = Math.max(1, Math.floor(clip * area / 256)), over = 0;
+        for (b = 0; b < 256; b++) if (hist[b] > lim) { over += hist[b] - lim; hist[b] = lim; }
+        var add = Math.floor(over / 256), rest = over - add * 256;
+        for (b = 0; b < 256; b++) hist[b] += add;
+        if (rest > 0) { var stp = Math.max(1, Math.floor(256 / rest)); for (b = 0; b < 256 && rest > 0; b += stp, rest--) hist[b]++; }
+        var o = (ty * nx + tx) * 256, sum = 0, sc = 255 / area;
+        for (b = 0; b < 256; b++) { sum += hist[b]; lut[o + b] = Math.min(255, Math.round(sum * sc)); }
+      }
+    }
+    var X0 = 0, Y0 = 0, X1 = w, Y1 = h;
+    if (win) { X0 = Math.max(0, Math.floor(win[0])); Y0 = Math.max(0, Math.floor(win[1])); X1 = Math.min(w, Math.ceil(win[2])); Y1 = Math.min(h, Math.ceil(win[3])); }
+    // ستون‌ها: دو کاشی کناری و وزن، یک بار برای همه‌ی ردیف‌ها
+    var CA = new Int32Array(w), CB = new Int32Array(w), WX = new Float32Array(w);
+    for (x = X0; x < X1; x++) { var fx = x / tw - 0.5, s1 = Math.floor(fx); WX[x] = fx - s1; CA[x] = Math.max(0, s1) * 256; CB[x] = Math.min(nx - 1, s1 + 1) * 256; }
+    for (y = Y0; y < Y1; y++) {
+      var fy = y / th - 0.5, t1 = Math.floor(fy), wy = fy - t1, ra = Math.max(0, t1) * nx * 256, rb = Math.min(ny - 1, t1 + 1) * nx * 256;
+      for (x = X0; x < X1; x++) {
+        i = y * w + x;
+        var v = Y[i], p = 4 * i, wx = WX[x], a = CA[x] + v, c = CB[x] + v;
+        var dl = (1 - wy) * (lut[ra + a] + wx * (lut[ra + c] - lut[ra + a])) + wy * (lut[rb + a] + wx * (lut[rb + c] - lut[rb + a])) - v;
+        d[p] += dl; d[p + 1] += dl; d[p + 2] += dl;
+      }
+    }
+  }
   function engine(ort, sDet, sPose) {
     var dc = canvas(DS, DS), pc = canvas(PW, PH), dx = dc.getContext('2d', { willReadFrequently: true }), px = pc.getContext('2d', { willReadFrequently: true });
     var box = null, n = 0;
@@ -107,9 +144,31 @@
       if (w > h * ar) h = w / ar; else w = h * ar;
       var k = PW / w;
       px.setTransform(1, 0, 0, 1, 0, 0); px.fillStyle = '#000'; px.fillRect(0, 0, PW, PH);
-      px.setTransform(k, 0, 0, k, -(cx - w / 2) * k, -(cy - h / 2) * k); px.drawImage(src, 0, 0, W, H);
+      px.setTransform(k, 0, 0, k, -(cx - w / 2) * k, -(cy - h / 2) * k);
+      if (enh) { var e = enhanced(src, W, H, cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, k); px.drawImage(ec, 0, 0, e.cw, e.ch, e.x, e.y, e.w, e.h); }
+      else px.drawImage(src, 0, 0, W, H);
       px.setTransform(1, 0, 0, 1, 0, 0);
       return { cx: cx, cy: cy, w: w, h: h };
+    }
+    // حالت فیلم شب (انتخاب کاربر): کنتراست محلی (CLAHE، مثل OpenCV با clipLimit=2 و کاشی‌های ⅛ فریم) فقط دور دونده.
+    // کاشی‌ها هم‌اندازه‌ی حالت تمام‌فریم و یک کاشی حاشیه دور پنجره‌ی برش، تا هیستوگرام هر کاشی زمینه‌ی کافی ببینه.
+    // فقط ورودی مدل عوض می‌شه؛ ویدیو و پخش‌کننده دست نمی‌خورن.
+    var enh = false, ec = canvas(8, 8), ex = ec.getContext('2d', { willReadFrequently: true });
+    function enhanced(src, W, H, x0, y0, x1, y1, k) {
+      var tw = W / 8, th = H / 8;
+      var gx0 = Math.max(0, Math.floor(x0 / tw) - 1), gy0 = Math.max(0, Math.floor(y0 / th) - 1);
+      var gx1 = Math.min(8, Math.ceil(x1 / tw) + 1), gy1 = Math.min(8, Math.ceil(y1 / th) + 1);
+      if (gx1 <= gx0) { gx0 = 0; gx1 = 8; }
+      if (gy1 <= gy0) { gy0 = 0; gy1 = 8; }
+      var rx = gx0 * tw, ry = gy0 * th, rw = (gx1 - gx0) * tw, rh = (gy1 - gy0) * th;
+      // حداکثر با وضوح خود بوم (بزرگ‌نمایی فقط هزینه‌ست)
+      var ks = Math.min(1, k), cw = Math.max(8, Math.round(rw * ks)), ch = Math.max(8, Math.round(rh * ks));
+      if (ec.width < cw || ec.height < ch) { ec.width = Math.max(ec.width, cw); ec.height = Math.max(ec.height, ch); }
+      ex.setTransform(1, 0, 0, 1, 0, 0); ex.drawImage(src, rx, ry, rw, rh, 0, 0, cw, ch);
+      var img = ex.getImageData(0, 0, cw, ch);
+      clahe(img.data, cw, ch, gx1 - gx0, gy1 - gy0, 2, [(x0 - rx) * ks - 1, (y0 - ry) * ks - 1, (x1 - rx) * ks + 1, (y1 - ry) * ks + 1]);
+      ex.putImageData(img, 0, 0);
+      return { cw: cw, ch: ch, x: rx, y: ry, w: rw, h: rh };
     }
     // خروجی SimCC نمونه‌ی i ام دسته → نقاط به پیکسل بوم ورودی
     function decode(o, i, c) {
@@ -229,6 +288,8 @@
       name: 'rtmpose-m',
       // هر فیلم از اول: کادر قبلی به فیلم تازه ربطی نداره
       reset: function () { lost(); n = 0; stats = { batched: 0, redo: 0 }; },
+      // حالت فیلم شب برای فیلم بعدی (processVideo بعد از reset صداش می‌زنه)
+      enhance: function (on) { enh = !!on; },
       detect: run,
       detectBatch: runBatch,
       stats: function () { return stats; },
@@ -236,5 +297,5 @@
     };
   }
 
-  root.CoachRtm = { create: create };
+  root.CoachRtm = { create: create, clahe: clahe };
 })(this);

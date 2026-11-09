@@ -3444,6 +3444,8 @@
   var gaitFiles = { side: null, side2: null, back: null }, gaitBusy = null, gaitError = null, GAIT_KEEP = 5, gaitJustDone = false;
   // شرایط دویدنِ هر فیلم (الزامی، جدا برای هر خونه)؛ با عوض شدن فیلم پاک می‌شه
   var gaitConds = { side: null, side2: null, back: null };
+  // فیلم شب یا نور کم (انتخاب کاربر برای هر فیلم): کنتراست محلی روی ورودی مدل
+  var gaitNight = { side: false, side2: false, back: false };
   // لایه‌های زاویه روی ویدیو (برای همه‌ی پخش‌کننده‌های یک نما)؛ پیش‌فرض همون زاویه‌هایی که قبلاً نشون داده می‌شد
   var GAIT_LAYERS = { side: ['knee', 'elbow', 'head'], back: ['pelvis', 'kneeIn', 'heel', 'arms'] };
   var gaitLayers = { side: { knee: true, elbow: true, head: false, foot: false }, back: { pelvis: true, kneeIn: false, heel: false, arms: false } };
@@ -3735,7 +3737,7 @@
     (r.perf || []).forEach(function (p) {
       meta.push([T(X + 'perf') + ' (' + T(X + 'views.' + (p.slot === 'back' ? 'back' : p.slot === 'side2' ? 'side2' : 'side')) + ')',
         fa(T(X + 'perfV', { s: p.totalS, n: p.frames, m: p.modelMs == null ? '—' : p.modelMs, o: p.otherMs == null ? '—' : p.otherMs })) + T('progress.sep') + T(X + 'read.' + (p.read === 'play' ? 'play' : 'seek')) +
-        (p.fallback ? ' (' + p.fallback + ')' : '') + (p.batch ? T('progress.sep') + fa(T(X + 'batch', { b: p.batch.batched, r: p.batch.redo })) : '') + (r.appV ? T('progress.sep') + 'v' + r.appV : '')]);
+        (p.fallback ? ' (' + p.fallback + ')' : '') + (p.night ? T('progress.sep') + T(X + 'night') : '') + (p.batch ? T('progress.sep') + fa(T(X + 'batch', { b: p.batch.batched, r: p.batch.redo })) : '') + (r.appV ? T('progress.sep') + 'v' + r.appV : '')]);
     });
     if (r.engine) meta.push([T(X + 'engine'), (r.engine === 'rtmpose-m' ? 'RTMPose-m (Halpe26)' : r.engine === 'mediapipe-full' ? 'MediaPipe Pose (full)' : r.engine) + (r.backend ? ' · ' + (r.backend === 'webgpu' ? 'GPU' : 'CPU') : '')]);
     [['side', r.qSide], ['side2', r.qSide2], ['back', r.qBack]].forEach(function (q) {
@@ -3776,6 +3778,8 @@
     var FX = gaitFactors(r);
     // میان‌بر به ویدیوی تحلیل با اسکلت (فقط در همین نشست)
     if (live && live.inputs && Object.keys(live.inputs).length) html += '<button type="button" class="btn btn-outline btn-block gait-jump" data-gait-jump="1">' + esc(T('gait.toVideo')) + '</button>';
+    // فیلم شب: یادآوری که تصویر پرکنتراست شد و عددها با احتیاط
+    if ((r.perf || []).some(function (p) { return p.night; })) html += '<p class="small gait-night-note">' + esc(T('gait.night.note')) + '</p>';
     if (FX) html += gaitFactorsHtml(FX);
     // سه محور (فقط گزارش‌هایی که فاکتور نمی‌شه براشون ساخت): سهم موارد در محدوده‌ی معمول (فقط پارامترهای دارای بازه‌ی مرجع) و الگوهای مرتبط با آسیب
     // هیچ اندازه‌گیری قابل‌اطمینانی نبود: به‌جای کارت‌های خالی، صریح بگو قابل ارزیابی نیست و چطور فیلم بهتری بگیره
@@ -3873,7 +3877,7 @@
     var more = !d0.full && window.CoachPose.windowSec && window.CoachPose.windowSec(k) > d0.duration + 0.5;
     var grow = !more ? Promise.resolve() : (gaitT0 = Date.now(), gaitProgress(T('gait.stage.more'), 0.02),
       window.CoachPose.load().then(function () {
-        return window.CoachPose.processVideo(L.inputs[slot].file, function (x) { gaitProgress(T('gait.stage.more') + ' ' + Math.round(x * 100) + '٪', 0.02 + 0.93 * x); }, { timeScale: k, from: d0.duration });
+        return window.CoachPose.processVideo(L.inputs[slot].file, function (x) { gaitProgress(T('gait.stage.more') + ' ' + Math.round(x * 100) + '٪', 0.02 + 0.93 * x); }, { timeScale: k, from: d0.duration, night: !!(L.args.night && L.args.night[slot]) });
       }).then(function (d) {
         d0.frames = d0.frames.concat(d.frames); d0.duration = d.duration; d0.full = d.full;
         window.CoachPose.release(d.video); d.video = null;
@@ -3899,7 +3903,9 @@
         ['easy', 'tempo', 'interval', 'race'].map(function (k) { return '<label class="chip"><input type="radio" name="gaitCond-' + kind + '" data-gait-cond="' + kind + '" value="' + k + '"' + (gaitConds[kind] === k ? ' checked' : '') + ' required><span>' + esc(T('gait.cond.' + k)) + '</span></label>'; }).join('') + '</div></div>' +
         '<div class="gait-cond"><p class="sub-legend" id="gs-' + kind + '">' + esc(T('gait.speedQ')) + '</p><div class="chips" role="radiogroup" aria-labelledby="gs-' + kind + '">' +
         [1, 4, 8].map(function (k) { return '<label class="chip"><input type="radio" name="gaitSpeed-' + kind + '" data-gait-speed="' + kind + '" value="' + k + '"' + (gaitSpeeds[kind] === k ? ' checked' : '') + '><span>' + esc(fa(T('gait.speed.' + k))) + '</span></label>'; }).join('') + '</div>' +
-        '<small class="muted">' + esc(T('gait.speedHint')) + '</small></div>' : '') + '</div>';
+        '<small class="muted">' + esc(T('gait.speedHint')) + '</small></div>' +
+        '<div class="gait-cond"><label class="check-row gait-night"><input type="checkbox" data-gait-night="' + kind + '"' + (gaitNight[kind] ? ' checked' : '') + '><span>' + esc(T('gait.night.label')) + '</span></label>' +
+        '<small class="muted">' + esc(T('gait.night.hint')) + '</small></div>' : '') + '</div>';
   }
   // تحلیل فقط وقتی هر فیلم انتخاب‌شده برچسب شرایط دویدن داره
   function gaitReady() {
@@ -3922,7 +3928,10 @@
       el.innerHTML = html;
       return;
     }
-    html += '<section class="card"><details class="gait-how"' + (reports.length ? '' : ' open') + '><summary>' + esc(T('gait.howTitle')) + '</summary><ul>' +
+    // محدودیت‌ها قبل از هر چیز: کاربر بدونه چه فیلمی جواب می‌ده و چه فیلمی نه
+    html += '<section class="card"><details class="gait-limits"' + (reports.length ? '' : ' open') + '><summary>' + esc(T('gait.limits.title')) + '</summary><p class="small">' + esc(T('gait.limits.intro')) + '</p><ul>' +
+      T('gait.limits.items').map(function (x) { return '<li><b>' + esc(fa(x[0])) + '</b> ' + esc(fa(x[1])) + '</li>'; }).join('') + '</ul></details>' +
+      '<details class="gait-how"' + (reports.length ? '' : ' open') + '><summary>' + esc(T('gait.howTitle')) + '</summary><ul>' +
       T('gait.how').map(function (x) { return '<li>' + esc(fa(x)) + '</li>'; }).join('') + '</ul></details>' +
       '<p class="small gait-one">' + esc(T('gait.oneEnough')) + '</p>' + gaitSlot('side') + gaitSlot('side2') + gaitSlot('back') +
       ((gaitFiles.side || gaitFiles.side2 || gaitFiles.back) ? '<p class="small muted">' + esc(T('gait.cond.hint')) + '</p>' : '') +
@@ -4062,7 +4071,7 @@
     releaseGaitLive();
     var files = { side: gaitFiles.side, side2: gaitFiles.side2, back: gaitFiles.back }, data = {}, failed = false, result = null;
     var args = { heightCm: state.profile.heightCm, conditions: { side: gaitConds.side, side2: gaitConds.side2, back: gaitConds.back }, load: gaitLoad(),
-      timeScale: { side: gaitSpeeds.side, side2: gaitSpeeds.side2, back: gaitSpeeds.back } };
+      timeScale: { side: gaitSpeeds.side, side2: gaitSpeeds.side2, back: gaitSpeeds.back }, night: { side: gaitNight.side, side2: gaitNight.side2, back: gaitNight.back } };
     var pct = function (x) { return Math.round(x * 100); };
     gaitT0 = Date.now();
     gaitProgress(T('gait.stage.load'), 0.02);
@@ -4072,7 +4081,7 @@
       chain = chain.then(function () {
         var span = 0.88 / slots.length, base = 0.05 + i * span;
         // بازه‌ی تحلیل به ثانیه‌ی واقعی: با ضریب اسلوموشن، قسمت بلندتری از فیلم پردازش می‌شه
-        return window.CoachPose.processVideo(files[k], function (x) { gaitProgress(T('gait.stage.' + k, { p: pct(x) }), base + x * span); }, { timeScale: args.timeScale[k] });
+        return window.CoachPose.processVideo(files[k], function (x) { gaitProgress(T('gait.stage.' + k, { p: pct(x) }), base + x * span); }, { timeScale: args.timeScale[k], night: args.night[k] });
       }).then(function (d) { data[k] = d; });
     });
     chain.then(function () {
@@ -4103,7 +4112,7 @@
       // فقط آخرین گزارش‌ها؛ تصویرها فقط برای آخرین گزارش نگه داشته می‌شن (حجم حافظه)
       state.gaitReports = [rep].concat((state.gaitReports || []).map(function (x) { var y = Object.assign({}, x); delete y.imgSide; delete y.imgBack; return y; })).slice(0, GAIT_KEEP);
       save();
-      gaitFiles = { side: null, side2: null, back: null }; gaitConds = { side: null, side2: null, back: null }; gaitSpeeds = { side: 1, side2: 1, back: 1 };
+      gaitFiles = { side: null, side2: null, back: null }; gaitConds = { side: null, side2: null, back: null }; gaitSpeeds = { side: 1, side2: 1, back: 1 }; gaitNight = { side: false, side2: false, back: false };
       // برای پخش انیمیشنی فقط فایل‌ها و نقاط نگه داشته می‌شن (نه ویدیوی باز)؛ پخش‌کننده فقط وقتی این صفحه بازه ساخته می‌شه
       var live = { id: rep.id, inputs: {}, args: args, scale: Object.assign({}, args.timeScale) };
       slots.forEach(function (k) {
@@ -4140,6 +4149,8 @@
   app.addEventListener('change', function (e) {
     var gs = e.target.dataset && e.target.dataset.gaitSpeed;
     if (gs) { gaitSpeeds[gs] = Number(e.target.value) || 1; return; }
+    var gn = e.target.dataset && e.target.dataset.gaitNight;
+    if (gn) { gaitNight[gn] = !!e.target.checked; return; }
     var ck = e.target.dataset && e.target.dataset.gaitCond;
     if (ck) {
       gaitConds[ck] = e.target.value;
@@ -4153,7 +4164,7 @@
     var k = e.target.dataset && e.target.dataset.gaitFile;
     if (!k) return;
     gaitFiles[k] = e.target.files && e.target.files[0] || null;
-    gaitConds[k] = null; gaitSpeeds[k] = 1;
+    gaitConds[k] = null; gaitSpeeds[k] = 1; gaitNight[k] = false;
     gaitError = null;
     renderGait();
   });

@@ -936,6 +936,26 @@
       title: 'Running form analysis',
       linkSub: 'From two short videos, side and back; on this phone',
       intro: 'Record two short videos of your running; the app finds your body points and checks your form against research-based standards. All processing happens on this phone and the videos are never sent anywhere.',
+      limits: {
+        title: 'Limits: which videos work?',
+        intro: 'Accuracy depends on the video more than anything else. Before filming, know this:',
+        items: [
+          ['Camera distance:', '3–5 m from the runner, so head to feet fills at least half the frame height. Farther away, the foot is only a few dozen pixels and foot strike and knee angle are not reliable.'],
+          ['Light:', 'Best in daylight or even lighting. At night the phone exposes each frame longer and moving legs come out blurred. The “night video” option helps, but most numbers stay estimated or uncertain.'],
+          ['Steady camera:', 'Tripod or rest it on something, about hip height. Hand-held or following the runner increases errors.'],
+          ['Duration:', 'At least 4 seconds of running (two full steps per foot); 10 seconds or more for confident results.'],
+          ['Frame rate:', '60 fps or slow motion captures foot strike more precisely and reduces blur.'],
+          ['Angle:', 'Side: phone perpendicular to the path; only the near side is reliable. Back: phone in line with the path.'],
+          ['One person in frame:', 'With several people in view, the app assumes the largest person is the runner.'],
+          ['Clothes and shoes:', 'Fitted clothes and light shoes help find knee, heel and toe; loose clothes, or dark clothes at night, reduce accuracy.'],
+          ['Not a diagnosis:', 'The report is descriptive and does not replace an expert assessment.']
+        ]
+      },
+      night: {
+        label: 'This video was filmed at night or in low light',
+        hint: 'The image gets local contrast enhancement before analysis so the body is easier to see (the video itself is unchanged). Night-time motion blur is not removed, so most numbers are shown as estimated or uncertain.',
+        note: 'This analysis used “night video” mode. In low light the legs are recorded blurred; read numbers marked “estimated” or “uncertain” with caution, and for a confident result film in daylight or good light.'
+      },
       howTitle: 'How to film',
       how: [
         'Keep the phone still (tripod or propped up), about hip height and 3 to 5 m away.',
@@ -1142,6 +1162,7 @@
         sub: 'For a physiotherapist or sports doctor: raw values, confidence, reference range and source for each parameter.',
         print: 'Print / save as PDF',
         meta: 'Analysis details', date: 'Date', condition: 'Run type', height: 'Height entered', cm: 'cm', video: 'Video', fps: 'Effective frame rate', frames: 'Frames', valid: 'Frames with a detected body', steps: 'Foot contacts', scale: 'Time factor', near: 'Side nearer the camera',
+        night: 'night video mode (local contrast on the model input)',
         perf: 'Analysis time', perfV: '{s} s, {n} frames; per frame: model {m} ms, other {o} ms', read: { play: 'frames read by playing the video', seek: 'frames read by seeking' }, batch: 'batch test: {b} frames together, {r} redone',
         engine: 'Body model', nSd: '{n} steps, SD {sd}', footPx: 'foot length in picture {px} px', used: '{n} usable steps', realSec: '{n} s real time',
         cadDetail: '{n} contacts in {s} s real time · time factor ×{k}', cadSlow: 'if slow motion ×{k}: about {c}', strikeN: '{n} steps · foot length in picture {px} px', left: 'left', right: 'right',

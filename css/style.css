@@ -1123,6 +1123,12 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 /* تحلیل فرم دویدن */
 .gait-how > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--primary); }
 .gait-how ul { margin: 0 0 var(--sp-2); padding-inline-start: 18px; }
+.gait-limits > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--primary); }
+.gait-limits ul { margin: 0 0 var(--sp-2); padding-inline-start: 18px; }
+.gait-limits li { text-align: start; margin-bottom: 4px; }
+.gait-limits p { text-align: start; }
+.gait-night { min-height: 44px; }
+.gait-night-note { text-align: start; color: var(--text-secondary); border-inline-start: 3px solid var(--border); padding-inline-start: 8px; }
 .gait-slot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); border: 1.5px dashed var(--border); border-radius: 12px; padding: 10px 12px; margin: var(--sp-2) 0; }
 .gait-slot.has-file { border-style: solid; border-color: var(--primary); background: var(--primary-soft); }
 .gait-slot > div { display: grid; gap: 2px; min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
@@ -1470,16 +1476,16 @@ input, select, textarea { background: var(--surface-elevated); }
 .pf-panel .tod-row.is-best { border-color: var(--primary); background: var(--primary-soft); }
 /* «نمایش جدول داده‌ها» و «بیشتر بدان»: ردیف انتهای کارت با خط جداکننده */
 .pf-panel .ch-table { margin-top: 10px; border-top: 1.5px solid var(--border); }
-.pf-panel .ch-table > summary, .pf-panel .gait-how > summary, .pf-panel .gait-methods > summary { list-style: none; justify-content: space-between; color: var(--text); font-weight: 600; }
-.pf-panel .ch-table > summary::-webkit-details-marker, .pf-panel .gait-how > summary::-webkit-details-marker, .pf-panel .gait-methods > summary::-webkit-details-marker { display: none; }
-.pf-panel .ch-table > summary::after, .pf-panel .gait-how > summary::after, .pf-panel .gait-methods > summary::after {
+.pf-panel .ch-table > summary, .pf-panel .gait-how > summary, .pf-panel .gait-limits > summary, .pf-panel .gait-methods > summary { list-style: none; justify-content: space-between; color: var(--text); font-weight: 600; }
+.pf-panel .ch-table > summary::-webkit-details-marker, .pf-panel .gait-how > summary::-webkit-details-marker, .pf-panel .gait-limits > summary::-webkit-details-marker, .pf-panel .gait-methods > summary::-webkit-details-marker { display: none; }
+.pf-panel .ch-table > summary::after, .pf-panel .gait-how > summary::after, .pf-panel .gait-limits > summary::after, .pf-panel .gait-methods > summary::after {
   content: ""; flex: none; width: 8px; height: 8px; margin-inline: 8px 4px; border-right: 2px solid var(--text-secondary); border-bottom: 2px solid var(--text-secondary);
   transform: translateY(-2px) rotate(45deg); transition: transform .2s;
 }
 .pf-panel details[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
 .pf-panel .pcard .learn-more { font-size: var(--fs-sm); margin: 6px 0 0; }
 /* بیومکانیک: جای فیلم‌ها ردیف‌های یک کارت؛ دکمه‌ی انتخاب فیلم ملایم تا «شروع تحلیل» اقدام اصلی بمونه */
-.pf-panel .gait-how { border-bottom: 1.5px solid var(--border); margin-bottom: 4px; }
+.pf-panel .gait-how, .pf-panel .gait-limits { border-bottom: 1.5px solid var(--border); margin-bottom: 4px; }
 .pf-panel .gait-one { color: var(--text-secondary); margin: 10px 0 4px; }
 .pf-panel .gait-slot { border: 0; border-top: 1.5px solid var(--border); border-radius: 0; padding: 14px 0; margin: 0; background: none; }
 .pf-panel .gait-slot.has-file { background: none; }

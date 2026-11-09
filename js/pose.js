@@ -120,11 +120,12 @@
   var REAL_SEC = 10, MAX_SRC = 40, MAX_SIDE = 1280, MAX_SIDE_RTM = 1920;
   function windowSec(scale) { return scale > 1 ? Math.min(MAX_SRC, REAL_SEC * scale) : MAX_SEC; }
   // هر فریم (هر ۱/۳۰ ثانیه‌ی فیلم): جابه‌جایی روی ویدیو، کشیدن روی بوم و تشخیص بدن
-  // opts: { timeScale: ضریب اسلوموشن (برای طول بازه)، from: ادامه از این ثانیه‌ی فیلم (اضافه کردن به فریم‌های قبلی) }
+  // opts: { timeScale: ضریب اسلوموشن (برای طول بازه)، from: ادامه از این ثانیه‌ی فیلم (اضافه کردن به فریم‌های قبلی)،
+  //   night: فیلم شب یا نور کم (کنتراست محلی روی ورودی مدل؛ فقط RTMPose) }
   function processVideo(file, onProgress, opts) {
     opts = opts || {};
     var en, v, cv, g;
-    return load().then(function (e) { en = e; en.reset(); return openVideo(file); }).then(function (video) {
+    return load().then(function (e) { en = e; en.reset(); if (en.enhance) en.enhance(!!opts.night); return openVideo(file); }).then(function (video) {
       v = video;
       var dur = Math.min(v.duration || 0, windowSec(opts.timeScale));
       if (!(dur > 0.5)) throw fail('short');
@@ -147,7 +148,7 @@
       var result = function () { fillSkipped(frames); return { w: v.videoWidth, h: v.videoHeight, duration: dur, full: dur >= (v.duration || 0) - STEP, frames: frames, video: v, input: { w: cv.width, h: cv.height }, engine: en.name, backend: en.backend || null,
         perf: { read: readMode, fallback: fallback, totalS: Math.round((performance.now() - tStart) / 100) / 10, frames: nDet,
           modelMs: nDet ? Math.round(modelMs / nDet) : null, otherMs: nDet ? Math.round((performance.now() - tStart - modelMs) / nDet) : null,
-          every: every, batch: timed.detectBatch && readMode === 'play' && en.stats ? en.stats() : null } }; };
+          every: every, night: !!(opts.night && en.enhance), batch: timed.detectBatch && readMode === 'play' && en.stats ? en.stats() : null } }; };
       var readMode = 'seek';
       // روش قبلی: جابه‌جایی روی ویدیو برای هر فریم (کند، ولی همه‌جا کار می‌کنه)
       function next() {
