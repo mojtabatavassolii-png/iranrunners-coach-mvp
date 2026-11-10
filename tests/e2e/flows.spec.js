@@ -54,9 +54,9 @@ async function onboard(page, o) {
   await next(page);
   await page.fill('#age', '33'); await page.fill('#height', '172'); await page.fill('#weight', '68');
   await next(page);
-  // سابقه با اسلایدر (شماره‌ی پله: ۸ = ۸ ماه) و وقفه
+  // سابقه با اسلایدر (شماره‌ی پله: ۸ = ۸ ماه)؛ وقفه پیش‌فرض «همین الان می‌دوم»
   await page.locator('#hist').fill(String(o.histIdx));
-  await chip(page, 'gap', o.gap || 'now');
+  if (o.gapIdx) await page.locator('#gapr').fill(String(o.gapIdx));
   await page.fill('#lastkm', String(o.last)); await page.fill('#avgkm', String(o.avg));
   await chip(page, 'structured', 'no');
   await next(page);

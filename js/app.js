@@ -1390,7 +1390,9 @@
       '<div class="level-num" aria-hidden="true"><b>' + fa(a.level) + '</b><small>' + esc(T('level.of10')) + '</small></div>' +
       '<div class="level-body"><h3>' + tt('level.title', { n: a.level, name: L.name }) + ' ' + helpLink('levels', T('level.help')) + '</h3>' +
       '<p class="small muted">' + (a.source === 'pb' ? tt('level.fromPb', { v: a.vdot.toFixed(1) }) : esc(T(a.source === 'never' ? 'level.fromZero' : a.source === 'return' ? 'level.fromReturn' : 'level.fromVolume'))) + '</p>' +
-      a.notes.map(function (n) { return '<p class="small level-note">' + t(n) + '</p>'; }).join('') +
+      (a.summary ? '<p class="level-summary">' + t(a.summary) + '</p><details class="level-why"><summary>' + esc(T('onb.whyLevel')) + '</summary>' +
+        a.notes.map(function (n) { return '<p class="small level-note">' + t(n) + '</p>'; }).join('') + '</details>'
+        : a.notes.map(function (n) { return '<p class="small level-note">' + t(n) + '</p>'; }).join('')) +
       '</div></div>';
   }
 
@@ -1407,7 +1409,14 @@
     var histIdx = 0;
     C.HISTORY_STEPS.forEach(function (m, i) { if (Math.abs(m - histM) < Math.abs(C.HISTORY_STEPS[histIdx] - histM)) histIdx = i; });
     // پروفایل‌های قدیمیِ دونده (بدون سؤال وقفه): «الان هم می‌دوم»
-    var gapSel = p.gap || (p.experience && p.experience !== 'never' && p.lastWeekKm != null ? 'now' : null);
+    // وقفه با اسلایدر (روز)؛ پروفایل‌های قبلی (گزینه‌ی ثابت یا بدون وقفه) → نزدیک‌ترین نقطه
+    var gapD = C.gapDaysOf(p), gapIdx = 0;
+    C.GAP_STEPS.forEach(function (d, i) { if (Math.abs(d - gapD) < Math.abs(C.GAP_STEPS[gapIdx] - gapD)) gapIdx = i; });
+    var GL = C.GAP_STEPS.length - 1;
+    var gapTicks = [[0, 'now'], [5, 'm3'], [9, 'y1'], [GL, 'max']].map(function (t0) {
+      var pct = t0[0] / GL * 100, edge = t0[0] === 0 ? 'is-start' : t0[0] === GL ? 'is-end' : '';
+      return '<span class="' + edge + '"' + (edge ? '' : ' style="inset-inline-start:' + pct.toFixed(1) + '%"') + '>' + esc(T('onb.gapTick.' + t0[1])) + '</span>';
+    }).join('');
     var histTicks = [[0, 'never'], [6, 'm6'], [12, 'y1'], [15, 'y3'], [C.HISTORY_STEPS.length - 1, 'max']].map(function (t0) {
       var pct = t0[0] / (C.HISTORY_STEPS.length - 1) * 100, edge = t0[0] === 0 ? ' is-start' : t0[0] === C.HISTORY_STEPS.length - 1 ? ' is-end' : '';
       return '<span class="' + edge.trim() + '"' + (edge ? '' : ' style="inset-inline-start:' + pct.toFixed(1) + '%"') + '>' + esc(T('onb.histTick.' + t0[1])) + '</span>';
@@ -1515,8 +1524,10 @@
         '<input type="hidden" name="experience" value="' + esc(C.experienceFromMonths(C.HISTORY_STEPS[histIdx])) + '">' +
         '<p class="alert alert-good zero-note" id="zero-note" hidden>' + esc(T('onb.zeroNote')) + '</p>' +
         '<div id="runner-fields">' +
-        '<p class="sub-legend">' + esc(T('onb.gapQ')) + req + '</p><div class="chips">' +
-        C.GAP_KEYS.map(function (k) { return chip('gap', k, T('gapOpt.' + k), gapSel === k, 'radio'); }).join('') + '</div>' +
+        '<p class="sub-legend" id="gap-q">' + esc(T('onb.gapQ')) + req + '</p>' +
+        '<div class="hist"><div class="hist-val"><span></span><b id="gap-val" aria-hidden="true"></b></div>' +
+        '<input type="range" id="gapr" name="gapIdx" min="0" max="' + GL + '" step="1" value="' + gapIdx + '" aria-labelledby="gap-q">' +
+        '<div class="hist-ticks" aria-hidden="true">' + gapTicks + '</div></div>' +
         '<div class="row2">' +
         '<div class="field"><label for="lastkm">' + esc(T('onb.lastWeek')) + req + '</label>' +
         '<input id="lastkm" name="lastWeekKm" type="number" inputmode="decimal"' + limAttrs('vol', '0.5') + ' required' + kmField(volLast) + '>' +
@@ -1527,7 +1538,10 @@
         // فعالیت هوازی جایگزین در وقفه (فقط برگشتی): جدول دنیلز برای این حالت افت کمتری داره
         '<div id="xt-block" hidden><p class="sub-legend">' + esc(T('onb.xtQ')) + '</p><div class="chips">' +
         C.XTRAIN_KEYS.map(function (k) { return chip('xtrain', k, T('onb.xtrain.' + k), (p.xtrain || 'none') === k, 'radio'); }).join('') + '</div>' +
-        '<small class="muted">' + esc(T('onb.xtHint')) + '</small></div>' +
+        '<small class="muted">' + esc(T('onb.xtHint')) + '</small>' +
+        '<div class="field"><label for="walknow">' + esc(T('onb.walkNowLabel')) + '</label>' +
+        '<input id="walknow" name="walkNow" type="number" inputmode="numeric" min="0" max="2000" step="10" value="' + esc(p.walkMinNow || '') + '">' +
+        '<small class="muted">' + esc(T('onb.walkNowHint')) + '</small></div></div>' +
         '<div id="reason-block" class="reason-block" hidden><p class="sub-legend">' + esc(T('onb.reasonQ')) + req + '</p>' +
         '<p class="small muted">' + esc(T('onb.reasonHint')) + '</p><div class="chips">' +
         VOL_REASONS.map(function (k) { return chip('volumeReason', k, T('onb.reasons.' + k), p.volumeReason === k, 'radio'); }).join('') + '</div></div>' +
@@ -1629,8 +1643,10 @@
     }
     function histMonths() { return C.HISTORY_STEPS[Number(form.runIdx.value) || 0] || 0; }
     function isNever() { return form.experience.value === 'never'; }
-    function gapVal() { var g = form.querySelector('input[name=gap]:checked'); return g ? g.value : null; }
-    function isReturning() { var g = gapVal(); return !isNever() && !!g && g !== 'now'; }
+    function gapDays() { return C.GAP_STEPS[Number(form.gapIdx.value) || 0] || 0; }
+    function gapVal() { return gapDays() > 0 ? 'slider' : 'now'; }
+    function isReturning() { return !isNever() && gapDays() > 0; }
+    function walkNow() { var v = Number(form.walkNow.value); return v > 0 && v <= 2000 ? Math.round(v) : 0; }
     var histLabel = histText;
     // اسلایدر → متن خوانا و دسته‌ی سابقه (فیلد مخفی experience)
     function syncHist() {
@@ -1638,6 +1654,9 @@
       document.getElementById('hist-val').textContent = lbl;
       form.runIdx.setAttribute('aria-valuetext', lbl);
       form.experience.value = C.experienceFromMonths(m);
+      var gd = gapDays(), gl = gd ? C.gapText(gd) : T('onb.gapNow');
+      document.getElementById('gap-val').textContent = fa(gl);
+      form.gapIdx.setAttribute('aria-valuetext', fa(gl));
     }
     function isWalkForm() { var e = form.querySelector('input[name=activity]:checked'); return !!e && e.value === 'walk'; }
     // پیاده‌روی: سابقه، دقیقه‌ی هفتگی، توان ۳۰ دقیقه‌ی پیوسته (بی‌سابقه = «نه»)
@@ -1669,11 +1688,11 @@
       if (isNever()) return { currentWeeklyKm: 0, experience: 'never', structured: false, pb: null };
       var v = readVolume();
       var st = form.querySelector('input[name=structured]:checked');
-      if (!v || (v.gap === 'drop' && !v.reason) || !gapVal() || !st) return null;
+      if (!v || (v.gap === 'drop' && !v.reason) || !st) return null;
       var pbv = readPb(), ret = isReturning(), xt = form.querySelector('input[name=xtrain]:checked');
       var out = volumeProfile(v);
       out.experience = form.experience.value; out.structured = st.value === 'yes'; out.pbInvalid = pbv === false;
-      out.runMonths = histMonths(); out.gap = gapVal(); out.xtrain = ret ? (xt ? xt.value : 'none') : null;
+      out.runMonths = histMonths(); out.gap = gapVal(); out.gapDays = gapDays(); out.xtrain = ret ? (xt ? xt.value : 'none') : null; out.walkMinNow = ret ? walkNow() : 0;
       out.pb = ret ? null : pbv || null; out.pbOld = ret ? pbv || null : null;
       out.startDate = form.startDate.value || C.dateKey(today()); out.age = Number(form.age.value) || 30;
       return out;
@@ -1868,9 +1887,8 @@
         if (vol && vol.gap === 'drop' && !vol.reason) E(3, T('onb.err.reason'));
         if (vol) volP = volumeProfile(vol);
         if (!fd.get('structured')) E(3, T('onb.err.struct'));
-        if (!fd.get('gap')) E(3, T('onb.err.gap'));
       }
-      var ret = !walkAct && !never && !!fd.get('gap') && fd.get('gap') !== 'now';
+      var ret = !walkAct && !never && gapDays() > 0;
       var curKm = volP.currentWeeklyKm;
       // ۴. رکورد
       var pbObj = never ? null : readPb();
@@ -1909,7 +1927,8 @@
         currentWeeklyKm: curKm, lastWeekKm: volP.lastWeekKm, monthAvgKm: volP.monthAvgKm, volumeReason: volP.volumeReason,
         experience: walkAct ? (p.experience || null) : fd.get('experience'), structured: !never && fd.get('structured') === 'yes',
         runMonths: walkAct ? (p.runMonths != null ? p.runMonths : null) : histMonths(),
-        gap: walkAct ? (p.gap || null) : never ? null : fd.get('gap') || null, xtrain: ret ? (fd.get('xtrain') || 'none') : null,
+        gap: walkAct ? (p.gap || null) : never ? null : gapVal(), gapDays: walkAct ? (p.gapDays != null ? p.gapDays : null) : never ? null : gapDays(),
+        xtrain: ret ? (fd.get('xtrain') || 'none') : null, walkMinNow: ret ? walkNow() : null,
         activity: walkAct ? 'walk' : 'run',
         walkGoal: walkAct ? (function () {
           var k = fd.get('walkGoal');
@@ -5955,7 +5974,7 @@
       row('level', tt('profile.levelVal', { n: lv.level, name: lv.info.name }) +
         (lv.vdot ? ' <span class="muted small">(VDOT ' + t(lv.vdot.toFixed(1)) + ')</span>' : '')) +
       row('exp', esc(p.runMonths != null ? histText(p.runMonths) : C.EXPERIENCE[p.experience] ? C.EXPERIENCE[p.experience].label : '—')) +
-      (p.gap && p.experience !== 'never' ? row('gap', esc(T('gapOpt.' + p.gap)) + (p.pbOld ? ' <span class="muted small">' + tt('profile.oldPb', { d: distName(p.pbOld.distanceKm), t: C.formatDuration(p.pbOld.timeSec) }) + '</span>' : '')) : '') +
+      (p.gap && p.experience !== 'never' ? row('gap', esc(fa(C.gapDaysOf(p) ? C.gapText(C.gapDaysOf(p)) : T('gapOpt.now'))) + (p.pbOld ? ' <span class="muted small">' + tt('profile.oldPb', { d: distName(p.pbOld.distanceKm), t: C.formatDuration(p.pbOld.timeSec) }) + '</span>' : '')) : '') +
       row('structured', esc(T(p.structured ? 'profile.structYes' : 'profile.structNo'))) +
       row('hr', hrz ? tt('profile.hrVal', { a: hrz.easy[0], b: hrz.easy[1] }) : muted('profile.notEntered')) +
       row('fitness', fit ? 'VDOT ' + t(fit.vdot.toFixed(1)) + ' · <a href="#fitness">' + esc(T('profile.details')) + '</a>' : '<a href="#fitness">' + esc(T('profile.registerTest')) + '</a>') +

@@ -1729,4 +1729,40 @@ test('برگشتی: مبتدی واقعی همون سطح ۰', function () {
   assert.strictEqual(C.assessLevel(p).level, 0);
   assert.strictEqual(C.returnInfo(Object.assign({}, p, { gap: 'gt2y' })), null);
 });
+test('برگشتی: اسلایدر وقفه (روز) و متن', function () {
+  assert.strictEqual(C.GAP_STEPS[0], 0);
+  assert.strictEqual(C.GAP_STEPS[C.GAP_STEPS.length - 1], 1825);
+  var p = returner({ gap: 'slider', gapDays: 60, lastWeekKm: 10, monthAvgKm: 10, currentWeeklyKm: 10 });
+  var ri = C.returnInfo(p);
+  assert.ok(Math.abs(ri.factor - (0.847 + (0.826 - 0.847) * 4 / 7)) < 1e-9);
+  assert.strictEqual(C.returnInfo(returner({ gap: 'now', gapDays: 0 })), null);
+});
+test('برگشتی: رکورد ضعیف → مسیر مبتدی عادی؛ بدون رکورد → بدون افزایش سقف', function () {
+  var weak = returner({ gapDays: 1095, pbOld: { distanceKm: 10, timeSec: hms(1, 8) }, lastWeekKm: 10, monthAvgKm: 10, currentWeeklyKm: 10 });
+  var a = C.assessLevel(weak);
+  assert.strictEqual(a.returning.capacity, 'weak');
+  assert.strictEqual(a.returning.rate, 1.1);
+  assert.strictEqual(a.returning.bonus, 0);
+  assert.ok(/قدم‌به‌قدم|step by step/.test(a.summary));
+  var none = returner({ gapDays: 1095, pbOld: null, lastWeekKm: 10, monthAvgKm: 10, currentWeeklyKm: 10 });
+  assert.strictEqual(C.assessLevel(none).returning.capacity, 'none');
+  assert.ok(C.volumeCeiling(none) < 20);
+  var good = returner({ gapDays: 1095, lastWeekKm: 10, monthAvgKm: 10, currentWeeklyKm: 10 });
+  assert.strictEqual(C.assessLevel(good).returning.capacity, 'good');
+  assert.strictEqual(C.volumeCeiling(good), 40);
+});
+test('برگشتی با پایه‌ی خوب: دو-پیاده هر هفته یک پله، از ۱۵ دقیقه؛ بیش از ۵ سال محافظه‌کارانه‌تر', function () {
+  var p = returner({ gapDays: 1095 });
+  var step = function (w) { return weekAt(p, w).days.filter(function (d) { return d.type === 'runwalk'; })[0].steps[0]; };
+  assert.ok(/2 دقیقه|2 min/.test(step(0)), step(0));
+  assert.ok(/3 دقیقه|3 min/.test(step(1)), step(1));
+  assert.ok(/4 دقیقه|4 min/.test(step(2)), step(2));
+  var five = returner({ gapDays: 1825 });
+  assert.strictEqual(C.returnInfo(five).frac, 0.3);
+  assert.strictEqual(C.returnInfo(five).fastSteps, false);
+  assert.strictEqual(C.volumeCeiling(five), 30);
+  // پیاده‌روی منظم الان: یک پله جلوتر
+  var walker = returner({ gapDays: 1095, walkMinNow: 120 });
+  assert.ok(/3 دقیقه|3 min/.test(weekAt(walker, 0).days.filter(function (d) { return d.type === 'runwalk'; })[0].steps[0]));
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

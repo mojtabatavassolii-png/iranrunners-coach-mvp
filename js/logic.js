@@ -166,6 +166,13 @@
   var GAP_KEYS = ['now', 'lt1m', '1to3m', '3to6m', '6to12m', '1to2y', 'gt2y'];
   var GAP_DAYS = { now: 0, lt1m: 14, '1to3m': 56, '3to6m': 135, '6to12m': 270, '1to2y': 540, gt2y: 900 };
   var XTRAIN_KEYS = ['none', 'some', 'often'];
+  // اسلایدر وقفه (روز): الان، ۲ هفته، ۱ ماه، ۶ هفته، ۲، ۳، ۴، ۶ و ۹ ماه، ۱، ۱٫۵، ۲، ۳ و ۴ سال، ۵ سال یا بیشتر
+  var GAP_STEPS = [0, 14, 30, 42, 60, 90, 120, 180, 270, 365, 545, 730, 1095, 1460, 1825];
+  // پروفایل‌های نسخه‌ی ۱۱۷ (گزینه‌های ثابت وقفه) → نقطه‌ی اسلایدر
+  function gapDaysOf(profile) {
+    if (profile.gapDays != null && isFinite(profile.gapDays)) return Math.max(0, Number(profile.gapDays));
+    return profile.gap && GAP_DAYS[profile.gap] != null ? GAP_DAYS[profile.gap] : 0;
+  }
   /*
    * ضریب افت VDOT بعد از وقفه: جدول Daniels' Running Formula (به نقل از VDOT O2، سایت خود دنیلز).
    * ستون اول بدون ورزش دیگه، ستون دوم با ورزش هوازی جایگزین. ردیف‌های ۳۵ و ۴۹ روزِ ستون اول و ۳۵، ۴۲ و ۴۹ روزِ ستون دوم
@@ -176,6 +183,14 @@
    */
   var DETRAIN = [[5, 1, 1], [14, 0.973, 0.986], [21, 0.952, 0.976], [28, 0.931, 0.965], [42, 0.889, 0.944], [56, 0.847, 0.923], [63, 0.826, 0.913], [70, 0.805, 0.902]];
   var DETRAIN_MAX_DAYS = 70;
+  // متن وقفه از روز: «۲ هفته»، «۶ ماه»، «۱٫۵ سال»، «۵ سال یا بیشتر»
+  function gapText(days) {
+    if (days >= 1825) return T('gapText.max');
+    if (days < 30) return T('gapText.w', { n: Math.round(days / 7) });
+    if (days === 42) return T('gapText.w', { n: 6 });
+    if (days < 365) return T('gapText.m', { n: Math.round(days / 30) });
+    return T('gapText.y', { n: Math.round(days / 365 * 2) / 2 });
+  }
   function detrainFactor(days, cross) {
     var c = cross ? 2 : 1;
     if (days <= DETRAIN[0][0]) return 1;
@@ -196,14 +211,16 @@
    *  - پله‌ی VDOT هر ۳ هفته تا ۹۵٪ رکورد قدیمی
    */
   function returnInfo(profile) {
-    var gap = profile.gap;
-    if (!gap || gap === 'now' || !GAP_DAYS[gap] || profile.experience === 'never' || isWalk(profile)) return null;
-    var days = GAP_DAYS[gap], cross = profile.xtrain === 'some' || profile.xtrain === 'often';
-    var out = { gap: gap, days: days, cross: cross, known: days <= DETRAIN_MAX_DAYS, factor: detrainFactor(days, cross),
+    if (!profile || profile.experience === 'never' || isWalk(profile)) return null;
+    var days = gapDaysOf(profile);
+    if (!(days > 0)) return null;
+    var cross = profile.xtrain === 'some' || profile.xtrain === 'often';
+    var out = { gap: profile.gap || null, days: days, cross: cross, known: days <= DETRAIN_MAX_DAYS, factor: detrainFactor(days, cross),
       bonus: days < 90 ? 2 : days <= 365 ? 1 : 0,
       rate: days < 90 ? 1.15 : days <= 365 ? 1.12 : 1.10,
-      frac: days < 90 ? 0.8 : days <= 365 ? 0.6 : days <= 730 ? 0.5 : 0.4,
-      easyWeeks: days >= 90 ? 4 : 0, rwSkip: 4 };
+      // بیش از ۵ سال: داده‌ای نیست؛ سقف محافظه‌کارانه‌تر
+      frac: days < 90 ? 0.8 : days <= 365 ? 0.6 : days <= 730 ? 0.5 : days < 1825 ? 0.4 : 0.3,
+      easyWeeks: days >= 90 ? 4 : 0, rwSkip: 4, capacity: 'none', walkMin: Number(profile.walkMinNow) || 0 };
     var pb = profile.pbOld;
     if (pb && pb.distanceKm >= 1 && pb.timeSec > 0) {
       out.oldVdot = vdotFromRace(pb.distanceKm, pb.timeSec);
@@ -212,7 +229,14 @@
       out.adjLevel = levelFromVdot(out.adjVdot);
       out.adjSec = raceTimeFromVdot(out.adjVdot, pb.distanceKm);
       out.distanceKm = pb.distanceKm;
+      // ظرفیت قبلی: رکورد بالاتر از سطح ۲ = پایه‌ی خوب؛ سطح ۲ یا کمتر = مسیر مبتدی عادی (بدون امتیاز وقفه و رشد سریع‌تر)
+      out.capacity = out.oldLevel > 2 ? 'good' : 'weak';
+      if (out.capacity === 'weak') { out.bonus = 0; out.rate = 1.1; out.rwSkip = 0; }
     }
+    // پیشرفت پیس هر ۳ هفته فقط با پایه‌ی خوب و وقفه‌ی کمتر از ۵ سال
+    out.fastSteps = out.capacity === 'good' && days < 1825;
+    // جمله‌ی ساده‌ی کارت سطح
+    out.summary = out.known && out.capacity === 'good' ? 'short' : out.capacity === 'good' ? 'good' : 'basic';
     return out;
   }
 
@@ -315,10 +339,12 @@
       out.source = 'return';
       out.returning = ri;
       out.notes = [T(ri.oldVdot ? (ri.known ? 'levelNote.returnKnown' : 'levelNote.returnBound') : 'levelNote.returnNoPb', {
-        gap: T('gapOpt.' + ri.gap), old: ri.oldVdot ? formatDuration(Math.round(raceTimeFromVdot(ri.oldVdot, ri.distanceKm))) : '',
+        gap: gapText(ri.days), old: ri.oldVdot ? formatDuration(Math.round(raceTimeFromVdot(ri.oldVdot, ri.distanceKm))) : '',
         adj: ri.adjSec ? formatDuration(Math.round(ri.adjSec)) : '', d: ri.distanceKm ? T('pbDistShort', { km: ri.distanceKm }) : '',
         rate: Math.round((ri.rate - 1) * 100) })];
       if (ri.easyWeeks) out.notes.push(T('levelNote.returnEasy', { n: ri.easyWeeks }));
+      if (ri.capacity === 'weak') out.notes.push(T('levelNote.returnWeak'));
+      out.summary = T('levelSummary.' + ri.summary);
       var vn0 = volumeNote(vi);
       if (vn0) out.notes.push(vn0);
       out.volume = vi;
@@ -660,7 +686,7 @@
     if (vc) cap = Math.max(cap, Math.min(vc, a.info.maxKm || vc));
     // برگشتی با رکورد قدیمی: درصدی از کف حجم سطح قدیمی، حداکثر تا سقف دو سطح بالاتر از سطح فعلی
     var ri = a.returning;
-    if (ri && ri.oldLevel) cap = Math.max(cap, Math.min(LEVELS[ri.oldLevel].km[0] * ri.frac, LEVELS[Math.min(10, a.level + 2)].maxKm));
+    if (ri && ri.capacity === 'good') cap = Math.max(cap, Math.min(LEVELS[ri.oldLevel].km[0] * ri.frac, LEVELS[Math.min(10, a.level + 2)].maxKm));
     return Math.max(s, floor05(cap));
   }
   // نرخ رشد هفتگی: ۱۰٪، در حالت احتیاط ۵٪
@@ -691,11 +717,20 @@
     var pr = progression(weekIdx), ri = returnInfo(profile);
     var km = volumeInfo(profile).start;
     var start = clamp(km * 8 / Math.max(1, nSessions), 8, 30);
+    // برگشتی با پایه‌ی خوب: زمان دویدن از ۱۵ دقیقه و هر هفته یک پله‌ی کامل (بدون تکرار دوهفته‌ای)
+    var fast = ri && ri.capacity === 'good';
+    if (fast) start = Math.max(start, 15);
     var cap = profile.injury && profile.injury.trim() ? Math.min(30, Math.max(12, start * 1.5)) : 30;
-    var runMin = Math.min(cap, start * Math.pow(1.1, pr.steps));
+    var rate = fast ? (profile.injury && profile.injury.trim() || profile.age >= 50 ? 1.1 : ri.rate) : 1.1;
+    var runMin = Math.min(cap, start * Math.pow(rate, pr.steps));
     if (pr.deload) runMin *= 0.8;
     // برگشتی: چند پله‌ی اول دو-پیاده (یک دقیقه دویدن) لازم نیست
-    var stageIdx = Math.min(RUN_WALK_STAGES.length - 1, pr.steps + Math.floor((start - 8) / 3) + (ri ? ri.rwSkip : 0));
+    // الان منظم راه می‌ره (۶۰+ دقیقه در هفته): یک پله جلوتر
+    var walkSkip = ri && ri.walkMin >= 60 ? 2 : 0;
+    var stageIdx = fast ? Math.min(RUN_WALK_STAGES.length - 1, ri.rwSkip + walkSkip + 2 * pr.steps)
+      : Math.min(RUN_WALK_STAGES.length - 1, pr.steps + Math.floor((start - 8) / 3) + (ri ? ri.rwSkip + walkSkip : 0));
+    // برگشتی سریع: پله‌ای که حداقل ۴ تکرارش از زمان دویدن این هفته (با ۱۵٪ رواداری) بیشتر نشه، تا رشد واقعی از سقف هفتگی جلو نزنه
+    if (fast) while (stageIdx > 0 && RUN_WALK_STAGES[stageIdx][0] * 4 > runMin * 1.15) stageIdx--;
     var stage = RUN_WALK_STAGES[stageIdx];
     return { runTotal: runMin, run: stage[0], walk: stage[1] };
   }
@@ -3056,7 +3091,7 @@
   // برگشتی: تا ۹۵٪ رکورد قدیمی هر ۳ هفته (انتخاب طراحی؛ شاهد محکمی برای سریع‌تر برگشتن آمادگی استقامتی پیدا نشد)
   function vdotStepWeeks(level, profile) {
     var ri = profile ? returnInfo(profile) : null;
-    if (ri && ri.oldVdot) {
+    if (ri && ri.fastSteps) {
       var fit = currentFitness(profile);
       if (!fit || fit.vdot < ri.oldVdot * 0.95) return 3;
     }
@@ -3233,7 +3268,7 @@
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,
     planSuggestion: planSuggestion, goalPath: goalPath,
     isWalk: isWalk, walkGoalInfo: walkGoalInfo, walkPath: walkPath, walkLevelSuggestion: walkLevelSuggestion, walkWeeksTo: walkWeeksTo, WALK_GOALS: WALK_GOALS, WALK_EVENT_KM: WALK_EVENT_KM, daySteps: daySteps, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
-    returnInfo: returnInfo, detrainFactor: detrainFactor, experienceFromMonths: experienceFromMonths, HISTORY_STEPS: HISTORY_STEPS, MONTHS_FROM_EXP: MONTHS_FROM_EXP, GAP_KEYS: GAP_KEYS, XTRAIN_KEYS: XTRAIN_KEYS,
+    returnInfo: returnInfo, GAP_STEPS: GAP_STEPS, gapDaysOf: gapDaysOf, gapText: gapText, detrainFactor: detrainFactor, experienceFromMonths: experienceFromMonths, HISTORY_STEPS: HISTORY_STEPS, MONTHS_FROM_EXP: MONTHS_FROM_EXP, GAP_KEYS: GAP_KEYS, XTRAIN_KEYS: XTRAIN_KEYS,
     PACE_LEVEL: PACE_LEVEL, PLAN_NEEDS: PLAN_NEEDS, vdotStepWeeks: vdotStepWeeks,
     analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS,
     healthFits: healthFits, healthMatches: healthMatches, healthActual: healthActual, HEALTH_MIN_SEC: HEALTH_MIN_SEC
