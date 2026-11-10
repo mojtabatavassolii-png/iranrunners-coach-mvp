@@ -1657,4 +1657,76 @@ test('سلامت: انتخاب تمرین برای روزهای برنامه', f
   assert.deepStrictEqual(a, { sec: 1800, km: 5.02, start: '07:15' });
   assert.deepStrictEqual(C.healthActual({ start: at('2026-10-26', 9), sec: 1200.4, km: null }), { sec: 1200, start: '09:15' });
 });
+// ---------- دونده‌ی برگشتی ----------
+function returner(over) {
+  return profileFor(1, Object.assign({ experience: '1to3y', runMonths: 36, structured: true, currentWeeklyKm: 0, lastWeekKm: 0, monthAvgKm: 0,
+    gap: 'gt2y', xtrain: 'none', pbOld: { distanceKm: 10, timeSec: hms(0, 35) }, goal: { type: '10', date: null } }, over || {}));
+}
+test('برگشتی: سابقه از اسلایدر به دسته‌ی قدیمی', function () {
+  assert.strictEqual(C.experienceFromMonths(0), 'never');
+  assert.strictEqual(C.experienceFromMonths(2), 'lt3m');
+  assert.strictEqual(C.experienceFromMonths(8), '3to12m');
+  assert.strictEqual(C.experienceFromMonths(36), '1to3y');
+  assert.strictEqual(C.experienceFromMonths(48), 'gt3y');
+});
+test('برگشتی: ضریب افت جدول دنیلز و درون‌یابی', function () {
+  assert.strictEqual(C.detrainFactor(3, false), 1);
+  assert.strictEqual(C.detrainFactor(14, false), 0.973);
+  assert.strictEqual(C.detrainFactor(14, true), 0.986);
+  assert.strictEqual(C.detrainFactor(56, false), 0.847);
+  assert.strictEqual(C.detrainFactor(70, true), 0.902);
+  assert.strictEqual(C.detrainFactor(900, false), 0.805);
+  assert.ok(Math.abs(C.detrainFactor(35, false) - (0.931 + 0.889) / 2) < 1e-9);
+});
+test('برگشتی: «الان هم می‌دوم» و پروفایل قدیمی بدون وقفه دست نمی‌خورن', function () {
+  var base = profileFor(4, { pb: { distanceKm: 10, timeSec: hms(0, 45) } });
+  var now = Object.assign({}, base, { gap: 'now', runMonths: 48 });
+  assert.strictEqual(C.returnInfo(base), null);
+  assert.strictEqual(C.returnInfo(now), null);
+  assert.deepStrictEqual(C.assessLevel(now).level, C.assessLevel(base).level);
+  assert.strictEqual(C.weeklyVolumeKm(now, 9), C.weeklyVolumeKm(base, 9));
+});
+test('برگشتی: ۳ سال وقفه، رکورد ۳۵ دقیقه، الان صفر → سطح ۱، بدون پیس، دو-پیاده‌ی کوتاه‌شده', function () {
+  var p = returner(), a = C.assessLevel(p);
+  assert.strictEqual(a.level, 1);
+  assert.strictEqual(a.source, 'return');
+  assert.strictEqual(a.returning.known, false);
+  assert.ok(Math.abs(a.returning.oldVdot - 60.7) < 0.1);
+  // بعد از ۷۰ روز پیس از رکورد قدیمی ساخته نمی‌شه
+  assert.strictEqual(C.currentFitness(p), null);
+  var pz = C.paceZones(p);
+  assert.ok(!pz || !pz.vdot);
+  // دو-پیاده از پله‌ی ۲ دقیقه دویدن شروع می‌شه (مبتدی: ۱ دقیقه)
+  var rwOf = function (q) { return weekAt(q, 0).days.filter(function (d) { return d.type === 'runwalk'; })[0].steps[0]; };
+  assert.ok(/^\D*2 /.test(rwOf(p).split(':')[1]), rwOf(p));
+  assert.ok(/^\D*1 /.test(rwOf(profileFor(1, { currentWeeklyKm: 0 })).split(':')[1]));
+  // سقف حجم ۴۰٪ کف حجم سطح ۸ (۱۰۰ کیلومتر)، نه ۶٫۵
+  assert.strictEqual(C.volumeCeiling(p), 40);
+});
+test('برگشتی: وقفه‌ی ۲ ماه → پیس از رکورد تعدیل‌شده، ۱۵٪ در هفته', function () {
+  var p = returner({ gap: '1to3m', lastWeekKm: 10, monthAvgKm: 10, currentWeeklyKm: 10 }), a = C.assessLevel(p);
+  assert.strictEqual(a.returning.known, true);
+  var fit = C.currentFitness(p);
+  assert.ok(fit && fit.entry.kind === 'baseline' && fit.entry.adjusted);
+  assert.ok(Math.abs(fit.vdot - 60.7 * 0.847) < 0.2);
+  assert.strictEqual(a.level, 3);
+  assert.strictEqual(C.weeklyVolumeKm(p, 1), 11.5);
+  // با آسیب فعلی حداکثر ۱۰٪
+  assert.strictEqual(C.weeklyVolumeKm(Object.assign({}, p, { injury: 'زانو' }), 1), 11);
+  // پله‌ی VDOT هر ۳ هفته تا ۹۵٪ رکورد قدیمی
+  assert.strictEqual(C.planSuggestion(p, '10', 0).stepWeeks, 3);
+});
+test('برگشتی: وقفه‌ی ۳ ماه به بالا → ۴ هفته‌ی اول بدون جلسه‌ی سخت', function () {
+  var p = returner({ gap: '3to6m', lastWeekKm: 25, monthAvgKm: 25, currentWeeklyKm: 25 });
+  assert.ok(C.assessLevel(p).level >= 2);
+  var hard = function (w) { return weekAt(p, w).days.filter(function (d) { return ['tempo', 'interval', 'reps', 'fartlek', 'hills'].indexOf(d.type) >= 0; }).length; };
+  for (var w = 0; w < 4; w++) assert.strictEqual(hard(w), 0, 'week ' + w);
+  var later = 0; for (var w2 = 4; w2 < 8; w2++) later += hard(w2);
+  assert.ok(later > 0);
+});
+test('برگشتی: مبتدی واقعی همون سطح ۰', function () {
+  var p = profileFor(1, { experience: 'never', runMonths: 0, currentWeeklyKm: 0 });
+  assert.strictEqual(C.assessLevel(p).level, 0);
+  assert.strictEqual(C.returnInfo(Object.assign({}, p, { gap: 'gt2y' })), null);
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

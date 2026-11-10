@@ -128,6 +128,13 @@
     var k = pbDistanceKey(km);
     return ['5', '10', '21', '42'].indexOf(k) >= 0 ? T('pbDist.' + k) : dKm(Math.round(km * 100) / 100) + ' ' + T('units.' + I.getUnits());
   }
+  // سابقه‌ی منظم دویدن (ماه) → متن خوانا: «۸ ماه»، «۴ سال»، «۱۰ سال یا بیشتر»
+  function histText(m) {
+    m = Number(m) || 0;
+    if (!m) return T('onb.histNever');
+    if (m >= 120) return T('onb.histMax');
+    return fa(m < 12 ? T('onb.histMonths', { n: m }) : T('onb.histYears', { n: m / 12 }));
+  }
   function paceFmt(secPerKm) { return C.formatDuration(I.pace(Math.round(secPerKm))); }
   // متن ترجمه‌شده با اعداد بومی و امن برای HTML
   function tt(key, params) { return t(T(key, params)); }
@@ -1382,7 +1389,7 @@
     return '<div class="level-card' + (compact ? ' compact' : '') + '">' +
       '<div class="level-num" aria-hidden="true"><b>' + fa(a.level) + '</b><small>' + esc(T('level.of10')) + '</small></div>' +
       '<div class="level-body"><h3>' + tt('level.title', { n: a.level, name: L.name }) + ' ' + helpLink('levels', T('level.help')) + '</h3>' +
-      '<p class="small muted">' + (a.source === 'pb' ? tt('level.fromPb', { v: a.vdot.toFixed(1) }) : esc(T(a.source === 'never' ? 'level.fromZero' : 'level.fromVolume'))) + '</p>' +
+      '<p class="small muted">' + (a.source === 'pb' ? tt('level.fromPb', { v: a.vdot.toFixed(1) }) : esc(T(a.source === 'never' ? 'level.fromZero' : a.source === 'return' ? 'level.fromReturn' : 'level.fromVolume'))) + '</p>' +
       a.notes.map(function (n) { return '<p class="small level-note">' + t(n) + '</p>'; }).join('') +
       '</div></div>';
   }
@@ -1393,7 +1400,18 @@
     var editing = !!state.profile;
     var migrating = editing && p.schemaVersion !== SCHEMA_VERSION;
     var goal = C.goalInfo(p);
-    var pb = p.pb || {};
+    // دونده‌ی برگشتی: رکورد قدیمی (دوره‌ای که منظم می‌دوید) در همون فیلد رکورد مرحله‌ی ۴
+    var pb = (p.gap && p.gap !== 'now' && p.pbOld) || p.pb || {};
+    // اسلایدر سابقه: پروفایل‌های قدیمی فقط دسته‌ی سابقه دارن → نقطه‌ی تقریبی
+    var histM = p.runMonths != null ? p.runMonths : (p.experience && C.MONTHS_FROM_EXP[p.experience] != null ? C.MONTHS_FROM_EXP[p.experience] : 0);
+    var histIdx = 0;
+    C.HISTORY_STEPS.forEach(function (m, i) { if (Math.abs(m - histM) < Math.abs(C.HISTORY_STEPS[histIdx] - histM)) histIdx = i; });
+    // پروفایل‌های قدیمیِ دونده (بدون سؤال وقفه): «الان هم می‌دوم»
+    var gapSel = p.gap || (p.experience && p.experience !== 'never' && p.lastWeekKm != null ? 'now' : null);
+    var histTicks = [[0, 'never'], [6, 'm6'], [12, 'y1'], [15, 'y3'], [C.HISTORY_STEPS.length - 1, 'max']].map(function (t0) {
+      var pct = t0[0] / (C.HISTORY_STEPS.length - 1) * 100, edge = t0[0] === 0 ? ' is-start' : t0[0] === C.HISTORY_STEPS.length - 1 ? ' is-end' : '';
+      return '<span class="' + edge.trim() + '"' + (edge ? '' : ' style="inset-inline-start:' + pct.toFixed(1) + '%"') + '>' + esc(T('onb.histTick.' + t0[1])) + '</span>';
+    }).join('');
     var days = p.days || [];
     var locs = p.locations || [];
     var todayKey = C.dateKey(today());
@@ -1489,10 +1507,16 @@
         chip('walk30', 'yes', T('app.yes'), p.walk30 === 'yes', 'radio') + chip('walk30', 'no', T('app.no'), p.walk30 === 'no', 'radio') + '</div></div>' +
         '</div>' +
         '<div id="run-fields3">' +
-        '<p class="sub-legend">' + esc(T('onb.expQ')) + req + '</p><div class="chips">' +
-        Object.keys(C.EXPERIENCE).map(function (k) { return chip('experience', k, C.EXPERIENCE[k].label, p.experience === k, 'radio'); }).join('') + '</div>' +
+        // سابقه‌ی منظم دویدن: اسلایدر پیوسته (ماهانه تا یک سال، بعد سالانه)؛ دسته‌ی سابقه‌ی قدیمی از روی همین ساخته می‌شه
+        '<p class="sub-legend" id="hist-q">' + esc(T('onb.histQ')) + req + '</p>' +
+        '<div class="hist"><div class="hist-val"><span class="small muted">' + esc(T('onb.histHint')) + '</span><b id="hist-val" aria-hidden="true"></b></div>' +
+        '<input type="range" id="hist" name="runIdx" min="0" max="' + (C.HISTORY_STEPS.length - 1) + '" step="1" value="' + histIdx + '" aria-labelledby="hist-q">' +
+        '<div class="hist-ticks" aria-hidden="true">' + histTicks + '</div></div>' +
+        '<input type="hidden" name="experience" value="' + esc(C.experienceFromMonths(C.HISTORY_STEPS[histIdx])) + '">' +
         '<p class="alert alert-good zero-note" id="zero-note" hidden>' + esc(T('onb.zeroNote')) + '</p>' +
         '<div id="runner-fields">' +
+        '<p class="sub-legend">' + esc(T('onb.gapQ')) + req + '</p><div class="chips">' +
+        C.GAP_KEYS.map(function (k) { return chip('gap', k, T('gapOpt.' + k), gapSel === k, 'radio'); }).join('') + '</div>' +
         '<div class="row2">' +
         '<div class="field"><label for="lastkm">' + esc(T('onb.lastWeek')) + req + '</label>' +
         '<input id="lastkm" name="lastWeekKm" type="number" inputmode="decimal"' + limAttrs('vol', '0.5') + ' required' + kmField(volLast) + '>' +
@@ -1500,6 +1524,10 @@
         '<div class="field"><label for="avgkm">' + esc(T('onb.monthAvg')) + req + '</label>' +
         '<input id="avgkm" name="monthAvgKm" type="number" inputmode="decimal"' + limAttrs('vol', '0.5') + ' required' + kmField(volAvg) + '>' +
         '<small class="muted">' + esc(T('onb.monthAvgHint')) + '</small></div></div>' +
+        // فعالیت هوازی جایگزین در وقفه (فقط برگشتی): جدول دنیلز برای این حالت افت کمتری داره
+        '<div id="xt-block" hidden><p class="sub-legend">' + esc(T('onb.xtQ')) + '</p><div class="chips">' +
+        C.XTRAIN_KEYS.map(function (k) { return chip('xtrain', k, T('onb.xtrain.' + k), (p.xtrain || 'none') === k, 'radio'); }).join('') + '</div>' +
+        '<small class="muted">' + esc(T('onb.xtHint')) + '</small></div>' +
         '<div id="reason-block" class="reason-block" hidden><p class="sub-legend">' + esc(T('onb.reasonQ')) + req + '</p>' +
         '<p class="small muted">' + esc(T('onb.reasonHint')) + '</p><div class="chips">' +
         VOL_REASONS.map(function (k) { return chip('volumeReason', k, T('onb.reasons.' + k), p.volumeReason === k, 'radio'); }).join('') + '</div></div>' +
@@ -1515,8 +1543,10 @@
         '<p class="alert alert-good" id="pb-never" hidden>' + esc(T('onb.pbNever')) + '</p>' +
         '<p class="alert alert-good" id="pb-walk" hidden>' + esc(T('onb.pbWalk')) + '</p>' +
         '<div id="pb-fields">' +
-        '<p class="small pb-intro">' + esc(T('onb.pbIntro')) + '</p>' +
-        '<p class="small muted">' + esc(T('onb.pbOptional')) + '</p>' +
+        '<p class="small pb-intro" id="pb-intro">' + esc(T('onb.pbIntro')) + '</p>' +
+        '<p class="small pb-intro" id="pb-intro-old" hidden>' + esc(T('onb.pbIntroOld')) + '</p>' +
+        '<p class="small muted" id="pb-opt">' + esc(T('onb.pbOptional')) + '</p>' +
+        '<p class="small muted" id="pb-opt-old" hidden>' + esc(T('onb.pbOldNote')) + '</p>' +
         '<div class="row2">' +
         '<div class="field"><label for="pbsel">' + esc(T('onb.pbDist')) + '</label><select id="pbsel" name="pbSel"><option value="">' + esc(T('onb.pbNone')) + '</option>' +
         PB_DISTANCES.map(function (d) { return '<option value="' + d[0] + '"' + (pbKey === d[0] ? ' selected' : '') + '>' + esc(T('pbDist.' + d[0])) + '</option>'; }).join('') +
@@ -1597,7 +1627,18 @@
       if (v > 26 || v < 3) return false;
       return { distanceKm: km, timeSec: tt2 };
     }
-    function isNever() { var e = form.querySelector('input[name=experience]:checked'); return !!e && e.value === 'never'; }
+    function histMonths() { return C.HISTORY_STEPS[Number(form.runIdx.value) || 0] || 0; }
+    function isNever() { return form.experience.value === 'never'; }
+    function gapVal() { var g = form.querySelector('input[name=gap]:checked'); return g ? g.value : null; }
+    function isReturning() { var g = gapVal(); return !isNever() && !!g && g !== 'now'; }
+    var histLabel = histText;
+    // اسلایدر → متن خوانا و دسته‌ی سابقه (فیلد مخفی experience)
+    function syncHist() {
+      var m = histMonths(), lbl = histLabel(m);
+      document.getElementById('hist-val').textContent = lbl;
+      form.runIdx.setAttribute('aria-valuetext', lbl);
+      form.experience.value = C.experienceFromMonths(m);
+    }
     function isWalkForm() { var e = form.querySelector('input[name=activity]:checked'); return !!e && e.value === 'walk'; }
     // پیاده‌روی: سابقه، دقیقه‌ی هفتگی، توان ۳۰ دقیقه‌ی پیوسته (بی‌سابقه = «نه»)
     function readWalk() {
@@ -1627,16 +1668,23 @@
       }
       if (isNever()) return { currentWeeklyKm: 0, experience: 'never', structured: false, pb: null };
       var v = readVolume();
-      var exp = form.querySelector('input[name=experience]:checked');
       var st = form.querySelector('input[name=structured]:checked');
-      if (!v || (v.gap === 'drop' && !v.reason) || !exp || !st) return null;
-      var pbv = readPb();
+      if (!v || (v.gap === 'drop' && !v.reason) || !gapVal() || !st) return null;
+      var pbv = readPb(), ret = isReturning(), xt = form.querySelector('input[name=xtrain]:checked');
       var out = volumeProfile(v);
-      out.experience = exp.value; out.structured = st.value === 'yes'; out.pb = pbv || null; out.pbInvalid = pbv === false;
+      out.experience = form.experience.value; out.structured = st.value === 'yes'; out.pbInvalid = pbv === false;
+      out.runMonths = histMonths(); out.gap = gapVal(); out.xtrain = ret ? (xt ? xt.value : 'none') : null;
+      out.pb = ret ? null : pbv || null; out.pbOld = ret ? pbv || null : null;
+      out.startDate = form.startDate.value || C.dateKey(today()); out.age = Number(form.age.value) || 30;
       return out;
     }
     function syncLevel() {
-      var walk = isWalkForm(), never = !walk && isNever();
+      syncHist();
+      var walk = isWalkForm(), never = !walk && isNever(), ret = !walk && isReturning();
+      document.getElementById('xt-block').hidden = !ret;
+      ['pb-intro', 'pb-opt'].forEach(function (id) { document.getElementById(id).hidden = ret; });
+      ['pb-intro-old', 'pb-opt-old'].forEach(function (id) { document.getElementById(id).hidden = !ret; });
+      form.pbSel.options[0].textContent = T(ret ? 'onb.pbNoneOld' : 'onb.pbNone');
       document.getElementById('run-fields3').hidden = walk;
       document.getElementById('walk-fields3').hidden = !walk;
       document.getElementById('run-goal5').hidden = walk;
@@ -1820,7 +1868,9 @@
         if (vol && vol.gap === 'drop' && !vol.reason) E(3, T('onb.err.reason'));
         if (vol) volP = volumeProfile(vol);
         if (!fd.get('structured')) E(3, T('onb.err.struct'));
+        if (!fd.get('gap')) E(3, T('onb.err.gap'));
       }
+      var ret = !walkAct && !never && !!fd.get('gap') && fd.get('gap') !== 'now';
       var curKm = volP.currentWeeklyKm;
       // ۴. رکورد
       var pbObj = never ? null : readPb();
@@ -1858,6 +1908,8 @@
         injury: String(fd.get('injury') || '').trim(),
         currentWeeklyKm: curKm, lastWeekKm: volP.lastWeekKm, monthAvgKm: volP.monthAvgKm, volumeReason: volP.volumeReason,
         experience: walkAct ? (p.experience || null) : fd.get('experience'), structured: !never && fd.get('structured') === 'yes',
+        runMonths: walkAct ? (p.runMonths != null ? p.runMonths : null) : histMonths(),
+        gap: walkAct ? (p.gap || null) : never ? null : fd.get('gap') || null, xtrain: ret ? (fd.get('xtrain') || 'none') : null,
         activity: walkAct ? 'walk' : 'run',
         walkGoal: walkAct ? (function () {
           var k = fd.get('walkGoal');
@@ -1867,7 +1919,7 @@
         }()) : (p.walkGoal || null),
         walkExp: walkAct ? walkIn.exp : (p.walkExp || null), walkMin: walkAct ? walkIn.min : (p.walkMin != null ? p.walkMin : null), walk30: walkAct ? walkIn.w30 : (p.walk30 || null),
         schemaVersion: SCHEMA_VERSION,
-        goal: p.goal && p.goal.type === goalObj.type && p.goal.targetSec ? Object.assign(goalObj, { targetSec: p.goal.targetSec }) : goalObj, pb: pbObj,
+        goal: p.goal && p.goal.type === goalObj.type && p.goal.targetSec ? Object.assign(goalObj, { targetSec: p.goal.targetSec }) : goalObj, pb: ret ? null : pbObj, pbOld: ret ? pbObj : null,
         hrMax: hrIn.max, hrRest: hrIn.rest,
         sex: sex, cycle: cycleObj,
         // تاریخچه‌ی فیتنس و تنظیم دستی پیس ایزی با ویرایش پروفایل حفظ می‌شن
@@ -5902,7 +5954,8 @@
         '<dl class="kv-list">' +
       row('level', tt('profile.levelVal', { n: lv.level, name: lv.info.name }) +
         (lv.vdot ? ' <span class="muted small">(VDOT ' + t(lv.vdot.toFixed(1)) + ')</span>' : '')) +
-      row('exp', esc(C.EXPERIENCE[p.experience] ? C.EXPERIENCE[p.experience].label : '—')) +
+      row('exp', esc(p.runMonths != null ? histText(p.runMonths) : C.EXPERIENCE[p.experience] ? C.EXPERIENCE[p.experience].label : '—')) +
+      (p.gap && p.experience !== 'never' ? row('gap', esc(T('gapOpt.' + p.gap)) + (p.pbOld ? ' <span class="muted small">' + tt('profile.oldPb', { d: distName(p.pbOld.distanceKm), t: C.formatDuration(p.pbOld.timeSec) }) + '</span>' : '')) : '') +
       row('structured', esc(T(p.structured ? 'profile.structYes' : 'profile.structNo'))) +
       row('hr', hrz ? tt('profile.hrVal', { a: hrz.easy[0], b: hrz.easy[1] }) : muted('profile.notEntered')) +
       row('fitness', fit ? 'VDOT ' + t(fit.vdot.toFixed(1)) + ' · <a href="#fitness">' + esc(T('profile.details')) + '</a>' : '<a href="#fitness">' + esc(T('profile.registerTest')) + '</a>') +

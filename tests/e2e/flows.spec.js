@@ -21,7 +21,7 @@ test.afterEach(async ({}, info) => {
   expect(info.pageErrors, 'خطای جاوااسکریپت در صفحه').toEqual([]);
 });
 
-const RUNNER = { first: 'تست', exp: '3to12m', last: 20, avg: 20, goal: '10', goalInDays: 100, days: [0, 1, 2, 3, 4, 5, 6] };
+const RUNNER = { first: 'تست', histIdx: 8, last: 20, avg: 20, goal: '10', goalInDays: 100, days: [0, 1, 2, 3, 4, 5, 6] };
 
 function addDays(days) { const d = new Date(); d.setDate(d.getDate() + days); return d; }
 function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -54,7 +54,9 @@ async function onboard(page, o) {
   await next(page);
   await page.fill('#age', '33'); await page.fill('#height', '172'); await page.fill('#weight', '68');
   await next(page);
-  await chip(page, 'experience', o.exp);
+  // سابقه با اسلایدر (شماره‌ی پله: ۸ = ۸ ماه) و وقفه
+  await page.locator('#hist').fill(String(o.histIdx));
+  await chip(page, 'gap', o.gap || 'now');
   await page.fill('#lastkm', String(o.last)); await page.fill('#avgkm', String(o.avg));
   await chip(page, 'structured', 'no');
   await next(page);

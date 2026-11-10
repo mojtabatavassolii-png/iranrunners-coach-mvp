@@ -75,7 +75,13 @@
       D: 'A periodised plan (base/build/peak) with Daniels sessions: repetitions (R), VO2max (I), threshold (T) and marathon pace (M).',
       E: 'A professional plan with double days, uphill sprints, strength work and careful recovery management.'
     },
+    gapOpt: { now: 'I run regularly now', lt1m: 'Less than 1 month', '1to3m': '1–3 months', '3to6m': '3–6 months', '6to12m': '6–12 months', '1to2y': '1–2 years', gt2y: 'More than 2 years' },
+    pbDistShort: '{km} km',
     levelNote: {
+      returnKnown: 'Returning runner ({gap} break): your old best ({d} in {old}) was adjusted with Jack Daniels\' detraining factor for this break to about {adj}, and paces come from that adjusted time. Your level comes from your current state, and volume rises by at most {rate}% a week, because tendons and joints come back more slowly than heart and lungs.',
+      returnBound: 'Returning runner ({gap} break): for breaks longer than 10 weeks there is no reliable data to convert your old best ({d} in {old}) into today\'s fitness; the most it could be today over the same distance is about {adj}. Until your first time trial, intensity is set by the talk test and effort. Your old best sets your ceiling and how fast you progress. Volume rises by at most {rate}% a week, because tendons and joints come back more slowly than heart and lungs.',
+      returnNoPb: 'Returning runner ({gap} break): your level comes from your current state and the length of your break, and volume rises by at most {rate}% a week, because tendons and joints come back more slowly than heart and lungs.',
+      returnEasy: 'The first {n} weeks are easy running and strides only; quality sessions come after that.',
       structuredCap: 'You haven\'t done structured training (intervals/tempo) yet, so your level was capped from {from} to {to}.',
       expCap: 'Based on your running history ({exp}), your level was capped from {from} to {to}.',
       cautious: 'We\'ll increase your volume cautiously, because your current mileage doesn\'t match your speed yet.',
@@ -123,6 +129,7 @@
       any: 'Anywhere in the range that passes the talk test is fine today; in hot weather (above 25 °C) run the slower half.'
     },
     reminder: {
+      return: 'You\'ve been running regularly again for a few weeks; time for a 5 km (or 2 km) time trial so your paces come from today\'s fitness.',
       none: 'You haven\'t logged a best time or time trial yet. A 2 or 5 km time trial lets us calculate your training paces (including your easy range) accurately.',
       stale: { one: 'Your last time trial or best time was {weeks} week ago. Fitness changes over time; log a new time trial to update your paces (every 4–6 weeks is ideal).',
         other: 'Your last time trial or best time was {weeks} weeks ago. Fitness changes over time; log a new time trial to update your paces (every 4–6 weeks is ideal).' }
@@ -555,6 +562,7 @@
       help: 'How do levels work?',
       fromPb: 'From your best time (VDOT {v})',
       fromVolume: 'From your current mileage and history',
+      fromReturn: 'From your current state, your break and your old best',
       fromZero: 'Starting from zero, step by step'
     },
     onb: {
@@ -589,6 +597,18 @@
       pbOptional: 'If you don\'t have one or aren\'t sure, leave this section empty; the system will estimate your level from your current training volume.',
       zeroNote: 'Great that you want to start! You don\'t need to know anything about kilometres or race times. Your plan starts with walking and adds very gentle running little by little; most people reach 15 minutes of continuous running within 4 to 8 weeks.',
       expQ: 'How long have you been running regularly?',
+      histQ: 'How long have you run regularly in your life?',
+      histHint: 'Add up the periods you ran at least twice a week',
+      histNever: 'I\'ve never run regularly',
+      histMonths: '{n} months', histYears: '{n} years', histMax: '10 years or more',
+      histTick: { never: 'Never', m6: '6 mo', y1: '1 yr', y3: '3 yrs', max: '10+ yrs' },
+      gapQ: 'How long since you last ran regularly?',
+      xtQ: 'Other aerobic exercise per week (cycling, swimming, hiking, gym)',
+      xtrain: { none: 'None', some: '1–2 times', often: '3 or more' },
+      xtHint: 'People who kept up other aerobic exercise during the break lose less fitness.',
+      pbIntroOld: 'Your best time from when you ran regularly, approximately (optional).',
+      pbOldNote: 'This is not used as today\'s pace directly; it is adjusted for the length of your break and sets your progress ceiling.',
+      pbNoneOld: 'Don\'t remember / none',
       structQ: 'Have you ever done structured training (intervals, tempo)?',
       pbQ: 'Your best recent time (optional)',
       pbDist: 'Distance',
@@ -655,6 +675,7 @@
         monthAvg: 'Enter last month\'s average weekly volume (0 to {max} {u}).',
         reason: 'Tell us whether last week\'s drop had a particular reason.',
         exp: 'Tell us how long you\'ve been running regularly.',
+        gap: 'Tell us how long since you last ran regularly (or “I run regularly now”).',
         struct: 'Tell us whether you\'ve done structured training (intervals, tempo).',
         pb: 'Best time: choose the distance and set its time with the hour, minute and second wheels, or choose "No best time".',
         age: 'Age must be between 12 and 90.',
@@ -1617,7 +1638,7 @@
       accountTitle: 'Account and data',
       rows: {
         age: 'Age',
-        level: 'Level', exp: 'Running history', structured: 'Structured training', hr: 'Heart rate', fitness: 'Current fitness',
+        level: 'Level', exp: 'Running history', gap: 'Break', structured: 'Structured training', hr: 'Heart rate', fitness: 'Current fitness',
         km: 'Training volume', body: 'Age / weight / height', days: 'Free days', locs: 'Training locations',
         sex: 'Sex', cycle: 'Cycle adaptation', injury: 'Injury / limitation', goal: 'Race goal', pb: 'Best time', start: 'Plan start', stats: 'Stats'
       },
@@ -1629,6 +1650,7 @@
       details: 'Details and update',
       registerTest: 'Log a time trial',
       kmVal: '{n:d} {u} per week',
+      oldPb: '(old best: {d} in {t})',
       kmVal2: 'Last week {last:d} · monthly average {avg:d} · plan starts at {start:d} {u}',
       bodyVal: '{age} years · {w} kg · {h} cm',
       notRecorded: 'Not recorded',

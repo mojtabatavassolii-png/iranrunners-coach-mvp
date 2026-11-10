@@ -153,6 +153,69 @@
 
   var TIER_INFO = i18nMap(['0', 'A', 'B', 'C', 'D', 'E'], 'tier');
 
+  // ---------- دونده‌ی برگشتی (سابقه‌ی منظم + وقفه) ----------
+  // سابقه‌ی کل (ماه، از اسلایدر فرم) → دسته‌های قدیمی سابقه، تا بقیه‌ی موتور و پروفایل‌های قدیمی دست نخورن
+  var HISTORY_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24, 36, 48, 60, 72, 84, 96, 108, 120];
+  function experienceFromMonths(m) {
+    m = Number(m) || 0;
+    return m <= 0 ? 'never' : m < 3 ? 'lt3m' : m < 12 ? '3to12m' : m <= 36 ? '1to3y' : 'gt3y';
+  }
+  // پروفایل‌های قدیمی (فقط دسته‌ی سابقه): نقطه‌ی تقریبی اسلایدر
+  var MONTHS_FROM_EXP = { never: 0, lt3m: 2, '3to12m': 6, '1to3y': 24, gt3y: 48 };
+  // وقفه (چه مدته منظم نمی‌دوه) → روزِ میانه‌ی هر گزینه
+  var GAP_KEYS = ['now', 'lt1m', '1to3m', '3to6m', '6to12m', '1to2y', 'gt2y'];
+  var GAP_DAYS = { now: 0, lt1m: 14, '1to3m': 56, '3to6m': 135, '6to12m': 270, '1to2y': 540, gt2y: 900 };
+  var XTRAIN_KEYS = ['none', 'some', 'often'];
+  /*
+   * ضریب افت VDOT بعد از وقفه: جدول Daniels' Running Formula (به نقل از VDOT O2، سایت خود دنیلز).
+   * ستون اول بدون ورزش دیگه، ستون دوم با ورزش هوازی جایگزین. ردیف‌های ۳۵ و ۴۹ روزِ ستون اول و ۳۵، ۴۲ و ۴۹ روزِ ستون دوم
+   * در منبعی که در دسترس بود نبودن یا (۴۲ روز، ۰٫۹۹۴) خارج از روند بودن؛ از ردیف‌های کناری درون‌یابی می‌شن.
+   * پشتوانه: Coyle و همکاران ۱۹۸۴ (VO2max در ۲۱ روز ۷٪ کم شد و بعد از ۵۶ روز حدود ۱۶٪ پایین‌تر ثابت موند).
+   * بعد از ۷۰ روز جدولی نیست و داده‌ی دونده‌ها برای ماه‌ها و سال‌ها وقفه پیدا نشد: پیس از رکورد قدیمی تعیین نمی‌شه و
+   * ضریب ۷۰ روز فقط «حداکثر ممکن» آمادگی امروزه.
+   */
+  var DETRAIN = [[5, 1, 1], [14, 0.973, 0.986], [21, 0.952, 0.976], [28, 0.931, 0.965], [42, 0.889, 0.944], [56, 0.847, 0.923], [63, 0.826, 0.913], [70, 0.805, 0.902]];
+  var DETRAIN_MAX_DAYS = 70;
+  function detrainFactor(days, cross) {
+    var c = cross ? 2 : 1;
+    if (days <= DETRAIN[0][0]) return 1;
+    if (days >= DETRAIN_MAX_DAYS) return DETRAIN[DETRAIN.length - 1][c];
+    for (var i = 1; i < DETRAIN.length; i++) {
+      var a = DETRAIN[i - 1], b = DETRAIN[i];
+      if (days <= b[0]) return a[c] + (b[c] - a[c]) * (days - a[0]) / (b[0] - a[0]);
+    }
+    return DETRAIN[DETRAIN.length - 1][c];
+  }
+  /*
+   * برگشت به دویدن (وقفه‌ی یک ماه یا بیشتر از دوره‌ای که منظم می‌دوید). انتخاب‌های طراحی (منبع مستقیم برای برگشتی‌ها نیست):
+   *  - امتیاز سطح نسبت به حجم فعلی: زیر ۳ ماه +۲، ۳ تا ۱۲ ماه +۱، بیشتر ۰
+   *  - افزایش هفتگی: زیر ۳ ماه ۱۵٪ (Nielsen 2014: در تازه‌کارها بیش از ۳۰٪ در دو هفته با آسیب‌های مسافتی همراه بود)،
+   *    ۳ تا ۱۲ ماه ۱۲٪، بیشتر ۱۰٪. تاندون خیلی کندتر از قلب و عضله سازگار می‌شه (Kjaer)، پس رکورد خوب قدیمی عجله نمیاره.
+   *  - سقف حجم: درصدی از کف حجم سطح قدیمی (۸۰، ۶۰، ۵۰ و ۴۰٪ برای زیر ۳ ماه، تا ۱۲ ماه، تا ۲ سال، بیشتر)
+   *  - وقفه‌ی ۳ ماه و بیشتر: ۴ هفته‌ی اول بدون جلسه‌ی سخت؛ در سطح ۱ چند پله‌ی اول دو-پیاده حذف می‌شه
+   *  - پله‌ی VDOT هر ۳ هفته تا ۹۵٪ رکورد قدیمی
+   */
+  function returnInfo(profile) {
+    var gap = profile.gap;
+    if (!gap || gap === 'now' || !GAP_DAYS[gap] || profile.experience === 'never' || isWalk(profile)) return null;
+    var days = GAP_DAYS[gap], cross = profile.xtrain === 'some' || profile.xtrain === 'often';
+    var out = { gap: gap, days: days, cross: cross, known: days <= DETRAIN_MAX_DAYS, factor: detrainFactor(days, cross),
+      bonus: days < 90 ? 2 : days <= 365 ? 1 : 0,
+      rate: days < 90 ? 1.15 : days <= 365 ? 1.12 : 1.10,
+      frac: days < 90 ? 0.8 : days <= 365 ? 0.6 : days <= 730 ? 0.5 : 0.4,
+      easyWeeks: days >= 90 ? 4 : 0, rwSkip: 4 };
+    var pb = profile.pbOld;
+    if (pb && pb.distanceKm >= 1 && pb.timeSec > 0) {
+      out.oldVdot = vdotFromRace(pb.distanceKm, pb.timeSec);
+      out.oldLevel = levelFromVdot(out.oldVdot);
+      out.adjVdot = out.oldVdot * out.factor;
+      out.adjLevel = levelFromVdot(out.adjVdot);
+      out.adjSec = raceTimeFromVdot(out.adjVdot, pb.distanceKm);
+      out.distanceKm = pb.distanceKm;
+    }
+    return out;
+  }
+
   function levelFromKm(km) {
     for (var n = 10; n >= 1; n--) if (km >= LEVELS[n].km[0]) return n;
     return 1;
@@ -242,6 +305,26 @@
         : T('levelNote.expCap', { exp: EXPERIENCE[exp].label, from: volLevel, to: capped }));
     }
     var out = { level: capped, volLevel: volLevel, vdot: null, pbLevel: null, cautious: false, notes: notes, source: 'volume' };
+    var ri = returnInfo(profile);
+    if (ri) {
+      // برگشتی: سطح از وضعیت فعلی + امتیاز وقفه، نه بالاتر از رکورد قدیمیِ تعدیل‌شده
+      var lv = Math.min(volLevel + ri.bonus, Math.max(capped, experienceCap(exp, km)));
+      if (!structured) lv = Math.min(lv, Math.max(capped, 4));
+      if (ri.adjLevel) lv = Math.min(lv, ri.adjLevel);
+      out.level = Math.max(1, lv);
+      out.source = 'return';
+      out.returning = ri;
+      out.notes = [T(ri.oldVdot ? (ri.known ? 'levelNote.returnKnown' : 'levelNote.returnBound') : 'levelNote.returnNoPb', {
+        gap: T('gapOpt.' + ri.gap), old: ri.oldVdot ? formatDuration(Math.round(raceTimeFromVdot(ri.oldVdot, ri.distanceKm))) : '',
+        adj: ri.adjSec ? formatDuration(Math.round(ri.adjSec)) : '', d: ri.distanceKm ? T('pbDistShort', { km: ri.distanceKm }) : '',
+        rate: Math.round((ri.rate - 1) * 100) })];
+      if (ri.easyWeeks) out.notes.push(T('levelNote.returnEasy', { n: ri.easyWeeks }));
+      var vn0 = volumeNote(vi);
+      if (vn0) out.notes.push(vn0);
+      out.volume = vi;
+      out.info = LEVELS[out.level];
+      return out;
+    }
     var pb = profile.pb;
     if (pb && pb.distanceKm >= 1 && pb.timeSec > 0) {
       var vd = vdotFromRace(pb.distanceKm, pb.timeSec);
@@ -390,6 +473,11 @@
     if (pb && pb.distanceKm && pb.timeSec && !list.some(function (t) { return t.distanceKm === pb.distanceKm && t.timeSec === pb.timeSec && t.date === pb.date; })) {
       list = list.concat([{ date: pb.date || profile.startDate, distanceKm: pb.distanceKm, timeSec: pb.timeSec, kind: 'baseline' }]);
     }
+    // برگشتی با وقفه‌ی تا ۷۰ روز: رکورد قدیمی ضرب‌در ضریب افت دنیلز، به‌عنوان رکورد پایه (بیشتر از ۷۰ روز: بدون پیس تا تایم‌تست)
+    var ri = returnInfo(profile);
+    if (ri && ri.known && ri.adjSec && !list.some(function (t) { return t.kind === 'baseline'; })) {
+      list = list.concat([{ date: profile.startDate, distanceKm: ri.distanceKm, timeSec: Math.round(ri.adjSec), kind: 'baseline', adjusted: true }]);
+    }
     // مرتب بر اساس تاریخ؛ در تاریخ یکسان، تایم‌تست بعدی بر رکورد پایه مقدمه
     return list.slice().sort(function (a, b) {
       if (a.date !== b.date) return a.date < b.date ? -1 : 1;
@@ -485,6 +573,12 @@
   function fitnessReminder(profile, today) {
     if (profile.experience === 'never' || isWalk(profile)) return null;
     var fit = currentFitness(profile);
+    // برگشتی بعد از وقفه‌ی طولانی: تایم‌تست اول بعد از چند هفته دویدن آسون (سطح ۱ بعد از ۸ هفته، بقیه بعد از ۴)
+    var ri = returnInfo(profile);
+    if (!fit && ri) {
+      var wk = weekIndexFor(profile, today), need = assessLevel(profile).level <= 1 ? 8 : 4;
+      return wk >= need ? { kind: 'return', message: T('reminder.return') } : null;
+    }
     if (!fit) return { kind: 'none', message: T('reminder.none') };
     var weeks = Math.floor(daysBetween(parseDate(fit.entry.date), today) / 7);
     if (weeks >= FITNESS_STALE_WEEKS) return { kind: 'stale', weeks: weeks, message: T('reminder.stale', { weeks: weeks, n: weeks }) };
@@ -564,17 +658,28 @@
     // افت موقت (سفر، آسیب، بیماری): اجازه‌ی برگشت تا میانگین قبلی ماه
     var vc = volumeInfo(profile).ceiling;
     if (vc) cap = Math.max(cap, Math.min(vc, a.info.maxKm || vc));
+    // برگشتی با رکورد قدیمی: درصدی از کف حجم سطح قدیمی، حداکثر تا سقف دو سطح بالاتر از سطح فعلی
+    var ri = a.returning;
+    if (ri && ri.oldLevel) cap = Math.max(cap, Math.min(LEVELS[ri.oldLevel].km[0] * ri.frac, LEVELS[Math.min(10, a.level + 2)].maxKm));
     return Math.max(s, floor05(cap));
   }
   // نرخ رشد هفتگی: ۱۰٪، در حالت احتیاط ۵٪
-  function growthRate(a) { return a.cautious ? 1.05 : 1.1; }
+  function growthRate(a, profile) {
+    if (a.returning) {
+      var r = a.returning.rate;
+      // آسیب فعلی یا سن ۵۰+: مثل بقیه حداکثر ۱۰٪
+      if (profile && ((profile.injury && profile.injury.trim()) || profile.age >= 50)) r = Math.min(r, 1.1);
+      return r;
+    }
+    return a.cautious ? 1.05 : 1.1;
+  }
 
   // گرد کردن تکراری رو به پایین تا قانون ۱۰٪ روی عدد نهایی هم برقرار باشه
   function weeklyVolume(profile, weekIdx, noDeload, a) {
     a = a || assessLevel(profile);
     var pr = progression(weekIdx);
     if (noDeload && pr.deload) pr = { deload: false, steps: pr.steps };
-    var ceil = volumeCeiling(profile, a), rate = growthRate(a);
+    var ceil = volumeCeiling(profile, a), rate = growthRate(a, profile);
     var v = startKm(profile);
     for (var i = 0; i < pr.steps; i++) v = Math.min(ceil, floor05(v * rate));
     return { km: pr.deload ? floor05(v * 0.8) : v, atCeiling: pr.steps > 0 && v >= ceil };
@@ -583,13 +688,14 @@
 
   // سطح ۱: زمان دویدن هر جلسه از حجم فعلی (حدود ۸ دقیقه برای هر کیلومتر) شروع می‌شه
   function runWalkMinutes(profile, weekIdx, nSessions) {
-    var pr = progression(weekIdx);
+    var pr = progression(weekIdx), ri = returnInfo(profile);
     var km = volumeInfo(profile).start;
     var start = clamp(km * 8 / Math.max(1, nSessions), 8, 30);
     var cap = profile.injury && profile.injury.trim() ? Math.min(30, Math.max(12, start * 1.5)) : 30;
     var runMin = Math.min(cap, start * Math.pow(1.1, pr.steps));
     if (pr.deload) runMin *= 0.8;
-    var stageIdx = Math.min(RUN_WALK_STAGES.length - 1, pr.steps + Math.floor((start - 8) / 3));
+    // برگشتی: چند پله‌ی اول دو-پیاده (یک دقیقه دویدن) لازم نیست
+    var stageIdx = Math.min(RUN_WALK_STAGES.length - 1, pr.steps + Math.floor((start - 8) / 3) + (ri ? ri.rwSkip : 0));
     var stage = RUN_WALK_STAGES[stageIdx];
     return { runTotal: runMin, run: stage[0], walk: stage[1] };
   }
@@ -1646,6 +1752,8 @@
       // اولین هفته‌ی برگشت بعد از مسابقه: فقط دویدن آسون
       if (rfWeek < 0.75) workouts = { quality: [], long: { kind: ultra ? 'ultra' : 'plain', share: 0 }, strides: false, vertFactor: 0.3 };
       // برگشت حجم بعد از آسیب: درصدی از حجم برنامه، هر هفته حداکثر ۱۰٪ بیشتر؛ دو هفته‌ی اول فقط دویدن آسون
+      // برگشت بعد از وقفه‌ی ۳ ماه و بیشتر: هفته‌های اول فقط دویدن آسون و استرایدز
+      if (a.returning && W < a.returning.easyWeeks) workouts = { quality: [], long: { kind: ultra ? 'ultra' : 'plain', share: 0 }, strides: true, vertFactor: 0.3 };
       var ipw = injuryPhase(profile, ws);
       if (ipw && ipw.phase === 'ramp') {
         // مبنا: حجم هفته‌ی شروع آسیب (بدون هفته‌ی سبک)، تا رشد هر هفته فقط از خود برگشت باشه و از ۱۰٪ بیشتر نشه
@@ -2945,7 +3053,15 @@
   var SPECIFIC_WEEKS = { '5': 6, '10': 8, '21': 10, '42': 12 }, FINISH_WEEKS = { '5': 3, '10': 4, '21': 6, '42': 8 };
   var ZERO_WEEKS = ZERO_FINAL + 1, ZERO_EXIT_KM = 6;
   // هفته‌های هر پله‌ی VDOT: دونده‌ی پیشرفته‌تر کندتر پیشرفت می‌کنه
-  function vdotStepWeeks(level) { return level <= 5 ? 4 : level <= 7 ? 5 : 6; }
+  // برگشتی: تا ۹۵٪ رکورد قدیمی هر ۳ هفته (انتخاب طراحی؛ شاهد محکمی برای سریع‌تر برگشتن آمادگی استقامتی پیدا نشد)
+  function vdotStepWeeks(level, profile) {
+    var ri = profile ? returnInfo(profile) : null;
+    if (ri && ri.oldVdot) {
+      var fit = currentFitness(profile);
+      if (!fit || fit.vdot < ri.oldVdot * 0.95) return 3;
+    }
+    return level <= 5 ? 4 : level <= 7 ? 5 : 6;
+  }
   // ریکاوری کندتر در سنین بالاتر
   function ageFactor(age) { age = Number(age) || 0; return age >= 60 ? 1.15 : age >= 50 ? 1.1 : 1; }
   // هفته‌ها تا رسیدن به یک حجم هفتگی، با همون الگوی رشد و هفته‌ی سبک موتور اصلی
@@ -2969,7 +3085,7 @@
     var start = level === 0 ? ZERO_EXIT_KM : opts && opts.km > 0 ? Math.max(5, floor05(opts.km)) : startKm(profile);
     // سطح ۳ به بالا (بهتر کردن زمان): حدود ۲۰٪ بیشتر از حجم فعلی، در سقف سطح؛ هیچ‌وقت کمتر از حجم فعلی نیست
     var peak = Math.max(need.km, pace ? Math.min(floor05(start * 1.2), Math.max(start, LEVELS[level].maxKm)) : 0, start);
-    var volW = weeksToVolume(start, peak, growthRate(a)), specW = (pace ? SPECIFIC_WEEKS : FINISH_WEEKS)[key];
+    var volW = weeksToVolume(start, peak, growthRate(a, profile)), specW = (pace ? SPECIFIC_WEEKS : FINISH_WEEKS)[key];
     var out = { key: key, km: km, level: level, pace: pace, zeroWeeks: zero, startKm: start, peakKm: peak,
       longKm: Math.min(Math.round(need.long + (pace ? Math.min(level - 2, 4) * (key === '42' ? 0.5 : 1) : 0)), RACE_LONG_CAP[key]),
       sessions: pace ? Math.max(need.ses, LEVELS[level].sessions - 1) : need.ses,
@@ -2978,7 +3094,7 @@
       var fit = currentFitness(profile), v = refVdot(profile, level);
       out.vdot = v; out.vdotKnown = !!fit;
       out.predSec = raceTimeFromVdot(v, km);
-      out.stepWeeks = vdotStepWeeks(level);
+      out.stepWeeks = vdotStepWeeks(level, profile);
       // پیشنهاد هدف: یک، دو و سه پله‌ی VDOT
       out.presets = [1, 2, 3].map(function (d) { return { steps: d, sec: Math.round(raceTimeFromVdot(v + d, km)), weeks: d * out.stepWeeks }; });
       out.paces = paceTable(v, key);
@@ -3042,7 +3158,7 @@
   function vdotStepSuggestion(profile, postRuns, today) {
     var level = assessLevel(profile).level, tg = goalTarget(profile, level), fit = currentFitness(profile);
     if (!tg || !fit || fit.vdot >= tg.vdot - 0.05) return null;
-    var weeks = Math.floor(daysBetween(parseDate(fit.entry.date), today) / 7), need = vdotStepWeeks(level);
+    var weeks = Math.floor(daysBetween(parseDate(fit.entry.date), today) / 7), need = vdotStepWeeks(level, profile);
     if (weeks < need || easyRpeTrend(postRuns, today) >= 2) return null;
     var to = Math.min(tg.vdot, fit.vdot + 1);
     return { from: fit.vdot, to: to, weeks: weeks, entry: { date: dateKey(today), distanceKm: 5, timeSec: Math.round(raceTimeFromVdot(to, 5)), kind: 'step' } };
@@ -3117,6 +3233,7 @@
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,
     planSuggestion: planSuggestion, goalPath: goalPath,
     isWalk: isWalk, walkGoalInfo: walkGoalInfo, walkPath: walkPath, walkLevelSuggestion: walkLevelSuggestion, walkWeeksTo: walkWeeksTo, WALK_GOALS: WALK_GOALS, WALK_EVENT_KM: WALK_EVENT_KM, daySteps: daySteps, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
+    returnInfo: returnInfo, detrainFactor: detrainFactor, experienceFromMonths: experienceFromMonths, HISTORY_STEPS: HISTORY_STEPS, MONTHS_FROM_EXP: MONTHS_FROM_EXP, GAP_KEYS: GAP_KEYS, XTRAIN_KEYS: XTRAIN_KEYS,
     PACE_LEVEL: PACE_LEVEL, PLAN_NEEDS: PLAN_NEEDS, vdotStepWeeks: vdotStepWeeks,
     analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS,
     healthFits: healthFits, healthMatches: healthMatches, healthActual: healthActual, HEALTH_MIN_SEC: HEALTH_MIN_SEC

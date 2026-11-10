@@ -63,7 +63,7 @@ async function hash() { return page.evaluate(() => location.hash); }
     await page.waitForURL(/#onboarding/);
     await chip('activity', 'run'); await page.fill('#fname', 'تست'); await next();
     await page.fill('#age', '33'); await page.fill('#height', '172'); await page.fill('#weight', '68'); await next();
-    await chip('experience', '3to12m'); await page.fill('#lastkm', '20'); await page.fill('#avgkm', '20'); await chip('structured', 'no'); await next();
+    await page.locator('#hist').fill('8'); await chip('gap', 'now'); await page.fill('#lastkm', '20'); await page.fill('#avgkm', '20'); await chip('structured', 'no'); await next();
     await page.locator('#level-preview .level-card').waitFor(); await next();
     await page.selectOption('#gtype', 'none');
     for (const d of [0, 1, 2, 3, 4, 5, 6]) await chip('days', String(d));
