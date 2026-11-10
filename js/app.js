@@ -44,6 +44,14 @@
   }
   var notifyTimer = null;
   var state = load();
+  // شناسه‌ی یکتای پروفایل (داده‌ها به این وصلن، نه به نام؛ نام تکراری می‌شه). پروفایل‌های قبلی یک بار شناسه می‌گیرن.
+  function newUid() {
+    try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) { /* */ }
+    return 'p-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+  if (state.profile && !state.profile.uid) { state.profile.uid = newUid(); try { P.store.set(STORE_KEY, JSON.stringify(state)); } catch (e) { /* */ } }
+  // نام: حداقل ۲ حرف و نه فقط عدد
+  function validName(v) { v = String(v || '').trim(); return v.length >= 2 && v.length <= 40 && !/^[\d\s۰-۹.\-_]+$/.test(v); }
 
   // ---------- تنظیمات نمایش (جدا از پروفایل): تقویم، شروع هفته، نمای برنامه ----------
   // 'auto' = بر اساس زبان: فارسی → شمسی و شنبه؛ انگلیسی → میلادی و دوشنبه
@@ -1390,9 +1398,9 @@
       '<div class="level-num" aria-hidden="true"><b>' + fa(a.level) + '</b><small>' + esc(T('level.of10')) + '</small></div>' +
       '<div class="level-body"><h3>' + tt('level.title', { n: a.level, name: L.name }) + ' ' + helpLink('levels', T('level.help')) + '</h3>' +
       '<p class="small muted">' + (a.source === 'pb' ? tt('level.fromPb', { v: a.vdot.toFixed(1) }) : esc(T(a.source === 'never' ? 'level.fromZero' : a.source === 'return' ? 'level.fromReturn' : 'level.fromVolume'))) + '</p>' +
-      (a.summary ? '<p class="level-summary">' + t(a.summary) + '</p><details class="level-why"><summary>' + esc(T('onb.whyLevel')) + '</summary>' +
-        a.notes.map(function (n) { return '<p class="small level-note">' + t(n) + '</p>'; }).join('') + '</details>'
-        : a.notes.map(function (n) { return '<p class="small level-note">' + t(n) + '</p>'; }).join('')) +
+      (a.summary ? '<p class="level-summary">' + t(a.summary) + '</p>' : '') +
+      (a.notes.length ? '<details class="level-why"><summary>' + esc(T('onb.whyLevel')) + '</summary>' +
+        a.notes.map(function (n) { return '<p class="small level-note">' + t(n) + '</p>'; }).join('') + '</details>' : '') +
       '</div></div>';
   }
 
@@ -1459,10 +1467,14 @@
 
       // ۱. نوع ورزش و اطلاعات هویتی
       step(1,
+        '<div class="row2">' +
+        '<div class="field"><label for="fname">' + esc(T('onb.firstName')) + req + '</label><input id="fname" name="firstName" type="text" maxlength="40" required minlength="2" autocomplete="given-name" value="' + esc(p.name || '') + '" placeholder="' + esc(T('onb.firstNamePh')) + '"></div>' +
+        '<div class="field"><label for="lname">' + esc(T('onb.lastName')) + req + '</label><input id="lname" name="lastName" type="text" maxlength="40" required minlength="2" autocomplete="family-name" value="' + esc(p.lastName || '') + '" placeholder="' + esc(T('onb.lastNamePh')) + '"></div>' +
+        '</div>' +
         '<p class="sub-legend" id="act-q">' + esc(T('onb.activityQ')) + '</p><div class="act-choice" role="radiogroup" aria-labelledby="act-q">' +
         ['run', 'walk'].map(function (k) {
           return '<label class="act-opt"><input type="radio" name="activity" value="' + k + '"' + ((p.activity || 'run') === k ? ' checked' : '') + '>' +
-            '<span><b>' + esc(T('onb.activity.' + k)) + '</b><small>' + esc(T('onb.activity.' + k + 'Sub')) + '</small></span></label>';
+            '<span><b>' + esc(T('onb.activity.' + k)) + '</b></span></label>';
         }).join('') + '</div>' +
         '<div class="onb-photo"><span class="onb-photo-pic" data-avatar-slot="72">' + avatarHtml(72) + '</span><div class="onb-photo-txt">' +
         '<p class="sub-legend">' + esc(T('onb.photo')) + '</p><div class="onb-photo-acts">' +
@@ -1470,11 +1482,7 @@
         '<input type="file" id="avatar-file" accept="image/*" class="sr-only">' +
         '<button type="button" class="linklike small" data-avatar-remove="1"' + (getAvatar() ? '' : ' hidden') + '>' + esc(T('profile.photoRemove')) + '</button></div>' +
         '</div></div>' +
-        '<div class="row2">' +
-        '<div class="field"><label for="fname">' + esc(T('onb.firstName')) + '</label><input id="fname" name="firstName" type="text" maxlength="40" autocomplete="given-name" value="' + esc(p.name || '') + '" placeholder="' + esc(T('onb.firstNamePh')) + '"></div>' +
-        '<div class="field"><label for="lname">' + esc(T('onb.lastName')) + '</label><input id="lname" name="lastName" type="text" maxlength="40" autocomplete="family-name" value="' + esc(p.lastName || '') + '" placeholder="' + esc(T('onb.lastNamePh')) + '"></div>' +
-        '</div>' +
-        '<p class="sub-legend">' + esc(T('cycle.sexQ')) + '</p><div class="chips">' +
+        '<p class="sub-legend">' + esc(T('cycle.sexQ')) + ' ' + learnQ('cycle') + '</p><div class="chips">' +
         ['female', 'male', 'na'].map(function (k) { return chip('sex', k, T('cycle.sex.' + k), p.sex === k, 'radio'); }).join('') + '</div>' +
         '<small class="muted">' + esc(T('cycle.sexHint')) + '</small>') +
 
@@ -1517,7 +1525,7 @@
         '</div>' +
         '<div id="run-fields3">' +
         // سابقه‌ی منظم دویدن: اسلایدر پیوسته (ماهانه تا یک سال، بعد سالانه)؛ دسته‌ی سابقه‌ی قدیمی از روی همین ساخته می‌شه
-        '<p class="sub-legend" id="hist-q">' + esc(T('onb.histQ')) + req + '</p>' +
+        '<p class="sub-legend" id="hist-q">' + esc(T('onb.histQ')) + req + ' ' + learnQ('returning') + '</p>' +
         '<div class="hist"><div class="hist-val"><span class="small muted">' + esc(T('onb.histHint')) + '</span><b id="hist-val" aria-hidden="true"></b></div>' +
         '<input type="range" id="hist" name="runIdx" min="0" max="' + (C.HISTORY_STEPS.length - 1) + '" step="1" value="' + histIdx + '" aria-labelledby="hist-q">' +
         '<div class="hist-ticks" aria-hidden="true">' + histTicks + '</div></div>' +
@@ -1557,8 +1565,8 @@
         '<p class="alert alert-good" id="pb-never" hidden>' + esc(T('onb.pbNever')) + '</p>' +
         '<p class="alert alert-good" id="pb-walk" hidden>' + esc(T('onb.pbWalk')) + '</p>' +
         '<div id="pb-fields">' +
-        '<p class="small pb-intro" id="pb-intro">' + esc(T('onb.pbIntro')) + '</p>' +
-        '<p class="small pb-intro" id="pb-intro-old" hidden>' + esc(T('onb.pbIntroOld')) + '</p>' +
+        '<p class="small pb-intro" id="pb-intro">' + esc(T('onb.pbIntro')) + ' ' + learnQ('vdot') + '</p>' +
+        '<p class="small pb-intro" id="pb-intro-old" hidden>' + esc(T('onb.pbIntroOld')) + ' ' + learnQ('returning') + '</p>' +
         '<p class="small muted" id="pb-opt">' + esc(T('onb.pbOptional')) + '</p>' +
         '<p class="small muted" id="pb-opt-old" hidden>' + esc(T('onb.pbOldNote')) + '</p>' +
         '<div class="row2">' +
@@ -1849,6 +1857,12 @@
       var selLocs = fd.getAll('locations');
       var never = fd.get('experience') === 'never';
       var volP = { lastWeekKm: 0, monthAvgKm: 0, volumeReason: null, currentWeeklyKm: 0 };
+      // ۱. نام و نام خانوادگی (اجباری)
+      var nameOk = validName(fd.get('firstName')), lnameOk = validName(fd.get('lastName'));
+      if (!nameOk) E(1, T('onb.err.firstName'));
+      if (!lnameOk) E(1, T('onb.err.lastName'));
+      form.firstName.setAttribute('aria-invalid', nameOk ? 'false' : 'true');
+      form.lastName.setAttribute('aria-invalid', lnameOk ? 'false' : 'true');
       // ۲. مشخصات بدنی
       if (!(age >= 12 && age <= 90)) E(2, T('onb.err.age'));
       if (!(h >= 120 && h <= 230)) E(2, T('onb.err.height'));
@@ -1943,6 +1957,7 @@
         sex: sex, cycle: cycleObj,
         // تاریخچه‌ی فیتنس و تنظیم دستی پیس ایزی با ویرایش پروفایل حفظ می‌شن
         fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0, races: p.races || [],
+        uid: p.uid || newUid(),
         createdAt: p.createdAt || new Date().toISOString()
       };
       return { errs: errs, next: next, pbObj: pbObj, curKm: curKm, startDate: sd };
@@ -2018,7 +2033,6 @@
     }
     if (s.makeup) html += '<div class="makeup-box"><strong>' + esc(T('adapt.makeupBox.title')) + '</strong><p>' + t(s.makeup.text) + '</p></div>';
     if (s.how && s.type !== 'cancelled') html += '<p class="sess-how">' + t(s.how) + '</p>';
-    if (s.talk && s.type !== 'cancelled') html += '<p class="talk-test">' + t(s.talk) + '</p>';
     if (s.cheer) html += '<p class="cheer">' + t(s.cheer) + '</p>';
     if (s.type !== 'cancelled') html += learnMore(SESSION_LEARN[s.type]);
     if (opts.hint && s.easyEffort && s.type !== 'walkrun') html += '<p class="day-hint">' + t(opts.hint.message) + '</p>';
@@ -3112,7 +3126,7 @@
   function renderRace() {
     var p = state.profile, g = C.goalInfo(p), now = today(), nowKey = C.dateKey(now), main = C.raceInfo(p);
     var mainParts = mainRaceHtml(p, g);
-    var html = '<header class="page-head"><h1>' + esc(T('race.pageTitle')) + '</h1></header>' + mainParts[0] + impactCard(now) + racePainNote(now) + (g.type !== 'none' ? homePath(now, true) : '');
+    var html = '<header class="page-head"><h1>' + esc(T('race.pageTitle')) + ' ' + learnQ('goals') + '</h1></header>' + mainParts[0] + impactCard(now) + racePainNote(now) + (g.type !== 'none' ? homePath(now, true) : '');
     // اهداف فرعی
     var list = goalList(p), K = null;
     html += '<section class="card races-card" id="races-card"><h2>' + esc(T('race.others')) + '</h2><p class="small muted">' + esc(T('race.othersHint')) + '</p>';
@@ -3247,7 +3261,7 @@
   function paceU(sec) { return fa(C.formatDuration(Math.round(I.pace(sec)))); }
   function renderPlans() {
     var p = state.profile, a = C.assessLevel(p), pace = a.level >= C.PACE_LEVEL;
-    var html = '<header class="page-head"><h1>' + esc(T('plans.title')) + '</h1></header><p class="page-intro">' + esc(T('plans.intro')) + '</p>' +
+    var html = '<header class="page-head"><h1>' + esc(T('plans.title')) + ' ' + learnQ('goals') + '</h1></header>' +
       '<section class="card plan-me"><p><b>' + tt('profile.levelNum', { n: a.level }) + '</b>' + esc(T('progress.sep')) + esc(a.info.name) + esc(T('progress.sep')) + tt('plans.volNow', { n: C.planSuggestion(p, '5').startKm }) + '</p>' +
       '<p class="small muted">' + esc(T(pace ? 'plans.modePace' : 'plans.modeVolume')) + '</p>' +
       (C.ageFactor(p.age) > 1 ? '<p class="small muted">' + esc(T('plans.ageNote')) + '</p>' : '') + '</section>';
@@ -4286,10 +4300,37 @@
     // آمادگی، پیشرفت هفته و نکته‌های فیتنس/قدم‌ها → پیشرفت؛ چرخه → برنامه؛ نصب → پروفایل؛ اهداف و مسیر → مسابقه و اهداف
     void p;
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
-      '<h1>' + esc(T(greetKey())) + '</h1></header>' + recBanner() + homeToday(base, r.session, ci, key, r) + homeChecklist(now);
+      '<h1>' + esc(p && p.name ? T('home.greetName', { g: T(greetKey()), name: p.name }) : T(greetKey())) + '</h1></header>' + nameCard() + recBanner() + homeToday(base, r.session, ci, key, r) + homeChecklist(now);
     app.innerHTML = '<div class="home">' + html + '</div>';
     collapseChecklist();
   }
+  // کاربرهای قبلی بدون نام یا نام خانوادگی: یک بار و بی‌مزاحمت (با «بعداً» دیگه نشون داده نمی‌شه؛ از پروفایل هم می‌شه کاملش کرد)
+  function nameCard() {
+    var p = state.profile;
+    if (!p || state.namePromptDone || (validName(p.name) && validName(p.lastName))) return '';
+    return '<section class="card name-card"><h2>' + esc(T('nameCard.title')) + '</h2><form id="name-form" novalidate><div class="row2">' +
+      '<div class="field"><label for="nc-f">' + esc(T('onb.firstName')) + '</label><input id="nc-f" type="text" maxlength="40" autocomplete="given-name" value="' + esc(p.name || '') + '"></div>' +
+      '<div class="field"><label for="nc-l">' + esc(T('onb.lastName')) + '</label><input id="nc-l" type="text" maxlength="40" autocomplete="family-name" value="' + esc(p.lastName || '') + '"></div></div>' +
+      '<p class="form-hint" id="nc-err" role="alert" hidden></p>' +
+      '<div class="name-card-acts"><button type="submit" class="btn btn-primary">' + esc(T('nameCard.save')) + '</button>' +
+      '<button type="button" class="btn btn-ghost" data-name-later="1">' + esc(T('nameCard.later')) + '</button></div></form></section>';
+  }
+  app.addEventListener('submit', function (e) {
+    if (!e.target || e.target.id !== 'name-form') return;
+    e.preventDefault();
+    var f = document.getElementById('nc-f'), l = document.getElementById('nc-l'), err = document.getElementById('nc-err');
+    var msgs = [];
+    if (!validName(f.value)) msgs.push(T('onb.err.firstName'));
+    if (!validName(l.value)) msgs.push(T('onb.err.lastName'));
+    f.setAttribute('aria-invalid', validName(f.value) ? 'false' : 'true'); l.setAttribute('aria-invalid', validName(l.value) ? 'false' : 'true');
+    if (msgs.length) { err.textContent = msgs.join(' '); err.hidden = false; return; }
+    state.profile.name = f.value.trim().slice(0, 40); state.profile.lastName = l.value.trim().slice(0, 40);
+    state.namePromptDone = true; save(); route();
+  });
+  app.addEventListener('click', function (e) {
+    if (!e.target.closest || !e.target.closest('[data-name-later]')) return;
+    state.namePromptDone = true; save(); route();
+  });
   // تمرین امروز با تطبیق و چک‌این امروز (برای صفحه‌های دیگه که کارت‌های قبلی خانه رو نشون می‌دن)
   function todayState() {
     var now = today(), key = C.dateKey(now), base = C.sessionFor(state.profile, now), ci = state.checkins[key];
@@ -4859,7 +4900,7 @@
     var html = '<div class="pf-tool"><div class="seg prange" role="group" aria-label="' + esc(T('progress.rangeAria')) + '">' +
       ['4w', '3m', 'all'].map(function (k) {
         return '<button type="button" data-prange="' + k + '" aria-pressed="' + (k === rk) + '">' + esc(T('progress.r' + (k === '4w' ? '4w' : k === '3m' ? '3m' : 'All'))) + '</button>';
-      }).join('') + '</div></div><p class="page-intro">' + esc(T('progress.intro')) + '</p>' +
+      }).join('') + '</div>' + learnQ('progress') + '</div>' +
       (a.walk ? '' : function () {
         var f = C.currentFitness(state.profile);
         return '<nav class="card list-group">' + listRows([['#fitness', 'watch', T('profile.linkFitness'), f ? 'VDOT ' + f.vdot.toFixed(1) + T('progress.sep') + T('profile.fitnessSub') : T('profile.registerTest')]]) + '</nav>';
@@ -5383,7 +5424,31 @@
   // =====================================================================
   // آموزش: مقاله‌های کوتاه علمی (محتوا از js/i18n/learn-*.js)، هر مقاله در #learn/<شناسه>
   // =====================================================================
-  var LEARN_ORDER = ['vdot', 'rpe', 'eighty', 'types', 'fartleks', 'tenpct', 'warmup', 'cycle'];
+  var LEARN_ORDER = ['vdot', 'rpe', 'eighty', 'types', 'fartleks', 'tenpct', 'warmup', 'cycle', 'returning', 'goals', 'progress'];
+  // فهرست آموزش، موضوع‌بندی‌شده: مقاله‌ها و بخش‌های راهنمای کار با برنامه (g:) کنار هم
+  var LEARN_GROUPS = [
+    ['start', ['g:start', 'returning', 'g:levels']], ['pace', ['vdot', 'rpe', 'g:fitness', 'g:intensity']],
+    ['train', ['eighty', 'types', 'fartleks', 'warmup', 'g:week', 'g:sessions', 'g:places']], ['injury', ['tenpct', 'g:checkin']],
+    ['goals', ['goals', 'g:goals']], ['progress', ['progress']], ['cycle', ['cycle', 'g:cycle']], ['data', ['g:data']]
+  ];
+  // «؟» کنار موارد پیچیده: مطلب آموزش همون‌جا در یک پنجره باز می‌شه (فرم یا صفحه‌ی فعلی از دست نمی‌ره)
+  function learnQ(id) {
+    var l = T('app.helpAbout', { t: learnTitle(id) });
+    return '<button type="button" class="help-link" data-learn-pop="' + id + '" aria-label="' + esc(l) + '" title="' + esc(l) + '">' + esc(T('app.helpMark')) + '</button>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-learn-pop]');
+    if (!b) return;
+    e.preventDefault();
+    var id = b.dataset.learnPop, a = T('learn.articles.' + id);
+    var dlg = document.getElementById('learn-pop');
+    if (!dlg) { dlg = document.createElement('dialog'); dlg.id = 'learn-pop'; dlg.className = 'learn-pop'; document.body.appendChild(dlg); }
+    dlg.innerHTML = '<div class="learn-pop-head"><h2>' + esc(a.title) + '</h2><button type="button" class="btn btn-ghost btn-sm" data-learn-close="1">' + esc(T('app.close')) + '</button></div>' +
+      '<div class="learn-body">' + a.body + '</div>';
+    dlg.querySelector('[data-learn-close]').addEventListener('click', function () { dlg.close(); });
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+    var h = dlg.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus(); }
+  });
   // مقاله‌های مرتبط با هر نوع جلسه (لینک «بیشتر بدان» زیر جلسه)
   var SESSION_LEARN = {
     easy: ['eighty', 'rpe'], long: ['eighty', 'rpe'], runwalk: ['tenpct', 'rpe'], walkrun: ['tenpct', 'rpe'],
@@ -5422,13 +5487,19 @@
     if (id && LEARN_ORDER.indexOf(id) < 0) id = null;
     var html;
     if (!id) {
-      html = '<header class="page-head"><h1>' + esc(T('learn.title')) + '</h1></header><p class="page-intro">' + T('learn.intro') + '</p>' +
-        '<ul class="learn-list" aria-label="' + esc(T('learn.listAria')) + '">' + LEARN_ORDER.map(function (k, i) {
-          var a = T('learn.articles.' + k);
-          return '<li><a class="card learn-item" href="#learn/' + k + '"><span class="learn-num" aria-hidden="true">' + fa(i + 1) + '</span>' +
-            '<span class="learn-text"><b>' + esc(a.title) + '</b><span class="small muted">' + esc(a.summary) + '</span>' +
-            '<span class="learn-time">' + tt('learn.readMin', { n: readMinutes(a.body) }) + '</span></span></a></li>';
-        }).join('') + '</ul>' + linkCard('#guide', T('app.nav.guide'), T('learn.guideSub'));
+      html = '<header class="page-head"><h1>' + esc(T('learn.title')) + '</h1></header>' +
+        LEARN_GROUPS.map(function (g) {
+          return '<section class="learn-group"><h2 class="learn-gh">' + esc(T('learn.groups.' + g[0])) + '</h2><ul class="learn-list">' + g[1].map(function (k) {
+            if (k.indexOf('g:') === 0) {
+              var gid = k.slice(2);
+              return '<li><a class="card learn-item learn-guide" href="#guide" data-guide="' + gid + '"><span class="learn-text"><b>' + esc(T('guide.sections.' + gid + '.title')) + '</b>' +
+                '<span class="small muted">' + esc(T('learn.guideTag')) + '</span></span></a></li>';
+            }
+            var a = T('learn.articles.' + k);
+            return '<li><a class="card learn-item" href="#learn/' + k + '"><span class="learn-text"><b>' + esc(a.title) + '</b><span class="small muted learn-sum">' + esc(a.summary) + '</span>' +
+              '<span class="learn-time">' + tt('learn.readMin', { n: readMinutes(a.body) }) + '</span></span></a></li>';
+          }).join('') + '</ul></section>';
+        }).join('');
     } else {
       var a = T('learn.articles.' + id);
       var others = LEARN_ORDER.filter(function (k) { return k !== id; });

@@ -61,7 +61,7 @@ async function hash() { return page.evaluate(() => location.hash); }
     await page.evaluate(() => { sessionStorage.setItem('gaam-intro', '1'); location.reload(); });
     await page.locator('#login-btn').click();
     await page.waitForURL(/#onboarding/);
-    await chip('activity', 'run'); await page.fill('#fname', 'تست'); await next();
+    await chip('activity', 'run'); await page.fill('#fname', 'تست'); await page.fill('#lname', 'آزمایشی'); await next();
     await page.fill('#age', '33'); await page.fill('#height', '172'); await page.fill('#weight', '68'); await next();
     await page.locator('#hist').fill('8'); await page.fill('#lastkm', '20'); await page.fill('#avgkm', '20'); await chip('structured', 'no'); await next();
     await page.locator('#level-preview .level-card').waitFor(); await next();

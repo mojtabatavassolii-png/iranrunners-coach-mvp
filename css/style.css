@@ -2089,3 +2089,17 @@ html.intro #app .login-import { opacity: 0; }
 .gait-del-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; margin-top: 8px; }
 .gait-del-row .btn { min-height: 44px; color: var(--error); }
 .gait-jump { margin: 8px 0 4px; }
+
+/* متن کمتر (v119): پاراگراف و توضیح خالی جا نمی‌گیرن */
+#app p:empty, #app small:empty { display: none; }
+/* آموزش: گروه‌های موضوعی و خلاصه‌ی یک‌خطی */
+.learn-group { margin-bottom: var(--sp-3, 16px); }
+.learn-gh { font-size: var(--fs-md, 1.05rem); margin: 18px 4px 8px; }
+.learn-sum { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+button.help-link { padding: 0; cursor: pointer; font-family: inherit; }
+/* پنجره‌ی «؟» */
+.learn-pop { border: 0; border-radius: 16px; padding: 0; width: min(560px, calc(100vw - 32px)); max-height: 82vh; overflow: auto; overscroll-behavior: contain; background: var(--surface, var(--bg)); color: var(--text); }
+.learn-pop::backdrop { background: rgba(0, 0, 0, .45); }
+.learn-pop-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; background: inherit; border-bottom: 1px solid var(--border); }
+.learn-pop-head h2 { margin: 0; font-size: 1.05rem; }
+.learn-pop .learn-body { padding: 4px 16px 16px; text-align: start; }

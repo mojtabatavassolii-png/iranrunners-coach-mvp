@@ -2,13 +2,15 @@
 (function (root) {
   var d = {
     title: 'Learn',
-    intro: 'Short articles on the science your plan is built on, so you know <b>why</b> you do each session, not just <b>what</b> to do.',
+    intro: '',
     listAria: 'Articles',
-    guideSub: 'How the app works: levels, weekly rules, check-in, race goals and privacy',
+    guideSub: 'Levels, the week, check-in, goals and privacy',
     readMin: '{n} min read',
     backTo: { home: 'Back to today', progress: 'Back to progress', list: 'All articles', article: 'Previous article', plan: 'Back to plan', fitness: 'Back to fitness', checkin: 'Back to check-in', race: 'Back to race goal', guide: 'Back to guide', profile: 'Back to profile', other: 'Back' },
     more: 'Learn more:',
     others: 'More articles',
+    guideTag: 'How the app works',
+    groups: { start: 'Getting started and levels', pace: 'Pace and fitness', train: 'Training', injury: 'Injury prevention', goals: 'Goals and plans', progress: 'Progress', cycle: 'Menstrual cycle', data: 'Data and privacy' },
     articles: {
       vdot: {
         title: 'VDOT and the Jack Daniels method',
@@ -210,6 +212,54 @@
           '<h2>In this plan</h2>' +
           '<p>This feature is entirely optional. The plan <b>estimates</b> phases from the dates you enter and, for hard sessions on period or pre-period days, suggests a lighter option. Nothing changes without your choice, and the data stays only in your browser.</p>' +
           '<p class="learn-src"><b>Sources:</b> McNulty et al. (2020), <i>Sports Med</i> 50:1813–1827; Mountjoy et al. (2023), <i>Br J Sports Med</i> (RED-S).</p>'
+      },
+      returning: {
+        title: 'Levels and returning to running',
+        summary: 'How your starting level comes from your history, current volume and best time, and how a return after a break is set.',
+        body:
+          '<h2>History and current volume</h2>' +
+          '<p>In the setup form, "history" means the total time you ran at least twice a week. Your starting level comes from your current volume (last week and the monthly average), and your history caps it.</p>' +
+          '<h2>An old best is not today\'s pace</h2>' +
+          '<p>After a break, your old best time is not used as today\'s pace. For breaks up to 10 weeks it is adjusted with Jack Daniels\' detraining factor and your paces come from the adjusted time. For longer breaks there is no reliable data, so until your first time trial intensity is set by the talk test, and your old best only sets your progress ceiling.</p>' +
+          '<p>People who kept up other aerobic exercise (cycling, swimming, hiking) during the break lose less fitness in the same table. If you walk regularly now, run/walk starts one step further.</p>' +
+          '<h2>Why carefully?</h2>' +
+          '<p>Heart and lungs come back faster than tendons and joints. So even with a good old best, weekly volume rises by at most 10–15% (depending on the break), and after a break of 3 months or more the first 4 weeks are easy running only. With a good base, run/walk advances faster and paces return toward your old best sooner.</p>' +
+          '<p class="learn-src"><b>Sources:</b> Daniels, <i>Daniels\' Running Formula</i> (VDOT adjustment after a break); Coyle et al. (1984), <i>J Appl Physiol</i> 57:1857; Nielsen et al. (2014), <i>JOSPT</i> 44(10):739; Kjaer et al. (2009), <i>Scand J Med Sci Sports</i>.</p>'
+      },
+      goals: {
+        title: 'Goals, races and suggested plans',
+        summary: 'Main and secondary races, time-to-ready estimates, target times and hill rules.',
+        body:
+          '<h2>Plan start</h2>' +
+          '<p>Your plan is laid out from the exact start date you choose. If it is mid-week, you get a few intro sessions until the next week starts.</p>' +
+          '<h2>Main and secondary races</h2>' +
+          '<p>Your main race is the backbone of the plan. A secondary goal (race or time trial) does not replace it: normal training continues, with a mini-taper before and a short recovery after. Its result updates your paces and estimates. To make a goal the main one, drag its handle onto the main goal card or tap "Make main goal".</p>' +
+          '<h2>Time to be ready</h2>' +
+          '<p>The tiles for each distance show roughly how long until you are ready at your current level. The times come from the 10% volume rule, an easy week every fourth week, the minimum preparation for each level and the Jack Daniels method; injury, illness or breaks make them longer.</p>' +
+          '<h2>Suggested plans</h2>' +
+          '<p>Ready-made templates for each distance, built with the same rules as your main plan. They are only suggestions: your plan does not change unless you add a race yourself. Up to level 2, suggestions are based on volume and distance only (finishing healthy); from level 3 you can set a target time.</p>' +
+          '<h2>Target time</h2>' +
+          '<p>Daniels method: training paces stay at your current fitness and only race-pace parts move toward the goal (at most two steps ahead). VDOT rises one point at a time and each step takes 4 to 6 weeks; if easy runs feel easy, the next step is suggested.</p>' +
+          '<h2>Hills and climbing (ultra and trail)</h2>' +
+          '<p>Weekly climbing grows by at most 10% a week, with a lighter week every 4 weeks. No session climbs more than 110% of your biggest session in the last month. Hill sessions never sit next to another hard day, and downhill work grows separately and more slowly.</p>' +
+          '<p class="learn-src"><b>Sources:</b> Daniels, <i>Daniels\' Running Formula</i>, 4th ed. (2022).</p>'
+      },
+      progress: {
+        title: 'Progress charts',
+        summary: 'What data each chart on the progress page is built from, and how to read it.',
+        body:
+          '<p>Every chart is built from your own data: the sessions you marked done, your daily check-ins, the RPE you logged after runs, and your race results and time trials.</p>' +
+          '<h2>The charts</h2>' +
+          '<ul><li><b>Weekly volume:</b> distance from completed sessions each week, with a 4-week moving average. For walking, total minutes with the recommended 150-minute line.</li>' +
+          '<li><b>Steps:</b> steps you logged each day (or a walk session\'s steps), with your step target line.</li>' +
+          '<li><b>Climbing:</b> metres of ascent from completed sessions each week, with a 4-week moving average.</li>' +
+          '<li><b>Training load (CTL / ATL / TSB):</b> each session\'s load = duration (minutes) × perceived effort (RPE). CTL is long-term fitness (a 42-day weighted average); TSB is fitness minus fatigue: positive means fresh, negative means accumulated fatigue.</li>' +
+          '<li><b>Paces:</b> easy, tempo and interval paces from the VDOT of each result or time trial. Higher on the chart means faster.</li>' +
+          '<li><b>Race prediction:</b> each week\'s prediction from your latest result or time trial up to that week.</li>' +
+          '<li><b>Check-ins:</b> fatigue and sleep quality (1–5) and the days you reported pain, to spot recurring patterns.</li>' +
+          '<li><b>Time of day:</b> easy and long runs with a recorded start time, grouped by time of day. This is correlation only; weather, sleep and fatigue matter too, and more logged runs make it more reliable.</li>' +
+          '<li><b>Adherence:</b> of the sessions planned in this range (up to today), how many you actually did.</li></ul>' +
+          '<p class="learn-src"><b>Sources:</b> Banister et al. (1975), impulse-response model; Foster et al. (2001), <i>J Strength Cond Res</i> 15(1):109 (session RPE).</p>'
       }
     }
   };

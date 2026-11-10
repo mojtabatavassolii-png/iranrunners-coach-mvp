@@ -50,7 +50,7 @@ async function onboard(page, o) {
   o = Object.assign({}, RUNNER, o || {});
   await enter(page);
   await chip(page, 'activity', 'run');
-  await page.fill('#fname', o.first);
+  await page.fill('#fname', o.first); await page.fill('#lname', o.lname || 'آزمایشی');
   await next(page);
   await page.fill('#age', '33'); await page.fill('#height', '172'); await page.fill('#weight', '68');
   await next(page);
@@ -148,7 +148,9 @@ test('پروفایل: اسم و بخش‌ها', async ({ page }) => {
   await onboard(page);
   await page.locator('#tabbar a[data-tab="profile"]').click();
   await expect(page).toHaveURL(/#profile/);
-  await expect(page.locator('#app')).toContainText('تست');
+  // اسم در سلام صفحه‌ی امروز هم هست؛ منتظر خود صفحه‌ی پروفایل
+  await expect(page.locator('#app .list-row').first()).toBeVisible();
+  await expect(page.locator('#app')).toContainText('تست آزمایشی');
   expect(await page.locator('#app .list-row').count()).toBeGreaterThan(3);
 });
 

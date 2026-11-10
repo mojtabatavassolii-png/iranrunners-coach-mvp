@@ -126,9 +126,9 @@
     talkTest: 'Talk test: you should be able to talk comfortably. If you can\'t, slow down, even below the target pace.',
     easyRpeWarning: 'This pace doesn\'t seem easy for you right now. We suggest setting your easy pace a little slower or logging a new time trial.',
     feedback: {
-      ok: 'Great, that\'s exactly how an easy run should feel.',
+      ok: 'That\'s the right effort.',
       runwalk: 'This session felt hard. Next time make the walking breaks longer and the running slower; if it happens again, repeat the same stage for another week.',
-      fast: 'You ran faster than the easy range, which is why it felt hard. Next time stay inside the range or even slower; easy runs should feel easy.',
+      fast: 'You ran faster than the easy range; next time stay in the range or slower.',
       check: 'This session was too hard for an "easy" run. Next time use the talk test to set your speed and keep an eye on your pace.'
     },
     dayHint: {
@@ -137,7 +137,7 @@
     },
     reminder: {
       return: 'You\'ve been running regularly again for a few weeks; time for a 5 km (or 2 km) time trial so your paces come from today\'s fitness.',
-      none: 'You haven\'t logged a best time or time trial yet. A 2 or 5 km time trial lets us calculate your training paces (including your easy range) accurately.',
+      none: 'For accurate paces, log a 2 or 5 km time trial.',
       stale: { one: 'Your last time trial or best time was {weeks} week ago. Fitness changes over time; log a new time trial to update your paces (every 4–6 weeks is ideal).',
         other: 'Your last time trial or best time was {weeks} weeks ago. Fitness changes over time; log a new time trial to update your paces (every 4–6 weeks is ideal).' }
     },
@@ -150,7 +150,7 @@
       mainPower: 'Brisk walking (long steps, arms moving); during it, {reps} times run very gently for just {run}, then walk for {walk}',
       main: '{reps} times: {run} very gentle running + {walk} brisk walking',
       continuous: '15 min of slow, continuous running; if you need to, walk a few steps and start again',
-      how: 'Run slowly enough that you can talk easily. Whenever you feel tired, walk; walking is part of the training, not a failure.',
+      how: 'Run slowly enough to talk easily; walk whenever you\'re tired.',
       cheer: {
         0: 'Just starting means you\'ve taken the most important step. This week is mostly walking.',
         1: 'Your body is getting used to it. The running bits are still very short; there\'s no rush.',
@@ -162,7 +162,7 @@
         7: 'The big goal: 15 minutes of continuous running. Start slowly; you can do this.'
       },
       feedbackOk: 'Well done! Keep going like this, slow and steady.',
-      feedbackHard: 'It\'s fine that it felt hard. Next time run slower and walk more. If the whole week felt hard, tap "It was hard" at the end of the week and we\'ll repeat this stage.',
+      feedbackHard: 'Next time run slower and walk more. If the whole week was hard, tap “Hard” to repeat this stage.',
       cardTitle: 'Your path to 15 minutes of continuous running',
       stage: 'Stage {n} of {total}',
       stageLabel: 'Stage',
@@ -429,7 +429,7 @@
     },
     adapt: {
       noTrain: 'Don\'t train today',
-      race: '{why}. It\'s race day; make your goal "finish feeling good", not a PB. If you don\'t feel well, skipping it is also the right call.',
+      race: '{why}. It\'s race day; aim to finish feeling good, not for a record. If you\'re unwell, don\'t start.',
       tier: { mild: 'Light adjustment', moderate: 'Moderate adjustment', severe: 'Major adjustment' },
       changed: 'Today\'s session was adjusted', kept: 'Session unchanged, with one tip',
       whyL: 'Why?', actL: 'Decision:', impactL: 'Effect on your week and goal:',
@@ -462,7 +462,7 @@
         shorterLong: 'Instead, run a shorter long run: {km:d} {u} instead of {orig:d}, at a fully easy effort.',
         shorterEasy: 'Shorten the session: {km:d} {u} instead of {orig:d}, at a very easy effort.',
         easy: 'Instead, run a short {km:d} {u} easy run at a very easy effort.',
-        rest: 'Active rest today: 20–30 minutes of light walking or gentle movement. Your body gets stronger through recovery, not by training on fatigue.',
+        rest: 'Active rest today: 20–30 minutes of easy walking or gentle movement.',
         keepHard: 'The session stays. If the first rep or block feels harder than usual, drop one rep (or a few minutes of the fast part).',
         keepLong: 'The session stays; keep the effort fully easy and drop the last few kilometres if the second half feels heavy.',
         keepEasy: 'Today\'s session is easy and hasn\'t changed; keep the effort truly gentle and cut it short if you don\'t feel good.',
@@ -474,10 +474,10 @@
       },
       moreRestStep: 'Take about 50% more rest than usual between reps (easy jog).',
       impact: {
-        raceNear: 'Your race is {n} days away. This change is small and won\'t have much effect on your readiness; your fitness was built over the past weeks, and now being fresh matters more than one session. Don\'t worry.',
+        raceNear: 'Your race is in {n} days; this change has little effect on your fitness.',
         tiny: 'This change is small and has no noticeable effect on this week\'s goals.',
-        makeup: 'This change took away part of this week\'s training. If you feel back to normal by {day} (fatigue 2 or lower and good sleep), {what} will be added to that day\'s easy run to make up part of it; a full make-up isn\'t needed or recommended.',
-        noRoom: 'There\'s no good opportunity to make it up this week, and there\'s no need: one lighter session doesn\'t change your multi-week training trend. Next week continues as planned.',
+        makeup: 'If you\'re back to normal by {day} (fatigue 2 or less, good sleep), {what} is added to that day\'s easy run.',
+        noRoom: 'No make-up needed this week; next week continues as planned.',
         persist: ' If this fatigue continues for a few more days, look at your sleep, nutrition and stress, and see a doctor if it persists.'
       },
       what: { strides: '6 × 20 s strides (full recovery)', steady: '10 minutes at a steady effort (RPE 5–6)', km: 'about {n:d} {u}' },
@@ -530,11 +530,12 @@
       langSwitch: 'فارسی',
       langSwitchAria: 'Switch language to Persian',
       bannerAria: 'Medical notice',
-      bannerStrong: 'This system can replace an in-person coach for planning your training, but never a doctor.',
+      bannerStrong: 'Not a substitute for a doctor:',
       bannerText: 'If you have pain or any health problem, please see a doctor.',
       saveFailed: 'Couldn\'t save in the browser; your data will only last until you close this page.',
       help: 'Explained in the Guide',
       helpMark: '?',
+      helpAbout: 'About: {t}', close: 'Close',
       timeBad: 'Couldn\'t read that time; try "9:40" or "940"',
       listSep: ', ',
       cancel: 'Cancel',
@@ -544,7 +545,7 @@
     },
     signout: {
       title: 'Sign out',
-      hint: 'To try creating a profile from scratch. Your current profile and all its data are set aside on this device and come back from the sign-in page.',
+      hint: 'Your profile isn\'t deleted; it comes back from the sign-in page.',
       hintStashed: 'A profile is already set aside and stays safe. Signing out deletes this current (test) profile.',
       btn: 'Sign out and start a new profile',
       confirm: 'Sign out? Your profile is not deleted; it is set aside and you can return to it from the sign-in page.',
@@ -595,17 +596,17 @@
       lastWeek: 'Last week\'s volume ({u})',
       lastWeekHint: 'Your last complete week, Saturday to Friday.',
       monthAvg: 'Last month\'s average ({u} per week)',
-      monthAvgHint: 'Weekly average over the past four weeks; e.g. 30+35+40+35 → 35.',
+      monthAvgHint: 'Weekly average over the last four weeks.',
       reasonQ: 'Last week was much lower than your monthly average. Was there a particular reason?',
-      reasonHint: 'Your answer tells us whether the drop is temporary or real, and where the plan should start.',
+      reasonHint: '',
       reasons: { injury: 'Injury', illness: 'Illness', travel: 'Travel', other: 'Another temporary reason', none: 'No particular reason; I\'m really running less' },
       startPreview: 'The plan starts at {n:d} {u} per week.',
-      pbIntro: 'The best time you\'ve run over one of the distances below in the last six months, with a fairly serious effort (not an ordinary training run, but an official race or an all-out time trial).',
-      pbOptional: 'If you don\'t have one or aren\'t sure, leave this section empty; the system will estimate your level from your current training volume.',
-      zeroNote: 'Great that you want to start! You don\'t need to know anything about kilometres or race times. Your plan starts with walking and adds very gentle running little by little; most people reach 15 minutes of continuous running within 4 to 8 weeks.',
+      pbIntro: 'Your best race or time-trial time in the last six months (optional).',
+      pbOptional: '',
+      zeroNote: 'Your plan starts with walking and adds running gradually.',
       expQ: 'How long have you been running regularly?',
       histQ: 'How long have you run regularly in your life?',
-      histHint: 'Add up the periods you ran at least twice a week',
+      histHint: '',
       histNever: 'I\'ve never run regularly',
       histMonths: '{n} months', histYears: '{n} years', histMax: '10 years or more',
       histTick: { never: 'Never', m6: '6 mo', y1: '1 yr', y3: '3 yrs', max: '10+ yrs' },
@@ -613,13 +614,13 @@
       gapNow: 'I run regularly right now',
       gapTick: { now: 'Now', m3: '3 mo', y1: '1 yr', y3: '3 yrs', max: '5+ yrs' },
       walkNowLabel: 'Walking per week (minutes, optional)',
-      walkNowHint: 'If you walk regularly now, run/walk starts one step further.',
+      walkNowHint: '',
       whyLevel: 'Why this level?',
       xtQ: 'Other aerobic exercise per week (cycling, swimming, hiking, gym)',
       xtrain: { none: 'None', some: '1–2 times', often: '3 or more' },
-      xtHint: 'People who kept up other aerobic exercise during the break lose less fitness.',
-      pbIntroOld: 'Your best time from when you ran regularly, approximately (optional).',
-      pbOldNote: 'This is not used as today\'s pace directly; it is adjusted for the length of your break and sets your progress ceiling.',
+      xtHint: '',
+      pbIntroOld: 'Your best time from when you ran regularly (optional).',
+      pbOldNote: '',
       pbNoneOld: 'Don\'t remember / none',
       structQ: 'Have you ever done structured training (intervals, tempo)?',
       pbQ: 'Your best recent time (optional)',
@@ -642,7 +643,7 @@
       s6: '6. Race goal',
       goalType: 'Target race type',
       startDate: 'When should your plan start?',
-      startDateHint: 'Your plan is laid out from this exact day. If it is mid-week, you get a few intro sessions until the next week starts.',
+      startDateHint: '',
       raceDate: 'Race date (if you have a specific race)',
       raceDateEq: 'Solar Hijri date: {d}',
       ultraKm: 'Race distance ({u})',
@@ -659,11 +660,11 @@
       stepOf: 'Step {n} of {total}',
       progressAria: 'Form steps',
       steps: {
-        1: { t: 'About you', sub: 'Choose running or walking; name, photo and gender are optional.' },
-        2: { t: 'Body', sub: 'Age, height and weight help set training intensity and volume.' },
-        3: { t: 'Your running right now', sub: 'Your experience and current volume decide where the plan starts.' , tw: 'Your walking now', subw: 'So the plan starts where you are.' },
-        4: { t: 'Recent best time', sub: 'A real result lets us calculate your training paces accurately.' , tw: 'Walking level', subw: 'Based on your answers.' },
-        5: { t: 'Goal and weekly schedule', sub: 'Your target race, free days, training places and heart rate.' }
+        1: { t: 'About you', sub: '' },
+        2: { t: 'Body', sub: '' },
+        3: { t: 'Your running right now', sub: '' , tw: 'Your walking now', subw: '' },
+        4: { t: 'Recent best time', sub: '' , tw: 'Walking level', subw: '' },
+        5: { t: 'Goal and weekly schedule', sub: '' }
       },
       next: 'Next',
       back: 'Back',
@@ -681,7 +682,7 @@
       submitNew: 'Build my plan',
       toastEdit: 'Plan updated.',
       toastNew: 'Your plan is ready!',
-      err: { walkExp: 'Tell us how long you have been walking regularly.', walkMin: 'Enter your weekly walking minutes between 0 and 2000.', walk30: 'Tell us whether you can walk 30 minutes non-stop.',
+      err: { firstName: 'Enter your first name (at least 2 letters).', lastName: 'Enter your last name (at least 2 letters).', walkExp: 'Tell us how long you have been walking regularly.', walkMin: 'Enter your weekly walking minutes between 0 and 2000.', walk30: 'Tell us whether you can walk 30 minutes non-stop.',
         km: 'Enter how many {uw} you currently run per week on average (a number from 0 to {max}).',
         lastWeek: 'Enter last week\'s volume (0 to {max} {u}; enter 0 if you didn\'t run).',
         monthAvg: 'Enter last month\'s average weekly volume (0 to {max} {u}).',
@@ -712,7 +713,7 @@
       sexHint: 'Only used for training suggestions.',
       sex: { female: 'Woman', male: 'Man', na: 'Prefer not to say' },
       title: 'Adapting to your menstrual cycle (optional)',
-      intro: 'If you like, you can enter details of your menstrual cycle so your training plan can take it into account. This is completely optional, and you can turn it off or change it at any time.',
+      intro: 'Optional; turn it off any time.',
       enable: 'I\'d like my plan to adapt to my cycle',
       lastStart: 'First day of your last period',
       cycleLen: 'Average cycle length (days)',
@@ -764,7 +765,7 @@
       profileOn: 'On · {len}-day cycle, {p}-day period',
       profileOff: 'Off',
       periodQ: 'On period days, how can you train?',
-      periodQHint: 'Your period days are adjusted automatically every month based on this; "light only" lowers both intensity and volume (about 65%, 50% on the first two days, at most 10 km). In your profile you can decide differently for a specific period (for example close to a race).',
+      periodQHint: 'Period days are adjusted automatically every month.',
       mode: { normal: 'Normal training, as planned', easy: 'Light training and easy runs only', rest: 'No training; full rest' },
       modeShort: { normal: 'Normal', easy: 'Light only', rest: 'Rest' },
       fullRestTarget: 'Full rest',
@@ -788,7 +789,7 @@
       pcDefault: 'Default for every month: "{mode}"',
       pcDefaultNone: 'You haven\'t chosen how to train on period days yet. Pick one so those days are adjusted automatically:',
       pcEditDefault: 'Change default',
-      pcIntro: 'You can decide separately for each period, for example close to a race or if this month is different. The change affects only that period; your default for later months stays the same.',
+      pcIntro: 'This period only; the default for later months stays the same.',
       pcRange: '{a} – {b}',
       pcNow: 'Now',
       pcRaceIn: 'Race during this period',
@@ -815,10 +816,10 @@
       jalali: 'Solar Hijri (Jalali)',
       gregorian: 'Gregorian',
       current: 'Now: {cal} calendar, weeks start on {day}.',
-      note: 'Defaults: Persian → Solar Hijri and Saturday; English → Gregorian and Monday. Changing the first day of the week moves the plan\'s week boundaries (the long run falls on the last day of the week); your free days stay the same.',
+      note: 'Changing the first day of the week shifts the plan\'s week boundaries.',
       saved: 'Settings saved.',
       units: 'Distance units',
-      unitsNote: 'All distances, weekly volume and paces are shown in this unit. Race names (like 5 km and 10 km), time trials and metre-based interval reps stay as they are.'
+      unitsNote: 'Distances and paces are shown in this unit.'
     },
     units: { km: 'km', mi: 'mi', word: { km: 'kilometres', mi: 'miles' }, pace: { km: 'min/km', mi: 'min/mi' }, short: { km: 'km', mi: 'mi' },
       opt: { km: 'Kilometres (km)', mi: 'Miles (mi)' } },
@@ -958,8 +959,8 @@
       painQ: 'Do you feel any pain right now?',
       where: 'Where?',
       wherePh: 'e.g. left knee, shin, lower back',
-      painNote: 'This means real pain (sharp, localised, or pain that gets worse when running), not general muscle soreness after training.',
-      painNoteWalk: 'This means real pain (sharp, localised, or pain that gets worse when walking), not general muscle soreness after training.',
+      painNote: 'Real pain: sharp, localised or worse with running; not general post-workout soreness.',
+      painNoteWalk: 'Real pain: sharp, localised or worse with walking; not general post-workout soreness.',
       submit: 'Save check-in',
       err: { fatigue: 'Choose your fatigue level.', sleep: 'Choose your sleep quality.', pain: 'Answer the pain question.', where: 'Tell us where it hurts, or tick the consent box to choose the area and level.' },
       toastDown: 'Today\'s session was adjusted to your check-in; see why.',
@@ -1363,11 +1364,11 @@
     plans: {
       title: 'Suggested plans',
       linkSub: '5 km, 10 km, half and full marathon for your level',
-      intro: 'Ready-made templates for each distance, based on your current level and mileage and built with the same rules as your main plan. They are only suggestions: your plan does not change unless you add a race yourself.',
+      intro: '',
       volNow: 'current mileage {n:d} {u} per week',
-      modeVolume: 'At your level, suggestions are based on mileage and distance only; the goal is to finish the distance healthy. From level 3 you can also set a target time.',
-      modePace: 'You can set a target time for each distance. The time to reach it uses the Jack Daniels method: VDOT rises one point at a time, and each step takes 4 to 6 weeks.',
-      ageNote: 'Because of your age, the estimates include about 10 to 15% more time so your body has enough room to recover.',
+      modeVolume: '',
+      modePace: '',
+      ageNote: 'Times are 10–15% longer for your age.',
       goalFinish: 'Goal: finish', goalPace: 'Goal: faster time',
       weeks: '{a} to {b} weeks', months: '{a} to {b} months', untilReady: 'until race-ready (approx.)', cycle: 'full preparation cycle (approx.)',
       zero: 'Starting from zero', zeroVal: 'about {n} weeks of walk-run',
@@ -1382,17 +1383,17 @@
       ambitious: 'This goal is more than one training season away (about {n} weeks); an intermediate goal first is better.',
       midUse: 'Intermediate goal: {t} in about {n} weeks',
       use: 'Add to my goals',
-      useHint: 'Opens the add-goal form with the suggested date {d} (the date is optional); if you have no main goal, this becomes it.',
-      foot: 'Times are approximate and come from the 10% mileage rule, an easy week every fourth week, the minimum preparation for each level and the Jack Daniels method. Injury, illness or breaks make them longer.'
+      useHint: '',
+      foot: ''
     },
     health: {
       title: 'Pain, injury and cycle',
       rowSub: 'Log pain, confirmed injury, gradual return',
-      disclaimer: 'Gaam does not give a medical diagnosis or prescribe treatment; it only adapts your training load to what you log. For anything serious, see a doctor or physiotherapist.',
+      disclaimer: 'Gaam does not diagnose; for anything serious, see a doctor or physiotherapist.',
       privacy: 'Pain, injury and cycle data are stored only with your consent and only on this device, never sent anywhere, and can be deleted at any time.',
       consentTitle: 'Consent for health data',
       consentText: 'Pain, injuries and your menstrual cycle are sensitive health data. Gaam keeps them only with your explicit consent.',
-      consentList: ['Stored only on this device (browser storage); there is no server.', 'Never used in aggregate statistics or shared with anyone.', 'Used only to adapt your own training plan.', 'You can delete all of it from this page at any time.'],
+      consentList: ['Stored only on this device, never shared, and deletable any time.'],
       consentShort: 'I agree that my health data (pain, injury and cycle) is stored only on this device',
       consentAsk: 'To adjust your plan to where and how much it hurts, we need your consent first. Without it, you can still just write where it hurts.',
       consentBtn: 'Continue', consentHint: 'Tick the box above to continue.',
@@ -1451,7 +1452,7 @@
           late: 'Your next period is later than predicted. If you forgot to log the start, add it; if it continues, a doctor can help.',
           absent: 'No period start has been logged for over 3 months. If you really have not had a period, it is worth seeing a doctor; in athletes it is sometimes related to nutrition and energy intake.'
         },
-        evidence: 'How the cycle affects training differs from person to person, and the evidence is limited and mixed; that is why Gaam only suggests (lightening or moving a hard session) and the decision is yours.'
+        evidence: ''
       },
       wipeTitle: 'Delete health data', wipeText: 'All pain logs, injuries, cycle history and your consent are deleted. The rest of your plan and training stays.',
       wipeBtn: 'Delete all health data', wipeConfirm: 'Are you sure? This cannot be undone.', wipeYes: 'Yes, delete', wiped: 'Health data deleted.'
@@ -1462,7 +1463,7 @@
       noneHint: 'Your weeks, taper and volume are built around the main goal.',
       changeMain: 'Change main goal',
       others: 'Secondary goals',
-      othersHint: 'Your main race is the backbone of the plan. A secondary goal (race or time trial) does not replace it: normal training continues, with a mini-taper before and a short recovery after. Its result updates your paces and estimates. To make a goal the main one, drag its handle onto the main goal card or tap "Make main goal".',
+      othersHint: '',
       kind: { race: 'Race', test: 'Time trial / test run' },
       source: { self: 'My choice', coach: 'Coach suggestion' },
       kindQ: 'Type of goal', sourceQ: 'Who chose this goal?',
@@ -1477,14 +1478,14 @@
         overlap: 'Only {n} days from "{g}"; the recovery of one overlaps the taper of the other.'
       },
       opt: { move: 'Move to {d}', train: 'As training', keep: 'Keep as is', keepAdd: 'Add anyway', saved: 'Secondary goal updated.' },
-      tilesTitle: 'Distance goals', tilesHint: 'For each distance, roughly how long until you are ready at your current level; tap one to see its suggested plan (optional).',
+      tilesTitle: 'Distance goals', tilesHint: '',
       hills: {
         title: 'Hills and climbing',
         stage0: 'Stage 1 of 3: introduction — short uphill strides and gentle downhills',
         stage1: 'Stage 2 of 3: 2–3 minute climbs and short downhills',
         stage2: 'Stage 3 of 3: long climbs and specific vertical sessions',
         week: 'This week: {v} m of planned climbing (cap {c} m)',
-        rules: 'Weekly climbing grows by at most 10% a week, with a lighter week every 4 weeks. No session climbs more than 110% of your biggest session in the last month. Hill sessions never sit next to another hard day, and downhill work grows separately and more slowly.',
+        rules: '',
         start: 'Starting point: {v} m per week', startEst: 'Starting point: estimated from your current volume',
         edit: 'Change'
       },
@@ -1510,7 +1511,7 @@
       targetHint: 'Race-pace parts are trained toward this goal; all other paces come from your current fitness.',
       targetErr: 'Enter the time as minutes:seconds or hours:minutes:seconds.',
       targetLine: 'Target time: {t}', targetPace: 'pace {p} {pu}', targetSet: 'Set a target time',
-      targetHow: 'Daniels method: training paces stay at your current fitness and only race-pace parts move toward the goal (at most two steps ahead). Every 4 to 6 weeks, if easy runs feel easy, we suggest moving up one step.',
+      targetHow: '',
       targetSave: 'Save', targetClear: 'Remove target time', targetSaved: 'Target time saved; race pace in your sessions is updated.', targetCleared: 'Target time removed.',
       fromPlan: 'Filled from a suggested plan; you can change anything.',
       err: {
@@ -1723,8 +1724,8 @@
       title: 'Connect {name}',
       subOn: 'Connected; watch and phone workouts are logged automatically',
       subOff: 'Mark sessions done from your watch or phone',
-      intro: 'Runs and walks your watch or phone recorded in {name} mark that day\'s planned session as done, with the real distance, time and start time. Gaam only reads workouts, never writes to {name}, and no data leaves your phone.',
-      rules: 'Only workouts of 10 minutes or more, only on days with a session, and only the last 14 days. If you untick “done”, that workout isn\'t logged again.',
+      intro: 'Runs recorded in {name} mark that day\'s session as done automatically. Nothing is written to {name} and no data leaves your phone.',
+      rules: 'Only workouts of 10 minutes or more, from the last 14 days.',
       connect: 'Connect {name}',
       now: 'Sync now',
       off: 'Disconnect',
@@ -1757,7 +1758,7 @@
       avg: 'Average pace',
       cur: 'Current pace',
       signal: { wait: 'Finding GPS…', weak: 'Weak GPS signal', good: 'Good GPS signal' },
-      webNote: 'In the browser, recording continues only while this page is open and the screen is on. The phone app keeps recording with the screen locked.',
+      webNote: 'In the browser, recording continues only while this page is open and the screen is on.',
       bgNote: 'Recording continues with the screen locked or the app in the background. The route shape, distance, time and splits are stored only on this phone.',
       noCheckin: 'You haven\'t checked in today yet; better to do it before you start.',
       recovered: 'A recording was left unfinished (the app was closed). Resume it or finish it.',
@@ -1803,7 +1804,7 @@
 
     backup: {
       title: 'Backup and transfer',
-      hint: 'All your data (profile, plan, check-ins, workouts, health data, running form reports, photo and settings) in one file. Use it to move your data to another phone or browser, or to the next version of the app. The file contains health data; keep it somewhere safe and don\'t send it to anyone.',
+      hint: 'All your data in one file, to move to another phone or browser. It includes health data; keep it safe and don\'t share it.',
       export: 'Save a backup file', import: 'Restore from file',
       exported: 'Backup file created.',
       summary: '{n}, backup of {d}: {c} check-ins and {s} completed sessions',
@@ -1817,7 +1818,9 @@
     },
     jdate: { day: 'Day', month: 'Month', year: 'Year' },
     tabs: { aria: 'Main sections', home: 'Today', plan: 'Plan', progress: 'Progress', learn: 'Learn', profile: 'Profile' },
+    nameCard: { title: 'Complete your name', save: 'Save', later: 'Later' },
     home: {
+      greetName: '{g}, {name}',
       date: '{day} {date}',
       startsOn: 'Your plan starts on {d}.',
       nextSession: 'Next session: {day} {date}, {s}, {t}',
@@ -1827,7 +1830,7 @@
       withWarmup: '(with about {n} min of warm-up)',
       startCheckin: 'Start check-in', checkinHint: 'Before you train; under a minute.', preview: 'Preview session',
       sessionDetails: 'Session details',
-      ci: { title: 'Today\'s check-in', done: 'Logged', edit: 'View or edit', todo: 'Not logged yet. It takes less than a minute and tunes today\'s session to how you feel.',
+      ci: { title: 'Today\'s check-in', done: 'Logged', edit: 'View or edit', todo: 'Takes under a minute.',
         afterRun: 'Today\'s session is done; no check-in needed.', rest: 'Rest day today; the check-in is optional.', optional: 'Log a check-in' },
       details: 'View details', weekPlan: 'This week\'s plan', minutes: '{n} min', more: 'More',
       smartTitle: 'Coach message',
@@ -1849,7 +1852,7 @@
     // ---------- My progress (charts) ----------
     progress: {
       title: 'My progress',
-      intro: 'Every chart is built from your own data: the sessions you marked done, your daily check-ins, the RPE you logged after runs, and your race results and time trials.',
+      intro: '',
       rangeAria: 'Chart time range',
       r4w: 'Last 4 weeks', r3m: 'Last 3 months', rAll: 'From the start',
       table: 'Show data table',
@@ -1858,22 +1861,22 @@
       partialTag: 'in progress',
       sep: ' · ',
       volW: {
-        title: 'Weekly walking minutes', desc: 'Total minutes of completed sessions each week, with a 4-week average and the recommended 150-minute line.',
+        title: 'Weekly walking minutes', desc: '',
         bars: 'Minutes per week', unit: 'min', val: '{n} min', who: 'WHO guideline', empty: 'Fills in as you log your walks'
       },
       steps: {
-        title: 'Daily steps', desc: 'Steps you logged each day (or a walk session\'s steps), with your step target line.',
+        title: 'Daily steps', desc: '',
         bars: 'Steps per day', unit: 'thousand steps', val: '{n} steps', avg: 'Daily average', target: 'Step target',
         hit: 'Target hit on {n} of {d} days', empty: 'Log steps in the box at the top'
       },
       vol: {
-        title: 'Weekly volume', desc: 'Distance from completed sessions each week, with a 4-week moving average.',
+        title: 'Weekly volume', desc: '',
         bars: 'Weekly {u}', ma: '4-week average', thisWeek: 'This week (so far)', avg4: '4-week average', trend: 'Trend',
         up: 'Rising', down: 'Falling', flat: 'Steady', unit: '{u}', val: '{n} {u}',
         empty: 'Fills in as you log runs'
       },
       pmc: {
-        title: 'Fitness and fatigue', desc: 'The standard CTL / ATL / TSB model. Each session\'s load = duration (minutes) × perceived effort (RPE).',
+        title: 'Fitness and fatigue', desc: '',
         ctl: 'Fitness (CTL)', atl: 'Fatigue (ATL)', tsb: 'Form (TSB)',
         ctlDesc: 'Weighted average of training load over the last 42 days; long-term fitness.',
         atlDesc: 'Weighted average of load over the last 7 days; short-term fatigue.',
@@ -1883,32 +1886,32 @@
         empty: 'Fills in as you log runs'
       },
       pace: {
-        title: 'Pace improvement', desc: 'Easy, tempo and interval paces from the VDOT of each race result or time trial. Higher on the chart = faster.',
+        title: 'Pace improvement', desc: '',
         e: 'Easy', t: 'Tempo', i: 'Interval', vdot: 'VDOT', unit: '{pu}', faster: '↑ faster',
         diffFaster: '{n} s faster', diffSlower: '{n} s slower', diffSame: 'No change', newTest: 'New result or time trial',
         empty: 'Fills in with a race result or time trial'
       },
       checkins: {
-        title: 'Check-in trends', desc: 'Fatigue and sleep quality (1–5) and the days you reported pain; useful for spotting recurring patterns.',
+        title: 'Check-in trends', desc: '',
         fatigue: 'Fatigue', sleep: 'Sleep quality', pain: 'Pain', painYes: 'Pain reported',
         avgF: 'Average fatigue', avgS: 'Average sleep', painDays: 'Pain days', of5: '{n} of 5',
         weeklyAvg: 'weekly average', painN: { one: '{n} pain day', other: '{n} pain days' },
         empty: 'Fills in with daily check-ins'
       },
       pred: {
-        title: '{race} prediction trend', desc: 'Each week\'s prediction from your latest result or time trial up to that week. Higher on the chart = faster.',
+        title: '{race} prediction trend', desc: '',
         riegel: 'Riegel formula', vdot: 'VDOT tables', now: 'Current prediction (Riegel)', delta: 'Change in this range',
         better: '{t} faster', worse: '{t} slower', same: 'No change',
         empty: 'Fills in with a race result or time trial'
       },
       vert: {
-        title: 'Weekly climbing', desc: 'Metres of ascent from completed sessions each week, with a 4-week moving average.',
+        title: 'Weekly climbing', desc: '',
         bars: 'Weekly ascent', ma: '4-week average', unit: 'm', val: '{n} m', thisWeek: 'This week (so far)', avg4: '4-week average',
         empty: 'Fills in as you log runs'
       },
       tod: {
         title: 'Morning or evening?',
-        desc: 'Easy and long runs with a start time recorded in "Mark as done", grouped by time of day (all time).',
+        desc: '',
         slot: { morning: 'Mornings', afternoon: 'Afternoons', evening: 'Evenings' },
         slotS: { morning: 'mornings', afternoon: 'afternoons', evening: 'evenings' },
         range: { morning: 'before 12:00', afternoon: '12:00 to 17:00', evening: 'from 17:00' },
@@ -1920,10 +1923,10 @@
         runs: { one: '{n} run', other: '{n} runs' },
         pace: 'pace {p}',
         rpe: 'effort {n}',
-        note: 'This is only a correlation: weather, sleep, food and weekly fatigue also affect pace. The more runs you record, the more reliable it gets.'
+        note: 'Correlation only; weather, sleep and fatigue matter too.'
       },
       adh: {
-        title: 'Plan adherence', desc: 'Of the sessions planned in this range (up to today), how many you actually did.',
+        title: 'Plan adherence', desc: '',
         rate: 'completed', of: '{n} of {total} sessions', count: { one: '{n} session ({p}%)', other: '{n} sessions ({p}%)' }, pct: '{n}%',
         completed: 'As planned', adapted: 'Adapted (fatigue, sleep or cycle)', pain: 'Cancelled for pain', missed: 'Not done',
         empty: 'No past sessions yet'
