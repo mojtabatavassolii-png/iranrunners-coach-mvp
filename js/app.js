@@ -1898,6 +1898,7 @@
         fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0, races: p.races || [], levelSkip: p.levelSkip || null,
         // تاریخچه‌ی برنامه می‌مونه، مگه اینکه کاربر حجم فعلیش رو عوض کرده باشه (عدد تازه‌ی خودش مبناست)
         planLog: p.planLog && Number(p.currentWeeklyKm) === Number(curKm) && Number(p.lastWeekKm) === Number(volP.lastWeekKm) && Number(p.monthAvgKm) === Number(volP.monthAvgKm) ? p.planLog : undefined,
+        levelHold: p.levelHold && Number(p.currentWeeklyKm) === Number(curKm) && Number(p.lastWeekKm) === Number(volP.lastWeekKm) && Number(p.monthAvgKm) === Number(volP.monthAvgKm) ? p.levelHold : null,
         uid: p.uid || newUid(),
         createdAt: p.createdAt || new Date().toISOString()
       };
@@ -4883,7 +4884,7 @@
       }).join('') + '</div>' + learnQ('progress') + '</div>' +
       (a.walk ? '' : function () {
         var f = C.currentFitness(state.profile);
-        return '<nav class="card list-group">' + listRows([['#fitness', 'watch', T('profile.linkFitness'), f ? 'VDOT ' + f.vdot.toFixed(1) + T('progress.sep') + T('profile.fitnessSub') : T('profile.registerTest')]]) + '</nav>';
+        return '<nav class="card list-group">' + listRows([['#fitness', 'watch', T('profile.linkFitness'), f ? 'VDOT ' + f.vdot.toFixed(1) + T('progress.sep') + T(f.entry.kind === 'baseline' && f.entry.adjusted ? 'profile.fitnessAdjusted' : 'profile.fitnessSub') : T('profile.registerTest')]]) + '</nav>';
       }());
     // از خانه: آمادگی امروز، پیشرفت هفته و نکته‌های فیتنس (دویدن) یا قدم‌های امروز (پیاده‌روی)
     var ts = todayState();
@@ -5554,7 +5555,8 @@
       var e = fit.entry, weeks = Math.floor(C.daysBetween(C.parseDate(e.date), now) / 7);
       html += '<div class="fit-head"><div class="vdot-badge"><b>' + t(fit.vdot.toFixed(1)) + '</b><small>VDOT</small></div><div>' +
         '<p>' + tt('fit.entryLine', { label: T('fit.entry.' + (e.kind || 'record')), d: distName(e.distanceKm) }) + ' <span dir="ltr">' + fa(C.formatDuration(e.timeSec)) + '</span></p>' +
-        '<p class="small muted">' + esc(faDate(e.date)) + (weeks > 0 ? tt('fit.weeksAgo', { n: weeks }) : esc(T('fit.thisWeek'))) + '</p></div></div>';
+        '<p class="small muted">' + esc(faDate(e.date)) + (weeks > 0 ? tt('fit.weeksAgo', { n: weeks }) : esc(T('fit.thisWeek'))) + '</p>' +
+        (e.kind === 'baseline' && e.adjusted ? '<p class="small muted">' + esc(T('profile.fitnessAdjusted')) + '</p>' : '') + '</div></div>';
     } else {
       html += '<p>' + esc(T('fit.none')) + '</p>';
     }
@@ -5817,6 +5819,9 @@
     var name = [p.name, p.lastName].map(function (x) { return (x || '').trim(); }).filter(Boolean).join(' ');
     var joined = p.createdAt && !isNaN(new Date(p.createdAt)) ? I.monthTitle(new Date(p.createdAt)) : null;
     var fit = C.currentFitness(p), lastGait = (state.gaitReports || [])[0];
+    // پیشنهاد پایین آمدن سطح (منتظر تصمیم دونده) و رکورد پایه‌ی تخمینی دونده‌ی برگشتی، روی کارت سطح هم دیده بشه
+    var lvSg = walker() ? null : C.fitnessLevelSuggestion(p), lvDown = lvSg && !lvSg.up ? lvSg : null;
+    var fitAdj = !!(fit && fit.entry.kind === 'baseline' && fit.entry.adjusted);
     app.innerHTML = '<section class="pf-head">' +
       '<span class="pf-avatar" data-avatar-slot="96">' + avatarHtml(96) + '</span>' +
       '<h1 class="pf-name">' + esc(name || T('profile.noName')) + '</h1>' +
@@ -5826,8 +5831,11 @@
       // از خانه: نصب برنامه
       '<div data-install-slot="home">' + installBanner() + '</div>' +
       (walker() ? walkGoalCard(p, now) : profileGoalCard(p, g, race, now)) +
-      '<a class="card pf-level" href="' + (walker() ? '#plan' : '#plans') + '"><span class="pf-level-badge" aria-hidden="true"><b>' + fa(lv.level) + '</b><small>' + esc(T('level.of10')) + '</small></span>' +
-      '<span class="pf-level-text"><b>' + tt('level.title', { n: lv.level, name: lv.info.name }) + '</b><small>' + esc(T(walker() ? 'profile.levelLinkWalk' : 'profile.levelLink')) + '</small></span>' + chevron(isRtl() ? 'left' : 'right') + '</a>' +
+      '<a class="card pf-level" href="' + (lvDown ? '#progress' : walker() ? '#plan' : '#plans') + '"><span class="pf-level-badge" aria-hidden="true"><b>' + fa(lv.level) + '</b><small>' + esc(T('level.of10')) + '</small></span>' +
+      '<span class="pf-level-text"><b>' + tt('level.title', { n: lv.level, name: lv.info.name }) + '</b>' +
+      (lvDown ? '<small class="pf-level-note">' + tt('profile.levelDownNote', { n: lvDown.to }) + '</small>' : '<small>' + esc(T(walker() ? 'profile.levelLinkWalk' : 'profile.levelLink')) + '</small>' +
+        (fitAdj ? '<small class="pf-level-note">' + esc(T('profile.levelFromVolume')) + '</small>' : '')) +
+      '</span>' + chevron(isRtl() ? 'left' : 'right') + '</a>' +
       periodCard(p, now, race) +
       listGroup(T('profile.groups.mine'), walker() ? [['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgressWalk')],
         ['#walkgoals', 'flag', T('wgoal.pageTitle'), C.walkGoalInfo(p).kind !== 'none' ? T('wgoal.' + C.walkGoalInfo(p).kind + '.t') : T('profile.goalSetShort')],
@@ -5836,7 +5844,7 @@
         ['#health', 'health', T('health.title'), healthRowSub()],
         ['#race', 'flag', T('race.pageTitle'), g.type !== 'none' ? C.goalLabel(g) + (race && race.date >= now ? T('progress.sep') + T('profile.goalIn', { n: Math.round(C.daysBetween(now, race.date)) }) : '') : T('profile.goalSetShort')],
         ['#plans', 'plans', T('plans.title'), T('plans.linkSub')],
-        ['#fitness', 'watch', T('profile.linkFitness'), fit ? 'VDOT ' + fit.vdot.toFixed(1) : T('profile.registerTest')],
+        ['#fitness', 'watch', T('profile.linkFitness'), fit ? 'VDOT ' + fit.vdot.toFixed(1) + (fitAdj ? T('progress.sep') + T('profile.fitnessAdjusted') : '') : T('profile.registerTest')],
         ['#gait', 'gait', T('profile.tabs.gait'), lastGait && lastGait.v >= 2 && lastGait.score != null ? T('profile.rowGaitLast', { d: faDate(lastGait.date), s: lastGait.score }) : T('profile.rowGait')]
       ]) +
       listGroup(T('profile.groups.prefs'), [

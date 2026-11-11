@@ -1420,6 +1420,7 @@ input, select, textarea { background: var(--surface-elevated); }
 .pf-level-text { flex: 1; display: grid; gap: 2px; text-align: start; }
 .pf-level-text b { font-size: var(--fs-lg); }
 .pf-level-text small { color: var(--text-secondary); font-size: var(--fs-sm); }
+.pf-level-text .pf-level-note { color: var(--text); }
 .pf-level:hover .pf-level-text b { color: var(--primary); }
 /* کارت‌های گرادیانی هدف (همسان با پروفایل) */
 .race-hero, .hcard-race { background: var(--surface); border: 0; }

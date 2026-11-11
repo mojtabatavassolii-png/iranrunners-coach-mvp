@@ -1657,7 +1657,7 @@
       privacy: 'Privacy and support', privacySub: 'Your data stays on this device',
       noName: 'Runner', noNameHint: 'Add your name in {link}.', noNameLink: 'Edit profile',
       tabs: { aria: 'Profile sections', progress: 'Progress', gait: 'Biomechanics' },
-      goalOthers: { one: '+{n} more race', other: '+{n} more races' }, goalSet: 'Set a goal →', goalManage: 'Races and results →', levelNum: '{n} of 10', goalIn: { one: '{n} day to go', other: '{n} days to go' }, fitnessSub: 'log a time trial or new result',
+      goalOthers: { one: '+{n} more race', other: '+{n} more races' }, goalSet: 'Set a goal →', goalManage: 'Races and results →', levelNum: '{n} of 10', goalIn: { one: '{n} day to go', other: '{n} days to go' }, fitnessSub: 'log a time trial or new result', fitnessAdjusted: 'estimated from your old record, adjusted for the break', levelFromVolume: 'Level set from your current volume; your first time trial will update it', levelDownNote: 'Your latest time trial points to level {n}; your call →',
       editHint: 'If your level, training volume or circumstances have changed, fill in the form again so the plan updates.',
       cycleLast: 'Last period started: {d}',
       cycleEdit: 'Edit cycle data',

@@ -1965,4 +1965,19 @@ test('رکورد تازه سطح رو خودکار بالا می‌بره (مث�
   assert.strictEqual(C.autoLevelUp(p, C.parseDate('2026-12-26')), null);
   assert.strictEqual(C.assessLevel(p).level, 8);
 });
+test('«ادامه از حجم فعلی» حجم رو کم می‌کنه ولی سطح رو نگه می‌داره', function () {
+  var p = profileFor(2, { startDate: '2026-09-26', goal: { type: '10', date: '2027-03-01' } }), now = C.parseDate('2026-11-07');
+  var data = { profile: p, done: {}, doneLog: {} };
+  for (var w = 0; w < 6; w++) { var s = C.buildWeek(p, C.addDays(C.parseDate(p.startDate), w * 7)).days.filter(function (x) { return x.km; })[0]; data.done[s.date] = true; }
+  var before = C.assessLevel(p).level;
+  var r = C.applyRebase(p, data, now);
+  assert.ok(r && r.km < 15, JSON.stringify(r));
+  assert.strictEqual(r.to, before);
+  assert.strictEqual(C.assessLevel(p).level, before);
+  assert.ok(C.buildWeek(p, C.addDays(now, 7)).days.every(function (d) { return d.type !== 'runwalk'; }), 'دویدن پیوسته، نه دو-پیاده');
+  // رکورد تازه سطح رو از نو تعیین می‌کنه
+  p.fitnessTests = [{ date: '2026-11-21', distanceKm: 5, timeSec: Math.round(C.raceTimeFromVdot(50, 5)), kind: 'test' }];
+  C.autoLevelUp(p, C.parseDate('2026-11-21'));
+  assert.strictEqual(p.levelHold, null);
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

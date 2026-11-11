@@ -348,6 +348,7 @@
       var vn0 = volumeNote(vi);
       if (vn0) out.notes.push(vn0);
       out.volume = vi;
+      holdLevel(profile, out);
       out.info = LEVELS[out.level];
       return out;
     }
@@ -370,8 +371,15 @@
     var vn = volumeNote(vi);
     if (vn) out.notes.push(vn);
     out.volume = vi;
+    holdLevel(profile, out);
     out.info = LEVELS[out.level];
     return out;
+  }
+  // «ادامه از حجم فعلی» حجم رو کم می‌کنه ولی سطح دونده رو نگه می‌داره (profile.levelHold)؛
+  // سطحی که از رکورد میاد (source: pb) خودش مبناست و این حد روش اعمال نمی‌شه
+  function holdLevel(profile, out) {
+    var h = Number(profile.levelHold) || 0;
+    if (h > out.level && out.source !== 'pb') { out.level = Math.min(10, h); out.held = true; }
   }
 
   // ---------- هدف مسابقه ----------
@@ -695,6 +703,7 @@
     var sg = rebaseSuggestion(profile, data, today);
     if (!sg) return null;
     var before = assessLevel(profile).level;
+    profile.levelHold = Math.max(Number(profile.levelHold) || 0, before);   // سطح دونده نگه داشته می‌شه، فقط حجم کم می‌شه
     profile.lastWeekKm = sg.last;
     profile.monthAvgKm = profile.currentWeeklyKm = sg.avg;
     profile.volumeReason = null;
@@ -726,6 +735,7 @@
     for (var i = 0; i < 3; i++) { var bw = buildWeek(profile, addDays(today, -7 * i)); if (bw.weekIndex >= 0) recent = Math.max(recent, bw.totalKm || 0); }
     if (recent > 0) km = Math.min(km, Math.max(5, floor05(recent * 1.1)));
     profile.pb = { distanceKm: fit.entry.distanceKm, timeSec: fit.entry.timeSec, date: fit.entry.date };
+    profile.levelHold = null;   // سطح از رکورد تازه میاد
     profile.currentWeeklyKm = profile.lastWeekKm = profile.monthAvgKm = km;
     profile.volumeReason = null;
     if (returnInfo(profile)) { profile.gap = 'now'; profile.gapDays = 0; profile.xtrain = null; profile.walkMinNow = null; }
