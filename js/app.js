@@ -429,16 +429,9 @@
   }
 
   // ---------- تطبیق جلسه با چک‌این ----------
-  function prevCheckin(key) {
-    return state.checkins[C.dateKey(C.addDays(C.parseDate(key), -1))] || null;
-  }
-  function effectiveSession(base) {
-    var ci = state.checkins[base.date];
-    // درد: آخرین ثبت درد تا این روز (تا وقتی «بدون درد» ثبت نشده) جلوتر از تطبیق خستگی و خواب
-    var ep = C.painEpisode(state.pains, state.checkins, C.parseDate(base.date));
-    if (ep) return withCycle(C.painAdjust(base, ep, C.paceZones(state.profile)));
-    return withCycle(C.adaptSession(base, ci, prevCheckin(base.date), C.paceZones(state.profile), { profile: state.profile, checkins: state.checkins }));
-  }
+  // جلسه‌ی واقعی هر روز (درد، تطبیق با خستگی و خواب، چرخه): در logic.js، تا اپ و شبیه‌ساز کاربران یک کد رو اجرا کنن
+  function prevCheckin(key) { return C.prevCheckin(state, key); }
+  function effectiveSession(base) { return C.effectiveSession(state, base); }
   // آمار «انجام‌شده» از داده‌ی واقعی: جلسه‌هایی که کاربر «انجام دادم» زده، با حجمی که همون لحظه ثبت شده
   // (بعد از تطبیق با چک‌این و روزهای پریود)؛ در کنار برنامه‌ی همون بازه
   function doneStats(list) {
@@ -455,65 +448,6 @@
     });
     o.km = Math.round(o.km * 10) / 10; o.dkm = Math.round(o.dkm * 10) / 10;
     return o;
-  }
-  // جلسه‌ی جایگزین با همون روز و برچسب نوع
-  function dressAlt(alt, s) {
-    alt = JSON.parse(JSON.stringify(alt));
-    alt.date = s.date; alt.dayName = s.dayName; alt.dayShort = s.dayShort;
-    alt.label = C.TYPE_INFO[alt.type].label; alt.hard = false; alt.original = s;
-    return alt;
-  }
-  // چرخه‌ی قاعدگی:
-  //  روزهای پریود: اگه کاربر حالت تمرین رو انتخاب کرده (پیش‌فرض یا فقط برای همین دوره)، برنامه خودکار تنظیم می‌شه
-  //  بقیه‌ی روزها (و کاربرهای بدون انتخاب): فقط پیشنهاد؛ جلسه فقط با انتخاب خود کاربر (adapt / rest) عوض می‌شه
-  function withCycle(r) {
-    var s = r.session;
-    if (!s || s.type === 'cancelled' || !s.date) return r;
-    var info = C.cycleInfo(state.profile, C.parseDate(s.date));
-    if (!info) return r;
-    r.cycle = { info: info };
-    var pp = C.periodPlan(state.profile, C.parseDate(s.date));
-    if (pp) {
-      var ps = C.periodSession(s, pp, C.paceZones(state.profile));
-      r.cycle.period = pp; r.cycle.label = s.label;
-      var cut = ps && ps.periodCut;
-      r.cycle.cut = cut || null;
-      r.cycle.result = ps ? ps.type === 'rest' ? 'rest' : !cut ? 'easy' : cut.unit === 'min' ? 'shorterMin' : cut.intensity ? 'easy' : 'shorter'
-        : s.type === 'race' ? 'race' : pp.mode === 'normal' && s.hard ? 'normal' : null;
-      if (ps) r.session = dressAlt(ps, s);
-      return r;
-    }
-    // جلسه‌ی سختی که کاربر از یکی از ۴ روز قبل به امروز جابه‌جا کرده
-    for (var back = 1; back <= 4; back++) {
-      var pk = C.dateKey(C.addDays(C.parseDate(s.date), -back));
-      if ((state.cycleChoices || {})[pk] === 'move' && cycleMoveTarget(pk) === s.date) {
-        var mv = dressAlt(C.sessionFor(state.profile, C.parseDate(pk)), s);
-        mv.hard = true; mv.movedFrom = pk;
-        r.session = mv; r.cycle.moved = pk;
-        return r;
-      }
-    }
-    var sug = C.cycleSuggestion(s, info, C.paceZones(state.profile));
-    if (!sug) { if (info.phase === 'follicular' && s.hard && s.type !== 'race') r.cycle.note = 'follicular'; return r; }
-    var ch = (state.cycleChoices || {})[s.date];
-    r.cycle.sug = sug; r.cycle.choice = ch; r.cycle.label = s.label; r.cycle.moveTo = cycleMoveTarget(s.date);
-    var alt = ch === 'adapt' || ch === 'move' ? sug.alt : (ch === 'rest' ? sug.rest : null);
-    if (ch === 'move' && !r.cycle.moveTo) alt = null;
-    if (alt) r.session = dressAlt(alt, s);
-    return r;
-  }
-  // پیشنهاد جابه‌جایی جلسه‌ی سخت: اولین روز ایزی در ۴ روز بعد که روز قبل و بعدش جلسه‌ی سخت نیست (و قبل از مسابقه)
-  function cycleMoveTarget(key) {
-    var d0 = C.parseDate(key), p = state.profile;
-    for (var i = 1; i <= 4; i++) {
-      var d = C.addDays(d0, i), s = C.sessionFor(p, d);
-      if (s.type === 'race') return null;
-      if (s.type !== 'easy') continue;
-      var nx = C.sessionFor(p, C.addDays(d, 1)), pv = i > 1 ? C.sessionFor(p, C.addDays(d, -1)) : null;
-      if (nx.hard || (pv && pv.hard)) continue;
-      return C.dateKey(d);
-    }
-    return null;
   }
   // inPanel: جزئیات روز در صفحه‌ی برنامه؛ یادداشت فاز امروز همون بالای صفحه در کارت چرخه هست و تکرار نمی‌شه
   function cycleBox(r, key, todayKey, inPanel) {

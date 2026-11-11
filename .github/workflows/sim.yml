@@ -1,0 +1,60 @@
+# شبیه‌سازی کاربران: شخصیت‌های جعلی دو سال روی همون موتور اپ (js/logic.js) زندگی می‌کنن؛ هر ۳۰ روز خود اپ در Chromium بی‌سر باز می‌شه.
+# فقط دستی (Run workflow). گزارش به‌صورت فایل قابل دانلود زیر همون اجرا گذاشته می‌شه و در مخزن ذخیره نمی‌شه
+# (کل مخزن روی GitHub Pages منتشر می‌شه). هیچ داده‌ی کاربر واقعی‌ای در کار نیست.
+name: User simulation
+
+on:
+  workflow_dispatch:
+    inputs:
+      persona:
+        description: 'شخصیت‌ها (مثلاً P03,P07؛ خالی = همه)'
+        required: false
+        default: ''
+      until:
+        description: 'تعداد روز'
+        required: false
+        default: '730'
+      browser:
+        description: 'باز کردن اپ در مرورگر هر ۳۰ روز'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+      - name: Install Playwright (Chromium)
+        if: inputs.browser
+        working-directory: tests/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Run simulation
+        env:
+          NODE_PATH: ${{ github.workspace }}/tests/e2e/node_modules
+          BASE_URL: http://localhost:8000/
+          PERSONA: ${{ inputs.persona }}
+          UNTIL: ${{ inputs.until }}
+          BROWSER: ${{ inputs.browser }}
+        run: |
+          mkdir -p tests/sim/out
+          python3 -m http.server 8000 >/dev/null 2>&1 &
+          sleep 2
+          args="--until ${UNTIL:-730} --json"
+          if [ -n "$PERSONA" ]; then args="$args --persona $PERSONA"; fi
+          if [ "$BROWSER" = "true" ]; then args="$args --browser"; fi
+          node tests/sim/run.js $args | tee tests/sim/out/summary.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: simulation-report
+          path: tests/sim/out/
+          retention-days: 30

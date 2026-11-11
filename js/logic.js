@@ -3239,6 +3239,78 @@
     return a;
   }
 
+  // =====================================================================
+  // جلسه‌ی واقعی هر روز: برنامه + درد یا تطبیق با چک‌این + چرخه (همون کدی که قبلاً در app.js بود)
+  // state: { profile, checkins, pains, cycleChoices }
+  // =====================================================================
+  function prevCheckin(state, key) {
+    return state.checkins[dateKey(addDays(parseDate(key), -1))] || null;
+  }
+  function effectiveSession(state, base) {
+    var ci = state.checkins[base.date];
+    // درد: آخرین ثبت درد تا این روز (تا وقتی «بدون درد» ثبت نشده) جلوتر از تطبیق خستگی و خواب
+    var ep = painEpisode(state.pains, state.checkins, parseDate(base.date));
+    if (ep) return withCycle(state, painAdjust(base, ep, paceZones(state.profile)));
+    return withCycle(state, adaptSession(base, ci, prevCheckin(state, base.date), paceZones(state.profile), { profile: state.profile, checkins: state.checkins }));
+  }
+  function dressAlt(alt, s) {
+    alt = JSON.parse(JSON.stringify(alt));
+    alt.date = s.date; alt.dayName = s.dayName; alt.dayShort = s.dayShort;
+    alt.label = TYPE_INFO[alt.type].label; alt.hard = false; alt.original = s;
+    return alt;
+  }
+  // چرخه‌ی قاعدگی:
+  //  روزهای پریود: اگه کاربر حالت تمرین رو انتخاب کرده (پیش‌فرض یا فقط برای همین دوره)، برنامه خودکار تنظیم می‌شه
+  //  بقیه‌ی روزها (و کاربرهای بدون انتخاب): فقط پیشنهاد؛ جلسه فقط با انتخاب خود کاربر (adapt / rest) عوض می‌شه
+  function withCycle(state, r) {
+    var s = r.session;
+    if (!s || s.type === 'cancelled' || !s.date) return r;
+    var info = cycleInfo(state.profile, parseDate(s.date));
+    if (!info) return r;
+    r.cycle = { info: info };
+    var pp = periodPlan(state.profile, parseDate(s.date));
+    if (pp) {
+      var ps = periodSession(s, pp, paceZones(state.profile));
+      r.cycle.period = pp; r.cycle.label = s.label;
+      var cut = ps && ps.periodCut;
+      r.cycle.cut = cut || null;
+      r.cycle.result = ps ? ps.type === 'rest' ? 'rest' : !cut ? 'easy' : cut.unit === 'min' ? 'shorterMin' : cut.intensity ? 'easy' : 'shorter'
+        : s.type === 'race' ? 'race' : pp.mode === 'normal' && s.hard ? 'normal' : null;
+      if (ps) r.session = dressAlt(ps, s);
+      return r;
+    }
+    // جلسه‌ی سختی که کاربر از یکی از ۴ روز قبل به امروز جابه‌جا کرده
+    for (var back = 1; back <= 4; back++) {
+      var pk = dateKey(addDays(parseDate(s.date), -back));
+      if ((state.cycleChoices || {})[pk] === 'move' && cycleMoveTarget(state, pk) === s.date) {
+        var mv = dressAlt(sessionFor(state.profile, parseDate(pk)), s);
+        mv.hard = true; mv.movedFrom = pk;
+        r.session = mv; r.cycle.moved = pk;
+        return r;
+      }
+    }
+    var sug = cycleSuggestion(s, info, paceZones(state.profile));
+    if (!sug) { if (info.phase === 'follicular' && s.hard && s.type !== 'race') r.cycle.note = 'follicular'; return r; }
+    var ch = (state.cycleChoices || {})[s.date];
+    r.cycle.sug = sug; r.cycle.choice = ch; r.cycle.label = s.label; r.cycle.moveTo = cycleMoveTarget(state, s.date);
+    var alt = ch === 'adapt' || ch === 'move' ? sug.alt : (ch === 'rest' ? sug.rest : null);
+    if (ch === 'move' && !r.cycle.moveTo) alt = null;
+    if (alt) r.session = dressAlt(alt, s);
+    return r;
+  }
+  // پیشنهاد جابه‌جایی جلسه‌ی سخت: اولین روز ایزی در ۴ روز بعد که روز قبل و بعدش جلسه‌ی سخت نیست (و قبل از مسابقه)
+  function cycleMoveTarget(state, key) {
+    var d0 = parseDate(key), p = state.profile;
+    for (var i = 1; i <= 4; i++) {
+      var d = addDays(d0, i), s = sessionFor(p, d);
+      if (s.type === 'race') return null;
+      if (s.type !== 'easy') continue;
+      var nx = sessionFor(p, addDays(d, 1)), pv = i > 1 ? sessionFor(p, addDays(d, -1)) : null;
+      if (nx.hard || (pv && pv.hard)) continue;
+      return dateKey(d);
+    }
+    return null;
+  }
   var api = {
     LEVELS: LEVELS, EXPERIENCE: EXPERIENCE, TIER_INFO: TIER_INFO, PERIOD_LABELS: PERIOD_LABELS,
     RACE_DISTANCES: RACE_DISTANCES, RACE_LABELS: RACE_LABELS,
@@ -3268,6 +3340,7 @@
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,
     planSuggestion: planSuggestion, goalPath: goalPath,
     isWalk: isWalk, walkGoalInfo: walkGoalInfo, walkPath: walkPath, walkLevelSuggestion: walkLevelSuggestion, walkWeeksTo: walkWeeksTo, WALK_GOALS: WALK_GOALS, WALK_EVENT_KM: WALK_EVENT_KM, daySteps: daySteps, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
+    effectiveSession: effectiveSession, prevCheckin: prevCheckin, dressAlt: dressAlt, cycleMoveTarget: cycleMoveTarget,
     returnInfo: returnInfo, GAP_STEPS: GAP_STEPS, gapDaysOf: gapDaysOf, gapText: gapText, detrainFactor: detrainFactor, experienceFromMonths: experienceFromMonths, HISTORY_STEPS: HISTORY_STEPS, MONTHS_FROM_EXP: MONTHS_FROM_EXP, GAP_KEYS: GAP_KEYS, XTRAIN_KEYS: XTRAIN_KEYS,
     PACE_LEVEL: PACE_LEVEL, PLAN_NEEDS: PLAN_NEEDS, vdotStepWeeks: vdotStepWeeks,
     analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS,
