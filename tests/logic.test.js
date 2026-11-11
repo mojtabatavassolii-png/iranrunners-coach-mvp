@@ -1858,4 +1858,38 @@ test('شبیه‌ساز ۷: قبول سطح تازه بعد از مسابقه، 
   var r = C.applyFitnessLevel(p, now);
   assert.ok(r.km <= recent * 1.1 + 0.5, r.km + ' > ' + recent);
 });
+test('شبیه‌ساز ۸: جلسه‌ی سختِ جابه‌جاشده به‌خاطر پریود، درد یا خستگیِ همون روز رو نادیده نمی‌گیره', function () {
+  var p = cycleProfile('2026-10-04'), found = 0;
+  for (var i = 0; i < 60 && found < 2; i++) {
+    var d = C.addDays(C.parseDate('2026-09-26'), i), k = C.dateKey(d), st = { profile: p, checkins: {}, pains: {}, cycleChoices: {} };
+    var r = C.effectiveSession(st, C.sessionFor(p, d));
+    if (!(r.cycle && r.cycle.sug && r.cycle.moveTo)) continue;
+    var t = r.cycle.moveTo, td = C.parseDate(t);
+    st.cycleChoices[k] = 'move';
+    var moved = C.effectiveSession(st, C.sessionFor(p, td));
+    assert.ok(moved.session.hard && moved.cycle.moved === k, 'جلسه‌ی سخت به ' + t + ' جابه‌جا شد');
+    st.pains[t] = { area: 'knee', level: 2, when: ['after'], flags: [] };
+    var withPain = C.effectiveSession(st, C.sessionFor(p, td));
+    assert.ok(!withPain.session.hard, 'با درد: ' + withPain.session.type);
+    assert.strictEqual(withPain.adaptation.kind, 'pain');
+    delete st.pains[t];
+    st.checkins[t] = { fatigue: 5, sleep: 1, pain: false };
+    var tired = C.effectiveSession(st, C.sessionFor(p, td));
+    assert.ok(!tired.session.hard, 'با خستگی شدید: ' + tired.session.type);
+    found++;
+  }
+  assert.ok(found > 0, 'روزی با پیشنهاد جابه‌جایی پیدا نشد');
+});
+test('شبیه‌ساز ۹: ارتفاع اولترا؛ استراید سربالایی داخل سقف هفته، بدون کوچیک‌شدن تدریجی برنامه', function () {
+  var low = profileFor(5, { goal: goalOf('ultra', null, { km: 50, gain: 2500, weeklyVert: 300 }) });
+  for (var w = 0; w < 30; w++) {
+    var wk = weekAt(low, w), planned = wk.days.reduce(function (x, d) { return x + (d.type === 'race' ? 0 : d.vert || 0); }, 0);
+    assert.ok(planned <= wk.vertCap + 5, 'w' + w + ' ' + planned + ' > ' + wk.vertCap);
+  }
+  // دونده‌ای که ارتفاع زیادی گفته ولی برنامه کمترش داده: بعد از ۴ هفته عدد خودش دیگه مبنای پرش نیست
+  var steep = profileFor(7, { goal: goalOf('ultra', null, { km: 50, gain: 3000 }) }), v = [];
+  for (var i = 0; i < 16; i++) v.push(weekAt(steep, i));
+  var nd = v.filter(function (x, j) { return j >= 4 && x.phase.key !== 'deload'; }).map(function (x) { return x.vert; });
+  assert.ok(nd[nd.length - 1] > nd[0], 'برنامه بزرگ‌تر می‌شه، نه کوچیک‌تر: ' + nd.join(' '));
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

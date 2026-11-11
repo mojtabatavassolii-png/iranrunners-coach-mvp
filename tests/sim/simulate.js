@@ -536,7 +536,8 @@ function simulate(persona, opts) {
       if (bw.vertCap > 0 && bw.vert > bw.vertCap * 1.02 + 20) F('major', 'vert-cap', day, 'ارتفاع هفته از سقف خود برنامه بیشتره', { vert: bw.vert, cap: bw.vertCap });
       var pv = full.slice(-3).map(function (w) { return w.vert || 0; }), mv = pv.length ? Math.max.apply(null, pv) : 0;
       var uv = (C.goalInfo(p).ultra || (p.goal && p.goal.ultra) || {}).weeklyVert || 0;
-      if (mv > 0 && !aroundRace && bw.vert > Math.max(mv * 1.1 + 60, uv * 1.1 + 20)) F('major', 'vert-growth', day, 'رشد ارتفاع هفتگی بیشتر از ۱۰٪', { from: mv, to: bw.vert, cap: bw.vertCap, userWeekly: uv });
+      var mv12 = full.slice(-12).reduce(function (x, w2) { return Math.max(x, w2.vert || 0); }, 0);   // برگشت به ارتفاع قبل از مسابقه رشد تازه نیست
+      if (mv > 0 && !aroundRace && bw.vert > Math.max(mv * 1.1 + 60, uv * 1.1 + 20, mv12 + 20)) F('major', 'vert-growth', day, 'رشد ارتفاع هفتگی بیشتر از ۱۰٪', { from: mv, to: bw.vert, cap: bw.vertCap, userWeekly: uv });
     }
   }
   function closeWeek(w, day) {

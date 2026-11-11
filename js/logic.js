@@ -922,13 +922,21 @@
   }
   // ارتفاع واقعی برنامه‌ی یک هفته‌ی قبلی (حافظه‌ی کوچک بر اساس کل پروفایل؛ با هر تغییر پروفایل از نو حساب می‌شه)
   var vertMemo = { key: null, map: {} };
-  function plannedVert(profile, ws) {
+  // { v: ارتفاع کل هفته، s: بیشترین ارتفاع یک جلسه }
+  function plannedVertInfo(profile, ws) {
     var key = JSON.stringify(profile), dk = dateKey(ws);
     if (vertMemo.key !== key) vertMemo = { key: key, map: {} };
     var m = vertMemo.map;
-    if (!(dk in m)) { m[dk] = 0; var v = buildWeek(profile, ws).vert || 0; vertMemo.key === key ? (m[dk] = v) : null; return v; }
+    if (!(dk in m)) {
+      m[dk] = { v: 0, s: 0 };
+      var bw = buildWeek(profile, ws);
+      var o = { v: bw.vert || 0, s: bw.days.reduce(function (x, d) { return Math.max(x, d.type === 'race' ? 0 : (d.vert || 0)); }, 0) };
+      if (vertMemo.key === key) m[dk] = o;
+      return o;
+    }
     return m[dk];
   }
+  function plannedVert(profile, ws) { return plannedVertInfo(profile, ws).v; }
   // منوی کیفی اولترا با مرحله‌ی تپه هماهنگ می‌شه
   function adaptHillSpecs(specs, hp, goal, tier) {
     return specs.map(function (q) {
@@ -1890,13 +1898,19 @@
       var hardFixed = b2bDay !== null ? [longDay, b2bDay] : [longDay];
       var specs = nSessions >= 3 ? workouts.quality : [];
       hp = ultra && level >= 2 ? hillPlan(goal, W, pr, tier, race, ws, weeklyKm, level, startKm(profile)) : null;
-      // رشد ۱۰٪ روی ارتفاع واقعی برنامه (بیشترین ۳ هفته‌ی قبل یا ارتفاع فعلی خود دونده)، نه فقط روی سقف؛
-      // وگرنه هفته‌هایی که زیر سقف بودن با باز شدن مرحله‌ی تپه یک‌باره ۲۰ تا ۴۰٪ بالا می‌رن
+      // سقف رشد ارتفاع واقعی: حداکثر ۱۰٪ بالاتر از بیشترین ارتفاع برنامه‌ی ۳ هفته‌ی قبل (در ۴ هفته‌ی اول، ارتفاع فعلی خود دونده هم مبناست).
+      // سقف اندازه‌ی جلسه‌ها (hp.cap) دست نمی‌خوره؛ اگه هفته از این حد بیشتر شد، لانگ‌ران و جلسه‌های تپه به همون نسبت کوچیک می‌شن (پایین‌تر)
       if (hp && w >= 1) {
-        var pv = 0;
-        for (var pw = 1; pw <= 3 && w - pw >= 0; pw++) pv = Math.max(pv, plannedVert(profile, addDays(ws, -7 * pw)));
-        var lim = Math.max(30, round10(Math.max(hp.v0, pv) * VERT_GROWTH * (pr.deload ? VERT_DELOAD : 1)));
-        if (lim < hp.cap) { hp.cap = lim; hp.descentCap = round10(lim * (hp.stage < 2 ? 0.5 : 0.8)); }
+        var pv = 0, ps = 0;
+        for (var pw = 1; pw <= 4 && w - pw >= 0; pw++) {
+          var pi = plannedVertInfo(profile, addDays(ws, -7 * pw));
+          if (pw <= 3) pv = Math.max(pv, pi.v);
+          ps = Math.max(ps, pi.s);
+        }
+        // هر جلسه هم حداکثر ۱۰٪ بیشتر از بزرگ‌ترین جلسه‌ی ۴ هفته‌ی قبل
+        if (ps > 0) hp.slim = Math.max(60, round10(Math.max(ps, w < 4 ? hp.v0 * 0.5 : 0) * VERT_GROWTH));
+        var baseV = Math.max(60, w < 4 ? Math.max(hp.v0, pv) : pv);
+        hp.vlim = Math.max(30, round10(baseV * VERT_GROWTH * (pr.deload ? VERT_DELOAD : 1)));
       }
       if (hp) {
         specs = adaptHillSpecs(specs, hp, goal, tier);
@@ -1922,6 +1936,33 @@
       var longVert = ultra ? Math.min(round10(longKm * rUl * vf), round10(longKm * 80)) : 0;
       var b2bVert = ultra && b2bKm ? Math.min(round10(b2bKm * rUl * vf * 0.8), round10(b2bKm * 80)) : 0;
       if (hp) capHills(hp, qSessions, qDays, weeklyKm, ctx, tier, function (lv, bv) { longVert = lv; b2bVert = bv; }, longVert, b2bVert, W);
+      var weekVertUsed = function () {
+        return Object.keys(qSessions).reduce(function (x, k) { return x + ((qSessions[k] && qSessions[k].vert) || 0); }, 0) + (longVert || 0) + (b2bDay !== null ? (b2bVert || 0) : 0);
+      };
+      // هفته از حد رشد بیشتر شد: فقط همون اضافه کم می‌شه (هفته‌های زیر حد دست نمی‌خورن، پس برنامه کم‌کم کوچیک نمی‌شه).
+      // اول لانگ‌ران و جلسه‌های تپه به یک نسبت؛ اگه جلسه‌ی تپه به‌خاطر حداقل تکرار کوچیک‌تر نشد، جلسه‌ی استیدی؛ آخر سر خود لانگ‌ران
+      if (hp && hp.slim) {
+        longVert = Math.min(longVert || 0, hp.slim); b2bVert = Math.min(b2bVert || 0, hp.slim);
+        Object.keys(qSessions).forEach(function (k) {
+          var q = qSessions[k];
+          for (var si = 0; si < 3 && q && q.vert > hp.slim + 5 && q.spec; si++) q = qSessions[k] = makeQuality(Object.assign({}, q.spec, { share: q.spec.share * hp.slim / q.vert }), weeklyKm, ctx);
+          if (q && q.vert > hp.slim + 5) qSessions[k] = makeQuality(Q(tier === 'B' ? 'tempoMild' : 'steady', 0.05), weeklyKm, ctx);
+        });
+      }
+      if (hp && hp.vlim) {
+        for (var vi = 0; vi < 4 && weekVertUsed() > hp.vlim + 5; vi++) {
+          var vScale = hp.vlim / weekVertUsed();
+          longVert = round10((longVert || 0) * vScale); b2bVert = round10((b2bVert || 0) * vScale);
+          Object.keys(qSessions).forEach(function (k) {
+            var q = qSessions[k];
+            if (q && q.vert && q.spec) qSessions[k] = makeQuality(Object.assign({}, q.spec, { share: q.spec.share * vScale }), weeklyKm, ctx);
+          });
+        }
+        Object.keys(qSessions).sort(function (x, y) { return ((qSessions[y] && qSessions[y].vert) || 0) - ((qSessions[x] && qSessions[x].vert) || 0); }).forEach(function (k) {
+          if (weekVertUsed() > hp.vlim + 5 && qSessions[k] && qSessions[k].vert) qSessions[k] = makeQuality(Q(tier === 'B' ? 'tempoMild' : 'steady', 0.05), weeklyKm, ctx);
+        });
+        if (weekVertUsed() > hp.vlim + 5) longVert = Math.max(0, round10((longVert || 0) - (weekVertUsed() - hp.vlim)));
+      }
 
       // سقف ۸۰/۲۰: اگه به‌خاطر حداقل تکرارها رد شد، اول بخش تند لانگ‌ران، بعد جلسات آخر منو حذف می‌شن
       var hardBudget = weeklyKm * 0.2;
@@ -1960,6 +2001,7 @@
       var strengthDays = safeEasy.slice(1).concat(easyDays.filter(function (d) { return safeEasy.indexOf(d) < 0; }))
         .slice(0, workouts.strength || 0);
 
+      var vertBudget = hp ? Math.min(hp.cap, hp.vlim || Infinity) : Infinity;
       sessionDays.forEach(function (d) {
         if (qSessions[d]) template[d] = { session: qSessions[d] };
         else if (b2bDay !== null && d === b2bDay) template[d] = { session: makeLong(longKm, ctx, 0, 'ultra', { vert: longVert, b2b: 'day1' }) };
@@ -1970,7 +2012,9 @@
         } else if (easyAlloc[d] !== undefined) {
           var e = makeEasy(easyAlloc[d], zones);
           if (workouts.doubles && e.km >= 14) makeDouble(e);
-          if (d === accentDay) (workouts.hillStrides ? addHillStrides : workouts.hills && W % 2 === 1 ? addHills : addStrides)(e);
+          // استراید سربالایی فقط اگه در بودجه‌ی ارتفاع هفته جا داره؛ وگرنه استراید روی زمین صاف
+          var hillOk = workouts.hillStrides && weekVertUsed() + 40 <= vertBudget;
+          if (d === accentDay) (hillOk ? addHillStrides : workouts.hills && W % 2 === 1 ? addHills : addStrides)(e);
           if (d === downDay) addDownStrides(e);
           if (strengthDays.indexOf(d) >= 0) addStrength(e);
           template[d] = { session: e };
@@ -3384,8 +3428,14 @@
     var ci = state.checkins[base.date];
     // درد: آخرین ثبت درد تا این روز (تا وقتی «بدون درد» ثبت نشده) جلوتر از تطبیق خستگی و خواب
     var ep = painEpisode(state.pains, state.checkins, parseDate(base.date));
-    if (ep) return withCycle(state, painAdjust(base, ep, paceZones(state.profile)));
-    return withCycle(state, adaptSession(base, ci, prevCheckin(state, base.date), paceZones(state.profile), { profile: state.profile, checkins: state.checkins }));
+    // اول چرخه (روزهای پریود، جلسه‌ی جابه‌جاشده، پیشنهادها)، بعد درد یا تطبیق با چک‌این؛ تا حرف آخر با بدن کاربر باشه.
+    // (قبلاً برعکس بود و جلسه‌ی سختی که به‌خاطر پریود به امروز جابه‌جا شده بود، روی جلسه‌ی سبک‌شده با درد نوشته می‌شد)
+    var cy = withCycle(state, { session: base, adaptation: null });
+    var zones = paceZones(state.profile);
+    var r = ep ? painAdjust(cy.session, ep, zones)
+      : adaptSession(cy.session, ci, prevCheckin(state, base.date), zones, { profile: state.profile, checkins: state.checkins });
+    if (cy.cycle) r.cycle = cy.cycle;
+    return r;
   }
   function dressAlt(alt, s) {
     alt = JSON.parse(JSON.stringify(alt));
