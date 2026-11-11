@@ -1813,4 +1813,49 @@ test('شبیه‌ساز ۴: مسیر هدف با ارزیابی آسیب هما�
   var noInj = C.goalPath(Object.assign({}, p, { injuries: [] }), now);
   assert.ok(noInj.status !== 'injury');
 });
+test('شبیه‌ساز ۵: درد سبک در پیاده‌روی؛ جلسه‌ی دقیقه‌ای کوتاه‌تر و آسون می‌شه', function () {
+  var p = walkP({ walkMin: 200, walkExp: 'gt1y', walk30: 'yes', age: 55, startDate: '2027-05-01' }), d = C.parseDate('2027-06-18');
+  var b = C.sessionFor(p, d);
+  assert.ok(b.hard && b.minutes >= 45);
+  var r = C.effectiveSession({ profile: p, checkins: {}, pains: { '2027-06-17': { area: 'foot', level: 2, when: ['after'], flags: [] } }, cycleChoices: {} }, b);
+  assert.strictEqual(r.session.type, 'walkEasy');
+  assert.ok(!r.session.hard && r.session.minutes < b.minutes && r.session.date === b.date);
+});
+test('شبیه‌ساز ۵: با درد، جلسه هیچ‌وقت از جلسه‌ی اصلی بلندتر نمی‌شه (حتی زیر ۳ کیلومتر)', function () {
+  var s = { type: 'easy', km: 2.5, hardKm: 0, date: '2027-01-02', dayName: '', label: '' };
+  var ep = { tier: 'mild', entry: { level: 2 } };
+  assert.ok(C.painAdjust(s, ep, C.paceZones(profileFor(3))).session.km <= 2.5);
+});
+test('شبیه‌ساز ۶: رشد ارتفاع هفتگی حداکثر ۱۰٪ بالای بیشترین ۳ هفته‌ی قبل یا ارتفاع فعلی دونده', function () {
+  var p = profileFor(6, { locations: ['trail'], days: [6, 0, 1, 3, 4, 5], startDate: '2026-11-14',
+    goal: { type: 'ultra', date: '2027-07-22', ultra: { km: 50, gain: 2500, loss: 2500, terrain: 'mountain', altitude: 2200, weeklyVert: 800, hillAccess: 'yes' } } });
+  var v = [];
+  for (var w = 0; w < 16; w++) v.push(C.buildWeek(p, C.addDays(C.parseDate(p.startDate), w * 7)).vert);
+  for (var i = 1; i < v.length; i++) {
+    var prev = Math.max.apply(null, v.slice(Math.max(0, i - 3), i));
+    assert.ok(v[i] <= Math.max(prev, 800) * 1.1 + 10, 'هفته‌ی ' + i + ': ' + v[i] + ' بعد از ' + prev);
+  }
+});
+test('شبیه‌ساز ۷: سه هفته زیر ۶۰٪ → پیشنهاد ادامه از حجم واقعی؛ مسیر هدف «عقب‌تر از برنامه»', function () {
+  var p = profileFor(5, { startDate: '2026-09-26', goal: { type: '21', date: '2027-03-01' } }), now = C.parseDate('2026-11-07');
+  var data = { profile: p, done: {}, doneLog: {} };
+  // هر هفته فقط یک جلسه انجام شده
+  for (var w = 0; w < 6; w++) { var s = C.buildWeek(p, C.addDays(C.parseDate(p.startDate), w * 7)).days.filter(function (x) { return x.km; })[0]; data.done[s.date] = true; }
+  var sg = C.rebaseSuggestion(p, data, now);
+  assert.ok(sg && sg.share < 0.6 && sg.km < sg.planAvg);
+  assert.strictEqual(C.goalPath(p, now, data).status, 'behind');
+  assert.strictEqual(C.rebaseSuggestion(p, Object.assign({ rebaseSkip: C.dateKey(C.weekStart(now)) }, data), now), null);
+  var r = C.applyRebase(p, data, now);
+  assert.strictEqual(r.km, sg.km);
+  assert.strictEqual(p.startDate, '2026-11-07');
+  assert.ok(C.buildWeek(p, C.addDays(now, 7)).totalKm <= sg.km * 1.1 + 1);
+});
+test('شبیه‌ساز ۷: قبول سطح تازه بعد از مسابقه، برگشت تدریجی رو حذف نمی‌کنه (حداکثر ۱۰٪ بالای ۳ هفته‌ی اخیر)', function () {
+  var p = profileFor(5, { startDate: '2026-09-26', goal: { type: '10', date: '2026-12-05' } }), now = C.parseDate('2026-12-12');
+  p.fitnessTests = [{ date: '2026-12-05', distanceKm: 10, timeSec: hms(0, 42), kind: 'race' }];
+  var recent = 0;
+  for (var i = 0; i < 3; i++) recent = Math.max(recent, C.buildWeek(p, C.addDays(now, -7 * i)).totalKm);
+  var r = C.applyFitnessLevel(p, now);
+  assert.ok(r.km <= recent * 1.1 + 0.5, r.km + ' > ' + recent);
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

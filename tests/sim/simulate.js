@@ -83,7 +83,7 @@ function simulate(persona, opts) {
   var H = {
     vdot: persona.hidden.vdot, v0: persona.hidden.vdot, room: persona.hidden.room, vStop: persona.hidden.vdot, offDays: 0,
     atl: 0, ctl: 0, pain: 0, painArea: null, painDays: 0, highPainDays: 0, injuredUntil: null,
-    cycleLast: p.cycle && p.cycle.lastStart ? C.parseDate(p.cycle.lastStart) : null, cycleNext: null, realStarts: [],
+    cycleLast: p.cycle && p.cycle.lastStart ? C.parseDate(p.cycle.lastStart) : null, cycleNext: null, realStarts: p.cycle && p.cycle.lastStart ? [p.cycle.lastStart] : [],
     testPlanned: false, churn: 0, churnWhy: {}, churnTotal: {}, lastChurnDay: -999, offStreak: 0, offStart: null, unmot: 0
   };
   var seedKm = Number(p.monthAvgKm) || Number(p.currentWeeklyKm) || 0;
@@ -174,6 +174,19 @@ function simulate(persona, opts) {
       if (!walk && bw.level === 0 && bw.weekIndex >= 0 && rnd.chance(T.ci * 0.8)) {
         var zf = rnd() < 0.25 ? 'easy' : rnd() < 0.12 ? 'hard' : 'ok';
         p.zeroWeeks = p.zeroWeeks || {}; p.zeroWeeks[bw.start] = { feel: zf, src: 'user' };
+      }
+      // برنامه جلوتر از تمرین: کارت «ادامه از حجم فعلی» در صفحه‌ی برنامه (app.js rebaseCard)
+      var rb = walk ? null : C.rebaseSuggestion(p, state, d);
+      if (rb) {
+        H.rebaseShown = day;
+        if (rnd.chance(T.ci)) {
+          if (rnd.chance(T.accept)) {
+            var rr = C.applyRebase(p, state, d);
+            levelLog.push({ day: day, why: 'rebase', from: rr.from, to: rr.to });
+            events.push({ day: day, kind: 'level', text: 'برنامه با حجم واقعی تنظیم شد: ' + rb.doneAvg + ' از ' + rb.planAvg + ' کیلومتر ← ' + rr.km + ' (سطح ' + rr.from + ' ← ' + rr.to + ')' });
+            bw = C.buildWeek(p, d); curWeek.plannedKm = bw.totalKm || 0; curWeek.weekIndex = bw.weekIndex; curWeek.level = bw.level;
+          } else state.rebaseSkip = C.dateKey(C.weekStart(d));
+        }
       }
       if (!walk && !H.injuredUntil) {
         var rem = C.fitnessReminder(p, d);
@@ -416,8 +429,13 @@ function simulate(persona, opts) {
         var rs = H.realStarts.filter(function (x) { return x <= k; }).slice(-7), rg = [];
         for (var gi2 = 1; gi2 < rs.length; gi2++) rg.push(C.daysBetween(C.parseDate(rs[gi2 - 1]), C.parseDate(rs[gi2])));
         var realOk = !lg.some(function (g) { return g > 90; }) && rg.length >= 2 && rg.every(function (g) { return g >= 21 && g <= 45; }) && Math.max.apply(null, rg) - Math.min.apply(null, rg) <= 9 && !(cyc.absent || []).some(function (w) { return day >= w[0] && day < w[1] + 60; });
-        var falseFl = cst.flags.filter(function (fl) { return fl === 'variable' || fl === 'outOfRange' || (fl === 'absent' && realOk); });
-        if (realOk && falseFl.length) F('major', 'cycle-false-irregular', day, 'چرخه‌ی واقعی منظمه ولی به‌خاطر یک ثبت جاافتاده هشدار «' + falseFl.join('، ') + '» اومده', { loggedGaps: lg, realGaps: rg, flags: cst.flags });
+        // «absent» (بیش از ۹۰ روز بدون ثبت) عمداً هشدار می‌ده: موتور ثبت‌نکردن رو از بی‌پریودی واقعی تشخیص نمی‌ده
+        var falseFl = cst.flags.filter(function (fl) { return fl === 'variable' || fl === 'outOfRange'; });
+        // مبهم: فاصله‌ی بلند تقریباً دو یا سه برابره ولی بیش از ۲۰٪ با طول معمول فرق داره (چرخه‌ی واقعی هم عوض شده)
+        var okL = lg.filter(function (g) { return g >= 21 && g <= 45; }), L0s = okL.length >= 2 ? okL.slice().sort(function (x, y) { return x - y; })[Math.floor(okL.length / 2)] : 28;
+        var ambiguous = lg.some(function (g) { var n = Math.round(g / L0s); return g > 45 && n >= 2 && n <= 3 && Math.abs(g / n - L0s) > Math.max(5, L0s * 0.2); });
+        if (realOk && falseFl.length && ambiguous) F('minor', 'cycle-ambiguous', day, 'یک ثبت جاافتاده همراه با تغییر طول چرخه؛ موتور نمی‌تونه از نامنظمی تشخیصش بده', { loggedGaps: lg, realGaps: rg, flags: cst.flags });
+        else if (realOk && falseFl.length) F('major', 'cycle-false-irregular', day, 'چرخه‌ی واقعی منظمه ولی به‌خاطر یک ثبت جاافتاده هشدار «' + falseFl.join('، ') + '» اومده', { loggedGaps: lg, realGaps: rg, flags: cst.flags });
         if (cst.flags.length) H.cycleFlags = H.cycleFlags || {}, cst.flags.forEach(function (fl) { if (!H.cycleFlags[fl]) { H.cycleFlags[fl] = day; events.push({ day: day, kind: 'cycle', text: 'هشدار چرخه: ' + fl }); } });
       }
       var np = C.nextPeriod(p, d);
@@ -436,14 +454,14 @@ function simulate(persona, opts) {
     // هدف و مسابقه
     var gi = C.goalInfo(p);
     if (!walk && gi.date && day % 7 === 0) {
-      var gp = C.goalPath(p, d);
+      var gp = C.goalPath(p, d, state);
       scanText(gp, 'goalPath', bad = []);
       bad.forEach(function (b) { F('major', 'text:goalPath:' + b.path, day, 'متن خراب در مسیر هدف', b); });
       var imp = p.injuries && p.injuries.length ? C.injuryImpact(p, d) : null;
       if (imp && imp.status && imp.status !== 'ok' && gp && gp.status === 'ok' && gi.date > k)
         F('major', 'goal-vs-injury', day, 'صفحه‌ی سلامت می‌گه رسیدن به مسابقه «' + imp.status + '»، ولی مسیر هدف می‌گه «ok»', { injury: imp.status, fullDate: imp.fullDate, race: gi.date, goalReady: gp.readyDate });
       var l6 = weeks.slice(-6).filter(function (w) { return w.weekIndex >= 0; });
-      if (l6.length === 6 && gp && gp.status && !gp.past && gi.date > k && C.daysBetween(d, C.parseDate(gi.date)) <= 42 &&
+      if (l6.length === 6 && gp && (gp.status === 'ok' || gp.status === 'ready') && !(H.rebaseShown != null && day - H.rebaseShown <= 42) && !gp.past && gi.date > k && C.daysBetween(d, C.parseDate(gi.date)) <= 42 &&
           l6.reduce(function (s0, w) { return s0 + w.doneKm; }, 0) < 0.5 * l6.reduce(function (s0, w) { return s0 + w.plannedKm; }, 0))
         F('major', 'goal-ignores-missed', day, 'شش هفته‌ی آخر زیر ۵۰٪ برنامه انجام شده و مسابقه نزدیکه، ولی مسیر هدف تغییری نکرده (فقط از شماره‌ی هفته حساب می‌شه)', { status: gp.status, ready: gp.readyDate, race: gi.date, planned: l6.map(function (w) { return w.plannedKm; }), done: l6.map(function (w) { return w.doneKm; }) });
       if (gp && gp.readyDate && gi.date > k) {
@@ -494,7 +512,7 @@ function simulate(persona, opts) {
     if (bw.weekIndex >= 0 && baseW.length && bw.totalKm > 0 && ph !== 'race') {
       var m1 = Math.max.apply(null, baseW.map(function (w) { return w.plannedKm; })), m2 = base2.length ? Math.max.apply(null, base2.map(function (w) { return w.plannedKm; })) : m1;
       var why = sideWk ? { why: 'side' } : levelLog.filter(function (x) { return day - x.day < 7; })[0] || (lastGoalChange && day - lastGoalChange.day < 7 ? { why: 'goal' } : null);
-      var lab = { side: 'هفته‌ی مسابقه‌ی فرعی', goal: 'تغییر هدف', level: 'تغییر سطح' };
+      var lab = { side: 'هفته‌ی مسابقه‌ی فرعی', goal: 'تغییر هدف', level: 'تغییر سطح', rebase: 'تنظیم با حجم واقعی' };
       var sv = why && why.why === 'side' ? 'minor' : 'major';
       if (m1 > 0 && bw.totalKm > m1 * 1.15 + 1) F(sv, 'vol-week' + (why ? '-' + why.why : ''), day, 'رشد حجم هفتگی بیشتر از ۱۵٪' + (why ? ' (' + lab[why.why] + ')' : ''), { from: m1, to: bw.totalKm, pct: Math.round((bw.totalKm / m1 - 1) * 100), phase: ph });
       else if (!aroundRace && m2 > 0 && bw.totalKm > m2 * 1.3 + 1) F(sv, 'vol-2week' + (why ? '-' + why.why : ''), day, 'رشد حجم دوهفته‌ای بیشتر از ۳۰٪', { from: m2, to: bw.totalKm, pct: Math.round((bw.totalKm / m2 - 1) * 100), phase: ph });
@@ -504,7 +522,7 @@ function simulate(persona, opts) {
       if (bw.vertCap > 0 && bw.vert > bw.vertCap * 1.02 + 20) F('major', 'vert-cap', day, 'ارتفاع هفته از سقف خود برنامه بیشتره', { vert: bw.vert, cap: bw.vertCap });
       var pv = full.slice(-3).map(function (w) { return w.vert || 0; }), mv = pv.length ? Math.max.apply(null, pv) : 0;
       var uv = (C.goalInfo(p).ultra || (p.goal && p.goal.ultra) || {}).weeklyVert || 0;
-      if (mv > 0 && !aroundRace && bw.vert > Math.max(mv * 1.1 + 60, uv)) F('major', 'vert-growth', day, 'رشد ارتفاع هفتگی بیشتر از ۱۰٪ (سقف ۱۰٪ روی «سقف» اعمال می‌شه، نه روی ارتفاع واقعی هفته‌ی قبل)', { from: mv, to: bw.vert, cap: bw.vertCap, userWeekly: uv });
+      if (mv > 0 && !aroundRace && bw.vert > Math.max(mv * 1.1 + 60, uv * 1.1 + 20)) F('major', 'vert-growth', day, 'رشد ارتفاع هفتگی بیشتر از ۱۰٪ (سقف ۱۰٪ روی «سقف» اعمال می‌شه، نه روی ارتفاع واقعی هفته‌ی قبل)', { from: mv, to: bw.vert, cap: bw.vertCap, userWeekly: uv });
     }
   }
   function closeWeek(w, day) {
@@ -512,7 +530,7 @@ function simulate(persona, opts) {
     weeks.push(w);
     // برنامه بدون توجه به انجام‌نشده‌ها جلو می‌ره؟ (۶ هفته‌ی پشت‌سرهم زیر ۶۰٪، ولی حجم برنامه بالا رفته)
     var last6 = weeks.slice(-6);
-    if (last6.length === 6 && !walk && last6.every(function (x) { return x.plannedKm > 5 && x.doneKm < x.plannedKm * 0.6; }) && last6[5].plannedKm > last6[0].plannedKm * 1.1)
+    if (last6.length === 6 && !walk && !(H.rebaseShown != null && day - H.rebaseShown <= 42) && last6.every(function (x) { return x.plannedKm > 5 && x.doneKm < x.plannedKm * 0.6; }) && last6[5].plannedKm > last6[0].plannedKm * 1.1)
       F('major', 'plan-ignores-missed', day, 'شش هفته زیر ۶۰٪ برنامه، ولی حجم برنامه همچنان بالا رفته', { planned: last6.map(function (x) { return x.plannedKm; }), done: last6.map(function (x) { return x.doneKm; }) });
     // آمادگی پنهان
     if (w.runs === 0) { H.offDays += 7; H.vdot = Math.max(H.v0 - 6, H.vStop * C.detrainFactor(Math.min(H.offDays, 70), false)); }

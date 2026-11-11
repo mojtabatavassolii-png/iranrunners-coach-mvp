@@ -1337,12 +1337,18 @@
       cal: 'Add to calendar (.ics)', calDone: 'Calendar file downloaded; open it to add it to your calendar',
       notify: 'Allow notifications', notifyOn: 'Notifications on', notifyOk: 'Notifications on (only while the app is open)', notifyNo: 'Notification permission was not granted'
     },
+    rebase: {
+      title: 'Your plan is ahead of your training',
+      text: 'Over the last three weeks you ran {done} km a week on average and the plan asked for {plan} km. Continuing with this gap raises the injury risk. If you like, the plan restarts today at {km} km a week and builds up with the usual growth rule.',
+      apply: 'Continue from my current volume', skip: 'Not now', done: 'Plan adjusted: from today, {km} km a week.'
+    },
     path: {
+      seePlan: 'Adjust plan →',
       seeHealth: 'Injury and plan →',
       title: 'Your path', now: 'Now', goal: 'Goal', level: 'Level {n}', aria: 'Progress toward your goal',
       week: 'Week {a} of about {b} weeks of preparation', notStarted: 'Your plan starts on {d}',
       race: 'Race in {n} days ({d})', eta: 'Estimated readiness: {a} to {b} weeks', etaMonth: 'Estimated arrival: around {m}', ready: 'In mileage and preparation, you are ready',
-      st: { ok: 'You have enough time', tight: 'Tight; check an intermediate goal', ready: 'Ready', injury: 'Injury: this race is unlikely' },
+      st: { ok: 'You have enough time', tight: 'Tight; check an intermediate goal', ready: 'Ready', injury: 'Injury: this race is unlikely', behind: 'Behind the plan' },
       more: 'Details →', seePlans: 'Suggested plans →',
       none: 'Your path: no goal yet', noneSub: 'See the suggested plans for your level and pick one'
     },

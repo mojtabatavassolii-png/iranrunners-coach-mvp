@@ -2149,6 +2149,7 @@
     var ts = todayState();
     html += homeCycle(ts.r, ts.key, ts.now);
     if (lv.level === 0) html += zeroCard(p, now);
+    html += rebaseCard(now);
     if (settings.planView === 'month') {
       html += monthCard(p, now, todayKey, isRunWalk, prevGlyph, nextGlyph);
       app.innerHTML = html;
@@ -2519,6 +2520,26 @@
     if (!vs) return;
     p.fitnessTests = (p.fitnessTests || []).concat([vs.entry]);
     save(); showToast(fa(T('fitNotes.stepDone', { v: vs.to.toFixed(1) }))); route();
+  });
+  // برنامه در برابر انجام‌شده‌ها: چند هفته خیلی کمتر از برنامه → پیشنهاد ادامه از حجم واقعی (C.rebaseSuggestion)
+  function rebaseCard(now) {
+    var sg = C.rebaseSuggestion(state.profile, state, now);
+    if (!sg) return '';
+    return '<section class="card rebase-card" id="rebase"><h3>' + esc(T('rebase.title')) + '</h3><p>' +
+      esc(fa(T('rebase.text', { done: sg.doneAvg, plan: sg.planAvg, km: sg.km }))) + '</p>' +
+      '<div class="actions"><button type="button" class="btn btn-primary" data-rebase="apply">' + esc(T('rebase.apply')) + '</button>' +
+      '<button type="button" class="btn btn-ghost" data-rebase="skip">' + esc(T('rebase.skip')) + '</button></div></section>';
+  }
+  app.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-rebase]');
+    if (!b) return;
+    var now = today();
+    if (b.dataset.rebase === 'skip') { state.rebaseSkip = C.dateKey(C.weekStart(now)); save(); route(); return; }
+    var r = C.applyRebase(state.profile, state, now);
+    if (!r) return;
+    viewWeekOffset = 0; save();
+    showToast(fa(T('rebase.done', { km: r.km })));
+    route();
   });
   // تغییر سطح بر اساس آخرین تایم‌تست (C.applyFitnessLevel؛ همون کدی که شبیه‌ساز اجرا می‌کنه)
   function applyFitnessLevel() {
@@ -4406,15 +4427,15 @@
   }
   // مسیر تو (در صفحه‌ی مسابقه و اهداف): وقتی زمان کمه به برنامه‌های پیشنهادی لینک می‌شه
   function homePath(now, inRace) {
-    var p = state.profile, gp = C.goalPath(p, now);
+    var p = state.profile, gp = C.goalPath(p, now, state);
     if (gp.none) return linkCard('#plans', T('path.none'), T('path.noneSub'));
     if (gp.past) return '';
     var lines = [gp.notStarted ? T('path.notStarted', { d: faDate(p.startDate) }) : T('path.week', { a: gp.elapsed + 1, b: gp.total })];
     if (gp.daysLeft != null) lines.push(gp.daysLeft === 0 ? T('home.race.today') : T('path.race', { n: gp.daysLeft, d: faDate(gp.goal.date) }));
     lines.push(pathEta(gp));
-    var tight = gp.status === 'tight', inj = gp.status === 'injury', link = !inRace || tight || inj;
-    return (link ? '<a class="card hcard path-card" href="' + (inj ? '#health' : tight ? '#plans' : '#race') + '">' : '<div class="card hcard path-card">') + '<div class="hcard-top"><span class="hcard-label">' + esc(T('path.title')) + '</span>' +
-      (link ? '<span class="hcard-link">' + esc(T(inj ? 'path.seeHealth' : tight ? 'path.seePlans' : 'path.more')) + '</span>' : '') + '</div>' +
+    var tight = gp.status === 'tight', inj = gp.status === 'injury', behind = gp.status === 'behind', link = !inRace || tight || inj || behind;
+    return (link ? '<a class="card hcard path-card" href="' + (inj ? '#health' : behind ? '#plan' : tight ? '#plans' : '#race') + '">' : '<div class="card hcard path-card">') + '<div class="hcard-top"><span class="hcard-label">' + esc(T('path.title')) + '</span>' +
+      (link ? '<span class="hcard-link">' + esc(T(inj ? 'path.seeHealth' : behind ? 'path.seePlan' : tight ? 'path.seePlans' : 'path.more')) + '</span>' : '') + '</div>' +
       '<div class="path-ends"><span class="path-now"><span class="path-hex" aria-hidden="true">' + fa(gp.level) + '</span><span><small>' + esc(T('path.now')) + '</small><b>' + tt('path.level', { n: gp.level }) + '</b></span></span>' +
       '<span class="path-goal"><small>' + esc(T('path.goal')) + '</small><b>' + t(C.goalLabel(gp.goal)) + '</b>' +
       (gp.goal.targetSec ? '<small dir="ltr">' + fa(C.formatDuration(gp.goal.targetSec)) + '</small>' : '') + '</span></div>' +
@@ -5808,7 +5829,7 @@
       return '<a class="card pf-goalcard" href="#race">' + head + '<b class="pf-goal-name">' + esc(T('profile.noGoal')) + '</b>' +
         '<span class="pf-goal-cta">' + esc(T('profile.goalSet')) + '</span></a>';
     }
-    var days = race ? Math.round(C.daysBetween(now, race.date)) : null, gp = C.goalPath(p, now);
+    var days = race ? Math.round(C.daysBetween(now, race.date)) : null, gp = C.goalPath(p, now, state);
     var nOther = goalList(p).filter(function (r) { return !r.date || r.date >= now; }).length;
     var bits = [];
     if (g.targetSec) bits.push(T('race.targetLine', { t: C.formatDuration(g.targetSec) }));

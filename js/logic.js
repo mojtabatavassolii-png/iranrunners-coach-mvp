@@ -621,6 +621,53 @@
     return { from: planLevel, to: fitLevel, up: fitLevel > planLevel };
   }
 
+  // ---------- برنامه در برابر انجام‌شده‌ها ----------
+  // حجم برنامه از شماره‌ی هفته میاد؛ اگه چند هفته خیلی کمتر انجام شده، برنامه خودش پایین نمیاد.
+  // اینجا انجام‌شده‌ی هفته‌های کامل گذشته با برنامه مقایسه می‌شه تا به کاربر پیشنهاد «تنظیم با حجم فعلی» داده بشه.
+  var REBASE_WEEKS = 3, REBASE_SHARE = 0.6, BEHIND_SHARE = 0.5;
+  function weekDone(profile, data, ws) {
+    var o = { plan: 0, done: 0 };
+    buildWeek(profile, ws).days.forEach(function (s) {
+      if (!s.km || ['rest', 'none', 'cancelled'].indexOf(s.type) >= 0) return;
+      o.plan += s.km;
+      if ((data.done || {})[s.date]) { var l = doneSession((data.doneLog || {})[s.date] || s); o.done += l.km || s.km; }
+    });
+    return o;
+  }
+  // سهم انجام‌شده در n هفته‌ی کامل قبل از هفته‌ی جاری (فقط هفته‌های بعد از شروع برنامه)
+  function adherence(profile, data, today, n) {
+    if (!data || isWalk(profile)) return null;
+    var ws = weekStart(today), wi = weekIndexFor(profile, today), list = [];
+    for (var i = 1; i <= n && wi - i >= 0; i++) list.push(weekDone(profile, data, addDays(ws, -7 * i)));
+    if (list.length < n) return null;
+    var plan = list.reduce(function (s, x) { return s + x.plan; }, 0), done = list.reduce(function (s, x) { return s + x.done; }, 0);
+    if (plan < 8 * n) return null;   // برنامه‌ی زمانی (سطح ۰ و دو-پیاده) یا خیلی کم
+    return { weeks: list, plan: plan, done: done, share: done / plan, lastDone: list[0].done, avgDone: done / n };
+  }
+  // پیشنهاد «برنامه رو با حجم فعلیت تنظیم کنم؟»: سه هفته‌ی کامل آخر زیر ۶۰٪، بدون آسیب فعال، و «فعلاً نه» برای همین هفته زده نشده
+  function rebaseSuggestion(profile, data, today) {
+    if (!data || isWalk(profile) || profile.experience === 'never') return null;
+    if (data.rebaseSkip === dateKey(weekStart(today))) return null;
+    if (profile.injuries && profile.injuries.length && injuryPhase(profile, today)) return null;
+    var ad = adherence(profile, data, today, REBASE_WEEKS);
+    if (!ad || ad.share >= REBASE_SHARE) return null;
+    var avg = Math.max(5, floor05(ad.avgDone)), last = floor05(ad.lastDone);
+    // عدد پیشنهاد = همون حجمی که برنامه واقعاً باهاش شروع می‌کنه (اگه هفته‌ی آخر خیلی کمتر بوده، قاعده‌ی افت ناگهانی از نصف میانگین شروع می‌کنه)
+    var km = Math.max(5, floor05(volumeInfo(Object.assign({}, profile, { lastWeekKm: last, monthAvgKm: avg, currentWeeklyKm: avg, volumeReason: null })).start));
+    return { share: ad.share, planAvg: round05(ad.plan / REBASE_WEEKS), doneAvg: round05(ad.avgDone), avg: avg, last: last, km: km };
+  }
+  // اعمال: حجم واقعی (هفته‌ی آخر و میانگین) حجم فعلی پروفایل می‌شه و برنامه از امروز با قانون رشد عادی ادامه پیدا می‌کنه
+  function applyRebase(profile, data, today) {
+    var sg = rebaseSuggestion(profile, data, today);
+    if (!sg) return null;
+    var before = assessLevel(profile).level;
+    profile.lastWeekKm = sg.last;
+    profile.monthAvgKm = profile.currentWeeklyKm = sg.avg;
+    profile.volumeReason = null;
+    profile.startDate = dateKey(today);
+    return { from: before, to: assessLevel(profile).level, km: startKm(profile) };
+  }
+
   // قبول سطح تازه از آخرین تایم‌تست: حجم از حجم فعلی برنامه ادامه پیدا می‌کنه، برنامه از امروز.
   // دونده‌ی برگشتی: با یک تست تازه دیگه «برگشتی» نیست؛ وقفه پاک می‌شه تا سطح از رکورد تازه بیاد (رکورد قدیمی می‌مونه)
   function applyFitnessLevel(profile, today) {
@@ -628,6 +675,10 @@
     if (!fit) return null;
     var before = assessLevel(profile).level;
     var km = weeklyVolume(profile, Math.max(0, buildWeek(profile, today).weekIndex), true).km;
+    // حداکثر ۱۰٪ بالاتر از بیشترین حجم برنامه‌ی این هفته و دو هفته‌ی قبل (مثلاً بعد از مسابقه، برگشت تدریجی حذف نشه)
+    var recent = 0;
+    for (var i = 0; i < 3; i++) { var bw = buildWeek(profile, addDays(today, -7 * i)); if (bw.weekIndex >= 0) recent = Math.max(recent, bw.totalKm || 0); }
+    if (recent > 0) km = Math.min(km, Math.max(5, floor05(recent * 1.1)));
     profile.pb = { distanceKm: fit.entry.distanceKm, timeSec: fit.entry.timeSec, date: fit.entry.date };
     profile.currentWeeklyKm = profile.lastWeekKm = profile.monthAvgKm = km;
     profile.volumeReason = null;
@@ -867,7 +918,16 @@
     if (pr.deload) cap *= VERT_DELOAD;
     cap = Math.max(30, round10(cap));
     var nearRace = race && race.date >= ws && daysBetween(ws, race.date) <= 16;
-    return { stage: stage, cap: cap, descentCap: round10(cap * (stage < 2 ? 0.5 : 0.8)), noDownhill: pr.deload || nearRace };
+    return { stage: stage, cap: cap, v0: v0, descentCap: round10(cap * (stage < 2 ? 0.5 : 0.8)), noDownhill: pr.deload || nearRace };
+  }
+  // ارتفاع واقعی برنامه‌ی یک هفته‌ی قبلی (حافظه‌ی کوچک بر اساس کل پروفایل؛ با هر تغییر پروفایل از نو حساب می‌شه)
+  var vertMemo = { key: null, map: {} };
+  function plannedVert(profile, ws) {
+    var key = JSON.stringify(profile), dk = dateKey(ws);
+    if (vertMemo.key !== key) vertMemo = { key: key, map: {} };
+    var m = vertMemo.map;
+    if (!(dk in m)) { m[dk] = 0; var v = buildWeek(profile, ws).vert || 0; vertMemo.key === key ? (m[dk] = v) : null; return v; }
+    return m[dk];
   }
   // منوی کیفی اولترا با مرحله‌ی تپه هماهنگ می‌شه
   function adaptHillSpecs(specs, hp, goal, tier) {
@@ -1830,6 +1890,14 @@
       var hardFixed = b2bDay !== null ? [longDay, b2bDay] : [longDay];
       var specs = nSessions >= 3 ? workouts.quality : [];
       hp = ultra && level >= 2 ? hillPlan(goal, W, pr, tier, race, ws, weeklyKm, level, startKm(profile)) : null;
+      // رشد ۱۰٪ روی ارتفاع واقعی برنامه (بیشترین ۳ هفته‌ی قبل یا ارتفاع فعلی خود دونده)، نه فقط روی سقف؛
+      // وگرنه هفته‌هایی که زیر سقف بودن با باز شدن مرحله‌ی تپه یک‌باره ۲۰ تا ۴۰٪ بالا می‌رن
+      if (hp && w >= 1) {
+        var pv = 0;
+        for (var pw = 1; pw <= 3 && w - pw >= 0; pw++) pv = Math.max(pv, plannedVert(profile, addDays(ws, -7 * pw)));
+        var lim = Math.max(30, round10(Math.max(hp.v0, pv) * VERT_GROWTH * (pr.deload ? VERT_DELOAD : 1)));
+        if (lim < hp.cap) { hp.cap = lim; hp.descentCap = round10(lim * (hp.stage < 2 ? 0.5 : 0.8)); }
+      }
       if (hp) {
         specs = adaptHillSpecs(specs, hp, goal, tier);
         // مرحله‌ی ۰ و ۱: استراید سربالایی هر هفته؛ مرحله‌ی ۰: سرازیری ملایم کوتاه هم
@@ -2129,7 +2197,12 @@
       // خفیف: حجم کمتر، بدون اینتروال، تپه، تمپو و بخش تند؛ مسابقه با تصمیم خود دونده می‌مونه
       if (s.type === 'race') { ad.raceKept = true; return { session: s, adaptation: ad }; }
       if (s.type === 'runwalk' || s.type === 'walkrun') { n = JSON.parse(JSON.stringify(s)); n.how = msg + ' ' + (n.how || ''); n.steps = n.steps.concat([T('painPlan.mildRw')]); }
-      else if (s.km) n = makeEasy(Math.max(3, s.km * (isHard(s.type) ? 0.7 : 0.8)), zones, msg);
+      else if (s.km) n = makeEasy(Math.min(s.km, Math.max(3, s.km * (isHard(s.type) ? 0.7 : 0.8))), zones, msg);   // هیچ‌وقت بیشتر از جلسه‌ی اصلی نه
+      // پیاده‌روی (جلسه‌ی دقیقه‌ای): پیاده‌روی آسون و کوتاه‌تر، بدون بخش تند یا تپه
+      else if (s.walk && s.minutes) {
+        n = makeWalkEasyLike(s, Math.max(10, Math.round(s.minutes * (isHard(s.type) ? 0.7 : 0.8) / 5) * 5), false, true);
+        n.how = msg + ' ' + (n.how || '');
+      }
       else return { session: s, adaptation: ad };
     }
     return { session: withDay(n, s), adaptation: ad };
@@ -3205,7 +3278,8 @@
   // مسیر تا هدف اصلی: سطح فعلی، هفته‌های گذشته و تخمین باقی‌مونده (همون محاسبه‌ی برنامه‌های پیشنهادی).
   // بخش‌های ثابت (حداقل آماده‌سازی، فاز اختصاصی) با گذشت هفته‌ها کم می‌شن؛ حجم از حجم فعلی برنامه
   // و پیس از آخرین VDOT ثبت‌شده دوباره حساب می‌شن، پس تخمین با پیشرفت واقعی کوتاه می‌شه.
-  function goalPath(profile, today) {
+  // data (اختیاری: state اپ): اگه چهار هفته‌ی کامل آخر زیر ۵۰٪ برنامه انجام شده، وضعیت «عقب‌تر از برنامه»
+  function goalPath(profile, today, data) {
     var g = goalInfo(profile), a = assessLevel(profile), level = a.level;
     var out = { level: level, goal: g };
     if (g.type === 'none') { out.none = true; return out; }
@@ -3236,6 +3310,11 @@
         out.frac = out.total ? elapsed / out.total : 1;
       }
       if (out.status && imp.status && imp.status !== 'ok') out.status = imp.status === 'unlikely' ? 'injury' : 'tight';
+    }
+    var ad = !imp && data ? adherence(profile, data, today, 4) : null;
+    if (ad && ad.share < BEHIND_SHARE) {
+      out.behind = { share: ad.share };
+      if (out.status === 'ok' || out.status === 'tight') out.status = 'behind';
     }
     return out;
   }
@@ -3385,6 +3464,7 @@
     currentFitness: currentFitness, fitnessEntries: fitnessEntries, hrZones: hrZones, easyRunFeedback: easyRunFeedback,
     easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, fitnessReminder: fitnessReminder,
     fitnessLevelSuggestion: fitnessLevelSuggestion, applyFitnessLevel: applyFitnessLevel,
+    adherence: adherence, rebaseSuggestion: rebaseSuggestion, applyRebase: applyRebase,
     EASY_ADJUST_MAX: EASY_ADJUST_MAX,
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks,
     goalInfo: goalInfo, goalLabel: goalLabel, GOAL_TYPES: GOAL_TYPES, TERRAIN_LABELS: TERRAIN_LABELS,
