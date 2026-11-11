@@ -44,8 +44,16 @@ jobs:
           path: native/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
       - name: Enable KVM for the emulator (and ffmpeg for the test clip)
+        # نصب ffmpeg گاهی روی سرورهای اوبونتو گیر می‌کنه: هر تلاش حداکثر ۵ دقیقه، ۳ بار، و کل مرحله ۱۵ دقیقه
+        timeout-minutes: 15
         run: |
-          command -v ffmpeg || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
+          APT="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o DPkg::Lock::Timeout=120"
+          for i in 1 2 3; do
+            command -v ffmpeg >/dev/null && break
+            timeout 300 sudo apt-get update -qq $APT && timeout 300 sudo apt-get install -y -qq $APT ffmpeg && break
+            echo "apt attempt $i failed or timed out"; sleep 10
+          done
+          command -v ffmpeg >/dev/null || { echo "::error::ffmpeg could not be installed (apt timed out 3 times)"; exit 1; }
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
       - name: Run on the Android emulator

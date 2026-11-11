@@ -204,7 +204,7 @@ function simulate(persona, opts) {
         if (wl && !unmot && rnd.chance(0.5)) {
           var before = C.assessLevel(p).level, l4 = weeks.slice(-2);
           var pm = l4.reduce(function (s0, w) { return s0 + w.plannedMin; }, 0), dm = l4.reduce(function (s0, w) { return s0 + w.doneMin; }, 0);
-          if (l4.length === 2 && pm > 0 && dm < pm * 0.7) F('major', 'walk-level-adherence', day, 'پیشنهاد سطح بالاتر پیاده‌روی با وجود انجام کم (دو هفته‌ی آخر زیر ۷۰٪)', { from: wl.from, to: wl.to, doneMin2w: dm, plannedMin2w: pm, pct: Math.round(dm / pm * 100) });
+          if (l4.length === 2 && pm > 0 && dm < pm * 0.6) F('major', 'walk-level-adherence', day, 'پیشنهاد سطح بالاتر پیاده‌روی با وجود انجام کم (دو هفته‌ی آخر زیر ۷۰٪)', { from: wl.from, to: wl.to, doneMin2w: dm, plannedMin2w: pm, pct: Math.round(dm / pm * 100) });
           Object.assign(p, wl.next); p.startDate = k;                      // app.js data-wlevel-up
           events.push({ day: day, kind: 'level', text: 'سطح پیاده‌روی ' + before + ' ← ' + C.assessLevel(p).level });
         }
@@ -323,7 +323,7 @@ function simulate(persona, opts) {
       if (plan.type === 'race') raceDay(day, d, k, plan);
       actualSess = { type: plan.type, km: actKm || plan.km, minutes: mins * over, hard: plan.hard };
       if (curWeek) {
-        curWeek.runs++; curWeek.doneKm += actKm || plan.km || 0; curWeek.doneMin += mins * over;
+        curWeek.runs++; curWeek.doneKm += actKm || plan.km || 0; curWeek.doneMin += walk ? (plan.minutes || mins) : mins * over;   // پیاده‌رو عدد واقعی ثبت نمی‌کنه؛ اپ دقیقه‌ی برنامه رو می‌بینه
         if (plan.type === 'long') curWeek.longKm = Math.max(curWeek.longKm, actKm || plan.km || 0);
       }
       if (ignored) events.push({ day: day, kind: 'ignore', text: 'با وجود درد سبک دوید' });
@@ -509,11 +509,25 @@ function simulate(persona, opts) {
     var baseW = aroundRace ? full.slice(-10).filter(function (w) { return RACEY.indexOf(w.phase) < 0 && w.phase !== 'return'; }).slice(-3) : last3;
     var base2 = aroundRace ? baseW : full.slice(-4, -1);
     var sideWk = bw.days.some(function (x) { return x.type === 'race'; }) && C.goalInfo(p).date !== bw.days.filter(function (x) { return x.type === 'race'; })[0].date;
-    if (bw.weekIndex >= 0 && baseW.length && bw.totalKm > 0 && ph !== 'race') {
+    // برگشت بعد از آسیب قانون خودش رو داره (درصدی از حجم قبل از آسیب، هر هفته حداکثر ۱۰٪)؛ اینجا سنجیده نمی‌شه
+    var INJ = ['injury', 'injuryReturn'], injNear = INJ.indexOf(ph) >= 0 || last3.some(function (w) { return INJ.indexOf(w.phase) >= 0; });
+    // برگشت به حجم قبل از مسابقه (بیشترین هفته‌ی عادی در ۱۲ هفته‌ی اخیر) رشد تازه نیست
+    var normal12 = full.slice(-12).filter(function (w) { return RACEY.indexOf(w.phase) < 0 && w.phase !== 'return' && INJ.indexOf(w.phase) < 0; });
+    var preRace = normal12.length ? Math.max.apply(null, normal12.map(function (w) { return w.plannedKm; })) : 0;
+    var racey12 = full.slice(-12).some(function (w) { return RACEY.indexOf(w.phase) >= 0; });
+    if (racey12 && bw.totalKm <= preRace + 0.5) baseW = [];
+    // برگشت به حجمی که در ۸ هفته‌ی اخیر برنامه بوده (مثلاً بعد از افت اطراف مسابقه‌ی فرعی) رشد تازه نیست
+    var max8 = full.slice(-8).reduce(function (m, w) { return Math.max(m, w.plannedKm); }, 0);
+    if (bw.totalKm <= max8 + 0.5) baseW = [];
+    // هفته‌های اول: حجم فعلی خود کاربر هم مبناست (هفته‌ی اول گاهی کمتر از حجم واقعی کاربره)
+    if (bw.weekIndex <= 2 && bw.totalKm <= (Number(persona.profile.currentWeeklyKm) || 0) * 1.1 + 1) baseW = [];
+    if (bw.weekIndex >= 0 && baseW.length && bw.totalKm > 0 && ph !== 'race' && !injNear) {
       var m1 = Math.max.apply(null, baseW.map(function (w) { return w.plannedKm; })), m2 = base2.length ? Math.max.apply(null, base2.map(function (w) { return w.plannedKm; })) : m1;
       var why = sideWk ? { why: 'side' } : levelLog.filter(function (x) { return day - x.day < 7; })[0] || (lastGoalChange && day - lastGoalChange.day < 7 ? { why: 'goal' } : null);
-      var lab = { side: 'هفته‌ی مسابقه‌ی فرعی', goal: 'تغییر هدف', level: 'تغییر سطح', rebase: 'تنظیم با حجم واقعی' };
-      var sv = why && why.why === 'side' ? 'minor' : 'major';
+      var lab = { side: 'هفته‌ی مسابقه‌ی فرعی', goal: 'تغییر هدف', level: 'تغییر سطح', rebase: 'تنظیم با حجم واقعی', return: 'برگشت بعد از مسابقه' };
+      var retPh = ph === 'return' || last3.some(function (w) { return w.phase === 'return'; });
+      if (retPh && !why) why = { why: 'return' };
+      var sv = why && (why.why === 'side' || why.why === 'return') ? 'minor' : 'major';
       if (m1 > 0 && bw.totalKm > m1 * 1.15 + 1) F(sv, 'vol-week' + (why ? '-' + why.why : ''), day, 'رشد حجم هفتگی بیشتر از ۱۵٪' + (why ? ' (' + lab[why.why] + ')' : ''), { from: m1, to: bw.totalKm, pct: Math.round((bw.totalKm / m1 - 1) * 100), phase: ph });
       else if (!aroundRace && m2 > 0 && bw.totalKm > m2 * 1.3 + 1) F(sv, 'vol-2week' + (why ? '-' + why.why : ''), day, 'رشد حجم دوهفته‌ای بیشتر از ۳۰٪', { from: m2, to: bw.totalKm, pct: Math.round((bw.totalKm / m2 - 1) * 100), phase: ph });
     }
@@ -522,7 +536,7 @@ function simulate(persona, opts) {
       if (bw.vertCap > 0 && bw.vert > bw.vertCap * 1.02 + 20) F('major', 'vert-cap', day, 'ارتفاع هفته از سقف خود برنامه بیشتره', { vert: bw.vert, cap: bw.vertCap });
       var pv = full.slice(-3).map(function (w) { return w.vert || 0; }), mv = pv.length ? Math.max.apply(null, pv) : 0;
       var uv = (C.goalInfo(p).ultra || (p.goal && p.goal.ultra) || {}).weeklyVert || 0;
-      if (mv > 0 && !aroundRace && bw.vert > Math.max(mv * 1.1 + 60, uv * 1.1 + 20)) F('major', 'vert-growth', day, 'رشد ارتفاع هفتگی بیشتر از ۱۰٪ (سقف ۱۰٪ روی «سقف» اعمال می‌شه، نه روی ارتفاع واقعی هفته‌ی قبل)', { from: mv, to: bw.vert, cap: bw.vertCap, userWeekly: uv });
+      if (mv > 0 && !aroundRace && bw.vert > Math.max(mv * 1.1 + 60, uv * 1.1 + 20)) F('major', 'vert-growth', day, 'رشد ارتفاع هفتگی بیشتر از ۱۰٪', { from: mv, to: bw.vert, cap: bw.vertCap, userWeekly: uv });
     }
   }
   function closeWeek(w, day) {
@@ -530,7 +544,7 @@ function simulate(persona, opts) {
     weeks.push(w);
     // برنامه بدون توجه به انجام‌نشده‌ها جلو می‌ره؟ (۶ هفته‌ی پشت‌سرهم زیر ۶۰٪، ولی حجم برنامه بالا رفته)
     var last6 = weeks.slice(-6);
-    if (last6.length === 6 && !walk && !(H.rebaseShown != null && day - H.rebaseShown <= 42) && last6.every(function (x) { return x.plannedKm > 5 && x.doneKm < x.plannedKm * 0.6; }) && last6[5].plannedKm > last6[0].plannedKm * 1.1)
+    if (last6.length === 6 && !walk && !(H.rebaseShown != null && day - H.rebaseShown <= 42) && last6[5].plannedKm >= 8 && last6.every(function (x) { return x.plannedKm > 5 && x.doneKm < x.plannedKm * 0.6; }) && last6[5].plannedKm > last6[0].plannedKm * 1.1)
       F('major', 'plan-ignores-missed', day, 'شش هفته زیر ۶۰٪ برنامه، ولی حجم برنامه همچنان بالا رفته', { planned: last6.map(function (x) { return x.plannedKm; }), done: last6.map(function (x) { return x.doneKm; }) });
     // آمادگی پنهان
     if (w.runs === 0) { H.offDays += 7; H.vdot = Math.max(H.v0 - 6, H.vStop * C.detrainFactor(Math.min(H.offDays, 70), false)); }
@@ -548,7 +562,7 @@ function simulate(persona, opts) {
     var plannedNow = curWeek ? curWeek.plannedKm : 0;
     events.push({ day: day, kind: 'return', text: 'برگشت بعد از ' + gapDays + ' روز؛ برنامه‌ی این هفته ' + plannedNow + ' کیلومتر، میانگین قبل از وقفه ' + r1(doneBefore) });
     if (!walk && plannedNow > 8 && plannedNow > Math.max(doneBefore, 1) * 1.1)
-      F(gapDays >= 28 ? 'major' : 'minor', 'gap-return-' + (gapDays >= 28 ? 'long' : 'short'), day,
+      F(gapDays >= 28 && plannedNow >= 15 && !(H.rebaseShown != null && day - H.rebaseShown <= 42) ? 'major' : 'minor', 'gap-return-' + (gapDays >= 28 ? 'long' : 'short'), day,
         'بعد از ' + gapDays + ' روز وقفه، حجم هفته‌ی برگشت بیشتر از قبل از وقفه‌ست', { gapDays: gapDays, plannedKm: plannedNow, doneBefore: r1(doneBefore), vdotHidden: r1(H.vdot) });
     if (gapDays >= 28) addChurn(day, persona.traits.temperament === 'sensitive' ? 3 : 1, 'hardReturn');
   }
@@ -601,7 +615,7 @@ function simulate(persona, opts) {
 
   findList.sort(function (a, b) { return SEV_ORDER[a.sev] - SEV_ORDER[b.sev] || a.day - b.day; });
   return {
-    persona: { id: persona.id, title: persona.title, focus: persona.focus, traits: persona.traits, seed: persona.seed, startDate: prep.profile.startDate },
+    persona: { id: persona.id, title: persona.title, focus: persona.focus, traits: persona.traits, axes: persona.axes || null, seed: persona.seed, startDate: prep.profile.startDate },
     days: days, weeks: weeks, events: events, findings: findList, churn: churnPts, churnTotal: Object.keys(H.churnTotal).reduce(function (o, k) { o[k] = r1(H.churnTotal[k]); return o; }, {}), snaps: snaps, perf: perf,
     end: { level: C.assessLevel(p).level, vdotHidden: r1(H.vdot), fitness: (function () { var f = C.currentFitness(p); return f ? r1(f.vdot) : null; })(),
       tests: (p.fitnessTests || []).length, injuries: (p.injuries || []).length, pains: Object.keys(state.pains).length,

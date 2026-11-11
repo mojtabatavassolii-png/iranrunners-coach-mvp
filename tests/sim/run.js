@@ -4,6 +4,7 @@
 //   node tests/sim/run.js --persona P07 --until 214   فقط یک شخصیت تا روز ۲۱۴ (بازتولید یک ایراد)
 //   node tests/sim/run.js --browser             به‌علاوه‌ی باز کردن خود اپ در مرورگر بی‌سر هر ۳۰ روز (سرور محلی لازمه: BASE_URL)
 //   node tests/sim/run.js --json                خروجی کامل JSON کنار گزارش
+//   node tests/sim/run.js --set 100             مرحله‌ی سوم: ۱۰۰ شخصیت (۱۰ دستی + ۹۰ ساخته‌شده با پوشش جفتی)
 'use strict';
 var fs = require('fs'), path = require('path');
 var clock = require('./lib/clock.js');
@@ -20,10 +21,12 @@ for (var i = 0; i < args.length; i++) {
   else if (a === '--json') opt.json = true;
   else if (a === '--out') opt.out = args[++i];
   else if (a === '--quiet') opt.quiet = true;
+  else if (a === '--set') opt.set = Number(args[++i]);
 }
 var OUT = path.resolve(opt.out || path.join(__dirname, 'out'));
 fs.mkdirSync(OUT, { recursive: true });
-var list = PERSONAS.filter(function (p) { return !opt.persona || opt.persona.indexOf(p.id) >= 0; });
+var ALL = opt.set ? require('./personas100.js').generate(opt.set) : PERSONAS;
+var list = ALL.filter(function (p) { return !opt.persona || opt.persona.indexOf(p.id) >= 0; });
 var SEV_FA = { critical: 'بحرانی', major: 'مهم', minor: 'جزئی', info: 'اطلاع' };
 
 (async function main() {
@@ -49,7 +52,7 @@ var SEV_FA = { critical: 'بحرانی', major: 'مهم', minor: 'جزئی', inf
     }
   }
   var report = require('./report.js');
-  var meta = { generated: new clock.RealDate().toISOString(), until: opt.until || 730, personas: list.length, ms: clock.RealDate.now() - t0, browser: !!opt.browser };
+  var meta = { coverage: ALL.coverage || null, generated: new clock.RealDate().toISOString(), until: opt.until || 730, personas: list.length, ms: clock.RealDate.now() - t0, browser: !!opt.browser };
   fs.writeFileSync(path.join(OUT, 'report.html'), report.html(results, meta));
   fs.writeFileSync(path.join(OUT, 'report-page.html'), report.fragment(results, meta));
   if (opt.json) fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify(results.map(function (r) { var o = Object.assign({}, r); delete o.snaps; return o; })));

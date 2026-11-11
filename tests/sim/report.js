@@ -6,6 +6,11 @@ var ORDER = { critical: 0, major: 1, minor: 2, info: 3 };
 
 // توضیح و پیشنهاد برای هر نوع ایراد (کد بدون پسوند)
 var EXPLAIN = {
+  'pain-hard': ['با درد ثبت‌شده جلسه‌ی سخت اومد. علت: جلسه‌ی سختی که کاربر به‌خاطر پریود از چند روز قبل به امروز جابه‌جا کرده، بعد از تطبیق درد روی جلسه‌ی امروز نوشته می‌شه و درد نادیده گرفته می‌شه.',
+    'در effectiveSession ترتیب رو عوض کن: اول چرخه (جابه‌جایی و پیشنهادها)، بعد درد؛ درد همیشه حرف آخر رو بزنه.'],
+  'vert-cap': ['ارتفاع هفته از سقف خود برنامه بیشتره (مثلاً ۲۵۰ با سقف ۲۱۰). استرایدهای سربالایی (۴۰ متر هر جلسه) بیرون از بودجه‌ی ارتفاع اضافه می‌شن. با سقف کمتری که نسخه‌ی ۱۲۱ برای هفته‌های سبک گذاشت، این فاصله دیده شد.',
+    'استرایدهای سربالایی رو هم در بودجه‌ی هفته حساب کن و اگه جا نبود حذفشون کن.'],
+  'cycle-ambiguous': ['یک ثبت جاافتاده همراه با تغییر طول چرخه؛ موتور نمی‌تونه از نامنظمی تشخیصش بده.', 'جای بحث نیست؛ فقط برای اطلاع.'],
   'level-apply': ['برای دونده‌ی برگشتی، وقفه‌ی قدیمی (مثلاً «۳ سال») در پروفایل می‌مونه و سطح همیشه از منطق برگشت میاد. تایم‌تست تازه و قبول پیشنهاد سطح اثری ندارن و پیشنهاد هر روز دوباره نشون داده می‌شه.',
     'با قبول سطح تازه (یا ثبت اولین تایم‌تست بعد از برگشت)، وقفه رو «همین الان می‌دوم» کن، یا در assessLevel وقتی رکورد تازه‌تر از تاریخ برگشت هست شاخه‌ی برگشت رو کنار بذار.'],
   'level-vs-hidden': ['نتیجه‌ی همون ایراد بالا: سطح برنامه دو سطح یا بیشتر پایین‌تر از آمادگی واقعی می‌مونه.', 'با رفع ایراد بالا حل می‌شه.'],
@@ -17,17 +22,21 @@ var EXPLAIN = {
     'در goalPath اگه injuryImpact وضعیت دیگه‌ای داره، همون وضعیت و تاریخ رو نشون بده.'],
   'walk-level-adherence': ['پیشنهاد سطح بالاتر پیاده‌روی فقط از شماره‌ی هفته‌ی برنامه میاد، نه از جلسه‌های انجام‌شده. کاربر بی‌انگیزه‌ای که نصف برنامه رو انجام داده دو سطح بالا می‌ره.',
     'در walkLevelSuggestion شرط بذار: حداقل ۷۰٪ دقیقه‌های دو هفته‌ی آخر انجام شده باشه.'],
-  'cycle-false-irregular': ['اگه کاربر یک بار شروع پریود رو ثبت نکنه، فاصله‌ی دو برابر (مثلاً ۵۷ روز) ثبت می‌شه و هشدار «خارج از محدوده» یا «نامنظم» (با توصیه‌ی مشورت با پزشک) تا ۶ چرخه می‌مونه، با اینکه چرخه منظمه.',
-    'فاصله‌ای نزدیک به دو برابر طول معمول رو «احتمالاً یک ثبت جاافتاده» حساب کن و قبل از هشدار از کاربر بپرس.'],
-  'vert-growth': ['قانون رشد ۱۰٪ ارتفاع روی «سقف» اعمال می‌شه، نه روی ارتفاع واقعی برنامه‌ی هفته‌ی قبل. هفته‌های اول زیر سقفن و بعد با تغییر مرحله‌ی تپه ارتفاع ۲۰ تا ۴۰٪ یک‌جا بالا می‌ره (خطر برای سرازیری‌ها).',
-    'سقف هر هفته رو حداکثر ۱۰٪ بیشتر از ارتفاع واقعی برنامه‌ی هفته‌ی قبل (یا ارتفاع فعلی کاربر) بذار.'],
+  'cycle-false-irregular-v121': ['', ''],
+  'cycle-false-irregular': ['(بعد از رفع نسخه‌ی ۱۲۰) هنوز وقتی طول چرخه‌ی خود کاربر بین ۲۲ تا ۳۰ روز تغییر می‌کنه و یک ثبت جا افتاده، فاصله‌ی دو برابر گاهی بیش از ۲۰٪ با «طول معمول» فرق داره و هشدار نامنظمی میاد. قبل از رفع: اگه کاربر یک بار شروع پریود رو ثبت نکنه، فاصله‌ی دو برابر (مثلاً ۵۷ روز) ثبت می‌شه و هشدار «خارج از محدوده» یا «نامنظم» (با توصیه‌ی مشورت با پزشک) تا ۶ چرخه می‌مونه، با اینکه چرخه منظمه.',
+    'معیار رو به بازه‌ی چرخه‌های عادی خود کاربر (۱۲ فاصله‌ی اخیر، ±۳ روز) تغییر بده، نه فقط درصدی از میانه.'],
+  'vert-growth': ['ارتفاع هفتگی بیشتر از ۱۰٪ بالا رفت. نسخه‌ی ۱۲۱ اجازه می‌ده ارتفاع تا «ارتفاع فعلی» که دونده موقع ثبت‌نام گفته برگرده؛ ولی بعد از ماه‌ها برنامه‌ی کمتر (مثلاً ۵۰۰ متر)، اون عدد قدیمیه و ارتفاع یک‌باره به ۱۲۳۰ می‌رسه. یک مورد دیگه بعد از تغییر هدف بود، چون تاریخچه‌ی برنامه ذخیره نمی‌شه و هفته‌های قبل با هدف تازه دوباره حساب می‌شن.',
+    'ارتفاع فعلی دونده فقط در ۴ هفته‌ی اول مبنا باشه؛ بعد فقط ارتفاع واقعی برنامه‌ی هفته‌های قبل.'],
   'level-flipflop': ['سطح بدون حاشیه از یک تایم‌تست میاد. اختلاف طبیعی ۲ تا ۳٪ بین دو تست (هوا، خستگی) سطح رو بالا و چند هفته بعد پایین می‌بره، و هر بار برنامه از اول شروع می‌شه.',
     'برای پایین‌آوردن سطح دو تست پشت‌سرهم یا حاشیه‌ی حدود ۱ VDOT لازم باشه.'],
   'repeat-level': ['پیشنهاد تغییر سطح فقط دکمه‌ی «قبول» داره. کاربری که نمی‌خواد، همون پیشنهاد رو ماه‌ها هر روز می‌بینه.',
     'دکمه‌ی «فعلاً نه» که پیشنهاد رو تا تایم‌تست بعدی پنهان کنه.'],
   'repeat': ['یادآوری تایم‌تست برای کاربری که تست نمی‌ده هر روز تکرار می‌شه.', 'بعد از چند بار دیدن، کم‌رنگ‌تر یا هفتگی نشون بده.'],
-  'vol-week': ['رشد حجم برنامه‌ی هفتگی بیشتر از ۱۵٪ نسبت به بیشترین حجم ۳ هفته‌ی قبل.', ''],
+  'vol-week': ['رشد حجم برنامه‌ی هفتگی بیشتر از ۱۵٪ نسبت به بیشترین حجم ۳ هفته‌ی قبل و بالاتر از حجم ۸ هفته‌ی اخیر. همه‌ی موارد بعد از مسابقه‌ان: شماره‌ی هفته‌ی برنامه در تیپر و مسابقه جلو می‌ره، پس برگشت بعد از مسابقه کمی بالاتر از حجم قبل از مسابقه تموم می‌شه (در حجم‌های کم حدود ۳ کیلومتر).',
+    'هدف برگشت بعد از مسابقه، حجم قبل از تیپر باشه؛ رشد تازه از هفته‌ی بعدش.'],
   'vol-2week': ['رشد حجم دوهفته‌ای بیشتر از ۳۰٪.', ''],
+  'vol-week-return': ['در هفته‌های برگشت بعد از مسابقه، حجم برنامه هفته‌ای ۲۰ تا ۳۰٪ بالا می‌ره تا به حجم قبل برسه؛ چون شماره‌ی هفته‌ی برنامه در تیپر و مسابقه جلو می‌ره، گاهی کمی (در حجم‌های کم حدود ۳ کیلومتر) بالاتر از حجم قبل از مسابقه تموم می‌شه.', 'هدف برگشت بعد از مسابقه، حجم قبل از تیپر باشه؛ رشد تازه از هفته‌ی بعدش.'],
+  'vol-2week-return': ['همون برگشت بعد از مسابقه، در بازه‌ی دوهفته‌ای.', ''],
   'vol-week-side': ['هفته‌ی مسابقه‌ی فرعی ۱۰ کیلومتری: مسابقه روی روز استراحت میاد و کل مسافتش به هفته اضافه می‌شه (+۳۳٪)؛ ایزی روز بعد کامل می‌مونه. طبق قاعده‌ی فعلی موتوره (فقط جلسه‌ی سخت عوض می‌شه).',
     'اگه بخوای، روز بعد از مسابقه‌ی فرعی ایزی رو کوتاه‌تر کن (مثلاً ۶۰٪).'],
   'gap-return': ['بعد از ۲ تا ۳ هفته وقفه، برنامه‌ی هفته‌ی برگشت از حجم واقعی قبل از وقفه بیشتره (برنامه وقفه رو نمی‌بینه).', 'همون پیشنهاد «برنامه رو با حجم فعلیت تنظیم کنم؟»'],
@@ -81,6 +90,43 @@ function timeline(r) {
     '<p class="legend"><span><span class="k k-done"></span>انجام‌شده</span><span><span class="k k-plan"></span>برنامه (' + (walk ? 'دقیقه' : 'کیلومتر') + ' در هفته)</span><span><span class="k k-pain"></span>درد</span><span><span class="k k-ev"></span>رویداد</span><span><span class="k k-race"></span>مسابقه</span><span><span class="k k-inj"></span>آسیب</span><span><span class="k k-churn"></span>احتمال ریزش</span></p>';
 }
 
+// الگوها: هر ایراد مهم در کدوم ویژگی‌ها بیشتر دیده می‌شه (نسبت به کل)، و ریزش بر اساس اخلاق
+var AX_FA = { sex: { f: 'زن', m: 'مرد' }, age: { young: 'جوان (۱۸ تا ۳۴)', mid: 'میانسال (۳۵ تا ۴۹)', senior: '۵۰+' }, activity: { run: 'دویدن', walk: 'پیاده‌روی' },
+  level: { zero: 'تازه‌کار کامل', low: 'سطح پایین', mid: 'سطح متوسط', high: 'سطح بالا' }, history: { new: 'تازه‌کار', regular: 'سابقه‌ی منظم', returning: 'برگشتی' },
+  goal: { health: 'سلامتی', 5: '۵ کیلومتر', 10: '۱۰ کیلومتر', 21: 'نیمه‌ماراتن', 42: 'ماراتن', ultra: 'اولترا' },
+  temperament: { disciplined: 'منظم', erratic: 'بی‌نظم', obsessive: 'وسواسی', sensitive: 'زودرنج', bored: 'بی‌حوصله', competitive: 'رقابت‌جو' },
+  injury: { low: 'حساسیت کم به آسیب', high: 'حساسیت بالا به آسیب' },
+  event: { none: 'بدون رویداد', travel: 'سفر', sick: 'بیماری', busy: 'شلوغی کاری', unmotivated: 'بی‌انگیزگی', goalChange: 'تغییر هدف', injury: 'آسیب', irregularCycle: 'چرخه‌ی نامنظم' },
+  mind: { detail: 'جزءنگر', holistic: 'کل‌نگر' } };
+function lifts(results, ids) {
+  var n = results.length, k = ids.length, out = [];
+  Object.keys(AX_FA).forEach(function (ax) {
+    Object.keys(AX_FA[ax]).forEach(function (v) {
+      var all = results.filter(function (r) { return r.persona.axes && r.persona.axes[ax] === v; }).length;
+      var hit = results.filter(function (r) { return ids.indexOf(r.persona.id) >= 0 && r.persona.axes && r.persona.axes[ax] === v; }).length;
+      if (k >= 4 && hit >= 3 && all && hit / k >= 0.5 && (hit / k) / (all / n) >= 1.5) out.push({ label: AX_FA[ax][v], hit: hit, of: k, lift: (hit / k) / (all / n) });
+    });
+  });
+  return out.sort(function (a, b) { return b.lift - a.lift; }).slice(0, 4);
+}
+function patterns(results, G, meta) {
+  var h = '<section><h2>الگوها</h2><p class="lead">برای هر ایراد مهم: ویژگی‌هایی که دست‌کم نصف شخصیت‌های گرفتار داشتن و دست‌کم ۱٫۵ برابر بیشتر از کل جمعیت بودن.' +
+    (meta.coverage ? ' پوشش جفتی: ' + fa(meta.coverage.covered) + ' از ' + fa(meta.coverage.pairs) + ' جفت ویژگی ممکن.' : '') + '</p>';
+  var rows = G.filter(function (g) { return g.sev !== 'minor'; }).map(function (g) {
+    var ids = g.items.map(function (f) { return f.persona; }), L = lifts(results, ids);
+    return '<tr><td>' + esc(g.items[0].msg) + '</td><td class="num">' + fa(ids.length) + '</td><td>' + (L.length ? L.map(function (x) { return esc(x.label) + ' (' + fa(x.hit) + ' از ' + fa(x.of) + ')'; }).join('، ') : '<span class="muted">' + (ids.length < 4 ? 'نمونه کمه' : 'پراکنده') + '</span>') + '</td></tr>';
+  });
+  h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ایراد</th><th>شخصیت</th><th>بیشتر در</th></tr></thead><tbody>' + rows.join('') + '</tbody></table></div>';
+  var T = {};
+  results.forEach(function (r) { var t = r.persona.axes && r.persona.axes.temperament; if (!t) return; T[t] = T[t] || { n: 0, pts: 0, who: 0, why: {} }; T[t].n++; T[t].pts += r.churn.length; if (r.churn.length) T[t].who++; r.churn.forEach(function (c) { T[t].why[c.why] = (T[t].why[c.why] || 0) + 1; }); });
+  h += '<h3>احتمال ریزش بر اساس اخلاق</h3><div class="tbl-wrap"><table class="tbl"><thead><tr><th>اخلاق</th><th>شخصیت</th><th>با دست‌کم یک نقطه‌ی ریزش</th><th>دلیل اصلی</th></tr></thead><tbody>' +
+    Object.keys(T).sort(function (a, b) { return T[b].who / T[b].n - T[a].who / T[a].n; }).map(function (t) {
+      var top = Object.keys(T[t].why).sort(function (a, b) { return T[t].why[b] - T[t].why[a]; })[0];
+      return '<tr><td>' + esc(AX_FA.temperament[t]) + '</td><td class="num">' + fa(T[t].n) + '</td><td class="num">' + fa(T[t].who) + ' (' + fa(Math.round(T[t].who / T[t].n * 100)) + '٪)</td><td>' + esc(top ? (CHURN[top] || [top])[0] : '—') + '</td></tr>';
+    }).join('') + '</tbody></table></div></section>';
+  return h;
+}
+
 function page(results, meta) {
   var all = [];
   results.forEach(function (r) { r.findings.forEach(function (f) { all.push(f); }); });
@@ -128,17 +174,21 @@ function page(results, meta) {
   h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>عامل</th><th>جمع امتیاز در همه</th><th>پیشنهاد</th></tr></thead><tbody>' +
     Object.keys(tot).sort(function (a, b) { return tot[b] - tot[a]; }).map(function (k) { var c = CHURN[k] || [k, '', '']; return '<tr><td>' + esc(c[0]) + '</td><td class="num">' + fa(Math.round(tot[k])) + '</td><td>' + esc(c[2]) + '</td></tr>'; }).join('') + '</tbody></table></div></section>';
 
-  h += '<section><h2>شخصیت‌ها، دو سال</h2>';
+  if (results.length > 20 && results[0].persona.axes) h += patterns(results, G, meta);
+  var many = results.length > 20;
+  h += '<section><h2>شخصیت‌ها، دو سال</h2>' + (many ? '<p class="lead">برای هر شخصیت روی ردیفش بزن تا خط زمانی و جزئیات باز بشه.</p>' : '');
   results.forEach(function (r) {
     var e = r.end, sev = r.findings.reduce(function (o, f) { o[f.sev] = (o[f.sev] || 0) + 1; return o; }, {});
     var tag = { disciplined: 'منظم', erratic: 'بی‌نظم', obsessive: 'وسواسی', sensitive: 'زودرنج', bored: 'بی‌حوصله', competitive: 'رقابت‌جو' }[r.persona.traits.temperament];
-    h += '<article class="persona"><div class="ph"><h3><span class="pid">' + r.persona.id + '</span>' + esc(r.persona.title) + '</h3><p class="muted">آزمون: ' + esc(r.persona.focus) + ' · ' + tag + ' · ' + (r.persona.traits.mind === 'detail' ? 'جزءنگر' : 'کل‌نگر') + '</p></div>' +
+    var head = '<div class="ph"><h3><span class="pid">' + r.persona.id + '</span>' + esc(r.persona.title) + '</h3><p class="muted">آزمون: ' + esc(r.persona.focus) + ' · ' + tag + ' · ' + (r.persona.traits.mind === 'detail' ? 'جزءنگر' : 'کل‌نگر') +
+      (many ? ' · ' + fa(sev.critical || 0) + ' بحرانی، ' + fa(sev.major || 0) + ' مهم، ' + fa(r.churn.length) + ' احتمال ریزش' : '') + '</p></div>';
+    h += (many ? '<details class="persona"><summary>' + head + '</summary>' : '<article class="persona">' + head) +
       timeline(r) +
       '<dl class="facts"><div><dt>سطح آخر</dt><dd>' + fa(e.level) + '</dd></div><div><dt>آمادگی پنهان / تخمین اپ (VDOT)</dt><dd>' + fa(e.vdotHidden) + ' / ' + (e.fitness ? fa(e.fitness) : '—') + '</dd></div>' +
       '<div><dt>جلسه‌ی انجام‌شده</dt><dd>' + fa(e.done) + '</dd></div><div><dt>چک‌این</dt><dd>' + fa(e.checkins) + '</dd></div><div><dt>تایم‌تست و مسابقه</dt><dd>' + fa(e.tests) + '</dd></div><div><dt>روز با درد ثبت‌شده / آسیب</dt><dd>' + fa(e.pains) + ' / ' + fa(e.injuries) + '</dd></div>' +
       '<div><dt>ایراد</dt><dd>' + fa(sev.major || 0) + ' مهم · ' + fa(sev.minor || 0) + ' جزئی</dd></div>' +
       (r.browser ? '<div><dt>مرورگر (صفحه / ایراد)</dt><dd>' + fa(r.browser.pages) + ' / ' + fa(r.browser.issues.length) + '</dd></div>' : '') + '</dl>' +
-      '<details><summary>رویدادها (' + fa(r.events.length) + ')</summary><ol class="evlist">' + r.events.map(function (x) { return '<li><span class="num">روز ' + fa(x.day) + '</span> ' + esc(x.text) + '</li>'; }).join('') + '</ol></details></article>';
+      '<details><summary>رویدادها (' + fa(r.events.length) + ')</summary><ol class="evlist">' + r.events.map(function (x) { return '<li><span class="num">روز ' + fa(x.day) + '</span> ' + esc(x.text) + '</li>'; }).join('') + '</ol></details>' + (many ? '</details>' : '</article>');
   });
   h += '</section>';
 
@@ -185,6 +235,7 @@ var CSS = [
   '.cmd code,pre{font-family:var(--mono);font-size:.78rem}.cmd{margin:4px 0;text-align:left}.cmd code{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:2px 8px;display:inline-block;max-width:100%;overflow-x:auto;white-space:nowrap}',
   'pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:4px 0 0;white-space:pre-wrap;word-break:break-word}',
   '.persona{border-top:1px solid var(--line);padding-top:18px;display:grid;gap:8px;min-width:0}.ph p{margin:2px 0 0;font-size:.88rem}',
+  'details.persona{padding-top:10px;margin:0}details.persona>summary{list-style:none;color:inherit;font-size:inherit}details.persona>summary::-webkit-details-marker{display:none}details.persona>summary h3::before{content:"+ ";color:var(--plan)}details.persona[open]>summary h3::before{content:"− "}details.persona>*+*{margin-top:8px}',
   '.pid{font-family:var(--mono);font-size:.85rem;color:var(--plan);margin-inline-end:8px}',
   '.tl{overflow-x:auto}.tl svg{width:100%;min-width:620px;height:auto;display:block}',
   '.grid{stroke:var(--line);stroke-width:1}.ax{fill:var(--muted);font-size:11px;font-family:var(--font)}',
