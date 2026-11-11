@@ -621,6 +621,21 @@
     return { from: planLevel, to: fitLevel, up: fitLevel > planLevel };
   }
 
+  // قبول سطح تازه از آخرین تایم‌تست: حجم از حجم فعلی برنامه ادامه پیدا می‌کنه، برنامه از امروز.
+  // دونده‌ی برگشتی: با یک تست تازه دیگه «برگشتی» نیست؛ وقفه پاک می‌شه تا سطح از رکورد تازه بیاد (رکورد قدیمی می‌مونه)
+  function applyFitnessLevel(profile, today) {
+    var fit = currentFitness(profile);
+    if (!fit) return null;
+    var before = assessLevel(profile).level;
+    var km = weeklyVolume(profile, Math.max(0, buildWeek(profile, today).weekIndex), true).km;
+    profile.pb = { distanceKm: fit.entry.distanceKm, timeSec: fit.entry.timeSec, date: fit.entry.date };
+    profile.currentWeeklyKm = profile.lastWeekKm = profile.monthAvgKm = km;
+    profile.volumeReason = null;
+    if (returnInfo(profile)) { profile.gap = 'now'; profile.gapDays = 0; profile.xtrain = null; profile.walkMinNow = null; }
+    profile.startDate = dateKey(today);
+    return { from: before, to: assessLevel(profile).level, km: km };
+  }
+
   // ---------- ضرایب احتیاط ----------
   function bmi(profile) {
     var h = profile.heightCm / 100;
@@ -2387,12 +2402,26 @@
   // طول چرخه‌ی واقعی از شروع‌های ثبت‌شده (میانه‌ی حداکثر ۶ فاصله‌ی اخیر بین ۲۱ و ۴۵ روز؛ حداقل ۲ فاصله)، وگرنه عدد واردشده.
   // بی‌نظمی (برای پیام ملایم مشورت با پزشک، نه تشخیص): اختلاف کوتاه‌ترین و بلندترین فاصله‌ی اخیر بیشتر از ۹ روز،
   // فاصله‌ی خارج از ۲۱ تا ۴۵ روز، یا بیش از ۹۰ روز بدون شروع تازه (حدودهای رایج بالینی؛ ACOG 2015).
+  // ثبت جاافتاده: فاصله‌ای نزدیک به ۲ یا ۳ برابر طول معمول (±۲۰٪، حداقل ۵ روز؛ اختلاف عادی ماه‌به‌ماه تا ۷ روزه) احتمالاً یعنی شروع یک دوره ثبت نشده، نه چرخه‌ی نامنظم.
+  // اون فاصله به چند فاصله‌ی برابر تقسیم می‌شه و به‌جای هشدار نامنظمی، از کاربر خواسته می‌شه تاریخ رو ثبت کنه.
   function cycleStats(profile, now) {
-    var c = (profile && profile.cycle) || {}, st = cycleStarts(profile), gaps = [];
-    for (var i = 1; i < st.length; i++) gaps.push(daysBetween(parseDate(st[i - 1]), parseDate(st[i])));
+    var c = (profile && profile.cycle) || {}, st = cycleStarts(profile), raw = [];
+    for (var i = 1; i < st.length; i++) raw.push(daysBetween(parseDate(st[i - 1]), parseDate(st[i])));
+    var manual = clamp(Number(c.cycleLen) || 28, 21, 45);
+    var okRaw = raw.slice(-6).filter(function (g) { return g >= 21 && g <= 45; });
+    // طول معمول: میانه‌ی فاصله‌های عادی اخیر (حداقل ۲ تا)، وگرنه عددی که کاربر وارد کرده
+    var L0 = okRaw.length >= 2 ? median(okRaw) : manual, tol = Math.max(5, L0 * 0.2), gaps = [], missed = [];
+    raw.forEach(function (g, j) {
+      var n = Math.round(g / L0);
+      if (g > 45 && n >= 2 && n <= 3 && Math.abs(g / n - L0) <= tol) {
+        for (var k = 0; k < n; k++) gaps.push(Math.round(g / n));
+        missed.push({ from: st[j], to: st[j + 1], days: g, n: n - 1 });
+      } else gaps.push(g);
+    });
     var recent = gaps.slice(-6), ok = recent.filter(function (g) { return g >= 21 && g <= 45; });
-    var manual = clamp(Number(c.cycleLen) || 28, 21, 45), computed = ok.length >= 2 ? Math.round(median(ok)) : null;
-    var out = { starts: st, gaps: recent, length: computed || manual, computed: !!computed, manual: manual, flags: [] };
+    var computed = ok.length >= 2 ? Math.round(median(ok)) : null;
+    var out = { starts: st, gaps: recent, length: computed || manual, computed: !!computed, manual: manual, flags: [], missed: missed.filter(function (m) { return raw.slice(-6).indexOf(m.days) >= 0; }) };
+    if (out.missed.length) out.flags.push('missed');
     if (recent.length >= 3 && Math.max.apply(null, recent) - Math.min.apply(null, recent) > 9) out.flags.push('variable');
     if (recent.some(function (g) { return g < 21 || g > 45; })) out.flags.push('outOfRange');
     if (now && st.length) {
@@ -3036,12 +3065,26 @@
     return out;
   }
   // پیشنهاد سطح بعدی: وقتی دو هفته‌ی کامل به سقف دقیقه‌های سطح رسیده (مثل پیشنهاد تغییر سطح دویدن)
-  function walkLevelSuggestion(profile, today) {
+  // data (اختیاری: state اپ با done و doneLog): پیشنهاد فقط وقتی دو هفته‌ی کامل آخر دست‌کم ۷۰٪ دقیقه‌های برنامه انجام شده
+  var WALK_UP_MIN_DONE = 0.7;
+  function walkDoneShare(profile, data, today, weeks) {
+    var plan = 0, done = 0, d0 = weekStart(today);
+    for (var i = 1; i <= weeks; i++) {
+      buildWalkWeek(profile, addDays(d0, -7 * i)).days.forEach(function (s) {
+        if (!s.minutes || ['rest', 'none', 'cancelled'].indexOf(s.type) >= 0) return;
+        plan += s.minutes;
+        if ((data.done || {})[s.date]) { var l = doneSession((data.doneLog || {})[s.date] || s); done += l.realMin || l.minutes || s.minutes; }
+      });
+    }
+    return plan ? done / plan : 1;
+  }
+  function walkLevelSuggestion(profile, today, data) {
     if (!isWalk(profile)) return null;
     var a = assessWalkLevel(profile);
     if (a.level >= 10) return null;
     var w = weekIndexFor(profile, today);
     if (w < 2 || !walkWeeklyMin(profile, w - 1, a).atCeiling || !walkWeeklyMin(profile, w - 2, a).atCeiling) return null;
+    if (data && walkDoneShare(profile, data, today, 2) < WALK_UP_MIN_DONE) return null;
     var cur = walkWeeklyMin(profile, w, a);
     // سابقه با گذشت هفته‌های برنامه بیشتر می‌شه (۴ هفته: تازه‌کار، ۱۲: ۳ تا ۱۲ ماه، ۴۰: بیش از یک سال)
     var order = ['never', 'lt3m', '3to12m', 'gt1y'], need = [0, 4, 12, 40], exp = profile.walkExp || 'never';
@@ -3182,6 +3225,18 @@
       if (out.daysLeft < 0) out.past = true;
       else out.status = rem === 0 ? 'ready' : out.daysLeft / 7 >= rem ? 'ok' : 'tight';
     } else if (rem === 0) out.status = 'ready';
+    // آسیب: همون ارزیابی صفحه‌ی سلامت (injuryImpact) روی مسیر هدف هم اعمال می‌شه تا دو عدد متناقض دیده نشه
+    var imp = profile.injuries && profile.injuries.length ? injuryImpact(profile, today) : null;
+    if (imp) {
+      out.injury = { phase: imp.phase, fullDate: imp.fullDate, status: imp.status };
+      if (imp.fullDate > out.readyDate) {
+        out.readyDate = imp.fullDate;
+        out.weeks = Math.max(out.weeks, Math.ceil(daysBetween(today, parseDate(imp.fullDate)) / 7));
+        out.weeksHi = Math.max(out.weeksHi, Math.ceil(out.weeks * 1.25)); out.total = elapsed + out.weeks;
+        out.frac = out.total ? elapsed / out.total : 1;
+      }
+      if (out.status && imp.status && imp.status !== 'ok') out.status = imp.status === 'unlikely' ? 'injury' : 'tight';
+    }
     return out;
   }
   // پیس‌های اصلی دنیلز برای یک VDOT (ثانیه بر کیلومتر)؛ race = پیس همون مسافت
@@ -3329,7 +3384,7 @@
     buildWeek: buildWeek, sessionFor: sessionFor, adaptSession: adaptSession, isHard: isHard, readiness: readiness, weekAdaptSummary: weekAdaptSummary,
     currentFitness: currentFitness, fitnessEntries: fitnessEntries, hrZones: hrZones, easyRunFeedback: easyRunFeedback,
     easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, fitnessReminder: fitnessReminder,
-    fitnessLevelSuggestion: fitnessLevelSuggestion,
+    fitnessLevelSuggestion: fitnessLevelSuggestion, applyFitnessLevel: applyFitnessLevel,
     EASY_ADJUST_MAX: EASY_ADJUST_MAX,
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks,
     goalInfo: goalInfo, goalLabel: goalLabel, GOAL_TYPES: GOAL_TYPES, TERRAIN_LABELS: TERRAIN_LABELS,
@@ -3339,7 +3394,7 @@
     ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,
     planSuggestion: planSuggestion, goalPath: goalPath,
-    isWalk: isWalk, walkGoalInfo: walkGoalInfo, walkPath: walkPath, walkLevelSuggestion: walkLevelSuggestion, walkWeeksTo: walkWeeksTo, WALK_GOALS: WALK_GOALS, WALK_EVENT_KM: WALK_EVENT_KM, daySteps: daySteps, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
+    isWalk: isWalk, walkGoalInfo: walkGoalInfo, walkPath: walkPath, walkLevelSuggestion: walkLevelSuggestion, walkDoneShare: walkDoneShare, walkWeeksTo: walkWeeksTo, WALK_GOALS: WALK_GOALS, WALK_EVENT_KM: WALK_EVENT_KM, daySteps: daySteps, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
     effectiveSession: effectiveSession, prevCheckin: prevCheckin, dressAlt: dressAlt, cycleMoveTarget: cycleMoveTarget,
     returnInfo: returnInfo, GAP_STEPS: GAP_STEPS, gapDaysOf: gapDaysOf, gapText: gapText, detrainFactor: detrainFactor, experienceFromMonths: experienceFromMonths, HISTORY_STEPS: HISTORY_STEPS, MONTHS_FROM_EXP: MONTHS_FROM_EXP, GAP_KEYS: GAP_KEYS, XTRAIN_KEYS: XTRAIN_KEYS,
     PACE_LEVEL: PACE_LEVEL, PLAN_NEEDS: PLAN_NEEDS, vdotStepWeeks: vdotStepWeeks,

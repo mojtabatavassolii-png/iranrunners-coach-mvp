@@ -187,11 +187,11 @@ function simulate(persona, opts) {
         }
       }
       if (walk) {
-        var wl = C.walkLevelSuggestion(p, d);
+        var wl = C.walkLevelSuggestion(p, d, state);
         if (wl && !unmot && rnd.chance(0.5)) {
-          var before = C.assessLevel(p).level, l4 = weeks.slice(-4);
+          var before = C.assessLevel(p).level, l4 = weeks.slice(-2);
           var pm = l4.reduce(function (s0, w) { return s0 + w.plannedMin; }, 0), dm = l4.reduce(function (s0, w) { return s0 + w.doneMin; }, 0);
-          if (l4.length === 4 && pm > 0 && dm < pm * 0.6) F('major', 'walk-level-adherence', day, 'پیشنهاد سطح بالاتر پیاده‌روی با وجود انجام کم (فقط از روی شماره‌ی هفته‌ی برنامه)', { from: wl.from, to: wl.to, doneMin4w: dm, plannedMin4w: pm, pct: Math.round(dm / pm * 100) });
+          if (l4.length === 2 && pm > 0 && dm < pm * 0.7) F('major', 'walk-level-adherence', day, 'پیشنهاد سطح بالاتر پیاده‌روی با وجود انجام کم (دو هفته‌ی آخر زیر ۷۰٪)', { from: wl.from, to: wl.to, doneMin2w: dm, plannedMin2w: pm, pct: Math.round(dm / pm * 100) });
           Object.assign(p, wl.next); p.startDate = k;                      // app.js data-wlevel-up
           events.push({ day: day, kind: 'level', text: 'سطح پیاده‌روی ' + before + ' ← ' + C.assessLevel(p).level });
         }
@@ -415,7 +415,7 @@ function simulate(persona, opts) {
         // هشدار نامنظمی برای چرخه‌ای که در واقع منظمه (فقط چون کاربر یک شروع رو ثبت نکرده)
         var rs = H.realStarts.filter(function (x) { return x <= k; }).slice(-7), rg = [];
         for (var gi2 = 1; gi2 < rs.length; gi2++) rg.push(C.daysBetween(C.parseDate(rs[gi2 - 1]), C.parseDate(rs[gi2])));
-        var realOk = rg.length >= 2 && rg.every(function (g) { return g >= 21 && g <= 45; }) && Math.max.apply(null, rg) - Math.min.apply(null, rg) <= 9 && !(cyc.absent || []).some(function (w) { return day >= w[0] && day < w[1] + 60; });
+        var realOk = !lg.some(function (g) { return g > 90; }) && rg.length >= 2 && rg.every(function (g) { return g >= 21 && g <= 45; }) && Math.max.apply(null, rg) - Math.min.apply(null, rg) <= 9 && !(cyc.absent || []).some(function (w) { return day >= w[0] && day < w[1] + 60; });
         var falseFl = cst.flags.filter(function (fl) { return fl === 'variable' || fl === 'outOfRange' || (fl === 'absent' && realOk); });
         if (realOk && falseFl.length) F('major', 'cycle-false-irregular', day, 'چرخه‌ی واقعی منظمه ولی به‌خاطر یک ثبت جاافتاده هشدار «' + falseFl.join('، ') + '» اومده', { loggedGaps: lg, realGaps: rg, flags: cst.flags });
         if (cst.flags.length) H.cycleFlags = H.cycleFlags || {}, cst.flags.forEach(function (fl) { if (!H.cycleFlags[fl]) { H.cycleFlags[fl] = day; events.push({ day: day, kind: 'cycle', text: 'هشدار چرخه: ' + fl }); } });
@@ -544,13 +544,7 @@ function simulate(persona, opts) {
       var acc = sg.up ? T.accept : T.accept * 0.5;
       events.push({ day: day, kind: 'level', text: 'پیشنهاد سطح ' + sg.from + ' ← ' + sg.to + (rnd() < acc ? ' (قبول)' : ' (رد)') });
       if (events[events.length - 1].text.indexOf('قبول') >= 0) {
-        // app.js applyFitnessLevel
-        var now = d, fit2 = C.currentFitness(p), wk = C.buildWeek(p, now);
-        var kmv = C.weeklyVolume(p, Math.max(0, wk.weekIndex), true).km;
-        p.pb = { distanceKm: fit2.entry.distanceKm, timeSec: fit2.entry.timeSec, date: fit2.entry.date };
-        p.currentWeeklyKm = p.lastWeekKm = p.monthAvgKm = kmv;
-        p.volumeReason = null;
-        p.startDate = k;
+        C.applyFitnessLevel(p, d);   // همون تابعی که دکمه‌ی «قبول سطح» در اپ صدا می‌زنه
         var lv = C.assessLevel(p).level;
         if (lv !== sg.to) F('major', 'level-apply', day, 'بعد از قبول پیشنهاد سطح، سطح برنامه با پیشنهاد فرق داره', { suggested: sg.to, got: lv });
         levelLog.push({ day: day, why: 'level', from: sg.from, to: lv });

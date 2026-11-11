@@ -1338,10 +1338,11 @@
       notify: 'Allow notifications', notifyOn: 'Notifications on', notifyOk: 'Notifications on (only while the app is open)', notifyNo: 'Notification permission was not granted'
     },
     path: {
+      seeHealth: 'Injury and plan →',
       title: 'Your path', now: 'Now', goal: 'Goal', level: 'Level {n}', aria: 'Progress toward your goal',
       week: 'Week {a} of about {b} weeks of preparation', notStarted: 'Your plan starts on {d}',
       race: 'Race in {n} days ({d})', eta: 'Estimated readiness: {a} to {b} weeks', etaMonth: 'Estimated arrival: around {m}', ready: 'In mileage and preparation, you are ready',
-      st: { ok: 'You have enough time', tight: 'Tight; check an intermediate goal', ready: 'Ready' },
+      st: { ok: 'You have enough time', tight: 'Tight; check an intermediate goal', ready: 'Ready', injury: 'Injury: this race is unlikely' },
       more: 'Details →', seePlans: 'Suggested plans →',
       none: 'Your path: no goal yet', noneSub: 'See the suggested plans for your level and pick one'
     },
@@ -1448,6 +1449,7 @@
         lenComputed: 'Your cycle length from your data: about {n} days (from your last {k} cycles).', lenManual: 'Cycle length: {n} days (the number you entered; once you log each start it is calculated from your own data).',
         gap: '{n} days', logQ: 'Start of your period', logBtn: 'Log start', logged: 'Logged; predictions updated.',
         flag: {
+          missed: 'A {n}-day gap was logged after {d}, about twice your usual cycle. A period start was probably not logged. If you remember it, add the date so predictions stay accurate.',
           variable: 'The gaps between your periods have varied a lot recently. This is not a diagnosis; if it is new for you, it is worth talking to a doctor.',
           late: 'Your next period is later than predicted. If you forgot to log the start, add it; if it continues, a doctor can help.',
           absent: 'No period start has been logged for over 3 months. If you really have not had a period, it is worth seeing a doctor; in athletes it is sometimes related to nutrition and energy intake.'

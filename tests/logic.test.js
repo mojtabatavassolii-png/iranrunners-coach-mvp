@@ -1767,4 +1767,50 @@ test('برگشتی با پایه‌ی خوب: دو-پیاده هر هفته یک
   var walker = returner({ gapDays: 1095, walkMinNow: 120 });
   assert.ok(/3 دقیقه|3 min/.test(weekAt(walker, 0).days.filter(function (d) { return d.type === 'runwalk'; })[0].steps[0]));
 });
+
+// ---------- ایرادهای پیداشده با شبیه‌ساز کاربران (tests/sim) ----------
+test('شبیه‌ساز ۱: برگشتی بعد از تایم‌تست و قبول سطح، دیگه برگشتی نیست و سطح از تست تازه میاد', function () {
+  var p = returner({ gapDays: 1095, startDate: '2026-11-14' });
+  assert.strictEqual(C.assessLevel(p).level, 1);
+  p.fitnessTests = [{ date: '2027-01-15', distanceKm: 2, timeSec: 573, kind: 'test' }];
+  var sg = C.fitnessLevelSuggestion(p);
+  assert.ok(sg && sg.up && sg.to >= 4);
+  var r = C.applyFitnessLevel(p, C.parseDate('2027-01-15'));
+  assert.strictEqual(r.to, C.assessLevel(p).level);
+  assert.ok(r.to > 1, 'سطح بعد از قبول: ' + r.to);
+  assert.strictEqual(C.returnInfo(p), null);
+  assert.strictEqual(C.fitnessLevelSuggestion(p), null);
+  assert.deepStrictEqual(p.pbOld, { distanceKm: 10, timeSec: hms(0, 35) });
+});
+test('شبیه‌ساز ۲: یک ثبت جاافتاده‌ی پریود هشدار نامنظمی نمی‌ده؛ «ثبت جاافتاده» می‌پرسه', function () {
+  var p = cycleProfile('2027-03-01');
+  p.cycle.cycleLen = 29; p.cycle.starts = ['2026-11-05', '2026-12-04', '2027-01-30'];
+  var s = C.cycleStats(p, C.parseDate('2027-03-10'));
+  assert.ok(s.flags.indexOf('missed') >= 0);
+  assert.strictEqual(s.flags.indexOf('outOfRange'), -1);
+  assert.strictEqual(s.flags.indexOf('variable'), -1);
+  assert.strictEqual(s.missed[0].days, 57);
+  // فاصله‌ی واقعاً نامنظم (نه نزدیک دو برابر) همچنان هشدار داره
+  var q = cycleProfile('2027-03-15');
+  q.cycle.starts = ['2026-11-05', '2026-12-04', '2027-01-03', '2027-03-15'];
+  var t = C.cycleStats(q, C.parseDate('2027-03-20'));
+  assert.ok(t.flags.indexOf('outOfRange') >= 0 && t.flags.indexOf('missed') < 0);
+});
+test('شبیه‌ساز ۳: پیشنهاد سطح بالاتر پیاده‌روی فقط با انجام دست‌کم ۷۰٪ دو هفته‌ی آخر', function () {
+  var p = walkP({ walkMin: 100, walkExp: 'gt1y', walk30: 'yes' }), now = C.parseDate('2027-01-30');
+  assert.ok(C.walkLevelSuggestion(p, now));
+  assert.strictEqual(C.walkLevelSuggestion(p, now, { done: {}, doneLog: {} }), null);
+  var done = {};
+  for (var i = 1; i <= 2; i++) C.buildWeek(p, C.addDays(C.weekStart(now), -7 * i)).days.forEach(function (s) { if (s.minutes) done[s.date] = true; });
+  assert.ok(C.walkLevelSuggestion(p, now, { done: done, doneLog: {} }));
+});
+test('شبیه‌ساز ۴: مسیر هدف با ارزیابی آسیب هماهنگه', function () {
+  var p = injP('2027-01-13', '2027-02-24', { goal: { type: '10', date: '2027-04-03' } });
+  var now = C.parseDate('2027-01-20'), im = C.injuryImpact(p, now), gp = C.goalPath(p, now);
+  assert.strictEqual(im.status, 'unlikely');
+  assert.strictEqual(gp.status, 'injury');
+  assert.ok(gp.readyDate >= im.fullDate);
+  var noInj = C.goalPath(Object.assign({}, p, { injuries: [] }), now);
+  assert.ok(noInj.status !== 'injury');
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

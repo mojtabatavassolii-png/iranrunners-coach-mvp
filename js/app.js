@@ -401,7 +401,7 @@
     }
     // پیشنهاد سطح بعدی پیاده‌روی
     if (C.isWalk(p)) {
-      var sg = C.walkLevelSuggestion(p, now);
+      var sg = C.walkLevelSuggestion(p, now, state);
       if (sg) notify({ key: 'wlevel-' + sg.to + '-' + p.startDate, k: 'success', m: 'wlevel', p: { from: sg.from, to: sg.to }, href: '#home' });
     } else {
       // وقت تست فیتنس (هفته‌ای یک‌بار تا ثبت تست)
@@ -2520,20 +2520,12 @@
     p.fitnessTests = (p.fitnessTests || []).concat([vs.entry]);
     save(); showToast(fa(T('fitNotes.stepDone', { v: vs.to.toFixed(1) }))); route();
   });
-  // تغییر سطح بر اساس آخرین تایم‌تست؛ حجم از حجم فعلی برنامه ادامه پیدا می‌کنه (نه از عدد قدیمی)
+  // تغییر سطح بر اساس آخرین تایم‌تست (C.applyFitnessLevel؛ همون کدی که شبیه‌ساز اجرا می‌کنه)
   function applyFitnessLevel() {
-    var p = state.profile, now = today();
-    var fit = C.currentFitness(p);
-    if (!fit) return;
-    var wk = C.buildWeek(p, now);
-    var km = C.weeklyVolume(p, Math.max(0, wk.weekIndex), true).km;
-    var before = C.assessLevel(p).level;
-    p.pb = { distanceKm: fit.entry.distanceKm, timeSec: fit.entry.timeSec, date: fit.entry.date };
-    p.currentWeeklyKm = p.lastWeekKm = p.monthAvgKm = km;
-    p.volumeReason = null;
-    p.startDate = C.dateKey(now);
+    var r = C.applyFitnessLevel(state.profile, today());
+    if (!r) return;
     save();
-    showToast(fa(T('toast.levelApplied', { to: C.assessLevel(p).level, from: before, km: km })));
+    showToast(fa(T('toast.levelApplied', { to: r.to, from: r.from, km: r.km })));
     route();
   }
 
@@ -2715,7 +2707,9 @@
       var g = i < a.length - 1 ? C.daysBetween(C.parseDate(a[i + 1]), C.parseDate(k)) : null;
       return '<li><span>' + esc(faDate(k)) + '</span>' + (g != null ? '<span class="muted">' + esc(fa(T('health.cyc.gap', { n: g }))) + '</span>' : '') + '</li>';
     }).join('') + '</ul>';
-    if (st.flags.length) html += '<p class="alert alert-note small" role="note">' + esc(T('health.cyc.flag.' + (st.flags.indexOf('absent') >= 0 ? 'absent' : st.flags.indexOf('late') >= 0 ? 'late' : 'variable'))) + '</p>';
+    // اولویت: بی‌پریودی، تأخیر، ثبت جاافتاده (پرسیدن از کاربر به‌جای هشدار نامنظمی)، نامنظمی
+    var cf = ['absent', 'late', 'missed'].filter(function (x) { return st.flags.indexOf(x) >= 0; })[0] || (st.flags.length ? 'variable' : null);
+    if (cf) html += '<p class="alert alert-note small" role="note">' + esc(fa(T('health.cyc.flag.' + cf, cf === 'missed' ? { n: st.missed[st.missed.length - 1].days, d: faDate(st.missed[st.missed.length - 1].from) } : {}))) + '</p>';
     html += '<form id="cyc-form" class="cyc-log" novalidate><div class="field"><label for="cyc-date">' + esc(T('health.cyc.logQ')) + '</label>' +
       '<input id="cyc-date" name="date" type="date" max="' + key + '" min="' + C.dateKey(C.addDays(now, -120)) + '" value="' + key + '"></div>' +
       '<p class="form-errors" hidden></p><button type="submit" class="btn btn-outline">' + esc(T('health.cyc.logBtn')) + '</button></form>' +
@@ -4418,9 +4412,9 @@
     var lines = [gp.notStarted ? T('path.notStarted', { d: faDate(p.startDate) }) : T('path.week', { a: gp.elapsed + 1, b: gp.total })];
     if (gp.daysLeft != null) lines.push(gp.daysLeft === 0 ? T('home.race.today') : T('path.race', { n: gp.daysLeft, d: faDate(gp.goal.date) }));
     lines.push(pathEta(gp));
-    var tight = gp.status === 'tight', link = !inRace || tight;
-    return (link ? '<a class="card hcard path-card" href="' + (tight ? '#plans' : '#race') + '">' : '<div class="card hcard path-card">') + '<div class="hcard-top"><span class="hcard-label">' + esc(T('path.title')) + '</span>' +
-      (link ? '<span class="hcard-link">' + esc(T(tight ? 'path.seePlans' : 'path.more')) + '</span>' : '') + '</div>' +
+    var tight = gp.status === 'tight', inj = gp.status === 'injury', link = !inRace || tight || inj;
+    return (link ? '<a class="card hcard path-card" href="' + (inj ? '#health' : tight ? '#plans' : '#race') + '">' : '<div class="card hcard path-card">') + '<div class="hcard-top"><span class="hcard-label">' + esc(T('path.title')) + '</span>' +
+      (link ? '<span class="hcard-link">' + esc(T(inj ? 'path.seeHealth' : tight ? 'path.seePlans' : 'path.more')) + '</span>' : '') + '</div>' +
       '<div class="path-ends"><span class="path-now"><span class="path-hex" aria-hidden="true">' + fa(gp.level) + '</span><span><small>' + esc(T('path.now')) + '</small><b>' + tt('path.level', { n: gp.level }) + '</b></span></span>' +
       '<span class="path-goal"><small>' + esc(T('path.goal')) + '</small><b>' + t(C.goalLabel(gp.goal)) + '</b>' +
       (gp.goal.targetSec ? '<small dir="ltr">' + fa(C.formatDuration(gp.goal.targetSec)) + '</small>' : '') + '</span></div>' +
@@ -4558,14 +4552,14 @@
   });
   // پیشنهاد سطح بعدی پیاده‌روی
   function walkLevelCard(now) {
-    var sg = C.walkLevelSuggestion(state.profile, now);
+    var sg = C.walkLevelSuggestion(state.profile, now, state);
     if (!sg) return '';
     return '<section class="card fitness-notes"><h3>' + esc(T('wlevel.title')) + '</h3><p>' + tt('wlevel.text', { from: sg.from, to: sg.to, n: sg.min }) + '</p>' +
       '<div class="actions"><button type="button" class="btn btn-outline" data-wlevel-up="1">' + tt('fitNotes.apply', { n: sg.to }) + '</button></div></section>';
   }
   app.addEventListener('click', function (e) {
     if (!e.target.closest('[data-wlevel-up]')) return;
-    var p = state.profile, sg = C.walkLevelSuggestion(p, today());
+    var p = state.profile, sg = C.walkLevelSuggestion(p, today(), state);
     if (!sg) return;
     Object.assign(p, sg.next);
     p.startDate = C.dateKey(today());
