@@ -1916,4 +1916,27 @@ test('تاریخچه‌ی هفتگی برنامه: ثبت، نگه‌داشتن 
   delete q.planLog[C.dateKey(C.addDays(ws, -7 * 6))]; delete q.planLog[C.dateKey(C.addDays(ws, -7))];
   assert.strictEqual(C.buildWeek(q, ws).totalKm, free);
 });
+test('شبیه‌ساز ۱۰: پایین‌آوردن سطح با یک تست کمی ضعیف‌تر پیشنهاد نمی‌شه؛ با دو تست یا تست خیلی ضعیف‌تر چرا', function () {
+  var at = function (v) { return Math.round(C.raceTimeFromVdot(v, 5)); };
+  var p = profileFor(6, { pb: { distanceKm: 5, timeSec: at(46), date: '2026-09-20' } });
+  var lvl = C.assessLevel(p).level;
+  var low = 0;   // مرز پایین سطح فعلی
+  for (var v = 60; v > 20; v -= 0.1) if (C.levelFromVdot(v) < lvl) { low = v + 0.1; break; }
+  p.fitnessTests = [{ date: '2026-10-10', distanceKm: 5, timeSec: at(low + 0.5), kind: 'test' }, { date: '2026-11-21', distanceKm: 5, timeSec: at(low - 0.4), kind: 'test' }];
+  assert.strictEqual(C.fitnessLevelSuggestion(p), null, 'یک تست کمی زیر مرز');
+  p.fitnessTests.push({ date: '2027-01-02', distanceKm: 5, timeSec: at(low - 0.5), kind: 'test' });
+  var s2 = C.fitnessLevelSuggestion(p);
+  assert.ok(s2 && !s2.up && s2.from === lvl, 'دو تست پشت‌سرهم زیر مرز');
+  p.fitnessTests = [{ date: '2026-10-10', distanceKm: 5, timeSec: at(low + 0.5), kind: 'test' }, { date: '2026-11-21', distanceKm: 5, timeSec: at(low - 2.5), kind: 'test' }];
+  assert.ok(C.fitnessLevelSuggestion(p), 'یک تست خیلی زیر مرز');
+  // بالا بردن: یک تست خیلی بهتر کافیه؛ تستی که فقط کمی بالای مرز سطح بعده، تأیید با تست دوم می‌خواد
+  p.fitnessTests = [{ date: '2026-11-21', distanceKm: 5, timeSec: at(60), kind: 'test' }];
+  assert.ok(C.fitnessLevelSuggestion(p).up);
+  var hi = 0;
+  for (var u = 30; u < 80; u += 0.1) if (C.levelFromVdot(u) > lvl) { hi = u; break; }
+  p.fitnessTests = [{ date: '2026-10-10', distanceKm: 5, timeSec: at(hi - 1), kind: 'test' }, { date: '2026-11-21', distanceKm: 5, timeSec: at(hi + 0.6), kind: 'test' }];
+  assert.strictEqual(C.fitnessLevelSuggestion(p), null, 'یک تست کمی بالای مرز');
+  p.fitnessTests.push({ date: '2027-01-02', distanceKm: 5, timeSec: at(hi + 0.3), kind: 'test' });
+  assert.ok(C.fitnessLevelSuggestion(p).up, 'دو تست بالای مرز');
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

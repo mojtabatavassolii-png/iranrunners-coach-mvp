@@ -462,7 +462,7 @@ function simulate(persona, opts) {
       var imp = p.injuries && p.injuries.length ? C.injuryImpact(p, d) : null;
       if (imp && imp.status && imp.status !== 'ok' && gp && gp.status === 'ok' && gi.date > k)
         F('major', 'goal-vs-injury', day, 'صفحه‌ی سلامت می‌گه رسیدن به مسابقه «' + imp.status + '»، ولی مسیر هدف می‌گه «ok»', { injury: imp.status, fullDate: imp.fullDate, race: gi.date, goalReady: gp.readyDate });
-      var l6 = weeks.slice(-6).filter(function (w) { return w.weekIndex >= 0; });
+      var l6 = weeks.slice(-6).filter(function (w) { return w.weekIndex >= 0 && w.plannedKm > 0; });   // هفته‌های زمانی (سطح ۰ و ۱) با کیلومتر سنجیده نمی‌شن
       if (l6.length === 6 && gp && (gp.status === 'ok' || gp.status === 'ready') && !(H.rebaseShown != null && day - H.rebaseShown <= 42) && !gp.past && gi.date > k && C.daysBetween(d, C.parseDate(gi.date)) <= 42 &&
           l6.reduce(function (s0, w) { return s0 + w.doneKm; }, 0) < 0.5 * l6.reduce(function (s0, w) { return s0 + w.plannedKm; }, 0))
         F('major', 'goal-ignores-missed', day, 'شش هفته‌ی آخر زیر ۵۰٪ برنامه انجام شده و مسابقه نزدیکه، ولی مسیر هدف تغییری نکرده (فقط از شماره‌ی هفته حساب می‌شه)', { status: gp.status, ready: gp.readyDate, race: gi.date, planned: l6.map(function (w) { return w.plannedKm; }), done: l6.map(function (w) { return w.doneKm; }) });

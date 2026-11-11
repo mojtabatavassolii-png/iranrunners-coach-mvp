@@ -612,12 +612,36 @@
   }
 
   // آیا فیتنس فعلی به سطح دیگه‌ای رسیده؟ (برنامه خودکار سطح عوض نمی‌کنه تا حجم پرش نکنه؛ به کاربر پیشنهاد می‌ده)
+  // اختلاف عادی دو تایم‌تست ۲ تا ۳٪ (حدود ۱ تا ۱٫۵ VDOT) است
+  var LEVEL_DOWN_MARGIN = 2, LEVEL_UP_MARGIN = 1;
   function fitnessLevelSuggestion(profile) {
     var fit = currentFitness(profile);
     if (!fit || fit.entry.kind === 'baseline' || fit.entry.kind === 'step' || profile.experience === 'never') return null;
     var planLevel = assessLevel(profile).level;
     var fitLevel = levelFromVdot(fit.vdot);
     if (fitLevel === planLevel) return null;
+    // پایین‌آوردن سطح: یک تایم‌تست فقط وقتی کافیه که دست‌کم ۲ VDOT زیر مرز پایین سطح فعلی باشه؛
+    // وگرنه تست واقعی قبلی (تا ۱۶ هفته قبل) هم باید سطح پایین‌تری نشون بده. اختلاف عادی ۲ تا ۳٪ بین دو تست
+    // (هوا، خستگی) سطح رو بالا و پایین نمی‌بره و برنامه هر بار از اول شروع نمی‌شه.
+    if (fitLevel < planLevel && planLevel >= 2) {
+      var low = vdotFromRace(42.195, LEVELS[planLevel].marathon[1] === Infinity ? hms(5, 30) : LEVELS[planLevel].marathon[1]);
+      if (fit.vdot > low - LEVEL_DOWN_MARGIN) {
+        var real = fitnessEntries(profile).filter(function (t) { return t.kind === 'test' || t.kind === 'race'; });
+        var prev = real.length >= 2 && real[real.length - 1] === fit.entry ? real[real.length - 2] : null;
+        var recent = prev && daysBetween(parseDate(prev.date), parseDate(fit.entry.date)) <= 16 * 7;
+        if (!recent || levelFromVdot(vdotFromRace(prev.distanceKm, prev.timeSec)) >= planLevel) return null;
+      }
+    }
+    // بالا بردن: یک تست فقط وقتی کافیه که دست‌کم ۱ VDOT بالای مرز سطح تازه باشه؛ وگرنه تست واقعی قبلی هم سطح بالاتری نشون بده
+    if (fitLevel > planLevel) {
+      var lowUp = vdotFromRace(42.195, LEVELS[fitLevel].marathon[1] === Infinity ? hms(5, 30) : LEVELS[fitLevel].marathon[1]);
+      if (fit.vdot < lowUp + LEVEL_UP_MARGIN) {
+        var realU = fitnessEntries(profile).filter(function (t) { return t.kind === 'test' || t.kind === 'race'; });
+        var prevU = realU.length >= 2 && realU[realU.length - 1] === fit.entry ? realU[realU.length - 2] : null;
+        var recentU = prevU && daysBetween(parseDate(prevU.date), parseDate(fit.entry.date)) <= 16 * 7;
+        if (!recentU || levelFromVdot(vdotFromRace(prevU.distanceKm, prevU.timeSec)) <= planLevel) return null;
+      }
+    }
     return { from: planLevel, to: fitLevel, up: fitLevel > planLevel };
   }
 
