@@ -1892,4 +1892,28 @@ test('شبیه‌ساز ۹: ارتفاع اولترا؛ استراید سربا�
   var nd = v.filter(function (x, j) { return j >= 4 && x.phase.key !== 'deload'; }).map(function (x) { return x.vert; });
   assert.ok(nd[nd.length - 1] > nd[0], 'برنامه بزرگ‌تر می‌شه، نه کوچیک‌تر: ' + nd.join(' '));
 });
+test('تاریخچه‌ی هفتگی برنامه: ثبت، نگه‌داشتن ۲۶ هفته، و حد رشد بعد از تغییر هدف', function () {
+  var p = profileFor(5, { startDate: '2026-09-26', goal: { type: '10', date: '2027-03-01' } });
+  var now = C.parseDate('2026-11-07');
+  assert.strictEqual(C.logWeek(p, now), true);
+  assert.strictEqual(C.logWeek(p, now), false);   // بدون تغییر
+  var k = C.dateKey(C.weekStart(now));
+  assert.ok(p.planLog[k].km > 0);
+  p.planLog['2025-01-04'] = { km: 1, vert: 0, sv: 0, ph: 'build' };
+  C.logWeek(p, C.addDays(now, 1));
+  assert.ok(!p.planLog['2025-01-04'], 'هفته‌های قدیمی‌تر از ۲۶ هفته پاک می‌شن');
+  // سه هفته‌ی ذخیره‌شده‌ی کم (مثلاً برگشت بعد از مسابقه)، بعد هدف تازه: هفته‌ی بعد حداکثر ۱۱۰٪
+  var q = profileFor(5, { startDate: '2026-09-26', goal: { type: '21', date: '2027-05-01' } }), ws = C.weekStart(C.parseDate('2026-12-12'));
+  var free = C.buildWeek(q, ws).totalKm;
+  q.planLog = {};
+  for (var i = 1; i <= 3; i++) q.planLog[C.dateKey(C.addDays(ws, -7 * i))] = { km: 20, vert: 0, sv: 0, ph: 'return' };
+  var lim = C.buildWeek(q, ws).totalKm;
+  assert.ok(free > 30 && lim <= 22.5, 'بدون تاریخچه ' + free + '، با تاریخچه ' + lim);
+  // برگشت به حجم عادیِ قبل (۱۲ هفته‌ی اخیر) آزاده
+  q.planLog[C.dateKey(C.addDays(ws, -7 * 6))] = { km: free, vert: 0, sv: 0, ph: 'build' };
+  assert.strictEqual(C.buildWeek(q, ws).totalKm, free);
+  // هفته‌ی قبلی ثبت نشده (کاربر اپ رو باز نکرده یا هفته‌های جلوتر): بدون حد
+  delete q.planLog[C.dateKey(C.addDays(ws, -7 * 6))]; delete q.planLog[C.dateKey(C.addDays(ws, -7))];
+  assert.strictEqual(C.buildWeek(q, ws).totalKm, free);
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

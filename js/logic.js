@@ -937,6 +937,41 @@
     return m[dk];
   }
   function plannedVert(profile, ws) { return plannedVertInfo(profile, ws).v; }
+
+  // ---------- تاریخچه‌ی هفتگی برنامه (profile.planLog) ----------
+  // هر بار که اپ باز می‌شه، حجم و ارتفاع برنامه‌ی همین هفته ذخیره می‌شه (هفته‌های گذشته دیگه عوض نمی‌شن).
+  // موتور هفته‌های گذشته رو با پروفایل فعلی دوباره حساب می‌کنه؛ اگه کاربر هدف رو عوض کنه (مثلاً بعد از مسابقه)،
+  // اون حساب دوباره با چیزی که واقعاً بهش نشون داده شده فرق داره. حد رشد از همین تاریخچه میاد.
+  var PLAN_LOG_WEEKS = 26;
+  function logWeek(profile, today) {
+    if (!profile || isWalk(profile)) return false;
+    var ws = weekStart(today), bw = buildWeek(profile, today);
+    if (!(bw.totalKm > 0 || bw.vert > 0)) return false;
+    var e = { km: bw.totalKm || 0, vert: bw.vert || 0, sv: bw.days.reduce(function (x, d) { return Math.max(x, d.type === 'race' ? 0 : (d.vert || 0)); }, 0),
+      ph: (bw.phase && bw.phase.key) || null };
+    var log = profile.planLog = profile.planLog || {}, k = dateKey(ws), before = JSON.stringify(log[k] || null);
+    log[k] = e;
+    var oldest = dateKey(addDays(ws, -7 * PLAN_LOG_WEEKS));
+    Object.keys(log).forEach(function (x) { if (x < oldest) delete log[x]; });
+    return JSON.stringify(e) !== before;
+  }
+  // حدها از تاریخچه: بیشترین ۳ هفته‌ی قبل × ۱۱۰٪، یا برگشت به بیشترین هفته‌ی عادی ۱۲ هفته‌ی اخیر (مثلاً حجم قبل از مسابقه)
+  function planLogLimit(profile, ws) {
+    var log = profile.planLog;
+    // فقط وقتی هفته‌ی درست قبلی ثبت شده (هفته‌های جلوتر از امروز یا بعد از یک هفته غیبت، بدون حد)
+    if (!log || !log[dateKey(addDays(ws, -7))]) return null;
+    var e3 = [], e12 = [], s4 = 0;
+    for (var i = 1; i <= 12; i++) {
+      var e = log[dateKey(addDays(ws, -7 * i))];
+      if (!e) continue;
+      if (i <= 3) e3.push(e);
+      if (i <= 4) s4 = Math.max(s4, e.sv || 0);
+      if (e.ph !== 'race' && e.ph !== 'taper') e12.push(e);
+    }
+    if (!e3.length) return null;
+    var mx = function (arr, f) { return arr.reduce(function (x, y) { return Math.max(x, y[f] || 0); }, 0); };
+    return { km: Math.max(mx(e3, 'km') * 1.1, mx(e12, 'km')), v3: mx(e3, 'vert'), v12: mx(e12, 'vert'), s4: s4, s12: mx(e12, 'sv') };
+  }
   // منوی کیفی اولترا با مرحله‌ی تپه هماهنگ می‌شه
   function adaptHillSpecs(specs, hp, goal, tier) {
     return specs.map(function (q) {
@@ -1879,6 +1914,11 @@
         weeklyKm = Math.max(5, Math.min(weeklyVolume(profile, W, true, a).km, floor05(preKm * ipw.factor)));
         if (ipw.noQuality) workouts = { quality: [], long: { kind: ultra ? 'ultra' : 'plain', share: 0 }, strides: ipw.k >= 1, vertFactor: 0.3 };
       }
+      // تاریخچه‌ی برنامه: حجم هفته حداکثر ۱۱۰٪ بیشترین ۳ هفته‌ی ذخیره‌شده (یا برگشت به حجم عادی ۱۲ هفته‌ی اخیر)؛
+      // هفته‌ی مسابقه‌ی اصلی و برگشت بعد از آسیب قانون خودشون رو دارن
+      var logLim = planLogLimit(profile, ws);
+      var raceWeek = race && race.date >= ws && race.date <= addDays(ws, 6);
+      if (logLim && !raceWeek && !(ipw && ipw.phase === 'ramp') && weeklyKm > logLim.km + 0.5) weeklyKm = Math.max(5, floor05(logLim.km));
 
       // ران‌های پشت‌سرهم (اولترا): سطح ۵+، پایه‌ی کافی (۵۰+ کیلومتر، بعد از ۴ هفته)، نه در هفته‌ی ریکاوری، دوره‌ی پایه یا نزدیک مسابقه
       var nearRace = race && race.date >= ws && daysBetween(ws, race.date) <= 20;
@@ -1909,8 +1949,12 @@
         }
         // هر جلسه هم حداکثر ۱۰٪ بیشتر از بزرگ‌ترین جلسه‌ی ۴ هفته‌ی قبل
         if (ps > 0) hp.slim = Math.max(60, round10(Math.max(ps, w < 4 ? hp.v0 * 0.5 : 0) * VERT_GROWTH));
+        // اگه تاریخچه‌ی ذخیره‌شده هست، مبنا همونه (نه حساب دوباره‌ی هفته‌های قبل با پروفایل فعلی)
+        if (logLim) { pv = logLim.v3; ps = Math.max(logLim.s4, 0); }
         var baseV = Math.max(60, w < 4 ? Math.max(hp.v0, pv) : pv);
         hp.vlim = Math.max(30, round10(baseV * VERT_GROWTH * (pr.deload ? VERT_DELOAD : 1)));
+        if (logLim && !pr.deload) hp.vlim = Math.max(hp.vlim, round10(logLim.v12));
+        if (logLim && ps > 0) hp.slim = Math.max(60, round10(Math.max(ps * VERT_GROWTH, logLim.s12, w < 4 ? hp.v0 * 0.5 * VERT_GROWTH : 0)));
       }
       if (hp) {
         specs = adaptHillSpecs(specs, hp, goal, tier);
@@ -3514,7 +3558,7 @@
     currentFitness: currentFitness, fitnessEntries: fitnessEntries, hrZones: hrZones, easyRunFeedback: easyRunFeedback,
     easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, fitnessReminder: fitnessReminder,
     fitnessLevelSuggestion: fitnessLevelSuggestion, applyFitnessLevel: applyFitnessLevel,
-    adherence: adherence, rebaseSuggestion: rebaseSuggestion, applyRebase: applyRebase,
+    adherence: adherence, rebaseSuggestion: rebaseSuggestion, applyRebase: applyRebase, logWeek: logWeek, planLogLimit: planLogLimit,
     EASY_ADJUST_MAX: EASY_ADJUST_MAX,
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks,
     goalInfo: goalInfo, goalLabel: goalLabel, GOAL_TYPES: GOAL_TYPES, TERRAIN_LABELS: TERRAIN_LABELS,

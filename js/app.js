@@ -910,6 +910,8 @@
       updateHeader();
       return;
     }
+    // تاریخچه‌ی هفتگی برنامه: حجم و ارتفاع همین هفته (برای حد رشد بعد از تغییر هدف یا سطح)
+    if (state.profile && C.logWeek(state.profile, today())) save();
     var v = (location.hash || '#home').slice(1), sub = null;
     // مقاله‌ی آموزش: #learn/<شناسه>
     if (v.indexOf('learn/') === 0) { sub = v.slice(6); v = 'learn'; }
@@ -1891,6 +1893,8 @@
         sex: sex, cycle: cycleObj,
         // تاریخچه‌ی فیتنس و تنظیم دستی پیس ایزی با ویرایش پروفایل حفظ می‌شن
         fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0, races: p.races || [],
+        // تاریخچه‌ی برنامه می‌مونه، مگه اینکه کاربر حجم فعلیش رو عوض کرده باشه (عدد تازه‌ی خودش مبناست)
+        planLog: p.planLog && Number(p.currentWeeklyKm) === Number(curKm) && Number(p.lastWeekKm) === Number(volP.lastWeekKm) && Number(p.monthAvgKm) === Number(volP.monthAvgKm) ? p.planLog : undefined,
         uid: p.uid || newUid(),
         createdAt: p.createdAt || new Date().toISOString()
       };

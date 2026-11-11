@@ -241,6 +241,8 @@ function simulate(persona, opts) {
         }
       }
     }
+    // اپ باز شده (چک‌این): تاریخچه‌ی هفتگی برنامه ثبت می‌شه (app.js route)
+    if (checked && C.logWeek(p, d)) base = C.sessionFor(p, d);
     var r = C.effectiveSession(state, base);
     // پیشنهاد چرخه: انتخاب کاربر
     if (r.cycle && r.cycle.sug && r.cycle.choice == null) {
@@ -527,7 +529,7 @@ function simulate(persona, opts) {
       var lab = { side: 'هفته‌ی مسابقه‌ی فرعی', goal: 'تغییر هدف', level: 'تغییر سطح', rebase: 'تنظیم با حجم واقعی', return: 'برگشت بعد از مسابقه' };
       var retPh = ph === 'return' || last3.some(function (w) { return w.phase === 'return'; });
       if (retPh && !why) why = { why: 'return' };
-      var sv = why && (why.why === 'side' || why.why === 'return') ? 'minor' : 'major';
+      var sv = why && (why.why === 'side' || why.why === 'return') || bw.totalKm < 12 ? 'minor' : 'major';   // زیر ۱۲ کیلومتر: حداقل اندازه‌ی جلسه‌ها، نه رشد واقعی
       if (m1 > 0 && bw.totalKm > m1 * 1.15 + 1) F(sv, 'vol-week' + (why ? '-' + why.why : ''), day, 'رشد حجم هفتگی بیشتر از ۱۵٪' + (why ? ' (' + lab[why.why] + ')' : ''), { from: m1, to: bw.totalKm, pct: Math.round((bw.totalKm / m1 - 1) * 100), phase: ph });
       else if (!aroundRace && m2 > 0 && bw.totalKm > m2 * 1.3 + 1) F(sv, 'vol-2week' + (why ? '-' + why.why : ''), day, 'رشد حجم دوهفته‌ای بیشتر از ۳۰٪', { from: m2, to: bw.totalKm, pct: Math.round((bw.totalKm / m2 - 1) * 100), phase: ph });
     }
