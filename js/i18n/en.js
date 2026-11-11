@@ -1364,7 +1364,14 @@
       srDone: '(done)', srTodo: '(not done)',
       allDone: 'All steps done!', allDoneSub: 'Now just keep going; this card will now fold away.'
     },
-    cele: {
+    levelUp: {
+    title: 'Congratulations! You moved up a level',
+    text: 'Your new result ({km} km in {t}) raised your VDOT to {v} and your level from {from} to {to}.',
+    planTitle: 'From this week',
+    plan: 'Your plan continues at level {to} with the new paces, starting from your current volume ({km} km a week).',
+    cont: "Let's go"
+  },
+  cele: {
       title: 'Well done, you took the first step!',
       text: 'Your first run is logged: {s}. From now on the plan adapts to your own data.',
       next: 'Next session', cont: 'Continue'

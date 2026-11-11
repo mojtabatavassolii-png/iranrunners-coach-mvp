@@ -912,6 +912,9 @@
     }
     // تاریخچه‌ی هفتگی برنامه: حجم و ارتفاع همین هفته (برای حد رشد بعد از تغییر هدف یا سطح)
     if (state.profile && C.logWeek(state.profile, today())) save();
+    // رکورد تازه سطح رو بالا برده: سطح همراه VDOT بالا می‌ره و پیام تبریک (هر مسیر ثبت رکورد: فیتنس، نتیجه‌ی مسابقه، Health)
+    var lvUp = state.profile && !C.isWalk(state.profile) ? C.autoLevelUp(state.profile, today()) : null;
+    if (lvUp) { save(); setTimeout(function () { openLevelUp(lvUp); }, 60); }
     var v = (location.hash || '#home').slice(1), sub = null;
     // مقاله‌ی آموزش: #learn/<شناسه>
     if (v.indexOf('learn/') === 0) { sub = v.slice(6); v = 'learn'; }
@@ -4758,6 +4761,28 @@
     card.addEventListener('animationend', gone);
     setTimeout(gone, 400);
   });
+
+  // ---------- تبریک بالا رفتن سطح با رکورد تازه ----------
+  function openLevelUp(r) {
+    if (document.getElementById('cele-modal')) return;
+    var dots = '';
+    for (var j = 0; j < 22; j++) dots += '<i style="inset-inline-start:' + (4 + (j * 37) % 92) + '%;animation-delay:' + (j % 7) * 0.08 + 's;background:' + ['var(--primary)', 'var(--success)', 'var(--warning)', 'var(--info)', 'var(--zone-5)'][j % 5] + '"></i>';
+    var e = r.entry || {};
+    modalRoot.innerHTML = '<div class="modal-backdrop" id="cele-modal"><div class="modal cele" role="dialog" aria-modal="true" aria-labelledby="cele-title" aria-describedby="cele-text">' +
+      '<div class="cele-dots" aria-hidden="true">' + dots + '</div><div class="cele-ico" aria-hidden="true">' + fa(r.to) + '</div>' +
+      '<h2 id="cele-title">' + esc(T('levelUp.title')) + '</h2>' +
+      '<p id="cele-text">' + tt('levelUp.text', { km: e.distanceKm, t: C.formatDuration(e.timeSec), v: r.vdot.toFixed(1), from: r.from, to: r.to }) + '</p>' +
+      '<div class="cele-next"><small>' + esc(T('levelUp.planTitle')) + '</small><b>' + tt('levelUp.plan', { to: r.to, km: r.km }) + '</b></div>' +
+      '<button type="button" class="btn btn-primary btn-block" data-cele-close="1">' + esc(T('levelUp.cont')) + '</button></div></div>';
+    document.body.classList.add('modal-open');
+    var btn = modalRoot.querySelector('[data-cele-close]');
+    btn.focus();
+    var close = function () { modalRoot.innerHTML = ''; document.body.classList.remove('modal-open'); document.removeEventListener('keydown', onKey); };
+    var onKey = function (ev) { if (ev.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    btn.addEventListener('click', close);
+    modalRoot.querySelector('#cele-modal').addEventListener('click', function (ev) { if (ev.target.id === 'cele-modal') close(); });
+  }
 
   // ---------- پیام تشویقی اولین تمرین ثبت‌شده (فقط یک بار) ----------
   function openCelebration(k) {

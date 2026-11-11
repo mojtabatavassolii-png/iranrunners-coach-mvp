@@ -1929,23 +1929,40 @@ test('شبیه‌ساز ۱۰: پایین‌آوردن سطح با یک تست ک
   assert.ok(s2 && !s2.up && s2.from === lvl, 'دو تست پشت‌سرهم زیر مرز');
   p.fitnessTests = [{ date: '2026-10-10', distanceKm: 5, timeSec: at(low + 0.5), kind: 'test' }, { date: '2026-11-21', distanceKm: 5, timeSec: at(low - 2.5), kind: 'test' }];
   assert.ok(C.fitnessLevelSuggestion(p), 'یک تست خیلی زیر مرز');
-  // بالا بردن: یک تست خیلی بهتر کافیه؛ تستی که فقط کمی بالای مرز سطح بعده، تأیید با تست دوم می‌خواد
+  // بالا بردن: هر تست واقعی که از مرز سطح بعد رد بشه کافیه (مثل پیس‌ها)
   p.fitnessTests = [{ date: '2026-11-21', distanceKm: 5, timeSec: at(60), kind: 'test' }];
   assert.ok(C.fitnessLevelSuggestion(p).up);
   var hi = 0;
   for (var u = 30; u < 80; u += 0.1) if (C.levelFromVdot(u) > lvl) { hi = u; break; }
-  p.fitnessTests = [{ date: '2026-10-10', distanceKm: 5, timeSec: at(hi - 1), kind: 'test' }, { date: '2026-11-21', distanceKm: 5, timeSec: at(hi + 0.6), kind: 'test' }];
-  assert.strictEqual(C.fitnessLevelSuggestion(p), null, 'یک تست کمی بالای مرز');
-  p.fitnessTests.push({ date: '2027-01-02', distanceKm: 5, timeSec: at(hi + 0.3), kind: 'test' });
-  assert.ok(C.fitnessLevelSuggestion(p).up, 'دو تست بالای مرز');
+  p.fitnessTests = [{ date: '2026-11-21', distanceKm: 5, timeSec: at(hi + 0.2), kind: 'test' }];
+  assert.ok(C.fitnessLevelSuggestion(p).up, 'یک تست کمی بالای مرز هم کافیه');
 });
-test('«فعلاً نه» برای پیشنهاد سطح: تا تایم‌تست بعدی پنهان، با تست تازه دوباره', function () {
+test('«فعلاً نه» فقط برای پیشنهاد پایین آوردن سطح: تا تایم‌تست بعدی پنهان، با تست تازه دوباره', function () {
   var at = function (v) { return Math.round(C.raceTimeFromVdot(v, 5)); };
-  var p = profileFor(3, { fitnessTests: [{ date: '2026-11-01', distanceKm: 5, timeSec: at(55), kind: 'test' }] });
-  assert.ok(C.fitnessLevelSuggestion(p));
+  var p = profileFor(6, { pb: { distanceKm: 5, timeSec: at(46), date: '2026-09-20' } });
+  p.fitnessTests = [{ date: '2026-11-01', distanceKm: 5, timeSec: at(37), kind: 'test' }];
+  var sg = C.fitnessLevelSuggestion(p);
+  assert.ok(sg && !sg.up);
   assert.strictEqual(C.skipLevelSuggestion(p), true);
   assert.strictEqual(C.fitnessLevelSuggestion(p), null);
-  p.fitnessTests.push({ date: '2026-12-13', distanceKm: 5, timeSec: at(55.5), kind: 'test' });
+  p.fitnessTests.push({ date: '2026-12-13', distanceKm: 5, timeSec: at(37.5), kind: 'test' });
   assert.ok(C.fitnessLevelSuggestion(p), 'تست تازه، پیشنهاد دوباره');
+});
+test('رکورد تازه سطح رو خودکار بالا می‌بره (مثل VDOT)؛ حجم از حجم فعلی برنامه، بدون پرش', function () {
+  var at = function (v) { return Math.round(C.raceTimeFromVdot(v, 5)); };
+  var p = profileFor(5, { startDate: '2026-09-26' }), now = C.parseDate('2026-11-14');
+  assert.strictEqual(C.assessLevel(p).level, 5);
+  var before = C.buildWeek(p, C.addDays(now, -7)).totalKm;
+  p.fitnessTests = [{ date: '2026-11-14', distanceKm: 5, timeSec: at(60.4), kind: 'test' }];
+  p.levelSkip = '2026-11-14|5|' + at(60.4);   // «فعلاً نه» قدیمی جلوی بالا رفتن رو نمی‌گیره
+  var r = C.autoLevelUp(p, now);
+  assert.ok(r && r.from === 5 && r.to === C.levelFromVdot(60.4) && r.to === 8, JSON.stringify(r));
+  assert.strictEqual(C.assessLevel(p).level, 8);
+  assert.ok(C.buildWeek(p, now).totalKm <= before * 1.1 + 1, 'حجم بدون پرش');
+  assert.strictEqual(C.autoLevelUp(p, now), null, 'یک بار');
+  // پایین آمدن خودکار نیست
+  p.fitnessTests.push({ date: '2026-12-26', distanceKm: 5, timeSec: at(40), kind: 'test' });
+  assert.strictEqual(C.autoLevelUp(p, C.parseDate('2026-12-26')), null);
+  assert.strictEqual(C.assessLevel(p).level, 8);
 });
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

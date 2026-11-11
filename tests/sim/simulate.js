@@ -243,6 +243,14 @@ function simulate(persona, opts) {
     }
     // اپ باز شده (چک‌این): تاریخچه‌ی هفتگی برنامه ثبت می‌شه (app.js route)
     if (checked && C.logWeek(p, d)) base = C.sessionFor(p, d);
+    if (checked && !walk) {
+      var au = C.autoLevelUp(p, d);   // app.js route: رکورد تازه (مثلاً نتیجه‌ی مسابقه) سطح رو بالا برده
+      if (au) {
+        levelLog.push({ day: day, why: 'level', from: au.from, to: au.to });
+        events.push({ day: day, kind: 'level', text: 'سطح خودکار بالا رفت ' + au.from + ' ← ' + au.to + ' (VDOT ' + au.vdot.toFixed(1) + ')' });
+        base = C.sessionFor(p, d);
+      }
+    }
     var r = C.effectiveSession(state, base);
     // پیشنهاد چرخه: انتخاب کاربر
     if (r.cycle && r.cycle.sug && r.cycle.choice == null) {
@@ -581,8 +589,9 @@ function simulate(persona, opts) {
     var sg = C.fitnessLevelSuggestion(p);
     if (sg) {
       var hiddenLvl = C.levelFromVdot(H.vdot);
-      var acc = sg.up ? T.accept : T.accept * 0.5;
-      events.push({ day: day, kind: 'level', text: 'پیشنهاد سطح ' + sg.from + ' ← ' + sg.to + (rnd() < acc ? ' (قبول)' : ' (رد)') });
+      // بالا رفتن خودکاره (app.js با C.autoLevelUp موقع باز شدن اپ)؛ پایین آمدن پیشنهاده و کاربر تصمیم می‌گیره
+      var acc = sg.up ? 1 : T.accept * 0.5;
+      events.push({ day: day, kind: 'level', text: (sg.up ? 'سطح خودکار بالا رفت ' : 'پیشنهاد سطح ') + sg.from + ' ← ' + sg.to + (sg.up ? ' (قبول)' : rnd() < acc ? ' (قبول)' : ' (رد)') });
       // رد: بیشتر کاربرها «فعلاً نه» رو می‌زنن تا پیشنهاد تا تست بعدی پنهان بشه (app.js data-level-later)
       if (events[events.length - 1].text.indexOf('(رد)') >= 0 && rnd.chance(0.7)) { C.skipLevelSuggestion(p); events[events.length - 1].text += ' ← فعلاً نه'; }
       if (events[events.length - 1].text.indexOf('قبول') >= 0) {

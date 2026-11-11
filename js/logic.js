@@ -612,8 +612,8 @@
   }
 
   // آیا فیتنس فعلی به سطح دیگه‌ای رسیده؟ (برنامه خودکار سطح عوض نمی‌کنه تا حجم پرش نکنه؛ به کاربر پیشنهاد می‌ده)
-  // اختلاف عادی دو تایم‌تست ۲ تا ۳٪ (حدود ۱ تا ۱٫۵ VDOT) است
-  var LEVEL_DOWN_MARGIN = 2, LEVEL_UP_MARGIN = 1;
+  // اختلاف عادی دو تایم‌تست ۲ تا ۳٪ (حدود ۱ تا ۱٫۵ VDOT) است؛ پایین آوردن سطح حاشیه می‌خواد. بالا رفتن با رکورد تازه بدون حاشیه و خودکاره
+  var LEVEL_DOWN_MARGIN = 2, LEVEL_UP_MARGIN = 0;
   // «فعلاً نه»: پیشنهاد سطح تا تایم‌تست یا مسابقه‌ی بعدی پنهان می‌شه (کلید = همون نتیجه‌ای که پیشنهاد رو ساخته)
   function fitnessKey(e) { return e ? [e.date, e.distanceKm, e.timeSec].join('|') : null; }
   function skipLevelSuggestion(profile) {
@@ -625,10 +625,11 @@
   function fitnessLevelSuggestion(profile) {
     var fit = currentFitness(profile);
     if (!fit || fit.entry.kind === 'baseline' || fit.entry.kind === 'step' || profile.experience === 'never') return null;
-    if (profile.levelSkip && profile.levelSkip === fitnessKey(fit.entry)) return null;
     var planLevel = assessLevel(profile).level;
     var fitLevel = levelFromVdot(fit.vdot);
     if (fitLevel === planLevel) return null;
+    // «فعلاً نه» فقط برای پایین آوردن سطحه؛ بالا رفتن با رکورد تازه خودکاره (autoLevelUp)
+    if (fitLevel < planLevel && profile.levelSkip && profile.levelSkip === fitnessKey(fit.entry)) return null;
     // پایین‌آوردن سطح: یک تایم‌تست فقط وقتی کافیه که دست‌کم ۲ VDOT زیر مرز پایین سطح فعلی باشه؛
     // وگرنه تست واقعی قبلی (تا ۱۶ هفته قبل) هم باید سطح پایین‌تری نشون بده. اختلاف عادی ۲ تا ۳٪ بین دو تست
     // (هوا، خستگی) سطح رو بالا و پایین نمی‌بره و برنامه هر بار از اول شروع نمی‌شه.
@@ -641,7 +642,7 @@
         if (!recent || levelFromVdot(vdotFromRace(prev.distanceKm, prev.timeSec)) >= planLevel) return null;
       }
     }
-    // بالا بردن: یک تست فقط وقتی کافیه که دست‌کم ۱ VDOT بالای مرز سطح تازه باشه؛ وگرنه تست واقعی قبلی هم سطح بالاتری نشون بده
+    // بالا بردن: با LEVEL_UP_MARGIN = 0، هر تست واقعی که از مرز سطح بالاتر رد بشه کافیه
     if (fitLevel > planLevel) {
       var lowUp = vdotFromRace(42.195, LEVELS[fitLevel].marathon[1] === Infinity ? hms(5, 30) : LEVELS[fitLevel].marathon[1]);
       if (fit.vdot < lowUp + LEVEL_UP_MARGIN) {
@@ -699,6 +700,18 @@
     profile.volumeReason = null;
     profile.startDate = dateKey(today);
     return { from: before, to: assessLevel(profile).level, km: startKm(profile) };
+  }
+
+  // رکورد تازه (تایم‌تست یا مسابقه‌ی واقعی) که VDOT رو به سطح بالاتری برده: سطح خودکار بالا می‌ره، مثل پیس‌ها.
+  // حجم از حجم فعلی برنامه ادامه پیدا می‌کنه (applyFitnessLevel)، پس پرش حجم نیست. پایین آوردن سطح خودکار نیست (فقط پیشنهاد).
+  function autoLevelUp(profile, today) {
+    var sg = fitnessLevelSuggestion(profile);
+    if (!sg || !sg.up) return null;
+    var fit = currentFitness(profile);
+    var r = applyFitnessLevel(profile, today);
+    if (!r || r.to <= r.from) return null;
+    r.vdot = fit.vdot; r.entry = fit.entry;
+    return r;
   }
 
   // قبول سطح تازه از آخرین تایم‌تست: حجم از حجم فعلی برنامه ادامه پیدا می‌کنه، برنامه از امروز.
@@ -3590,7 +3603,7 @@
     buildWeek: buildWeek, sessionFor: sessionFor, adaptSession: adaptSession, isHard: isHard, readiness: readiness, weekAdaptSummary: weekAdaptSummary,
     currentFitness: currentFitness, fitnessEntries: fitnessEntries, hrZones: hrZones, easyRunFeedback: easyRunFeedback,
     easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, fitnessReminder: fitnessReminder,
-    fitnessLevelSuggestion: fitnessLevelSuggestion, skipLevelSuggestion: skipLevelSuggestion, applyFitnessLevel: applyFitnessLevel,
+    fitnessLevelSuggestion: fitnessLevelSuggestion, skipLevelSuggestion: skipLevelSuggestion, applyFitnessLevel: applyFitnessLevel, autoLevelUp: autoLevelUp,
     adherence: adherence, rebaseSuggestion: rebaseSuggestion, applyRebase: applyRebase, logWeek: logWeek, planLogLimit: planLogLimit,
     EASY_ADJUST_MAX: EASY_ADJUST_MAX,
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks,
