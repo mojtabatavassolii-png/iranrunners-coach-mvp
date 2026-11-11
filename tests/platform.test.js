@@ -43,6 +43,8 @@ function load(o) {
     FileReader: function () { var r = this; r.readAsDataURL = function () { r.result = 'data:x;base64,QUJD'; r.onload(); }; }
   };
   win.location.reload = function () { log.reloaded = true; };
+  if (o.nav) Object.keys(o.nav).forEach(function (k) { win.navigator[k] = o.nav[k]; });
+  if (o.docEvents) { win.document.addEventListener = function (n, f) { (o.docEvents[n] = o.docEvents[n] || []).push(f); }; win.document.removeEventListener = function (n, f) { o.docEvents[n] = (o.docEvents[n] || []).filter(function (g) { return g !== f; }); }; }
   if (o.local) Object.keys(o.local).forEach(function (k) { win.localStorage.setItem(k, o.local[k]); });
   if (!o.notification) delete win.Notification;
   var ctx = { window: win, URL: { createObjectURL: function () { return 'blob:x'; }, revokeObjectURL: function () {} },
@@ -219,6 +221,36 @@ runs.push(test('GPS: نیتیو با سرویس پس‌زمینه؛ نقطه‌�
     assert.deepStrictEqual(errs, ['denied']);
     return x.P.gps.stop(h);
   }).then(function () { assert.ok(c.calls.indexOf('unwatch:w1') >= 0); });
+}));
+runs.push(test('GPS وب: سرعت دستگاه، و قفل روشن‌ماندن صفحه با برگشتن به صفحه دوباره گرفته می‌شه', function () {
+  var reqs = 0, locks = [], ev = {}, onPos = null;
+  var wakeLock = { request: function () { reqs++; var l = { released: false, h: null, addEventListener: function (n, f) { l.h = f; }, release: function () { l.released = true; } }; locks.push(l); return Promise.resolve(l); } };
+  var geo = { watchPosition: function (ok) { onPos = ok; return 7; }, clearWatch: function (id) { geo.cleared = id; } };
+  var x = load({ nav: { wakeLock: wakeLock, geolocation: geo }, docEvents: ev }), pts = [];
+  var tick = function () { return new Promise(function (r) { setImmediate(r); }); };
+  return x.P.gps.start(function (p) { pts.push(p); }, function () {}).then(function (h) {
+    return tick().then(function () {
+      assert.strictEqual(reqs, 1);
+      onPos({ coords: { latitude: 35.7, longitude: 51.4, accuracy: 5, speed: 2.9 }, timestamp: 5 });
+      assert.strictEqual(pts[0].speed, 2.9);
+      // مرورگر قفل رو با رفتن به اپ دیگه آزاد کرد؛ برگشتن به صفحه → دوباره گرفته می‌شه
+      locks[0].h();
+      x.win.document.visibilityState = 'visible';
+      ev.visibilitychange.forEach(function (f) { f(); });
+      return tick();
+    }).then(function () {
+      assert.strictEqual(reqs, 2);
+      // تا وقتی قفل هست، دوباره درخواست نمی‌شه
+      ev.visibilitychange.forEach(function (f) { f(); });
+      return tick();
+    }).then(function () {
+      assert.strictEqual(reqs, 2);
+      h.stop();
+      assert.strictEqual(geo.cleared, 7);
+      assert.ok(locks[1].released);
+      assert.strictEqual((ev.visibilitychange || []).length, 0);
+    });
+  });
 }));
 runs.push(test('ضربان: سنسور بلوتوث، عددها از رشته‌ی hex، قطع اتصال، دستگاه قبلی و لغو', function () {
   var c = fakeCap({}), x = load({ capacitor: c }), data = [], states = [];

@@ -524,7 +524,14 @@
   var rec = null, recTimer = null, recSavedAt = 0;
   (function () {
     var live = P.store.getJSON(REC_KEY);
-    if (live && live.st && live.key) { rec = { key: live.key, st: live.st, hr: live.hr || null, status: 'pause', recovered: true, handle: null }; K.pause(rec.st, Date.now()); if (rec.hr) H.gap(rec.hr); }
+    if (live && live.st && live.key) {
+      rec = { key: live.key, st: live.st, hr: live.hr || null, status: 'pause', recovered: true, handle: null };
+      // مکث از آخرین لحظه‌ای که صفحه زنده بود (یا آخرین نقطه)، نه از لحظه‌ی باز شدن دوباره؛
+      // وگرنه کل مدتی که اپ بسته بوده «زمان دویدن» بدون مسافت حساب می‌شه و پیس خراب می‌شه
+      var alive = Math.max(Number(live.aliveAt) || 0, (live.st.last && live.st.last.t) || 0), nowR = Date.now();
+      K.pause(rec.st, alive > 0 && alive < nowR ? Math.max(alive, live.st.segStart || 0) : nowR);
+      if (rec.hr) H.gap(rec.hr);
+    }
   })();
   function recLive() { return !!(rec && (rec.status === 'run' || rec.status === 'pause')); }
   function recPersist(force) {
@@ -532,7 +539,7 @@
     var now = Date.now();
     if (!force && now - recSavedAt < 5000) return;
     recSavedAt = now;
-    try { P.store.setJSON(REC_KEY, { key: rec.key, st: rec.st, hr: rec.hr || null }); } catch (e) { /* */ }
+    try { P.store.setJSON(REC_KEY, { key: rec.key, st: rec.st, hr: rec.hr || null, aliveAt: now }); } catch (e) { /* */ }
   }
   function recClear() {
     if (rec && rec.handle) P.gps.stop(rec.handle);
@@ -547,7 +554,22 @@
     return fa((h ? h + ':' + p2(m) : m) + ':' + p2(s));
   }
   function recPace(v) { return v ? fa(paceFmt(v)) : '—'; }
+  // قبل از «شروع»: GPS از باز شدن صفحه‌ی ثبت روشنه تا سیگنال خوب بشه؛ دو نقطه‌ی پشت‌سرهم با دقت ۱۵ متر یا بهتر یعنی آماده
+  function recReady() { return !!(rec && rec.warm && rec.warm.good >= 2); }
+  function recSig() {
+    if (rec && rec.st) return K.signal(rec.st);
+    return rec && rec.warm ? (rec.warm.acc <= K.GOOD_ACC ? 'good' : 'weak') : 'wait';
+  }
   function recPoint(p) {
+    if (rec && rec.status === 'idle' && !rec.st) {
+      var before = recReady() + '|' + recSig() + '|' + (rec.err || '');
+      rec.warm = rec.warm || { good: 0, acc: null };
+      rec.warm.acc = p.acc;
+      rec.warm.good = p.acc <= K.GOOD_ACC ? rec.warm.good + 1 : 0;
+      if (rec.err) rec.err = null;
+      if (before !== recReady() + '|' + recSig() + '|' && location.hash === '#record') renderRecord();
+      return;
+    }
     if (!rec || !rec.st || rec.status !== 'run') return;
     // موقعیت دوباره رسید: پیام خطای قبلی برداشته می‌شه
     if (rec.err) { rec.err = null; if (location.hash === '#record') renderRecord(); }
@@ -558,7 +580,7 @@
     if (!rec) return;
     rec.err = code;
     // بدون اجازه، ثبت شروع نشده حساب می‌شه
-    if (code === 'denied' && rec.st && rec.st.points === 0) { if (rec.handle) P.gps.stop(rec.handle); rec.handle = null; rec.status = 'idle'; rec.st = null; }
+    if (code === 'denied' && (!rec.st || rec.st.points === 0)) { if (rec.handle) P.gps.stop(rec.handle); rec.handle = null; rec.status = 'idle'; rec.st = null; }
     if (location.hash === '#record') renderRecord();
   }
   function recWatch() {
@@ -711,6 +733,8 @@
     var rt = el('rec-route');
     if (rt) rt.innerHTML = liveRoute();
     hrPaint(false);
+    // «زنده بودن صفحه» هر چند ثانیه ذخیره می‌شه، حتی وقتی نقطه‌ای نمیاد (برای زمان درست اگه اپ بسته بشه)
+    recPersist(false);
   }
   function recSession(key) {
     return loggable(effectiveSession(C.sessionFor(state.profile, C.parseDate(key))).session);
@@ -733,7 +757,7 @@
       '<div><dt>' + esc(T('rec.dist')) + '</dt><dd><b id="rec-km">' + fa(dKm(st ? Math.floor(st.dist / 10) / 100 : 0).toFixed(2)) + '</b> <small>' + esc(u) + '</small></dd></div>' +
       '<div><dt>' + esc(T('rec.avg')) + '</dt><dd><b id="rec-avg">' + recPace(st && K.avgPace(st, now)) + '</b></dd></div>' +
       '<div><dt>' + esc(T('rec.cur')) + '</dt><dd><b id="rec-cur">' + recPace(st && K.currentPace(st, now)) + '</b></dd></div></dl>' +
-      '<p class="rec-signal rec-sig-' + (st ? K.signal(st) : 'wait') + '" id="rec-signal">' + esc(T('rec.signal.' + (st ? K.signal(st) : 'wait'))) + '</p>' +
+      '<p class="rec-signal rec-sig-' + recSig() + '" id="rec-signal">' + esc(T('rec.signal.' + recSig())) + '</p>' +
       '<div class="rec-route" id="rec-route">' + liveRoute() + '</div>' +
       (rec.status !== 'done' ? hrBlock() : '');
     if (rec.err) {
@@ -741,7 +765,9 @@
         (rec.err === 'denied' && P.gps.canOpenSettings() ? '<button type="button" class="btn btn-outline" data-rec-settings="1">' + esc(T('rec.settings')) + '</button>' : '');
     }
     if (rec.status === 'idle') {
-      html += '<div class="rec-actions"><button type="button" class="btn btn-primary btn-block rec-big" data-rec="start">' + esc(T('rec.start')) + '</button></div>' +
+      // تا سیگنال خوب نشده، شروع ممکنه ولی پیشنهاد نمی‌شه (اولین نقطه‌ی بد مبنای مسافت می‌شه)
+      html += (recReady() ? '' : '<p class="small rec-wait">' + esc(T('rec.waitFix')) + '</p>') +
+        '<div class="rec-actions"><button type="button" class="btn ' + (recReady() ? 'btn-primary' : 'btn-outline') + ' btn-block rec-big" data-rec="start">' + esc(T(recReady() ? 'rec.start' : 'rec.startAnyway')) + '</button></div>' +
         '<p class="small muted">' + esc(T(P.gps.background() ? 'rec.bgNote' : 'rec.webNote')) + '</p>';
     } else if (rec.status === 'run' || rec.status === 'pause') {
       html += '<div class="rec-actions">' + (rec.status === 'run'
@@ -759,6 +785,8 @@
         '<button type="button" class="btn btn-ghost" data-rec="discard">' + esc(T(rec.discardAsk ? 'rec.discardSure' : 'rec.discard')) + '</button></div>';
     }
     app.innerHTML = html + '</section>';
+    // صفحه‌ی ثبت باز شد: GPS از همین حالا روشن می‌شه تا موقع «شروع» سیگنال آماده باشه
+    if (rec.status === 'idle' && !rec.err && !rec.handle && rec.key === todayKey) recWatch();
     clearInterval(recTimer);
     recTimer = rec.status === 'run' ? setInterval(recTick, 1000) : null;
   }
@@ -910,6 +938,8 @@
       updateHeader();
       return;
     }
+    // GPS گرم‌شده‌ی صفحه‌ی ثبت (قبل از شروع) با رفتن به صفحه‌ی دیگه خاموش می‌شه
+    if (rec && rec.status === 'idle' && rec.handle && (location.hash || '').slice(1) !== 'record') { P.gps.stop(rec.handle); rec.handle = null; rec.warm = null; }
     // تاریخچه‌ی هفتگی برنامه: حجم و ارتفاع همین هفته (برای حد رشد بعد از تغییر هدف یا سطح)
     if (state.profile && C.logWeek(state.profile, today())) save();
     // رکورد تازه سطح رو بالا برده: سطح همراه VDOT بالا می‌ره و پیام تبریک (هر مسیر ثبت رکورد: فیتنس، نتیجه‌ی مسابقه، Health)

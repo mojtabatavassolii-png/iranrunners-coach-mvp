@@ -88,6 +88,46 @@ test('اسپلیت‌ها با پیس متغیر', function () {
   assert.ok(Math.abs(s.splits[0] - 360) <= 4 && Math.abs(s.splits[1] - 270) <= 4, s.splits.join(','));
 });
 
+test('رانش آهسته در حالت ایستاده (پشت چراغ) مسافت نمی‌سازه؛ مسافت قبل و بعدش درسته', function () {
+  var t0 = 1e12, st = K.create(t0);
+  K.add(st, { lat: 35.7, lon: 51.4, acc: 6, t: t0 });
+  var e = run(st, 35.7, t0, 200, 3, 6);                  // ۶۰۰ متر
+  var lat = e.lat, t = e.t;
+  // ۲ دقیقه ایستادن با رانش آهسته‌ی ۱۰ متری رفت‌وبرگشتی (تا حدود ۰٫۴ متر بر ثانیه)، بدون سرعت دستگاه
+  for (var i = 1; i <= 120; i++) { t += 1000; K.add(st, { lat: lat + (10 * Math.sin(i / 25)) / M, lon: 51.4 + (4 * Math.sin(i / 15)) / M / 0.81, acc: 8, t: t }); }
+  assert.ok(st.dist < 625, 'ایستادن ' + st.dist);
+  run(st, lat, t, 200, 3, 6);                            // ۶۰۰ متر دیگه
+  assert.ok(Math.abs(st.dist - 1200) < 40, st.dist);
+});
+
+test('سرعت دستگاه: ایستاده با سرعت صفر مسافت نمی‌سازه، ولی سرعت صفرِ اشتباه حین دویدن نادیده گرفته می‌شه', function () {
+  var t0 = 1e12, st = K.create(t0);
+  K.add(st, { lat: 35.7, lon: 51.4, acc: 8, t: t0, speed: 0 });
+  for (var i = 1; i <= 120; i++) K.add(st, { lat: 35.7 + (10 * Math.sin(i / 3)) / M, lon: 51.4, acc: 8, t: t0 + i * 1000, speed: 0.1 });
+  assert.ok(st.dist < 5, st.dist);
+  var st2 = K.create(t0), lat = 35.7;
+  for (var j = 0; j <= 200; j++) { K.add(st2, { lat: lat, lon: 51.4, acc: 5, t: t0 + j * 1000, speed: 0 }); lat += 3 / M; }
+  assert.ok(st2.dist > 500, 'دستگاه با سرعت صفر اشتباه ' + st2.dist);
+  // یک عدد پرت سرعت (نویز) نقطه‌ی ایستاده رو «در حرکت» نمی‌کنه
+  var st3 = K.create(t0);
+  K.add(st3, { lat: 35.7, lon: 51.4, acc: 8, t: t0, speed: 0 });
+  for (var k = 1; k <= 60; k++) K.add(st3, { lat: 35.7 + (12 * Math.sin(k)) / M, lon: 51.4, acc: 8, t: t0 + k * 1000, speed: k % 10 === 0 ? 1.2 : 0.1 });
+  assert.ok(st3.dist < 5, st3.dist);
+});
+
+test('دقت: نقطه‌ی ۲۵ متری کنار گذاشته می‌شه، ولی اگه سیگنال ۲۰ ثانیه ضعیف بمونه ثبت ادامه پیدا می‌کنه', function () {
+  var t0 = 1e12, st = K.create(t0);
+  K.add(st, { lat: 35.7, lon: 51.4, acc: 6, t: t0 });
+  var e = run(st, 35.7, t0, 100, 3, 6);                  // ۳۰۰ متر
+  run(st, e.lat, e.t, 10, 3, 25);                        // ۱۰ ثانیه سیگنال ضعیف: کنار گذاشته
+  assert.strictEqual(st.rejected, 10);
+  var st2 = K.create(t0);
+  K.add(st2, { lat: 35.7, lon: 51.4, acc: 6, t: t0 });
+  var e2 = run(st2, 35.7, t0, 100, 3, 6);
+  run(st2, e2.lat, e2.t, 200, 3, 25);                    // ۲۰۰ ثانیه سیگنال ضعیف (بین ساختمان‌ها)
+  assert.ok(Math.abs(st2.dist - 900) < 40, st2.dist);    // بعد از ۲۰ ثانیه ادامه پیدا کرد، با خط مستقیم از آخرین نقطه‌ی خوب
+});
+
 test('وضعیت سیگنال', function () {
   var st = K.create(0);
   assert.strictEqual(K.signal(st), 'wait');

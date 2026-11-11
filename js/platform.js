@@ -186,17 +186,35 @@
     supported: function () { return !!(nav.geolocation && nav.geolocation.watchPosition); },
     background: function () { return false; },
     start: function (onPoint, onError) {
-      var lock = null;
-      // صفحه روشن بمونه (مرورگرهایی که پشتیبانی می‌کنن)
-      if (nav.wakeLock && nav.wakeLock.request) nav.wakeLock.request('screen').then(function (l) { lock = l; }, function () {});
+      var lock = null, stopped = false;
+      // صفحه روشن بمونه (مرورگرهایی که پشتیبانی می‌کنن). مرورگر قفل رو با رفتن به اپ دیگه یا خاموش شدن صفحه آزاد می‌کنه؛
+      // با برگشتن به صفحه دوباره گرفته می‌شه، وگرنه از اون به بعد صفحه خاموش می‌شه و ثبت می‌خوابه
+      function getLock() {
+        if (stopped || lock || !(nav.wakeLock && nav.wakeLock.request)) return;
+        nav.wakeLock.request('screen').then(function (l) {
+          if (stopped) { try { l.release(); } catch (e) { /* */ } return; }
+          lock = l;
+          if (l.addEventListener) l.addEventListener('release', function () { lock = null; });
+        }, function () {});
+      }
+      var doc = root.document;
+      function onVis() { if (doc.visibilityState === 'visible') getLock(); }
+      getLock();
+      if (doc && doc.addEventListener) doc.addEventListener('visibilitychange', onVis);
       var id = nav.geolocation.watchPosition(function (p) {
-        onPoint({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: p.timestamp || Date.now() });
+        // speed: سرعت خود دستگاه (داپلر)؛ برای تشخیص ایستادن. null یا منفی یعنی نامعلوم
+        onPoint({ lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, t: p.timestamp || Date.now(), speed: p.coords.speed });
       }, function (e) {
         // ۳ (TIMEOUT): فقط مدتی نقطه‌ی تازه نیومده؛ ثبت ادامه داره
         if (e && e.code === 3) return;
         onError(e && e.code === 1 ? 'denied' : 'unavailable');
       }, { enableHighAccuracy: true, maximumAge: 0 });
-      return Promise.resolve({ stop: function () { nav.geolocation.clearWatch(id); if (lock) { try { lock.release(); } catch (e) { /* */ } } } });
+      return Promise.resolve({ stop: function () {
+        stopped = true;
+        nav.geolocation.clearWatch(id);
+        if (doc && doc.removeEventListener) doc.removeEventListener('visibilitychange', onVis);
+        if (lock) { try { lock.release(); } catch (e) { /* */ } lock = null; }
+      } });
     },
     stop: function (h) { if (h && h.stop) h.stop(); return Promise.resolve(); },
     canOpenSettings: function () { return false; },
@@ -369,7 +387,7 @@
         var r = BG.addWatcher({ backgroundTitle: texts.title, backgroundMessage: texts.message || 'GPS', requestPermissions: true, stale: false, distanceFilter: 0 },
           function (loc, err) {
             if (err) { onError(err.code === 'NOT_AUTHORIZED' ? 'denied' : 'unavailable'); return; }
-            if (loc) onPoint({ lat: loc.latitude, lon: loc.longitude, acc: loc.accuracy, t: loc.time || Date.now() });
+            if (loc) onPoint({ lat: loc.latitude, lon: loc.longitude, acc: loc.accuracy, t: loc.time || Date.now(), speed: loc.speed });
           });
         return Promise.resolve(r).then(function (id) { return { id: id }; });
       };

@@ -2014,6 +2014,7 @@ html.intro #app .login-import { opacity: 0; }
 .rec-stats dd { margin: var(--sp-1) 0 0; }
 .rec-stats b { font-size: var(--fs-xl); font-weight: 800; font-variant-numeric: tabular-nums; }
 .rec-signal { text-align: center; font-size: var(--fs-sm); color: var(--text-secondary); }
+.rec-wait { text-align: center; color: var(--text-secondary); margin-block-end: 8px; }
 .rec-sig-good::before, .rec-sig-weak::before, .rec-sig-wait::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 6px; vertical-align: middle; background: var(--text-disabled); }
 .rec-sig-good::before { background: var(--success); }
 .rec-sig-weak::before { background: var(--warning); }

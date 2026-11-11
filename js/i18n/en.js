@@ -1774,6 +1774,7 @@
       avg: 'Average pace',
       cur: 'Current pace',
       signal: { wait: 'Finding GPS…', weak: 'Weak GPS signal', good: 'Good GPS signal' },
+      waitFix: 'Waiting for a good GPS signal… stay in the open for a few seconds for a more accurate distance.', startAnyway: 'Start anyway',
       webNote: 'In the browser, recording continues only while this page is open and the screen is on.',
       bgNote: 'Recording continues with the screen locked or the app in the background. The route shape, distance, time and splits are stored only on this phone.',
       noCheckin: 'You haven\'t checked in today yet; better to do it before you start.',

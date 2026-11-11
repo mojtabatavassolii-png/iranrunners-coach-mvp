@@ -9,12 +9,20 @@
  */
 (function (root) {
   'use strict';
-  var MAX_ACC = 30;        // نقطه‌ی با دقت بدتر از ۳۰ متر کنار گذاشته می‌شه
+  var MAX_ACC = 20;        // برای حساب مسافت فقط نقطه‌ی با دقت ۲۰ متر یا بهتر
+  var RELAX_ACC = 30;      // ولی اگه ۲۰ ثانیه هیچ نقطه‌ی خوبی نیومده (سیگنال ضعیف بین ساختمان‌ها)، تا ۳۰ متر هم قبول می‌شه
+  var RELAX_MS = 20000;
   var MAX_SPEED = 8;       // بیشتر از ۸ متر بر ثانیه (۲۹ کیلومتر بر ساعت) پرش GPS حساب می‌شه، نه دویدن
   var MIN_STEP = 3;        // جابه‌جایی کمتر از ۳ متر (یا نصف دقت) لرزش GPS در حالت ایستاده‌ست
   var JUMP_RESET = 5;      // بعد از ۵ پرش پشت‌سرهم، نقطه‌ی تازه مبنا می‌شه (بدون حساب کردن مسافتش)
   var WINDOW_MS = 30000;   // پیس لحظه‌ای از ۳۰ ثانیه‌ی آخر
   var MOVING = 0.5;        // سریع‌تر از نیم متر بر ثانیه یعنی در حال حرکت
+  // تشخیص ایستادن (پشت چراغ، استراحت): رانش آهسته‌ی GPS در حالت ایستاده نباید مسافت بسازه.
+  // سرعت خود دستگاه (داپلر) اگه باشه ملاکه؛ وگرنه جابه‌جایی خالص نقطه‌های ۲۰ ثانیه‌ی آخر (رانش، رفت‌وبرگشتی و کمه).
+  var STILL_SPEED = 0.5;   // سرعت دستگاه کمتر از این یعنی ایستاده
+  var STILL_NET = 0.6;     // جابه‌جایی خالص کمتر از ۰٫۶ متر بر ثانیه در پنجره یعنی ایستاده
+  var STILL_WIN = 20000, STILL_MIN = 12000;
+  var CLEAR_MOVE = 2.5;    // اگه پنجره حرکت روشنی نشون بده (بیش از ۲٫۵ متر بر ثانیه)، سرعت صفرِ اشتباه دستگاه نادیده گرفته می‌شه
   var ROUTE_STEP = 8;      // فاصله‌ی نقطه‌های شکل مسیر (متر)
   var ROUTE_TOL = 4;       // ساده‌سازی شکل مسیر برای ذخیره (متر)
 
@@ -28,7 +36,7 @@
 
   function create(now) {
     return { startedAt: now, activeMs: 0, segStart: now, paused: false, dist: 0, movingMs: 0, last: null,
-      jumps: 0, rejected: 0, points: 0, splits: [], recent: [], lastAcc: null, route: [], kmMarks: [] };
+      jumps: 0, rejected: 0, points: 0, splits: [], recent: [], lastAcc: null, route: [], kmMarks: [], win: [], okAt: null, stillPts: 0 };
   }
   function r5(x) { return Math.round(x * 1e5) / 1e5; }
   // نقطه‌ی شکل مسیر؛ newSeg: تکه‌ی تازه (شروع، بعد از توقف یا قطع GPS)
@@ -42,24 +50,58 @@
   // زمان فعال (بدون توقف‌ها)
   function elapsed(st, now) { return st.activeMs + (st.paused ? 0 : Math.max(0, now - st.segStart)); }
 
+  // ایستاده؟ speed: سرعت دستگاه (متر بر ثانیه) یا null
+  function isStill(st, speed) {
+    // جابه‌جایی خالص: فاصله‌ی میانگین نیمه‌ی اول و دوم پنجره (میانگین‌گیری نویز تک‌نقطه‌ها رو کم می‌کنه)
+    var w = st.win, net = null;
+    if (w.length >= 4 && w[w.length - 1].t - w[0].t >= STILL_MIN) {
+      var h = Math.floor(w.length / 2), mean = function (a) {
+        return a.reduce(function (o, q) { return { lat: o.lat + q.lat / a.length, lon: o.lon + q.lon / a.length, t: o.t + q.t / a.length }; }, { lat: 0, lon: 0, t: 0 });
+      };
+      var A = mean(w.slice(0, h)), B = mean(w.slice(h));
+      net = haversine(A, B) / Math.max(1, (B.t - A.t) / 1000);
+    }
+    if (speed != null) return speed < STILL_SPEED && !(net != null && net > CLEAR_MOVE);
+    return net != null && net < STILL_NET;
+  }
+
   // یک نقطه‌ی تازه؛ true اگه مسافت اضافه شد
   function add(st, p) {
     if (!p || !isFinite(p.lat) || !isFinite(p.lon) || !isFinite(p.t)) return false;
     st.lastAcc = p.acc;
     if (st.paused) return false;
-    if (!(p.acc <= MAX_ACC)) { st.rejected++; return false; }
+    st.win = st.win || [];
+    if (st.okAt == null) st.okAt = p.t;
+    // دقت: ۲۰ متر؛ بعد از ۲۰ ثانیه بدون نقطه‌ی قبول‌شده، تا ۳۰ متر
+    // حالت سیگنال ضعیف تا وقتی ادامه داره که نقطه‌ها ضعیف بمونن (نه هر ۲۰ ثانیه یک نقطه)
+    if (!(p.acc <= (st.relaxed || p.t - st.okAt >= RELAX_MS ? RELAX_ACC : MAX_ACC))) { st.rejected++; return false; }
+    st.relaxed = p.acc > MAX_ACC;
     var last = st.last;
-    if (!last) { st.last = { lat: p.lat, lon: p.lon, t: p.t }; st.points++; routeAdd(st, p.lat, p.lon, true); return false; }
+    if (!last) { st.last = { lat: p.lat, lon: p.lon, t: p.t }; st.okAt = p.t; st.points++; st.win = [{ lat: p.lat, lon: p.lon, t: p.t }]; routeAdd(st, p.lat, p.lon, true); return false; }
     if (p.t <= last.t) return false;
     var d = haversine(last, p), dt = (p.t - last.t) / 1000;
     if (d / dt > MAX_SPEED) {
       st.rejected++;
-      if (++st.jumps >= JUMP_RESET) { st.last = { lat: p.lat, lon: p.lon, t: p.t }; st.jumps = 0; routeAdd(st, p.lat, p.lon, true); }
+      if (++st.jumps >= JUMP_RESET) { st.last = { lat: p.lat, lon: p.lon, t: p.t }; st.okAt = p.t; st.jumps = 0; st.win = []; routeAdd(st, p.lat, p.lon, true); }
       return false;
     }
     st.jumps = 0;
+    st.okAt = p.t;
+    st.win.push({ lat: p.lat, lon: p.lon, t: p.t });
+    while (st.win.length > 2 && p.t - st.win[0].t > STILL_WIN) st.win.shift();
     if (d < Math.max(MIN_STEP, (p.acc || 0) / 2)) {
-      // ایستاده یا لرزش: نقطه‌ی مبنا عوض نمی‌شه تا لرزش‌های کوچک روی هم جمع نشن
+      // لرزش: نقطه‌ی مبنا عوض نمی‌شه تا لرزش‌های کوچک روی هم جمع نشن
+      return false;
+    }
+    // سرعت دستگاه: میانه‌ی ۳ نقطه‌ی آخر (یک عدد پرت نویز داپلر، ایستاده رو «در حرکت» نکنه)
+    var speed = null;
+    if (isFinite(p.speed) && p.speed >= 0) {
+      st.spd = (st.spd || []).concat([p.speed]).slice(-3);
+      speed = st.spd.slice().sort(function (x, y) { return x - y; })[Math.floor(st.spd.length / 2)];
+    } else st.spd = [];
+    if (isStill(st, speed)) {
+      // ایستاده (رانش آهسته): مسافت اضافه نمی‌شه و مبنا همون می‌مونه؛ با راه افتادن دوباره، فاصله از همین مبنا حساب می‌شه
+      st.stillPts++;
       return false;
     }
     var before = st.dist;
@@ -88,7 +130,7 @@
     st.activeMs += Math.max(0, now - st.segStart);
     st.paused = true;
     // فاصله‌ی بین محل توقف و محل ادامه حساب نمی‌شه
-    st.last = null; st.recent = []; st.jumps = 0;
+    st.last = null; st.recent = []; st.jumps = 0; st.win = []; st.okAt = null; st.spd = [];
   }
   function resume(st, now) {
     if (!st.paused) return;
@@ -106,14 +148,15 @@
     return d >= 20 && dt > 0 ? dt / (d / 1000) : null;
   }
   // وضعیت GPS برای نمایش: 'wait' (هنوز نقطه‌ای نیومده) | 'weak' | 'good'
-  function signal(st) { return st.lastAcc == null ? 'wait' : (st.lastAcc <= 15 ? 'good' : 'weak'); }
+  var GOOD_ACC = 15;
+  function signal(st) { return st.lastAcc == null ? 'wait' : (st.lastAcc <= GOOD_ACC ? 'good' : 'weak'); }
 
   // نتیجه برای ذخیره: همون شکل عدد واقعی جلسه (km، sec، start) به‌علاوه‌ی اسپلیت‌ها
   function summary(st, now) {
     var sec = Math.round(elapsed(st, now) / 1000), d = new Date(st.startedAt);
     var pad = function (n) { return (n < 10 ? '0' : '') + n; };
     return { km: Math.round(st.dist / 10) / 100, sec: sec, movingSec: Math.round(st.movingMs / 1000), splits: st.splits.slice(),
-      start: pad(d.getHours()) + ':' + pad(d.getMinutes()), points: st.points, rejected: st.rejected };
+      start: pad(d.getHours()) + ':' + pad(d.getMinutes()), points: st.points, rejected: st.rejected, still: st.stillPts || 0 };
   }
 
   // ---------- شکل مسیر برای ذخیره ----------
@@ -160,7 +203,7 @@
   }
 
   var api = { routeOut: routeOut, decode: decode, encode: encode, simplify: simplify, create: create, add: add, pause: pause, resume: resume, elapsed: elapsed, avgPace: avgPace, currentPace: currentPace,
-    signal: signal, summary: summary, haversine: haversine, MAX_ACC: MAX_ACC, MAX_SPEED: MAX_SPEED };
+    signal: signal, summary: summary, haversine: haversine, MAX_ACC: MAX_ACC, MAX_SPEED: MAX_SPEED, GOOD_ACC: GOOD_ACC };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CoachTrack = api;
 })(typeof window !== 'undefined' ? window : this);
