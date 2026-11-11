@@ -1939,4 +1939,13 @@ test('شبیه‌ساز ۱۰: پایین‌آوردن سطح با یک تست ک
   p.fitnessTests.push({ date: '2027-01-02', distanceKm: 5, timeSec: at(hi + 0.3), kind: 'test' });
   assert.ok(C.fitnessLevelSuggestion(p).up, 'دو تست بالای مرز');
 });
+test('«فعلاً نه» برای پیشنهاد سطح: تا تایم‌تست بعدی پنهان، با تست تازه دوباره', function () {
+  var at = function (v) { return Math.round(C.raceTimeFromVdot(v, 5)); };
+  var p = profileFor(3, { fitnessTests: [{ date: '2026-11-01', distanceKm: 5, timeSec: at(55), kind: 'test' }] });
+  assert.ok(C.fitnessLevelSuggestion(p));
+  assert.strictEqual(C.skipLevelSuggestion(p), true);
+  assert.strictEqual(C.fitnessLevelSuggestion(p), null);
+  p.fitnessTests.push({ date: '2026-12-13', distanceKm: 5, timeSec: at(55.5), kind: 'test' });
+  assert.ok(C.fitnessLevelSuggestion(p), 'تست تازه، پیشنهاد دوباره');
+});
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

@@ -614,9 +614,18 @@
   // آیا فیتنس فعلی به سطح دیگه‌ای رسیده؟ (برنامه خودکار سطح عوض نمی‌کنه تا حجم پرش نکنه؛ به کاربر پیشنهاد می‌ده)
   // اختلاف عادی دو تایم‌تست ۲ تا ۳٪ (حدود ۱ تا ۱٫۵ VDOT) است
   var LEVEL_DOWN_MARGIN = 2, LEVEL_UP_MARGIN = 1;
+  // «فعلاً نه»: پیشنهاد سطح تا تایم‌تست یا مسابقه‌ی بعدی پنهان می‌شه (کلید = همون نتیجه‌ای که پیشنهاد رو ساخته)
+  function fitnessKey(e) { return e ? [e.date, e.distanceKm, e.timeSec].join('|') : null; }
+  function skipLevelSuggestion(profile) {
+    var fit = currentFitness(profile);
+    if (!fit) return false;
+    profile.levelSkip = fitnessKey(fit.entry);
+    return true;
+  }
   function fitnessLevelSuggestion(profile) {
     var fit = currentFitness(profile);
     if (!fit || fit.entry.kind === 'baseline' || fit.entry.kind === 'step' || profile.experience === 'never') return null;
+    if (profile.levelSkip && profile.levelSkip === fitnessKey(fit.entry)) return null;
     var planLevel = assessLevel(profile).level;
     var fitLevel = levelFromVdot(fit.vdot);
     if (fitLevel === planLevel) return null;
@@ -3581,7 +3590,7 @@
     buildWeek: buildWeek, sessionFor: sessionFor, adaptSession: adaptSession, isHard: isHard, readiness: readiness, weekAdaptSummary: weekAdaptSummary,
     currentFitness: currentFitness, fitnessEntries: fitnessEntries, hrZones: hrZones, easyRunFeedback: easyRunFeedback,
     easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, fitnessReminder: fitnessReminder,
-    fitnessLevelSuggestion: fitnessLevelSuggestion, applyFitnessLevel: applyFitnessLevel,
+    fitnessLevelSuggestion: fitnessLevelSuggestion, skipLevelSuggestion: skipLevelSuggestion, applyFitnessLevel: applyFitnessLevel,
     adherence: adherence, rebaseSuggestion: rebaseSuggestion, applyRebase: applyRebase, logWeek: logWeek, planLogLimit: planLogLimit,
     EASY_ADJUST_MAX: EASY_ADJUST_MAX,
     profileWarnings: profileWarnings, raceInfo: raceInfo, taperWeeks: taperWeeks,

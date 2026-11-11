@@ -937,6 +937,7 @@
       up: 'If you like, the plan can continue from this week at the new level, starting from your current mileage.',
       down: 'If you\'ve had a break or an injury, it\'s better to continue at the lower level from your current mileage.',
       apply: 'Continue the plan at level {n}',
+      later: 'Not now', laterToast: 'No more level suggestions until your next time trial or race.',
       step: '{n} weeks have passed since your latest result and your easy runs felt easy. Following the Daniels method, it is time to move your paces one step toward your target time (VDOT {a} to {b}).',
       stepApply: 'Move up one step', stepTest: 'or run a time trial', stepDone: 'Paces updated to VDOT {v}.'
     },

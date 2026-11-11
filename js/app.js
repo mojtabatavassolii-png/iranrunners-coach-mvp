@@ -1892,7 +1892,7 @@
         hrMax: hrIn.max, hrRest: hrIn.rest,
         sex: sex, cycle: cycleObj,
         // تاریخچه‌ی فیتنس و تنظیم دستی پیس ایزی با ویرایش پروفایل حفظ می‌شن
-        fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0, races: p.races || [],
+        fitnessTests: p.fitnessTests || [], easyAdjustSec: p.easyAdjustSec || 0, races: p.races || [], levelSkip: p.levelSkip || null,
         // تاریخچه‌ی برنامه می‌مونه، مگه اینکه کاربر حجم فعلیش رو عوض کرده باشه (عدد تازه‌ی خودش مبناست)
         planLog: p.planLog && Number(p.currentWeeklyKm) === Number(curKm) && Number(p.lastWeekKm) === Number(volP.lastWeekKm) && Number(p.monthAvgKm) === Number(volP.monthAvgKm) ? p.planLog : undefined,
         uid: p.uid || newUid(),
@@ -2373,6 +2373,7 @@
       return;
     }
     if (e.target.closest('[data-apply-level]')) { applyFitnessLevel(); return; }
+    if (e.target.closest('[data-level-later]')) { if (C.skipLevelSuggestion(state.profile)) { save(); showToast(T('fitNotes.laterToast')); route(); } return; }
     var zf = e.target.closest('[data-zero-feel]');
     if (zf) {
       var zwk = C.buildWeek(state.profile, today());
@@ -2513,7 +2514,8 @@
     var sg = C.fitnessLevelSuggestion(p);
     if (sg) items.push('<li>' + esc(T('fitNotes.suggestA')) + ' <strong>' + tt('fitNotes.suggestLevel', { n: sg.to }) + '</strong> ' + tt('fitNotes.suggestB', { from: sg.from }) + ' ' +
       esc(T(sg.up ? 'fitNotes.up' : 'fitNotes.down')) +
-      '<div class="actions"><button type="button" class="btn btn-outline" data-apply-level="1">' + tt('fitNotes.apply', { n: sg.to }) + '</button></div></li>');
+      '<div class="actions"><button type="button" class="btn btn-outline" data-apply-level="1">' + tt('fitNotes.apply', { n: sg.to }) + '</button>' +
+      '<button type="button" class="btn btn-ghost" data-level-later="1">' + esc(T('fitNotes.later')) + '</button></div></li>');
     if (!items.length) return '';
     return '<section class="card fitness-notes"><h3>' + esc(T('fitNotes.title')) + '</h3><ul>' + items.join('') + '</ul></section>';
   }

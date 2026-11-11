@@ -260,6 +260,8 @@ function simulate(persona, opts) {
     if (r.adaptation && r.adaptation.message) msgs.push(r.adaptation.message);
     if (!walk) { var fr = C.fitnessReminder(p, d); if (fr) msgs.push(fr.message); }
     var sgL = walk ? null : C.fitnessLevelSuggestion(p);
+    // پیشنهاد سطحی که هنوز روی صفحه‌ست: کاربری که اپ رو باز کرده گاهی «فعلاً نه» می‌زنه (بی‌حوصله و زودرنج بیشتر)
+    if (sgL && checked && rnd.chance(['bored', 'sensitive'].indexOf(persona.traits.temperament) >= 0 ? 0.15 : 0.06)) { C.skipLevelSuggestion(p); sgL = null; }
     if (sgL) msgs.push('level:' + sgL.from + '>' + sgL.to);
     Object.keys(msgStreak).forEach(function (m) { if (msgs.indexOf(m) < 0) delete msgStreak[m]; });
     msgs.forEach(function (m) {
@@ -544,6 +546,9 @@ function simulate(persona, opts) {
   }
   function closeWeek(w, day) {
     w.doneKm = r1(w.doneKm); w.doneMin = Math.round(w.doneMin);
+    // آخرین نسخه‌ی برنامه‌ی هفته که کاربر دیده (اگه وسط هفته هدف یا سطح عوض شده، همونی که اپ در تاریخچه ثبت کرده)
+    var lg = p.planLog && p.planLog[w.start];
+    if (lg) { w.plannedKm = lg.km; w.vert = lg.vert; }
     weeks.push(w);
     // برنامه بدون توجه به انجام‌نشده‌ها جلو می‌ره؟ (۶ هفته‌ی پشت‌سرهم زیر ۶۰٪، ولی حجم برنامه بالا رفته)
     var last6 = weeks.slice(-6);
@@ -578,6 +583,8 @@ function simulate(persona, opts) {
       var hiddenLvl = C.levelFromVdot(H.vdot);
       var acc = sg.up ? T.accept : T.accept * 0.5;
       events.push({ day: day, kind: 'level', text: 'پیشنهاد سطح ' + sg.from + ' ← ' + sg.to + (rnd() < acc ? ' (قبول)' : ' (رد)') });
+      // رد: بیشتر کاربرها «فعلاً نه» رو می‌زنن تا پیشنهاد تا تست بعدی پنهان بشه (app.js data-level-later)
+      if (events[events.length - 1].text.indexOf('(رد)') >= 0 && rnd.chance(0.7)) { C.skipLevelSuggestion(p); events[events.length - 1].text += ' ← فعلاً نه'; }
       if (events[events.length - 1].text.indexOf('قبول') >= 0) {
         C.applyFitnessLevel(p, d);   // همون تابعی که دکمه‌ی «قبول سطح» در اپ صدا می‌زنه
         var lv = C.assessLevel(p).level;
