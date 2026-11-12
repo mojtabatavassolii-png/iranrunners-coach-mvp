@@ -525,7 +525,7 @@
   (function () {
     var live = P.store.getJSON(REC_KEY);
     if (live && live.st && live.key) {
-      rec = { key: live.key, st: live.st, hr: live.hr || null, status: 'pause', recovered: true, handle: null };
+      rec = { key: live.key, st: live.st, hr: live.hr || null, status: 'pause', recovered: true, handle: null, free: !!live.free };
       // مکث از آخرین لحظه‌ای که صفحه زنده بود (یا آخرین نقطه)، نه از لحظه‌ی باز شدن دوباره؛
       // وگرنه کل مدتی که اپ بسته بوده «زمان دویدن» بدون مسافت حساب می‌شه و پیس خراب می‌شه
       var alive = Math.max(Number(live.aliveAt) || 0, (live.st.last && live.st.last.t) || 0), nowR = Date.now();
@@ -539,7 +539,7 @@
     var now = Date.now();
     if (!force && now - recSavedAt < 5000) return;
     recSavedAt = now;
-    try { P.store.setJSON(REC_KEY, { key: rec.key, st: rec.st, hr: rec.hr || null, aliveAt: now }); } catch (e) { /* */ }
+    try { P.store.setJSON(REC_KEY, { key: rec.key, st: rec.st, hr: rec.hr || null, aliveAt: now, free: !!rec.free }); } catch (e) { /* */ }
   }
   function recClear() {
     if (rec && rec.handle) P.gps.stop(rec.handle);
@@ -648,7 +648,7 @@
   // قطع شدن حین ثبت: یک بار خودکار دوباره وصل می‌شه؛ نشد، دکمه‌ی «اتصال دوباره».
   var HR_DEV_KEY = 'gaam-hr-device', hrConn = null, hrState = 'off', hrNow = null, hrMsg = '', hrRetry = null;
   function hrEasyMax() {
-    var z = state.profile && C.hrZones(state.profile), s = rec && recSession(rec.key);
+    var z = state.profile && C.hrZones(state.profile), s = rec && !rec.free && recSession(rec.key);
     return z && s && s.easyEffort ? z.easy[1] : null;
   }
   function hrData(bytes) {
@@ -742,16 +742,16 @@
   function renderRecord() {
     var todayKey = C.dateKey(today());
     if (!rec) rec = { key: todayKey, st: null, status: 'idle', handle: null };
-    var s = recSession(rec.key), st = rec.st, now = Date.now(), u = T('units.word.' + I.getUnits());
-    var target = s.km ? t(s.target) : (s.minutes ? tt('home.minutes', { n: s.minutes }) : '');
+    var s = rec.free ? null : recSession(rec.key), st = rec.st, now = Date.now(), u = T('units.word.' + I.getUnits());
+    var target = !s ? '' : s.km ? t(s.target) : (s.minutes ? tt('home.minutes', { n: s.minutes }) : '');
     var html = '<section class="card rec-card"><p class="eyebrow">' + esc(T('rec.title')) + '</p>' +
-      '<h1 class="rec-head">' + badge(s.type, s.label) + (target ? ' <span class="rec-target">' + target + '</span>' : '') + '</h1>';
+      '<h1 class="rec-head">' + (s ? badge(s.type, s.label) : esc(T('free.title'))) + (target ? ' <span class="rec-target">' + target + '</span>' : '') + '</h1>';
     if (!P.gps.supported()) {
       app.innerHTML = html + '<p class="form-errors" role="alert">' + esc(T('rec.unavailable')) + '</p></section>';
       return;
     }
     if (rec.recovered) html += '<div class="alert alert-note" role="status"><p>' + esc(T('rec.recovered')) + '</p></div>';
-    if (rec.status === 'idle' && rec.key === todayKey && !state.checkins[todayKey]) html += '<p class="small muted">' + esc(T('rec.noCheckin')) + ' <a href="#checkin">' + esc(T('home.startCheckin')) + '</a></p>';
+    if (rec.status === 'idle' && !rec.free && rec.key === todayKey && !state.checkins[todayKey]) html += '<p class="small muted">' + esc(T('rec.noCheckin')) + ' <a href="#checkin">' + esc(T('home.startCheckin')) + '</a></p>';
     html += '<div class="rec-time" id="rec-time" aria-live="off">' + recClock(st ? K.elapsed(st, now) / 1000 : 0) + '</div>' +
       '<dl class="rec-stats">' +
       '<div><dt>' + esc(T('rec.dist')) + '</dt><dd><b id="rec-km">' + fa(dKm(st ? Math.floor(st.dist / 10) / 100 : 0).toFixed(2)) + '</b> <small>' + esc(u) + '</small></dd></div>' +
@@ -777,7 +777,7 @@
         (rec.status === 'pause' ? '<p class="small muted">' + esc(T('rec.paused')) + '</p>' : '');
     } else if (rec.status === 'done') {
       var sm = K.summary(st, now);
-      html += '<div class="rec-done"><p><b>' + esc(T('rec.doneQ')) + '</b></p>' +
+      html += '<div class="rec-done"><p><b>' + esc(T('rec.doneQ')) + '</b></p>' + (rec.free && sm.km >= 0.05 ? freeAskHtml() : '') +
         (sm.splits.length ? '<p class="small">' + esc(T('rec.splits')) + ' ' + sm.splits.map(function (x) { return '<span dir="ltr">' + fa(C.formatDuration(x)) + '</span>'; }).join(' · ') + '</p>' : '') +
         (sm.km < 0.05 ? '<p class="form-errors" role="alert">' + esc(T('rec.tooShort')) + '</p>' : '') +
         '<div class="rec-actions">' + (sm.km >= 0.05 ? '<button type="button" class="btn btn-primary rec-big" data-rec="save">' + esc(T('rec.save')) + '</button>' : '') +
@@ -804,6 +804,9 @@
     else if (a === 'discard') {
       if (!rec.discardAsk) { rec.discardAsk = true; }
       else { recClear(); showToast(T('rec.discarded')); location.hash = '#home'; return; }
+    } else if (a === 'save' && rec.free) {
+      saveFreeRun(now);
+      return;
     } else if (a === 'save') {
       var sm = K.summary(rec.st, now), key = rec.key;
       if (!state.done[key]) markDone(key);
@@ -815,6 +818,10 @@
       if (rt) log.route = rt; else delete log.route;
       var hs = rec.hr && H.summary(rec.hr);
       if (hs && hs.sec >= 30) log.hr = { avg: hs.avg, max: hs.max, above: hs.aboveSec, easyMax: hrEasyMax() }; else delete log.hr;
+      // بیشتر از برنامه دویده (بیش از ۱۰٪): پیشنهاد تطبیق جلسه‌های بعدی (فقط پیشنهاد)
+      var plannedS = recSession(key);
+      if (plannedS && plannedS.km && sm.km > plannedS.km * 1.1)
+        addAdvice(C.adviceAfterRun(state, { date: key, km: sm.km, planned: true, kind: ['tempo', 'interval'].indexOf(plannedS.type) >= 0 ? plannedS.type : null }, today()));
       recClear();
       save();
       showToast(T('rec.saved'));
@@ -825,6 +832,155 @@
       return;
     }
     renderRecord();
+  });
+
+  // =====================================================================
+  // تمرین آزاد (روز بدون جلسه، یا دویدن جدا از جلسه‌ی امروز) و حجم هفته
+  // ذخیره در state.activities (مدل مشترک C.makeActivity؛ بعداً Health و Strava و Garmin هم همین‌جا)
+  // =====================================================================
+  var freeAsk = false, freeKind = null, freeRpe = null;
+  function startFree() {
+    if (recLive()) { location.hash = '#record'; return; }
+    if (rec && rec.handle) P.gps.stop(rec.handle);
+    rec = { key: C.dateKey(today()), st: null, status: 'idle', handle: null, free: true };
+    freeKind = null; freeRpe = null; freeAsk = false;
+    if (location.hash === '#record') renderRecord(); else location.hash = '#record';
+  }
+  // دکمه‌ی «ثبت تمرین آزاد» (همیشه، حتی روز استراحت). اگه امروز جلسه‌ی انجام‌نشده هست، اول می‌پرسه
+  function freeButton() {
+    if (!P.gps.supported() || recLive() || !state.profile) return '';
+    var key = C.dateKey(today()), s = recSession(key), open = s && !state.done[key] && ['rest', 'none', 'cancelled'].indexOf(s.type) < 0;
+    if (freeAsk && open) {
+      return '<div class="card free-ask"><p><b>' + esc(T('free.askQ')) + '</b></p><div class="actions">' +
+        '<a class="btn btn-primary" href="#record" data-free="planned">' + esc(T('free.askPlanned')) + '</a>' +
+        '<button type="button" class="btn btn-outline" data-free="go">' + esc(T('free.askSeparate')) + '</button></div></div>';
+    }
+    return '<button type="button" class="btn btn-outline btn-block free-btn" data-free="' + (open ? 'ask' : 'go') + '">' + esc(T('free.button')) + '</button>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-free]');
+    if (!b) return;
+    var a = b.dataset.free;
+    if (a === 'ask') { freeAsk = true; route(); return; }
+    if (a === 'planned') { freeAsk = false; rec = null; return; }   // لینک خودش به #record می‌ره (حالت جلسه‌ی برنامه)
+    if (a === 'go') { e.preventDefault(); startFree(); }
+  });
+  // آخر ثبت: نوع و سختی، هر دو اختیاری و با یک لمس
+  function freeAskHtml() {
+    var kinds = ['easy', 'tempo', 'interval', 'long', 'unsure'];
+    var chip = function (name, v, label, on) { return '<button type="button" class="chip-btn' + (on ? ' is-on' : '') + '" data-free-pick="' + name + ':' + v + '" aria-pressed="' + on + '">' + label + '</button>'; };
+    return '<div class="free-q"><p class="small">' + esc(T('free.kindQ')) + '</p><div class="chip-row">' +
+      kinds.map(function (k) { return chip('kind', k, esc(T('free.kind.' + k)), freeKind === k); }).join('') + '</div>' +
+      '<p class="small">' + esc(T('free.rpeQ')) + '</p><div class="chip-row rpe-row" dir="ltr">' +
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) { return chip('rpe', n, fa(n), freeRpe === n); }).join('') + '</div></div>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-free-pick]');
+    if (!b) return;
+    var kv = b.dataset.freePick.split(':');
+    if (kv[0] === 'kind') freeKind = freeKind === kv[1] ? null : kv[1];
+    else { var n = Number(kv[1]); freeRpe = freeRpe === n ? null : n; }
+    renderRecord();
+  });
+  function saveFreeRun(now) {
+    var sm = K.summary(rec.st, now), hs = rec.hr && H.summary(rec.hr), key = rec.key;
+    var act = C.addActivity(state, {
+      source: 'gps', sport: walker() ? 'walk' : 'run', date: key, start: new Date(rec.st.startedAt).toISOString(),
+      sec: sm.sec, movingSec: sm.movingSec, km: sm.km, splits: sm.splits.length ? sm.splits : null, route: K.routeOut(rec.st),
+      hr: hs && hs.sec >= 30 ? { avg: hs.avg, max: hs.max } : null,
+      kind: freeKind === 'unsure' ? null : freeKind, rpe: freeRpe
+    });
+    if (act && !walker()) addAdvice(C.adviceAfterRun(state, act, today()));
+    recClear();
+    freeKind = null; freeRpe = null;
+    save();
+    showToast(T('free.saved'));
+    location.hash = '#home';
+  }
+  // ---------- پیشنهادهای تطبیقی (state.advice) ----------
+  function addAdvice(list) {
+    if (!list || !list.length) return;
+    state.advice = (state.advice || []).filter(function (x) { return x.status === 'open' ? adviceLive(x) : x.at > C.dateKey(C.addDays(today(), -30)); });
+    list.forEach(function (x) {
+      if (state.advice.some(function (y) { return y.id === x.id; })) return;
+      state.advice.push(Object.assign({ status: 'open', at: C.dateKey(today()) }, x));
+    });
+  }
+  // پیشنهادی که روزهای تغییرش گذشته، دیگه نشون داده نمی‌شه؛ پیام‌های بدون تغییر (درد) تا ۲ روز
+  function adviceLive(x) {
+    var k = C.dateKey(today());
+    if (!x.changes || !x.changes.length) return x.at >= C.dateKey(C.addDays(today(), -2));
+    return x.changes.some(function (c) { return c.date >= k && !state.done[c.date]; });
+  }
+  function adviceText(x) {
+    var u = T('units.word.' + I.getUnits());
+    var lines = (x.changes || []).map(function (c) {
+      return '<li>' + (c.to === 'easy' ? tt('advice.toEasy', { day: dayNameOf(c.date) }) : tt('advice.trim', { day: dayNameOf(c.date), km: dKm(c.km), from: dKm(c.from), u: u })) + '</li>';
+    }).join('');
+    var head = x.rule === 'over' ? (x.over > 0 ? tt('advice.over', { n: dKm(x.over), u: u }) : esc(T('advice.overCap'))) :
+      x.rule === 'long' ? esc(T('advice.long')) : x.rule === 'hardNext' ? esc(T('advice.hardNext')) : x.rule === 'taper' ? esc(T('advice.taper')) :
+      x.rule === 'hardShare' ? esc(T('advice.hardShare')) : esc(T('advice.pain'));
+    return '<p>' + head + '</p>' + (lines ? '<ul class="advice-list">' + lines + '</ul>' : '');
+  }
+  function dayNameOf(k) { var d = C.parseDate(k); return T('days')[(d.getDay() + 1) % 7]; }
+  function adviceCards() {
+    var open = (state.advice || []).filter(function (x) { return x.status === 'open' && adviceLive(x); }).slice(-2);
+    return open.map(function (x) {
+      var info = !x.changes || !x.changes.length;
+      return '<section class="card advice-card" role="status"><div class="hcard-top"><span class="hcard-label">' + esc(T('advice.title')) + '</span>' + learnQ('freeruns') + '</div>' +
+        adviceText(x) + '<div class="actions">' + (info ? '<button type="button" class="btn btn-outline" data-advice="no:' + x.id + '">' + esc(T('advice.ok')) + '</button>'
+          : '<button type="button" class="btn btn-primary" data-advice="yes:' + x.id + '">' + esc(T('advice.yes')) + '</button>' +
+            '<button type="button" class="btn btn-ghost" data-advice="no:' + x.id + '">' + esc(T('advice.no')) + '</button>') + '</div></section>';
+    }).join('');
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-advice]');
+    if (!b) return;
+    var v = b.dataset.advice.split(':'), x = (state.advice || []).filter(function (y) { return y.id === v.slice(1).join(':'); })[0];
+    if (!x) return;
+    if (v[0] === 'yes') {
+      state.planAdjust = state.planAdjust || {};
+      (x.changes || []).forEach(function (c) { if (!state.done[c.date]) state.planAdjust[c.date] = { to: c.to, km: c.km, from: c.from || null, advice: x.id }; });
+      x.status = 'accepted';
+      showToast(T('advice.done'));
+    } else x.status = 'dismissed';
+    save(); route();
+  });
+  // ---------- نوار حجم هفته (خانه، برنامه، پروفایل) ----------
+  function weekBar(compact) {
+    if (!state.profile) return '';
+    var w = C.weekActual(state, today());
+    if (!w.plan && !w.done) return '';
+    var u = w.byMin ? T('wbar.min') : T('units.word.' + I.getUnits()), cv = function (x) { return w.byMin ? x : Math.round(dKm(x) * 10) / 10; };
+    var max = Math.max(w.plan, w.done) || 1, pDone = Math.min(w.done, w.plan) / max * 100, pOver = w.over / max * 100;
+    var sub = w.over > 0 ? tt('wbar.over', { n: cv(w.over), u: u }) : tt('wbar.left', { n: cv(w.left), u: u });
+    if (w.free > 0) sub += esc(T('progress.sep')) + tt('wbar.free', { n: cv(w.free), u: u });
+    if (compact) return T('wbar.of', { d: cv(w.done), p: cv(w.plan), u: u });
+    return '<section class="card week-bar"><div class="wb-head"><span class="hcard-label">' + esc(T('wbar.title')) + '</span><b>' + tt('wbar.of', { d: cv(w.done), p: cv(w.plan), u: u }) + '</b></div>' +
+      '<div class="wb-track" role="img" aria-label="' + esc(fa(T('wbar.of', { d: cv(w.done), p: cv(w.plan), u: u }))) + '"><i class="wb-done" style="width:' + pDone.toFixed(1) + '%"></i>' +
+      (pOver > 0 ? '<i class="wb-over" style="width:' + pOver.toFixed(1) + '%"></i>' : '') + '</div>' +
+      '<p class="small muted wb-sub">' + sub + '</p></section>';
+  }
+  // تمرین‌های آزاد یک روز (زیر جزئیات روز در صفحه‌ی برنامه)، با حذف دومرحله‌ای
+  var actDelAsk = null;
+  function freeActsHtml(key) {
+    var list = (state.activities || []).filter(function (a) { return a.date === key && !a.plannedDate; });
+    if (!list.length) return '';
+    var u = T('units.word.' + I.getUnits());
+    return '<div class="free-acts"><h4>' + esc(T('free.listTitle')) + '</h4><ul>' + list.map(function (a) {
+      var bits = [a.km ? fa((Math.round(dKm(a.km) * 100) / 100).toFixed(2)) + ' ' + esc(u) : '', '<span dir="ltr">' + fa(C.formatDuration(a.sec)) + '</span>',
+        a.kind ? esc(T('free.kind.' + a.kind)) : '', a.rpe ? tt('free.rpeShort', { n: a.rpe }) : '', esc(T('free.src.' + a.source))].filter(Boolean);
+      return '<li>' + bits.join(esc(T('progress.sep'))) + ' <button type="button" class="linklike small" data-act-del="' + a.id + '">' + esc(T(actDelAsk === a.id ? 'free.delSure' : 'free.del')) + '</button></li>';
+    }).join('') + '</ul></div>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-act-del]');
+    if (!b) return;
+    var id = b.dataset.actDel;
+    if (actDelAsk !== id) { actDelAsk = id; route(); return; }
+    actDelAsk = null;
+    state.activities = (state.activities || []).filter(function (a) { return a.id !== id; });
+    save(); showToast(T('free.deleted')); route();
   });
   // دکمه‌ی «ثبت با GPS» برای جلسه‌ی امروز (خانه و برنامه)
   function recButton(key, s, cls) {
@@ -939,7 +1095,7 @@
       return;
     }
     // GPS گرم‌شده‌ی صفحه‌ی ثبت (قبل از شروع) با رفتن به صفحه‌ی دیگه خاموش می‌شه
-    if (rec && rec.status === 'idle' && rec.handle && (location.hash || '').slice(1) !== 'record') { P.gps.stop(rec.handle); rec.handle = null; rec.warm = null; }
+    if (rec && rec.status === 'idle' && (location.hash || '').slice(1) !== 'record') { if (rec.handle) P.gps.stop(rec.handle); rec = null; }
     // تاریخچه‌ی هفتگی برنامه: حجم و ارتفاع همین هفته (برای حد رشد بعد از تغییر هدف یا سطح)
     if (state.profile && C.logWeek(state.profile, today())) save();
     // رکورد تازه سطح رو بالا برده: سطح همراه VDOT بالا می‌ره و پیام تبریک (هر مسیر ثبت رکورد: فیتنس، نتیجه‌ی مسابقه، Health)
@@ -2362,6 +2518,8 @@
     // آمار هفته از جلسه‌های واقعی (بعد از تطبیق با چک‌این و روزهای پریود)؛ اگه با برنامه‌ی اصلی فرق داشت، اون هم نشون داده می‌شه
     var resolved = week.days.map(function (d) { return effectiveSession(d); });
     var ws = doneStats(resolved);
+    // تمرین‌های آزاد این هفته هم جزو «انجام شد»
+    C.freeInWeek(state, C.parseDate(week.start)).forEach(function (a) { ws.dkm = Math.round((ws.dkm + (a.sport === 'walk' ? 0 : a.km || 0)) * 10) / 10; ws.dmin += Math.round(a.sec / 60); });
     var runDays = ws.n, effKm = ws.km, effMin = ws.min;
     var kmChanged = Math.abs(effKm - week.totalKm) > 0.05, minChanged = effMin !== week.totalMin;
     var zero = lv.level === 0;
@@ -2429,6 +2587,7 @@
       (rs.adaptation ? adaptationBox(rs.adaptation, d) : '') + cycleBox(rs, d, todayKey, true) +
       (ss.type !== 'cancelled' ? sessionBody(ss, canLog && ls === ss ? { key: d, prefix: 'panel' } : {}) : '') +
       (canLog && ls !== ss ? postRunBlock(d, ls, 'panel') : '') +
+      freeActsHtml(d) +
       '</div>';
   }
 
@@ -4454,7 +4613,7 @@
     // آمادگی، پیشرفت هفته و نکته‌های فیتنس/قدم‌ها → پیشرفت؛ چرخه → برنامه؛ نصب → پروفایل؛ اهداف و مسیر → مسابقه و اهداف
     void p;
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
-      '<h1>' + esc(p && p.name ? T('home.greetName', { g: T(greetKey()), name: p.name }) : T(greetKey())) + '</h1></header>' + nameCard() + recBanner() + homeToday(base, r.session, ci, key, r) + homeChecklist(now);
+      '<h1>' + esc(p && p.name ? T('home.greetName', { g: T(greetKey()), name: p.name }) : T(greetKey())) + '</h1></header>' + nameCard() + recBanner() + adviceCards() + homeToday(base, r.session, ci, key, r) + weekBar() + freeButton() + homeChecklist(now);
     app.innerHTML = '<div class="home">' + html + '</div>';
     collapseChecklist();
   }
@@ -5601,11 +5760,11 @@
   // =====================================================================
   // آموزش: مقاله‌های کوتاه علمی (محتوا از js/i18n/learn-*.js)، هر مقاله در #learn/<شناسه>
   // =====================================================================
-  var LEARN_ORDER = ['vdot', 'rpe', 'eighty', 'types', 'fartleks', 'tenpct', 'warmup', 'cycle', 'returning', 'goals', 'progress'];
+  var LEARN_ORDER = ['vdot', 'rpe', 'eighty', 'types', 'fartleks', 'tenpct', 'warmup', 'cycle', 'returning', 'goals', 'progress', 'freeruns'];
   // فهرست آموزش، موضوع‌بندی‌شده: مقاله‌ها و بخش‌های راهنمای کار با برنامه (g:) کنار هم
   var LEARN_GROUPS = [
     ['start', ['g:start', 'returning', 'g:levels']], ['pace', ['vdot', 'rpe', 'g:fitness', 'g:intensity']],
-    ['train', ['eighty', 'types', 'fartleks', 'warmup', 'g:week', 'g:sessions', 'g:places']], ['injury', ['tenpct', 'g:checkin']],
+    ['train', ['eighty', 'types', 'fartleks', 'warmup', 'g:week', 'g:sessions', 'g:places']], ['injury', ['tenpct', 'freeruns', 'g:checkin']],
     ['goals', ['goals', 'g:goals']], ['progress', ['progress']], ['cycle', ['cycle', 'g:cycle']], ['data', ['g:data']]
   ];
   // «؟» کنار موارد پیچیده: مطلب آموزش همون‌جا در یک پنجره باز می‌شه (فرم یا صفحه‌ی فعلی از دست نمی‌ره)
@@ -6035,9 +6194,10 @@
         (fitAdj ? '<small class="pf-level-note">' + esc(T('profile.levelFromVolume')) + '</small>' : '')) +
       '</span>' + chevron(isRtl() ? 'left' : 'right') + '</a>' +
       periodCard(p, now, race) +
-      listGroup(T('profile.groups.mine'), walker() ? [['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgressWalk')],
+      listGroup(T('profile.groups.mine'), walker() ? [weekBar(true) ? ['#plan', 'plans', T('wbar.title'), weekBar(true)] : null, ['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgressWalk')],
         ['#walkgoals', 'flag', T('wgoal.pageTitle'), C.walkGoalInfo(p).kind !== 'none' ? T('wgoal.' + C.walkGoalInfo(p).kind + '.t') : T('profile.goalSetShort')],
         ['#settings', 'bell', T('remind.title'), remindSub(), 'remind']] : [
+        weekBar(true) ? ['#plan', 'plans', T('wbar.title'), weekBar(true)] : null,
         ['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgress')],
         ['#health', 'health', T('health.title'), healthRowSub()],
         ['#race', 'flag', T('race.pageTitle'), g.type !== 'none' ? C.goalLabel(g) + (race && race.date >= now ? T('progress.sep') + T('profile.goalIn', { n: Math.round(C.daysBetween(now, race.date)) }) : '') : T('profile.goalSetShort')],

@@ -1364,6 +1364,43 @@
       srDone: '(done)', srTodo: '(not done)',
       allDone: 'All steps done!', allDoneSub: 'Now just keep going; this card will now fold away.'
     },
+    free: {
+      title: 'Free run',
+      button: 'Log a free run',
+      askQ: "Is this today's session or a separate run?",
+      askPlanned: "Today's session",
+      askSeparate: 'Separate run',
+      kindQ: 'What kind? (optional)',
+      kind: { easy: 'Easy', tempo: 'Tempo', interval: 'Intervals', long: 'Long', unsure: 'Not sure' },
+      rpeQ: 'Effort from 1 to 10? (optional)',
+      rpeShort: 'effort {n}',
+      saved: 'Free run saved and added to this week.',
+      listTitle: 'Free run',
+      src: { gps: 'Gaam GPS', manual: 'manual', health: 'Health', strava: 'Strava', garmin: 'Garmin' },
+      del: 'Delete', delSure: 'Sure? Delete', deleted: 'Free run deleted.'
+    },
+    advice: {
+      title: 'Plan suggestion',
+      over: 'You ran {n} {u} more than planned this week.',
+      overCap: 'With this run, this week goes above the safe range.',
+      long: 'This run was much longer than your longest run in the past month.',
+      hardNext: 'You ran hard; better not to have a hard session tomorrow.',
+      taper: 'Your race is close; better to keep the next hard session easy.',
+      hardShare: 'The hard share of this week is getting high.',
+      pain: 'You logged pain; the plan follows pain management. If it gets worse, log it.',
+      toEasy: '{day}: easy run instead of the hard session',
+      trim: '{day}: {km} {u} (instead of {from})',
+      yes: 'Accept', no: 'No', ok: 'OK',
+      done: 'The plan for these days was updated.'
+    },
+    wbar: {
+      title: 'This week',
+      of: '{d} of {p} {u}',
+      left: '{n} {u} to go',
+      over: '{n} {u} over plan',
+      free: '{n} {u} free runs',
+      min: 'min'
+    },
     tdays: {
       q: 'How many days a week do you want to train?',
       title: 'Training days',

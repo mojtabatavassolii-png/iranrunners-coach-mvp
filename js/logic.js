@@ -674,6 +674,9 @@
       o.plan += s.km;
       if ((data.done || {})[s.date]) { var l = doneSession((data.doneLog || {})[s.date] || s); o.done += l.km || s.km; }
     });
+    // تمرین‌های آزاد (روز بدون جلسه یا دویدن دوم) هم جزو انجام‌شده‌ان
+    o.free = freeInWeek(data, ws).reduce(function (x, a) { return x + (a.sport === 'walk' ? 0 : a.km || 0); }, 0);
+    o.done += o.free;
     return o;
   }
   // سهم انجام‌شده در n هفته‌ی کامل قبل از هفته‌ی جاری (فقط هفته‌های بعد از شروع برنامه)
@@ -686,6 +689,158 @@
     if (plan < 8 * n) return null;   // برنامه‌ی زمانی (سطح ۰ و دو-پیاده) یا خیلی کم
     return { weeks: list, plan: plan, done: done, share: done / plan, lastDone: list[0].done, avgDone: done / n };
   }
+  // =====================================================================
+  // تمرین‌های ثبت‌شده بیرون از برنامه (مدل مشترک همه‌ی منبع‌ها: GPS خود اپ، دستی، و بعداً Health، Strava، Garmin)
+  // data.activities = [{ id, source, sourceId, sport, date, start, sec, movingSec, km, splits, route, hr, elevGain,
+  //                      kind: easy|tempo|interval|long|null, rpe: 1..10|null, plannedDate: null|روز جلسه‌ی برنامه, createdAt }]
+  // تمرینی که به جلسه‌ی برنامه لینک شده (plannedDate) همون «انجام شد» اون روزه و جدا حساب نمی‌شه.
+  // =====================================================================
+  var ACT_SOURCES = ['gps', 'manual', 'health', 'strava', 'garmin'];
+  function makeActivity(o) {
+    o = o || {};
+    var a = {
+      id: o.id || 'a_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      source: ACT_SOURCES.indexOf(o.source) >= 0 ? o.source : 'manual', sourceId: o.sourceId || null,
+      sport: o.sport === 'walk' ? 'walk' : 'run', date: o.date, start: o.start || null,
+      sec: Math.max(0, Math.round(Number(o.sec) || 0)), movingSec: o.movingSec != null ? Math.round(o.movingSec) : null,
+      km: o.km > 0 ? Math.round(o.km * 100) / 100 : 0,
+      kind: ['easy', 'tempo', 'interval', 'long'].indexOf(o.kind) >= 0 ? o.kind : null,
+      rpe: o.rpe >= 1 && o.rpe <= 10 ? Math.round(o.rpe) : null,
+      plannedDate: o.plannedDate || null, createdAt: o.createdAt || new Date().toISOString()
+    };
+    ['splits', 'route', 'hr', 'elevGain'].forEach(function (k) { if (o[k] != null) a[k] = o[k]; });
+    return a;
+  }
+  // تکراری: همون منبع و همون شناسه‌ی بیرونی
+  function addActivity(data, o) {
+    var a = makeActivity(o);
+    data.activities = data.activities || [];
+    if (a.sourceId && data.activities.some(function (x) { return x.source === a.source && x.sourceId === a.sourceId; })) return null;
+    data.activities.push(a);
+    return a;
+  }
+  function freeInWeek(data, ws) {
+    var a = dateKey(ws), b = dateKey(addDays(ws, 6));
+    return ((data && data.activities) || []).filter(function (x) { return !x.plannedDate && x.date >= a && x.date <= b; });
+  }
+  function isHardActivity(a) { return !!a && (a.kind === 'tempo' || a.kind === 'interval' || (a.rpe || 0) >= 7); }
+  // حجم این هفته (هفته‌ی برنامه، از شنبه): برنامه، انجام‌شده (جلسه‌های برنامه + آزاد)، مونده.
+  // پیاده‌روی و سطح ۰/۱ (برنامه‌ی زمانی): با دقیقه
+  function weekActual(state, anyDate) {
+    var p = state.profile, ws = weekStart(anyDate), wk = buildWeek(p, ws), byMin = isWalk(p) || wk.level <= 1;
+    var off = function (t) { return ['rest', 'none', 'cancelled'].indexOf(t) >= 0; };
+    var o = { start: dateKey(ws), byMin: byMin, plan: 0, done: 0, free: 0 };
+    wk.days.forEach(function (s) {
+      if (!off(s.type)) o.plan += byMin ? (s.minutes || 0) : (s.km || 0);
+      if (!(state.done || {})[s.date]) return;
+      var l = doneSession((state.doneLog || {})[s.date] || s);
+      if (off(l.type)) return;
+      o.done += byMin ? Math.round(l.realMin || l.minutes || 0) : (l.km || 0);
+    });
+    freeInWeek(state, ws).forEach(function (a) { o.free += byMin ? Math.round(a.sec / 60) : (a.sport === 'walk' ? 0 : a.km || 0); });
+    o.done += o.free;
+    var r1 = function (x) { return byMin ? Math.round(x) : Math.round(x * 10) / 10; };
+    o.plan = r1(o.plan); o.done = r1(o.done); o.free = r1(o.free);
+    o.left = Math.max(0, Math.round((o.plan - o.done) * 10) / 10);
+    o.over = Math.max(0, Math.round((o.done - o.plan) * 10) / 10);
+    return o;
+  }
+
+  // ---------- تطبیق پیشنهادی بعد از تمرین آزاد یا دویدن بیشتر از برنامه ----------
+  // هیچ تغییری بدون «قبول» کاربر اعمال نمی‌شه؛ قبول = data.planAdjust[روز] = { to: 'easy'|'trim', km }، از مسیر effectiveSession.
+  // قاعده‌ها از همون موتور فعلی و دو منبع:
+  //  · حجم هفته بیشتر از ۱۱۰٪ برنامه‌ی همون هفته (سقف رشد ۱۰٪ و تاریخچه‌ی برنامه؛ Nielsen و همکاران JOSPT 2014: افزایش بیش از ۳۰٪ در دو هفته)
+  //  · یک دویدن بیش از ۱۱۰٪ بلندترین دویدن ۳۰ روز اخیر (Frandsen و همکاران BJSM 2025)
+  //  · جلسه‌ی سخت فردای یک تمرین سخت (حداقل ۴۸ ساعت بین دو جلسه‌ی سخت، placeQuality)
+  //  · سهم سخت هفته بیش از ۲۰٪ (قانون ۸۰/۲۰، hardBudget)
+  //  · درد یا آسیب فعال: فقط قاعده‌های درد و آسیب؛ نزدیک مسابقه: جلسه‌ی سخت بعدی آسون، خود مسابقه دست نمی‌خوره
+  var ADVICE_OVER = 1.1, ADVICE_SINGLE = 1.1, ADVICE_HARD = 0.2;
+  function plannedOpen(state, from, to) {
+    // جلسه‌های برنامه‌ی انجام‌نشده بین دو روز (با تطبیق‌های فعلی: درد، چرخه، چک‌این)
+    var out = [];
+    for (var d = from; d <= to; d = addDays(d, 1)) {
+      var k = dateKey(d);
+      if ((state.done || {})[k]) continue;
+      var e = effectiveSession(state, sessionFor(state.profile, d)).session;
+      if (e && e.km > 0 && ['rest', 'none', 'cancelled', 'race'].indexOf(e.type) < 0) out.push(e);
+    }
+    return out;
+  }
+  function longestRun(state, beforeKey, days, excludeId) {
+    var from = dateKey(addDays(parseDate(beforeKey), -days)), m = 0;
+    Object.keys(state.done || {}).forEach(function (k) {
+      if (k < from || k > beforeKey || !state.done[k]) return;
+      var l = doneSession((state.doneLog || {})[k]);
+      if (l && l.km) m = Math.max(m, l.km);
+    });
+    (state.activities || []).forEach(function (a) { if (a.id !== excludeId && a.sport !== 'walk' && a.date >= from && a.date <= beforeKey) m = Math.max(m, a.km || 0); });
+    return m;
+  }
+  // act: { id?, date, km, kind, rpe, planned: true اگه جلسه‌ی خود برنامه بوده } ؛ خروجی: فهرست پیشنهاد (حداکثر ۲)
+  function adviceAfterRun(state, act, today) {
+    var p = state.profile;
+    if (!p || isWalk(p) || !act || !act.date) return [];
+    // جلسه‌های باقی‌مونده از امروز (جلسه‌ی امروز هم، اگه هنوز انجام نشده)
+    var d = parseDate(act.date), ws = weekStart(d), we = addDays(ws, 6), start = parseDate(dateKey(today));
+    if (start <= d) start = act.planned ? addDays(d, 1) : d;
+    // درد یا آسیب فعال: قاعده‌های خودشون مقدم‌ان؛ فقط یادآوری
+    var ep = painEpisode(state.pains, state.checkins, today);
+    if (ep || (p.injuries && p.injuries.length && injuryPhase(p, today))) return [{ rule: 'pain', id: 'pain-' + act.date, changes: [] }];
+    var out = [], hard = isHardActivity(act);
+    var race = raceInfo(p), taper = race && race.date >= d && daysBetween(d, race.date) <= taperWeeks(race.key) * 7;
+    // ۱) جلسه‌ی سخت فردا (یا هر جلسه‌ی سخت بعدی تا آخر هفته، اگه دوره‌ی کاهش بار قبل از مسابقه‌ست)
+    if (hard) {
+      var nextHard = plannedOpen(state, start, taper ? we : addDays(d, 1)).filter(function (e) { return e.hard && e.type !== 'long'; })[0];
+      if (nextHard) out.push({ rule: taper ? 'taper' : 'hardNext', id: 'h-' + act.date + '-' + nextHard.date, day: nextHard.date, dayName: nextHard.dayName,
+        changes: [{ date: nextHard.date, to: 'easy', km: round05(Math.max(3, nextHard.km - (nextHard.hardKm || 0) * 0.3)) }] });
+    }
+    // ۲) حجم هفته بیشتر از ۱۱۰٪ برنامه → دویدن‌های آسون و لانگ‌ران بعدی همین هفته کوتاه‌تر (هر کدوم حداقل ۳ کیلومتر)
+    var wa = weekActual(state, d), rest = plannedOpen(state, start, we);
+    var proj = wa.done + rest.reduce(function (x, e) { return x + (e.km || 0); }, 0), cap = wa.plan * ADVICE_OVER;
+    var single = !act.planned ? longestRun(state, dateKey(addDays(d, -1)), 30, act.id) : 0;
+    var longJump = single > 0 && act.km > single * ADVICE_SINGLE;
+    if (wa.plan > 0 && (proj > cap + 0.25 || longJump)) {
+      var excess = Math.max(proj - cap, longJump ? Math.max(0, act.km - single) : 0), changes = [];
+      rest.filter(function (e) { return e.type === 'easy' || e.type === 'long'; })
+        .sort(function (a, b) { return (a.type === 'long') - (b.type === 'long') || b.km - a.km; })
+        .forEach(function (e) {
+          if (excess < 0.5) return;
+          var cut = Math.min(excess, e.km - (e.type === 'long' ? Math.max(3, e.km * 0.7) : 3));
+          cut = Math.floor(cut * 2) / 2;
+          if (cut >= 0.5) { changes.push({ date: e.date, to: 'trim', km: round05(e.km - cut), from: e.km, type: e.type, dayName: e.dayName }); excess -= cut; }
+        });
+      if (changes.length) out.push({ rule: longJump && proj <= cap + 0.25 ? 'long' : 'over', id: 'o-' + act.date + '-' + Math.round(proj), over: round05(Math.max(0, wa.done - wa.plan)), changes: changes });
+    }
+    // ۳) سهم سخت هفته بیشتر از ۲۰٪ → جلسه‌ی کیفی بعدی آسون
+    if (hard && !out.some(function (x) { return x.rule === 'hardNext' || x.rule === 'taper'; })) {
+      var wk = buildWeek(p, ws), hardKm = 0, tot = 0;
+      wk.days.forEach(function (s) { if ((state.done || {})[s.date] && s.km) { tot += s.km; hardKm += s.type === 'race' ? 0 : (s.hardKm || 0); } });
+      freeInWeek(state, ws).forEach(function (a) { if (a.sport !== 'walk') { tot += a.km || 0; if (isHardActivity(a)) hardKm += (a.km || 0) * 0.6; } });
+      var nq = plannedOpen(state, start, we).filter(function (e) { return e.hard && e.type !== 'long'; })[0];
+      if (tot > 0 && hardKm / Math.max(tot, wa.plan) > ADVICE_HARD && nq)
+        out.push({ rule: 'hardShare', id: 's-' + act.date + '-' + nq.date, day: nq.date, dayName: nq.dayName, changes: [{ date: nq.date, to: 'easy', km: round05(Math.max(3, nq.km)) }] });
+    }
+    return out.slice(0, 2);
+  }
+  // چند هفته‌ی کامل پشت‌سرهم بالای ۱۱۰٪ برنامه و بدون درد: پیشنهاد تایم‌تست (سطح و پیس با داده‌ی تازه)
+  function overTrend(state, today) {
+    var p = state.profile;
+    if (!p || isWalk(p)) return null;
+    var ws = weekStart(today), wi = weekIndexFor(p, today), n = 0;
+    for (var i = 1; i <= 3 && wi - i >= 0; i++) { var x = weekDone(p, state, addDays(ws, -7 * i)); if (x.plan > 0 && x.done > x.plan * ADVICE_OVER) n++; }
+    return n >= 3 ? { weeks: n } : null;
+  }
+  // پیشنهاد قبول‌شده روی یک جلسه‌ی برنامه
+  function applyPlanAdjust(s, adj, zones) {
+    if (!adj || !s || !s.km || ['rest', 'none', 'cancelled', 'race'].indexOf(s.type) >= 0) return null;
+    var km = round05(Math.max(3, adj.km || s.km)), n;
+    if (adj.to === 'trim' && s.type === 'long' && s._ctx) n = makeLong(km, s._ctx, 0, 'plain', {});
+    else n = makeEasy(km, zones);
+    n = dressAlt(n, s);
+    n.advice = true;
+    return n;
+  }
+
   // پیشنهاد «برنامه رو با حجم فعلیت تنظیم کنم؟»: سه هفته‌ی کامل آخر زیر ۶۰٪، بدون آسیب فعال، و «فعلاً نه» برای همین هفته زده نشده
   function rebaseSuggestion(profile, data, today) {
     if (!data || isWalk(profile) || profile.experience === 'never') return null;
@@ -3658,6 +3813,9 @@
     var ep = painEpisode(state.pains, state.checkins, parseDate(base.date));
     // اول چرخه (روزهای پریود، جلسه‌ی جابه‌جاشده، پیشنهادها)، بعد درد یا تطبیق با چک‌این؛ تا حرف آخر با بدن کاربر باشه.
     // (قبلاً برعکس بود و جلسه‌ی سختی که به‌خاطر پریود به امروز جابه‌جا شده بود، روی جلسه‌ی سبک‌شده با درد نوشته می‌شد)
+    // پیشنهاد تطبیقی قبول‌شده (بعد از تمرین آزاد) روی همین روز؛ درد و چک‌این بعدش اعمال می‌شن (محدودکننده‌ترها مقدم)
+    var adj = state.planAdjust && state.planAdjust[base.date];
+    if (adj && !(state.done || {})[base.date]) base = applyPlanAdjust(base, adj, paceZones(state.profile)) || base;
     var cy = withCycle(state, { session: base, adaptation: null });
     var zones = paceZones(state.profile);
     var r = ep ? painAdjust(cy.session, ep, zones)
@@ -3741,6 +3899,8 @@
     buildWeek: buildWeek, sessionFor: sessionFor, adaptSession: adaptSession, isHard: isHard, readiness: readiness, weekAdaptSummary: weekAdaptSummary,
     currentFitness: currentFitness, fitnessEntries: fitnessEntries, hrZones: hrZones, easyRunFeedback: easyRunFeedback,
     easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, fitnessReminder: fitnessReminder,
+    makeActivity: makeActivity, addActivity: addActivity, freeInWeek: freeInWeek, weekActual: weekActual, adviceAfterRun: adviceAfterRun,
+    overTrend: overTrend, applyPlanAdjust: applyPlanAdjust, longestRun: longestRun, isHardActivity: isHardActivity,
     sessionRange: sessionRange, SESSION_RANGE: SESSION_RANGE, dayCount: dayCount, daysSuggestion: daysSuggestion, acceptDaysSuggestion: acceptDaysSuggestion, recordCheck: recordCheck,
     fitnessLevelSuggestion: fitnessLevelSuggestion, skipLevelSuggestion: skipLevelSuggestion, applyFitnessLevel: applyFitnessLevel, autoLevelUp: autoLevelUp,
     adherence: adherence, rebaseSuggestion: rebaseSuggestion, applyRebase: applyRebase, logWeek: logWeek, planLogLimit: planLogLimit,

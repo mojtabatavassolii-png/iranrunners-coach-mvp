@@ -845,7 +845,7 @@ test('برنامه به انگلیسی: هیچ متن فارسی در جلسه�
 test('بخش آموزش: مقاله‌های دوزبانه با ساختار و طول یکسان', function () {
   var lf = require('../js/i18n/learn-fa.js'), le = require('../js/i18n/learn-en.js');
   // هشت مقاله‌ی علمی (۳۰۰ تا ۵۰۰ کلمه) و سه مقاله‌ی راهنما (توضیح‌هایی که از صفحه‌ها به آموزش منتقل شدن)
-  var ids = ['vdot', 'rpe', 'eighty', 'types', 'fartleks', 'tenpct', 'warmup', 'cycle'], refs = ['returning', 'goals', 'progress'];
+  var ids = ['vdot', 'rpe', 'eighty', 'types', 'fartleks', 'tenpct', 'warmup', 'cycle'], refs = ['returning', 'goals', 'progress', 'freeruns'];
   assert.deepStrictEqual(Object.keys(lf.articles), ids.concat(refs));
   assert.deepStrictEqual(Object.keys(le.articles), ids.concat(refs));
   assert.deepStrictEqual(Object.keys(lf).sort(), Object.keys(le).sort());
@@ -2080,6 +2080,90 @@ test('اعتبار رکورد: جهش بزرگ VDOT، پرش دو سطح و رک
   assert.ok(big && big.reasons.indexOf('jump') >= 0 && big.reasons.indexOf('levels') >= 0, JSON.stringify(big));
   var gps = C.recordCheck(p, { date: '2026-11-01', distanceKm: 5, timeSec: hms(0, 26, 0), kind: 'test' }, { doneLog: { '2026-11-01': { src: 'gps', actual: { km: 5.2, sec: 1560 } } } });
   assert.deepStrictEqual(gps.reasons, ['gps']);
+});
+
+// ---------- تمرین آزاد، حجم هفته و پیشنهاد تطبیقی ----------
+function freeState(over) {
+  var p = profileFor(3, Object.assign({ days: [0, 1, 3, 6], startDate: '2026-10-03', goal: goalOf('10') }, over || {}));
+  var st = { profile: p, done: {}, doneLog: {}, checkins: {}, pains: {}, activities: [] };
+  // شنبه و یکشنبه‌ی هفته‌ی ۱۴ آبان (۲۰۲۶-۱۱-۱۴) انجام شده
+  C.buildWeek(p, C.parseDate('2026-11-14')).days.forEach(function (d) {
+    if (d.date <= '2026-11-15' && d.km) { st.done[d.date] = true; st.doneLog[d.date] = JSON.parse(JSON.stringify(d)); }
+  });
+  return st;
+}
+test('مدل مشترک تمرین: منبع، تکراری نشدن با شناسه‌ی بیرونی، و حجم هفته (از شنبه) با تمرین آزاد', function () {
+  var st = freeState(), w0 = C.weekActual(st, C.parseDate('2026-11-16'));
+  assert.strictEqual(w0.start, '2026-11-14');
+  assert.strictEqual(w0.free, 0);
+  var a = C.addActivity(st, { source: 'strava', sourceId: 'x1', date: '2026-11-16', km: 8.004, sec: 2900, kind: 'tempo', rpe: 11 });
+  assert.strictEqual(a.km, 8); assert.strictEqual(a.rpe, null); assert.strictEqual(a.sport, 'run');
+  assert.strictEqual(C.addActivity(st, { source: 'strava', sourceId: 'x1', date: '2026-11-16', km: 8, sec: 2900 }), null);
+  var w1 = C.weekActual(st, C.parseDate('2026-11-16'));
+  assert.strictEqual(w1.free, 8); assert.ok(Math.abs(w1.done - (w0.done + 8)) < 0.05);
+  // تمرین لینک‌شده به جلسه‌ی برنامه جدا حساب نمی‌شه؛ تمرین هفته‌ی بعد هم نه
+  C.addActivity(st, { source: 'gps', date: '2026-11-17', km: 5, sec: 1800, plannedDate: '2026-11-17' });
+  C.addActivity(st, { source: 'gps', date: '2026-11-21', km: 5, sec: 1800 });
+  assert.strictEqual(C.weekActual(st, C.parseDate('2026-11-16')).free, 8);
+});
+test('تمرین آزاد در پایبندی حساب می‌شه (کسی که روزهای دیگه می‌دوه «عقب‌افتاده» دیده نمی‌شه)', function () {
+  var st = freeState({ startDate: '2026-09-26' }), today = C.parseDate('2026-11-14');
+  // سه هفته‌ی قبل: هیچ جلسه‌ی برنامه انجام نشده، ولی هر هفته معادل برنامه آزاد دویده
+  for (var i = 1; i <= 3; i++) {
+    var ws = C.addDays(C.weekStart(today), -7 * i), wk = C.buildWeek(st.profile, ws);
+    C.addActivity(st, { source: 'gps', date: C.dateKey(C.addDays(ws, 2)), km: wk.totalKm, sec: wk.totalKm * 360 });
+  }
+  st.done = {}; st.doneLog = {};
+  assert.strictEqual(C.rebaseSuggestion(st.profile, st, today), null);
+});
+test('پیشنهاد: حجم هفته بیش از ۱۱۰٪ برنامه → دویدن‌های آسون بعدی کوتاه‌تر (حداقل ۳ کیلومتر)، فقط پیشنهاد', function () {
+  var st = freeState(), a = C.addActivity(st, { source: 'gps', date: '2026-11-16', km: 8, sec: 2900, kind: 'easy', rpe: 4 });
+  var adv = C.adviceAfterRun(st, a, C.parseDate('2026-11-16'));
+  var o = adv.filter(function (x) { return x.rule === 'over'; })[0];
+  assert.ok(o && o.changes.length, JSON.stringify(adv));
+  o.changes.forEach(function (c) { assert.ok(c.km >= 3 && c.km < c.from && c.date > '2026-11-16', JSON.stringify(c)); });
+  // بدون قبول، برنامه دست نخورده
+  var key = o.changes[0].date, before = C.effectiveSession(st, C.sessionFor(st.profile, C.parseDate(key))).session;
+  assert.strictEqual(before.km, o.changes[0].from);
+  // با قبول: همون روز کوتاه‌تر، برچسب «تطبیق‌یافته» (original)
+  st.planAdjust = {}; st.planAdjust[key] = { to: o.changes[0].to, km: o.changes[0].km };
+  var after = C.effectiveSession(st, C.sessionFor(st.profile, C.parseDate(key))).session;
+  assert.strictEqual(after.km, o.changes[0].km); assert.ok(after.original && after.advice);
+  // هفته‌ی کامل با قبول: حداکثر ۱۱۰٪ برنامه
+  var wa = C.weekActual(st, C.parseDate('2026-11-16')), rest = 0;
+  ['2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20'].forEach(function (k) { var e = C.effectiveSession(st, C.sessionFor(st.profile, C.parseDate(k))).session; if (e.km && ['rest', 'none'].indexOf(e.type) < 0) rest += e.km; });
+  assert.ok(wa.done + rest <= wa.plan * 1.1 + 0.5, (wa.done + rest) + ' / ' + wa.plan);
+});
+test('پیشنهاد: تمرین آزاد سخت و جلسه‌ی سخت فردا → فردا آسون؛ دویدن خیلی بلندتر از بلندترین دویدن ماه → کوتاه‌تر', function () {
+  var st = freeState();
+  // جلسه‌ی سخت هفته رو پیدا کن و تمرین آزاد سخت رو روز قبلش بذار
+  var wk = C.buildWeek(st.profile, C.parseDate('2026-11-14')), hard = wk.days.filter(function (d) { return d.hard && d.type !== 'long' && d.date > '2026-11-16'; })[0];
+  if (hard) {
+    var day = C.dateKey(C.addDays(C.parseDate(hard.date), -1));
+    var a = C.addActivity(st, { source: 'gps', date: day, km: 5, sec: 1500, kind: 'interval', rpe: 8 });
+    var adv = C.adviceAfterRun(st, a, C.parseDate(day));
+    assert.ok(adv.some(function (x) { return x.rule === 'hardNext' && x.changes[0].date === hard.date && x.changes[0].to === 'easy'; }), JSON.stringify(adv));
+  }
+  var st2 = freeState(), b = C.addActivity(st2, { source: 'gps', date: '2026-11-16', km: 18, sec: 6500, kind: 'long', rpe: 5 });
+  var adv2 = C.adviceAfterRun(st2, b, C.parseDate('2026-11-16'));
+  assert.ok(adv2.length && adv2[0].changes.length, JSON.stringify(adv2));
+  assert.ok(C.longestRun(st2, '2026-11-15', 30, b.id) < 18 / 1.1);
+});
+test('پیشنهاد: با درد ثبت‌شده فقط یادآوری درد (بدون تغییر برنامه)؛ پیاده‌روی بدون پیشنهاد', function () {
+  var st = freeState();
+  st.pains['2026-11-16'] = { level: 4, area: 'knee', at: '2026-11-16T08:00:00Z' };
+  var a = C.addActivity(st, { source: 'gps', date: '2026-11-16', km: 12, sec: 4300, kind: 'tempo', rpe: 8 });
+  var adv = C.adviceAfterRun(st, a, C.parseDate('2026-11-16'));
+  assert.deepStrictEqual(adv.map(function (x) { return x.rule; }), ['pain']);
+  assert.strictEqual(adv[0].changes.length, 0);
+  var w = freeState({ activity: 'walk', walkExp: 'regular', walkMin: 120 });
+  assert.deepStrictEqual(C.adviceAfterRun(w, { date: '2026-11-16', km: 5, sec: 3000 }, C.parseDate('2026-11-16')), []);
+});
+test('پیشنهاد قبول‌شده روی روزی که انجام شده اعمال نمی‌شه؛ مسابقه هیچ‌وقت عوض نمی‌شه', function () {
+  var st = freeState(), key = '2026-11-15', s = C.sessionFor(st.profile, C.parseDate(key));
+  st.planAdjust = {}; st.planAdjust[key] = { to: 'easy', km: 3 };
+  assert.strictEqual(C.effectiveSession(st, s).session.km, s.km);   // انجام‌شده
+  assert.strictEqual(C.applyPlanAdjust({ type: 'race', km: 10 }, { to: 'easy', km: 3 }, null), null);
 });
 
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

@@ -2117,3 +2117,22 @@ button.help-link { padding: 0; cursor: pointer; font-family: inherit; }
 .days-line { margin: 10px 0 0; color: var(--text-secondary); }
 .days-capped { margin: 4px 0 0; padding: 6px 10px; border-radius: 8px; border-inline-start: 3px solid var(--warning); background: var(--surface-2, var(--surface)); }
 .days-panel h2 { margin-block-start: 0; }
+
+/* حجم هفته، تمرین آزاد و پیشنهادهای برنامه */
+.week-bar .wb-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.wb-track { display: flex; height: 10px; border-radius: 6px; background: var(--border); overflow: hidden; margin-block: 8px 4px; }
+.wb-track .wb-done { background: var(--primary); }
+.wb-track .wb-over { background: var(--warning); }
+.wb-sub { margin: 0; }
+.free-btn { margin-block: 4px 12px; }
+.free-ask .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.free-q { margin-block: 8px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-block: 4px 10px; }
+.chip-btn { min-height: 40px; min-width: 40px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.chip-btn.is-on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.rpe-row .chip-btn { padding: 6px 0; min-width: 40px; }
+.advice-card .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.advice-list { margin: 4px 0 8px; padding-inline-start: 20px; }
+.free-acts { margin-block-start: 12px; border-block-start: 1px solid var(--border); padding-block-start: 8px; }
+.free-acts h4 { margin: 0 0 4px; }
+.free-acts ul { margin: 0; padding-inline-start: 18px; }

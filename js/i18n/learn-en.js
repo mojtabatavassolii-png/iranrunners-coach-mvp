@@ -260,6 +260,20 @@
           '<li><b>Time of day:</b> easy and long runs with a recorded start time, grouped by time of day. This is correlation only; weather, sleep and fatigue matter too, and more logged runs make it more reliable.</li>' +
           '<li><b>Adherence:</b> of the sessions planned in this range (up to today), how many you actually did.</li></ul>' +
           '<p class="learn-src"><b>Sources:</b> Banister et al. (1975), impulse-response model; Foster et al. (2001), <i>J Strength Cond Res</i> 15(1):109 (session RPE).</p>'
+      },
+      freeruns: {
+        title: 'Free runs and plan suggestions',
+        summary: 'How runs outside the plan are counted and why the plan suggests changes afterwards.',
+        body:
+          '<p>Whenever you like, even on a rest day, you can run with “Log a free run”. It counts toward your weekly volume and history.</p>' +
+          '<h2>Why do you get a suggestion afterwards?</h2>' +
+          '<ul><li><b>Weekly volume:</b> if the week goes above 110% of the plan, the next easy runs are suggested shorter. This is the plan’s own 10% growth limit.</li>' +
+          '<li><b>One very long run:</b> a run more than 10% longer than your longest run of the past month has been linked to more injuries (Frandsen et al., 2025).</li>' +
+          '<li><b>Two hard days in a row:</b> hard sessions need at least 48 hours between them; after a hard free run, tomorrow’s hard session is suggested easy.</li>' +
+          '<li><b>80/20:</b> if the hard share of the week goes above about 20%, the next quality session is suggested easy.</li></ul>' +
+          '<h2>Your call</h2>' +
+          '<p>Nothing changes unless you tap Accept. If you logged pain or an injury, pain and injury rules come first. Your goal and race never change automatically.</p>' +
+          '<p class="learn-src"><b>Sources:</b> Nielsen et al. (2014), JOSPT; Frandsen et al. (2025), BJSM; Seiler (2010), 80/20 intensity distribution.</p>'
       }
     }
   };
