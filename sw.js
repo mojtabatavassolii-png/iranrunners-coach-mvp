@@ -5,7 +5,7 @@
  * - بقیه (آیکون‌ها، فونت وزیرمتن روی خود سایت): کش و به‌روزرسانی در پس‌زمینه.
  * با هر انتشار، VERSION و نسخه‌ی فایل‌ها در index.html با هم بالا می‌رن (تست این هماهنگی رو بررسی می‌کنه).
  */
-var VERSION = '131';
+var VERSION = '132';
 var CACHE = 'coach-v' + VERSION;
 // صبر حداکثر برای شبکه موقع باز کردن صفحه، قبل از نشون دادن نسخه‌ی کش‌شده
 var NAV_WAIT = 1500;
@@ -20,6 +20,8 @@ var SHELL = [
   'manifest.json',
   'css/style.css?v=' + VERSION,
   'js/vendor/jalaali.js?v=' + VERSION,
+  'js/vendor/leaflet/leaflet.js?v=' + VERSION,
+  'js/vendor/leaflet/leaflet.css?v=' + VERSION,
   'js/i18n.js?v=' + VERSION,
   'js/i18n/fa.js?v=' + VERSION,
   'js/i18n/en.js?v=' + VERSION,

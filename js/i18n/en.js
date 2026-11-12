@@ -1364,6 +1364,18 @@
       srDone: '(done)', srTodo: '(not done)',
       allDone: 'All steps done!', allDoneSub: 'Now just keep going; this card will now fold away.'
     },
+    map: {
+      title: 'Background map when recording',
+      on: 'On', off: 'Off',
+      privacy: 'The map loads from OpenStreetMap; that service sees your approximate area. Your route and time are not sent.',
+      test: 'Test map',
+      testing: 'Testing…',
+      testOk: '{name}: loaded ({ms} ms)',
+      testFail: '{name}: did not load',
+      fallback: 'Map unavailable; recording continues.',
+      aria: 'Live map with route and current position',
+      center: 'Back to my position'
+    },
     free: {
       title: 'Free run',
       button: 'Log a free run',
@@ -1911,7 +1923,7 @@
       loginLink: 'Already have data? Restore from a backup file'
     },
     jdate: { day: 'Day', month: 'Month', year: 'Year' },
-    tabs: { aria: 'Main sections', home: 'Today', plan: 'Plan', progress: 'Progress', learn: 'Learn', profile: 'Profile' },
+    tabs: { aria: 'Main sections', home: 'Today', plan: 'Plan', progress: 'Progress', learn: 'Learn', profile: 'Profile', record: 'Free run' },
     nameCard: { title: 'Complete your name', save: 'Save', later: 'Later' },
     home: {
       greetName: '{g}, {name}',

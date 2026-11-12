@@ -2136,3 +2136,19 @@ button.help-link { padding: 0; cursor: pointer; font-family: inherit; }
 .free-acts { margin-block-start: 12px; border-block-start: 1px solid var(--border); padding-block-start: 8px; }
 .free-acts h4 { margin: 0 0 4px; }
 .free-acts ul { margin: 0; padding-inline-start: 18px; }
+
+/* نوار پایین: دکمه‌ی وسط «ثبت آزاد» */
+.tabbar-inner { grid-template-columns: repeat(5, 1fr); }
+.tabbar a.tab-rec .tab-rec-ico { position: relative; width: 54px; height: 54px; margin-top: -22px; border-radius: 50%;
+  background: var(--primary); color: var(--on-primary); box-shadow: 0 4px 14px rgba(0, 0, 0, .18); border: 3px solid var(--bg); }
+.tabbar a.tab-rec.is-active .tab-rec-ico { background: var(--primary-pressed, var(--primary)); color: var(--on-primary); }
+.tabbar a.tab-rec .tab-rec-live { display: none; position: absolute; top: 2px; inset-inline-end: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--danger, #d33); border: 2px solid var(--bg); }
+.tabbar.is-rec-live a.tab-rec .tab-rec-live { display: block; }
+@media (min-width: 1100px) { .tabbar-inner { grid-template-columns: 1fr; } .tabbar a.tab-rec .tab-rec-ico { margin-top: 0; width: 48px; height: 48px; } }
+
+/* نقشه‌ی زنده در صفحه‌ی ثبت */
+.rec-map-wrap { position: relative; margin: var(--sp-2) 0; }
+.rec-map { height: 260px; border-radius: 16px; overflow: hidden; background: var(--surface-elevated); z-index: 0; }
+.rec-map-center { position: absolute; bottom: 10px; inset-inline-start: 10px; z-index: 500; background: var(--surface); border: 1px solid var(--border); }
+.rec-map-note { text-align: center; margin: 4px 0 0; }
+.rec-map .leaflet-control-attribution { font-size: 10px; }

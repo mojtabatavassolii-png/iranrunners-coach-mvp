@@ -149,6 +149,13 @@
     if (st.paused) return;
     st.activeMs += Math.max(0, now - st.segStart);
     st.paused = true;
+    // موقعیت هموارشده چند متر عقب‌تر از آخرین نقطه‌ی واقعیه (تأخیر فیلتر)؛ موقع توقف یا پایان این فاصله اضافه می‌شه،
+    // مگه اینکه پرش باشه یا دونده ایستاده بوده
+    var l = st.last, r = st.raw;
+    if (l && r && r.t >= l.t) {
+      var gap = haversine(l, r), gdt = Math.max(1, (r.t - l.t) / 1000);
+      if (gap >= MIN_STEP && gap / gdt <= MAX_SPEED && !isStill(st, null)) { st.dist += gap; routeAdd(st, r.lat, r.lon, false); }
+    }
     // فاصله‌ی بین محل توقف و محل ادامه حساب نمی‌شه
     st.last = null; st.recent = []; st.jumps = 0; st.win = []; st.okAt = null; st.spd = []; st.kf = null; st.raw = null;
   }

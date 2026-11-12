@@ -564,24 +564,39 @@
     if (rec && rec.status === 'idle' && !rec.st) {
       var before = recReady() + '|' + recSig() + '|' + (rec.err || '');
       rec.warm = rec.warm || { good: 0, acc: null };
-      rec.warm.acc = p.acc;
+      rec.warm.acc = p.acc; rec.warm.pos = { lat: p.lat, lon: p.lon, acc: p.acc };
+      if (recMap) mapUpdate();
       rec.warm.good = p.acc <= K.GOOD_ACC ? rec.warm.good + 1 : 0;
-      if (rec.err) rec.err = null;
-      if (before !== recReady() + '|' + recSig() + '|' && location.hash === '#record') renderRecord();
+      if (rec.err) { rec.err = null; recErrPaint(); }
+      if (before.replace(/\|[^|]*$/, '') !== recReady() + '|' + recSig() && location.hash === '#record') renderRecord();
       return;
     }
     if (!rec || !rec.st || rec.status !== 'run') return;
     // موقعیت دوباره رسید: پیام خطای قبلی برداشته می‌شه
-    if (rec.err) { rec.err = null; if (location.hash === '#record') renderRecord(); }
+    if (rec.err) { rec.err = null; recErrPaint(); }
     K.add(rec.st, p);
     recPersist(false);
+  }
+  function recErrHtml() {
+    if (!rec || !rec.err) return '';
+    return '<p class="form-errors" role="alert">' + esc(T('rec.err.' + rec.err)) + '</p>' +
+      (rec.err === 'denied' && P.gps.canOpenSettings() ? '<button type="button" class="btn btn-outline" data-rec-settings="1">' + esc(T('rec.settings')) + '</button>' : '');
+  }
+  // فقط جعبه‌ی خطا عوض می‌شه، نه کل صفحه (نقشه دوباره ساخته نشه؛ خطای لحظه‌ای «موقعیت در دسترس نیست» روی بعضی گوشی‌ها زیاده)
+  function recErrPaint() {
+    var b = document.getElementById('rec-err-box');
+    if (b && location.hash === '#record') b.innerHTML = recErrHtml();
   }
   function recError(code) {
     if (!rec) return;
     rec.err = code;
     // بدون اجازه، ثبت شروع نشده حساب می‌شه
-    if (code === 'denied' && (!rec.st || rec.st.points === 0)) { if (rec.handle) P.gps.stop(rec.handle); rec.handle = null; rec.status = 'idle'; rec.st = null; }
-    if (location.hash === '#record') renderRecord();
+    if (code === 'denied' && (!rec.st || rec.st.points === 0)) {
+      if (rec.handle) P.gps.stop(rec.handle); rec.handle = null; rec.status = 'idle'; rec.st = null;
+      if (location.hash === '#record') renderRecord();
+      return;
+    }
+    recErrPaint();
   }
   function recWatch() {
     if (rec.handle) return Promise.resolve();
@@ -730,8 +745,8 @@
     el('rec-cur').textContent = recPace(K.currentPace(st, now));
     el('rec-signal').textContent = T('rec.signal.' + K.signal(st));
     el('rec-signal').className = 'rec-signal rec-sig-' + K.signal(st);
-    var rt = el('rec-route');
-    if (rt) rt.innerHTML = liveRoute();
+    if (recMap) mapUpdate();
+    else { var rt = el('rec-route'); if (rt) rt.innerHTML = liveRoute(); }
     hrPaint(false);
     // «زنده بودن صفحه» هر چند ثانیه ذخیره می‌شه، حتی وقتی نقطه‌ای نمیاد (برای زمان درست اگه اپ بسته بشه)
     recPersist(false);
@@ -758,12 +773,9 @@
       '<div><dt>' + esc(T('rec.avg')) + '</dt><dd><b id="rec-avg">' + recPace(st && K.avgPace(st, now)) + '</b></dd></div>' +
       '<div><dt>' + esc(T('rec.cur')) + '</dt><dd><b id="rec-cur">' + recPace(st && K.currentPace(st, now)) + '</b></dd></div></dl>' +
       '<p class="rec-signal rec-sig-' + recSig() + '" id="rec-signal">' + esc(T('rec.signal.' + recSig())) + '</p>' +
-      '<div class="rec-route" id="rec-route">' + liveRoute() + '</div>' +
+      recMapHtml() +
       (rec.status !== 'done' ? hrBlock() : '');
-    if (rec.err) {
-      html += '<p class="form-errors" role="alert">' + esc(T('rec.err.' + rec.err)) + '</p>' +
-        (rec.err === 'denied' && P.gps.canOpenSettings() ? '<button type="button" class="btn btn-outline" data-rec-settings="1">' + esc(T('rec.settings')) + '</button>' : '');
-    }
+    html += '<div id="rec-err-box">' + recErrHtml() + '</div>';
     if (rec.status === 'idle') {
       // تا سیگنال خوب نشده، شروع ممکنه ولی پیشنهاد نمی‌شه (اولین نقطه‌ی بد مبنای مسافت می‌شه)
       html += (recReady() ? '' : '<p class="small rec-wait">' + esc(T('rec.waitFix')) + '</p>') +
@@ -784,7 +796,10 @@
         '<button type="button" class="btn btn-outline rec-big" data-rec="back">' + esc(T('rec.back')) + '</button></div>' +
         '<button type="button" class="btn btn-ghost" data-rec="discard">' + esc(T(rec.discardAsk ? 'rec.discardSure' : 'rec.discard')) + '</button></div>';
     }
+    mapDestroy();
     app.innerHTML = html + '</section>';
+    mapInit();
+    var tb = document.getElementById('tabbar'); if (tb) tb.classList.toggle('is-rec-live', recLive());
     // صفحه‌ی ثبت باز شد: GPS از همین حالا روشن می‌شه تا موقع «شروع» سیگنال آماده باشه
     if (rec.status === 'idle' && !rec.err && !rec.handle && rec.key === todayKey) recWatch();
     clearInterval(recTimer);
@@ -982,6 +997,108 @@
     state.activities = (state.activities || []).filter(function (a) { return a.id !== id; });
     save(); showToast(T('free.deleted')); route();
   });
+
+  // =====================================================================
+  // نقشه‌ی زنده در صفحه‌ی ثبت (Leaflet، کپی محلی در js/vendor/leaflet) با تایل‌های OpenStreetMap.
+  // درخواست تایل محدوده‌ی تقریبی موقعیت رو به سرویس نقشه نشون می‌ده (در صفحه‌ی حریم خصوصی گفته شده)؛ با تنظیم «نقشه‌ی زمینه» خاموش می‌شه.
+  // اگه تایل‌ها ۸ ثانیه بار نشدن، خطا دادن یا آفلاینیم: همون شکل مسیر SVG (بدون اینترنت)؛ ثبت هیچ‌وقت به نقشه وابسته نیست.
+  // =====================================================================
+  var TILE_SOURCES = [
+    { id: 'osm', url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', maxZoom: 19, attr: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }
+  ];
+  var MAP_WAIT = 8000, recMap = null, mapLayers = null, mapFollow = true, mapFailed = false, mapTimer = null;
+  function mapWanted() { return settings.mapOn !== false && !!window.L && navigator.onLine !== false && !mapFailed; }
+  function recMapHtml() {
+    if (!mapWanted()) return '<div class="rec-route" id="rec-route">' + liveRoute() + '</div>' +
+      (mapFailed && settings.mapOn !== false ? '<p class="small muted rec-map-note">' + esc(T('map.fallback')) + '</p>' : '');
+    return '<div class="rec-map-wrap"><div class="rec-map" id="rec-map" dir="ltr" role="img" aria-label="' + esc(T('map.aria')) + '"></div>' +
+      '<button type="button" class="btn btn-icon rec-map-center" data-map-center="1" aria-label="' + esc(T('map.center')) + '" hidden>◎</button></div>' +
+      '<div class="rec-route" id="rec-route" hidden></div>';
+  }
+  // موقعیت فعلی: آخرین نقطه‌ی خام ثبت، یا نقطه‌ی گرم‌شدن قبل از شروع
+  function recPos() {
+    var st = rec && rec.st;
+    if (st && st.raw) return { lat: st.raw.lat, lon: st.raw.lon, acc: st.raw.acc || st.lastAcc || 20 };
+    if (st && st.last) return { lat: st.last.lat, lon: st.last.lon, acc: st.lastAcc || 20 };
+    return rec && rec.warm && rec.warm.pos ? rec.warm.pos : null;
+  }
+  function mapInit() {
+    var el = document.getElementById('rec-map');
+    if (!el || !mapWanted()) return;
+    var src = TILE_SOURCES[0], pos = recPos(), loaded = false;
+    try {
+      recMap = window.L.map(el, { zoomControl: true, attributionControl: true }).setView(pos ? [pos.lat, pos.lon] : [35.70, 51.39], pos ? 16 : 11);
+      recMap.attributionControl.setPrefix(false);
+      window.L.tileLayer(src.url, { maxZoom: src.maxZoom, attribution: src.attr })
+        .on('tileload', function () { loaded = true; })
+        .addTo(recMap);
+    } catch (e) { mapFallback(); return; }
+    var color = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#7a5a2b';
+    mapLayers = {
+      line: window.L.polyline([], { color: color, weight: 5, opacity: 0.9 }).addTo(recMap),
+      acc: window.L.circle([0, 0], { radius: 1, stroke: false, fillColor: '#3b82f6', fillOpacity: 0.15 }),
+      dot: window.L.circleMarker([0, 0], { radius: 7, color: '#fff', weight: 2.5, fillColor: '#3b82f6', fillOpacity: 1 })
+    };
+    mapFollow = true;
+    recMap.on('dragstart', function () { mapFollow = false; var b = document.querySelector('[data-map-center]'); if (b) b.hidden = false; });
+    clearTimeout(mapTimer);
+    mapTimer = setTimeout(function () { if (recMap && !loaded) mapFallback(); }, MAP_WAIT);
+    mapUpdate();
+  }
+  function mapUpdate() {
+    if (!recMap || !mapLayers) return;
+    var st = rec && rec.st, pos = recPos();
+    mapLayers.line.setLatLngs(st && st.route ? st.route.filter(function (sg) { return sg.length >= 2; }) : []);
+    if (pos) {
+      mapLayers.dot.setLatLng([pos.lat, pos.lon]); mapLayers.acc.setLatLng([pos.lat, pos.lon]).setRadius(Math.max(3, pos.acc || 10));
+      if (!recMap.hasLayer(mapLayers.dot)) { mapLayers.acc.addTo(recMap); mapLayers.dot.addTo(recMap); recMap.setView([pos.lat, pos.lon], 16); }
+      else if (mapFollow) recMap.panTo([pos.lat, pos.lon], { animate: false });
+    }
+  }
+  function mapDestroy() {
+    clearTimeout(mapTimer);
+    if (recMap) { try { recMap.remove(); } catch (e) { /* */ } }
+    recMap = null; mapLayers = null;
+  }
+  // نقشه بار نشد: تا آخر همین جلسه‌ی اپ، شکل مسیر بدون نقشه (و یک خط توضیح)
+  function mapFallback() {
+    mapFailed = true;
+    mapDestroy();
+    var w = document.querySelector('.rec-map-wrap'), rt = document.getElementById('rec-route');
+    if (w) w.outerHTML = '<p class="small muted rec-map-note">' + esc(T('map.fallback')) + '</p>';
+    if (rt) { rt.hidden = false; rt.innerHTML = liveRoute(); }
+  }
+  window.addEventListener('offline', function () { if (recMap) mapFallback(); });
+  document.addEventListener('click', function (e) {
+    if (!(e.target.closest && e.target.closest('[data-map-center]'))) return;
+    mapFollow = true; e.target.closest('[data-map-center]').hidden = true;
+    var pos = recPos(); if (recMap && pos) recMap.setView([pos.lat, pos.lon], Math.max(recMap.getZoom(), 15));
+  });
+  // تست نقشه (تنظیمات): یک تایل از هر منبع، با زمان بار شدن؛ برای دیدن اینکه از همین گوشی و همین شبکه کار می‌کنه یا نه
+  function mapTest(out) {
+    out.textContent = T('map.testing');
+    var done = 0, res = [];
+    TILE_SOURCES.forEach(function (src, i) {
+      var img = new Image(), t0 = Date.now(), fin = false;
+      var end = function (ok) {
+        if (fin) return; fin = true;
+        res[i] = T(ok ? 'map.testOk' : 'map.testFail', { name: 'OpenStreetMap', ms: Date.now() - t0 });
+        if (++done === TILE_SOURCES.length) out.textContent = fa(res.join(' · '));
+      };
+      img.onload = function () { end(true); }; img.onerror = function () { end(false); };
+      setTimeout(function () { end(false); }, MAP_WAIT);
+      img.referrerPolicy = 'strict-origin-when-cross-origin';
+      img.src = src.url.replace('{z}', '12').replace('{x}', '2631').replace('{y}', '1617') + '?t=' + Date.now();
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-map]');
+    if (!b) return;
+    if (b.dataset.map === 'test') { mapTest(document.getElementById('map-test-out')); return; }
+    settings.mapOn = b.dataset.map === 'on';
+    if (settings.mapOn) mapFailed = false;
+    saveSettings(); route();
+  });
   // دکمه‌ی «ثبت با GPS» برای جلسه‌ی امروز (خانه و برنامه)
   function recButton(key, s, cls) {
     if (!P.gps.supported() || key !== C.dateKey(today()) || state.done[key] || ['rest', 'none', 'cancelled'].indexOf(s.type) >= 0) return '';
@@ -1117,6 +1234,9 @@
     var tab = TAB_OF[v] || null;
     tabbar.hidden = v === 'onboarding' || noProfile;
     document.body.classList.toggle('has-tabbar', !tabbar.hidden);
+    // ثبت در جریان: نقطه‌ی قرمز روی دکمه‌ی وسط
+    tabbar.classList.toggle('is-rec-live', recLive());
+    if (v !== 'record') mapDestroy();
     tabbar.querySelectorAll('a').forEach(function (a) {
       var on = a.dataset.tab === tab;
       a.classList.toggle('is-active', on);
@@ -1172,9 +1292,9 @@
       chevron(isRtl() ? 'right' : 'left') + esc(T('app.back')) + '</a></nav>';
   }
   // تب مادر هر صفحه
-  var TABS = ['home', 'plan', 'learn', 'profile'];
+  var TABS = ['home', 'plan', 'record', 'learn', 'profile'];
   var TAB_OF = { home: 'home', checkin: 'home', health: 'profile', race: 'profile', plans: 'profile', walkgoals: 'profile', progress: 'profile', gait: 'profile', plan: 'plan', fitness: 'profile',
-    learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile', record: 'home' };
+    learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile', record: 'record' };
   // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
   var lastView = null, lastTab = null;
   function animateView(v, tab) {
@@ -6359,6 +6479,12 @@
         '<div class="field"><span class="field-label" id="units-lbl">' + esc(T('settings.units')) + '</span><div class="seg" role="group" aria-labelledby="units-lbl">' +
         ['km', 'mi'].map(function (u) { return '<button type="button" data-setunits="' + u + '" aria-pressed="' + (I.getUnits() === u) + '">' + esc(T('units.opt.' + u)) + '</button>'; }).join('') +
         '</div><small class="muted">' + esc(T('settings.unitsNote')) + '</small></div>') +
+      // نقشه‌ی زمینه در ثبت با GPS
+      (P.gps.supported() ? setSection('map', 'watch', T('map.title'), esc(T(settings.mapOn !== false ? 'map.on' : 'map.off')),
+        '<div class="seg" role="group" aria-label="' + esc(T('map.title')) + '">' +
+        ['on', 'off'].map(function (k) { return '<button type="button" data-map="' + k + '" aria-pressed="' + ((settings.mapOn !== false) === (k === 'on')) + '">' + esc(T('map.' + k)) + '</button>'; }).join('') +
+        '</div><small class="muted">' + esc(T('map.privacy')) + '</small>' +
+        '<div class="actions"><button type="button" class="btn btn-outline" data-map="test">' + esc(T('map.test')) + '</button></div><p class="small" id="map-test-out" aria-live="polite"></p>') : '') +
       // یادآوری جلسه‌ها
       setSection('remind', 'bell', T('remind.title'), esc(remindSub()), remindSection()) +
       // نصب اپلیکیشن

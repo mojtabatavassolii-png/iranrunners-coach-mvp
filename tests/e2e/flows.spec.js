@@ -286,6 +286,9 @@ test('ثبت با GPS: شروع، بازگشت بعد از بستن صفحه، �
   let lat = 35.7;
   await context.grantPermissions(['geolocation']);
   await context.setGeolocation({ latitude: lat, longitude: 51.4, accuracy: 5 });
+  // تایل‌های نقشه از سرورهای OpenStreetMap درخواست نمی‌شن: یک تصویر ۱×۱ ساختگی
+  const tilePng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  await context.route('https://tile.openstreetmap.org/**', (rt) => rt.fulfill({ status: 200, contentType: 'image/png', body: tilePng }));
   async function walk(n) {
     for (let i = 0; i < n; i++) {
       await page.waitForTimeout(1000);
@@ -299,8 +302,9 @@ test('ثبت با GPS: شروع، بازگشت بعد از بستن صفحه، �
   await page.locator('[data-rec="start"]').click();
   await walk(8);
   await expect.poll(async () => Number((await page.locator('#rec-km').innerText()).replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace('٫', '.'))).toBeGreaterThan(0.02);
-  // شکل مسیر زنده
-  await expect(page.locator('#rec-route svg polyline')).toHaveCount(1);
+  // مسیر زنده: روی نقشه (Leaflet) یا شکل مسیر بدون نقشه
+  // (خط عمودی روی نقشه پهنای صفر داره و «نمایان» حساب نمی‌شه؛ وجودش کافیه)
+  await expect(page.locator('#rec-map .leaflet-overlay-pane path, #rec-route svg polyline')).not.toHaveCount(0);
   // صفحه بسته و باز شد: ثبت متوقف‌شده برمی‌گرده
   await page.reload();
   await expect(page.locator('.rec-card .alert')).toContainText('ناتموم');
