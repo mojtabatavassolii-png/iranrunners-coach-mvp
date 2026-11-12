@@ -2124,6 +2124,7 @@ button.help-link { padding: 0; cursor: pointer; font-family: inherit; }
 .wb-track .wb-done { background: var(--primary); }
 .wb-track .wb-over { background: var(--warning); }
 .wb-sub { margin: 0; }
+.wb-why { margin: 6px 0 0; color: var(--text-secondary); border-inline-start: 3px solid var(--primary); padding-inline-start: 8px; }
 .free-btn { margin-block: 4px 12px; }
 .free-ask .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .free-q { margin-block: 8px; }

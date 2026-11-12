@@ -127,6 +127,71 @@ function patterns(results, G, meta) {
   return h;
 }
 
+
+// ---------- حس پیشرفت (feeling.js) ----------
+var MOOD_FA = { great: 'حس پیشرفت', good: 'راضی', neutral: 'مطمئن نیست', stuck: 'درجا زدن', down: 'ناامید' };
+var MOOD_KEYS = ['great', 'good', 'neutral', 'stuck', 'down'];
+function moodStrip(r) {
+  return '<div class="mstrip" role="img" aria-label="حس پیشرفت ماه‌به‌ماه">' + (r.feelings || []).map(function (f) {
+    return '<i class="m-' + f.mood + '" title="' + esc('ماه ' + f.month + ': ' + fa(f.line)) + '"></i>';
+  }).join('') + '</div>';
+}
+function personaFeel(r) {
+  var F = r.feelings || [];
+  if (!F.length) return '';
+  var best = F.slice().sort(function (a, b) { return b.score - a.score; })[0], worst = F.slice().sort(function (a, b) { return a.score - b.score; })[0];
+  var last = F[F.length - 1];
+  return '<div class="feel"><p class="feel-h">حس پیشرفت، ماه‌به‌ماه</p>' + moodStrip(r) +
+    '<ul class="quotes"><li><span class="q-tag m-' + best.mood + '">بهترین · ماه ' + fa(best.month) + '</span> «' + esc(fa(best.line)) + '»</li>' +
+    (worst !== best ? '<li><span class="q-tag m-' + worst.mood + '">بدترین · ماه ' + fa(worst.month) + '</span> «' + esc(fa(worst.line)) + '»</li>' : '') +
+    '<li><span class="q-tag m-' + last.mood + '">آخر · ماه ' + fa(last.month) + '</span> «' + esc(fa(last.line)) + '»</li></ul></div>';
+}
+function feelSection(results) {
+  var all = [];
+  results.forEach(function (r) { (r.feelings || []).forEach(function (f) { all.push({ r: r, f: f }); }); });
+  if (!all.length) return '';
+  var nM = Math.max.apply(null, all.map(function (x) { return x.f.month; })), Q = [];
+  for (var q = 0; q * 3 < nM; q++) Q.push(all.filter(function (x) { return x.f.month > q * 3 && x.f.month <= q * 3 + 3; }));
+  var dist = function (list) { var o = {}; MOOD_KEYS.forEach(function (k) { o[k] = 0; }); list.forEach(function (x) { o[x.f.mood]++; }); return o; };
+  var bar = function (list) {
+    var d = dist(list), n = list.length || 1;
+    return '<div class="mbar">' + MOOD_KEYS.map(function (k) { return d[k] ? '<i class="m-' + k + '" style="width:' + (d[k] / n * 100).toFixed(1) + '%" title="' + esc(MOOD_FA[k] + ': ' + fa(Math.round(d[k] / n * 100)) + '٪') + '"></i>' : ''; }).join('') + '</div>';
+  };
+  var pct = function (list, keys) { return list.length ? Math.round(list.filter(function (x) { return keys.indexOf(x.f.mood) >= 0; }).length / list.length * 100) : 0; };
+  var h = '<section><h2>حس پیشرفت</h2><p class="lead">هر ۳۰ روز، هر شخصیت با یک جمله می‌گه از پیشرفتش چه حسی داره. این <b>مدل</b> است، نه نظر آدم واقعی: ' +
+    'از چیزهایی ساخته می‌شه که خود اون آدم حس می‌کنه یا در اپ می‌بینه (آمادگی پنهان که دویدن رو راحت‌تر یا سخت‌تر می‌کنه، VDOT و سطح در اپ، حجم هفتگی، ' +
+    'منظم بودن، درد و آسیب، پیام‌های تکراری، مسابقه) و با وزن خلق‌وخوی هر شخصیت جمع می‌شه؛ مثلاً برای رقابت‌جو عددها مهم‌ترن و برای زودرنج درد.</p>';
+  h += '<div class="legend">' + MOOD_KEYS.map(function (k) { return '<span><i class="k m-' + k + '"></i>' + MOOD_FA[k] + '</span>'; }).join('') + '</div>';
+  h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>بازه</th><th>توزیع حس</th><th>مثبت</th><th>منفی</th></tr></thead><tbody>' +
+    Q.map(function (list, i) {
+      return '<tr><td>ماه ' + fa(i * 3 + 1) + ' تا ' + fa(Math.min(nM, i * 3 + 3)) + '</td><td>' + bar(list) + '</td><td class="num">' + fa(pct(list, ['great', 'good'])) + '٪</td><td class="num">' + fa(pct(list, ['stuck', 'down'])) + '٪</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  // دلیل‌های پرتکرار در ماه‌های منفی (بدون عدد)
+  var why = {}, whyPos = {};
+  var norm = function (t) { return t.replace(/\d+([.٫]\d+)?/g, '…').replace(/از … به …/g, '').replace(/\s+/g, ' ').trim(); };
+  all.forEach(function (x) {
+    var tgt = ['stuck', 'down'].indexOf(x.f.mood) >= 0 ? why : ['great', 'good'].indexOf(x.f.mood) >= 0 ? whyPos : null;
+    if (tgt) (x.f.reasons || []).forEach(function (t) { var k = norm(t); tgt[k] = (tgt[k] || 0) + 1; });
+  });
+  var topList = function (o) { return Object.keys(o).sort(function (a, b) { return o[b] - o[a]; }).slice(0, 7).map(function (k) { return '<li>' + esc(k) + ' <span class="num">(' + fa(o[k]) + ' ماه)</span></li>'; }).join(''); };
+  h += '<div class="two"><div><h3>چرا حس درجا زدن یا ناامیدی؟</h3><ol class="why">' + topList(why) + '</ol></div><div><h3>چی حس پیشرفت می‌ده؟</h3><ol class="why">' + topList(whyPos) + '</ol></div></div>';
+  // پیشرفت نامرئی: بدن بهتر شده ولی عدد اپ عوض نشده
+  var inv = results.filter(function (r) { return (r.feelings || []).some(function (f) { return f.invisible; }); });
+  var invM = all.filter(function (x) { return x.f.invisible; }).length;
+  h += '<p><b>پیشرفت نامرئی:</b> ' + fa(inv.length) + ' شخصیت در ' + fa(invM) + ' ماه، دست‌کم یک واحد VDOT پنهان از آخرین تایم‌تست بهتر شده بودن ولی هیچ عدد یا سطحی در اپ عوض نشده بود' +
+    (inv.length ? ' (' + inv.slice(0, 12).map(function (r) { return r.persona.id; }).join('، ') + (inv.length > 12 ? '، …' : '') + ')' : '') + '.</p>';
+  // میانگین حس بر اساس خلق‌وخو
+  var TT = {}, TF = { disciplined: 'منظم', erratic: 'بی‌نظم', obsessive: 'وسواسی', sensitive: 'زودرنج', bored: 'بی‌حوصله', competitive: 'رقابت‌جو' };
+  all.forEach(function (x) { var t = x.r.persona.traits.temperament; TT[t] = TT[t] || []; TT[t].push(x); });
+  h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>خلق‌وخو</th><th>توزیع حس در دو سال</th><th>مثبت</th><th>منفی</th></tr></thead><tbody>' +
+    Object.keys(TT).sort(function (a, b) { return pct(TT[b], ['great', 'good']) - pct(TT[a], ['great', 'good']); }).map(function (t) {
+      return '<tr><td>' + (TF[t] || t) + '</td><td>' + bar(TT[t]) + '</td><td class="num">' + fa(pct(TT[t], ['great', 'good'])) + '٪</td><td class="num">' + fa(pct(TT[t], ['stuck', 'down'])) + '٪</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  // پیاده‌روی در برابر دویدن
+  var wk = all.filter(function (x) { return x.r.persona.traits.walk; }), rn = all.filter(function (x) { return !x.r.persona.traits.walk; });
+  if (wk.length) h += '<p class="muted">دونده‌ها: ' + fa(pct(rn, ['great', 'good'])) + '٪ مثبت، ' + fa(pct(rn, ['stuck', 'down'])) + '٪ منفی · پیاده‌روها: ' + fa(pct(wk, ['great', 'good'])) + '٪ مثبت، ' + fa(pct(wk, ['stuck', 'down'])) + '٪ منفی.</p>';
+  return h + '</section>';
+}
 function page(results, meta) {
   var all = [];
   results.forEach(function (r) { r.findings.forEach(function (f) { all.push(f); }); });
@@ -174,6 +239,7 @@ function page(results, meta) {
   h += '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>عامل</th><th>جمع امتیاز در همه</th><th>پیشنهاد</th></tr></thead><tbody>' +
     Object.keys(tot).sort(function (a, b) { return tot[b] - tot[a]; }).map(function (k) { var c = CHURN[k] || [k, '', '']; return '<tr><td>' + esc(c[0]) + '</td><td class="num">' + fa(Math.round(tot[k])) + '</td><td>' + esc(c[2]) + '</td></tr>'; }).join('') + '</tbody></table></div></section>';
 
+  h += feelSection(results);
   if (results.length > 20 && results[0].persona.axes) h += patterns(results, G, meta);
   var many = results.length > 20;
   h += '<section><h2>شخصیت‌ها، دو سال</h2>' + (many ? '<p class="lead">برای هر شخصیت روی ردیفش بزن تا خط زمانی و جزئیات باز بشه.</p>' : '');
@@ -183,7 +249,7 @@ function page(results, meta) {
     var head = '<div class="ph"><h3><span class="pid">' + r.persona.id + '</span>' + esc(r.persona.title) + '</h3><p class="muted">آزمون: ' + esc(r.persona.focus) + ' · ' + tag + ' · ' + (r.persona.traits.mind === 'detail' ? 'جزءنگر' : 'کل‌نگر') +
       (many ? ' · ' + fa(sev.critical || 0) + ' بحرانی، ' + fa(sev.major || 0) + ' مهم، ' + fa(r.churn.length) + ' احتمال ریزش' : '') + '</p></div>';
     h += (many ? '<details class="persona"><summary>' + head + '</summary>' : '<article class="persona">' + head) +
-      timeline(r) +
+      timeline(r) + personaFeel(r) +
       '<dl class="facts"><div><dt>سطح آخر</dt><dd>' + fa(e.level) + '</dd></div><div><dt>آمادگی پنهان / تخمین اپ (VDOT)</dt><dd>' + fa(e.vdotHidden) + ' / ' + (e.fitness ? fa(e.fitness) : '—') + '</dd></div>' +
       '<div><dt>جلسه‌ی انجام‌شده</dt><dd>' + fa(e.done) + '</dd></div><div><dt>چک‌این</dt><dd>' + fa(e.checkins) + '</dd></div><div><dt>تایم‌تست و مسابقه</dt><dd>' + fa(e.tests) + '</dd></div><div><dt>روز با درد ثبت‌شده / آسیب</dt><dd>' + fa(e.pains) + ' / ' + fa(e.injuries) + '</dd></div>' +
       '<div><dt>ایراد</dt><dd>' + fa(sev.major || 0) + ' مهم · ' + fa(sev.minor || 0) + ' جزئی</dd></div>' +
@@ -247,7 +313,17 @@ var CSS = [
   '.evlist{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:2px;font-size:.88rem}.num{font-variant-numeric:tabular-nums;color:var(--muted)}',
   '.tbl-wrap{overflow-x:auto}.tbl{border-collapse:collapse;width:100%;font-size:.9rem}.tbl th,.tbl td{text-align:start;padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:top}.tbl th{color:var(--muted);font-weight:600;font-size:.8rem}',
   '.churn-list{margin:0;padding-inline-start:18px;display:grid;gap:6px}.churn-list .fix{margin:2px 0 0;color:var(--muted)}',
-  '.limits{margin:0;padding-inline-start:18px;max-width:75ch}'
+  '.limits{margin:0;padding-inline-start:18px;max-width:75ch}',
+  '/* حس پیشرفت: پنج حالت از سبز تا قرمز */',
+  ':root{--m-great:#2e7d4f;--m-good:#8bbf6a;--m-neutral:#c9c3a8;--m-stuck:#e0995a;--m-down:#c2453b}',
+  '@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--m-great:#5fbf86;--m-good:#a6d38a;--m-neutral:#8c8873;--m-stuck:#e8a46a;--m-down:#ec7a70}}',
+  ':root[data-theme="dark"]{--m-great:#5fbf86;--m-good:#a6d38a;--m-neutral:#8c8873;--m-stuck:#e8a46a;--m-down:#ec7a70}',
+  '.m-great{background:var(--m-great)}.m-good{background:var(--m-good)}.m-neutral{background:var(--m-neutral)}.m-stuck{background:var(--m-stuck)}.m-down{background:var(--m-down)}',
+  '.mbar{display:flex;height:14px;border-radius:4px;overflow:hidden;min-width:180px;background:var(--line)}.mbar i{display:block;height:100%}',
+  '.mstrip{display:flex;gap:2px;margin:4px 0}.mstrip i{display:block;flex:1;max-width:22px;height:14px;border-radius:2px}',
+  '.feel{margin-top:4px}.feel-h{margin:0;font-size:.8rem;color:var(--muted)}.quotes{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px;font-size:.9rem}',
+  '.q-tag{display:inline-block;font-size:.72rem;font-weight:700;padding:0 8px;border-radius:99px;color:#fff;margin-inline-end:6px}',
+  '.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}.why{margin:6px 0 0;padding-inline-start:20px;display:grid;gap:3px}'
 ].join('\n');
 
 var HEAD = '<title>شبیه‌ساز گام</title>\n<meta name="claude:viewport-fit-sides" content="cover">\n' +

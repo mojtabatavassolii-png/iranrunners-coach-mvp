@@ -2166,4 +2166,98 @@ test('پیشنهاد قبول‌شده روی روزی که انجام شده ا
   assert.strictEqual(C.applyPlanAdjust({ type: 'race', km: 10 }, { to: 'easy', km: 3 }, null), null);
 });
 
+test('برگشت بعد از وقفه‌ی ۱۴ روز یا بیشتر: هفته‌ی برگشت از حجم واقعی قبل از وقفه، بعد رشد تدریجی', function () {
+  var p = profileFor(5, { startDate: '2026-09-26', goal: { type: '21', date: '2027-06-01' } });
+  var st = { profile: p, done: {}, doneLog: {}, activities: [] };
+  // ۴ هفته فقط نصف جلسات انجام شده، بعد وقفه
+  for (var w = 0; w < 4; w++) weekAt(p, w).days.forEach(function (s, i) {
+    if (s.km && ['rest', 'none', 'cancelled'].indexOf(s.type) < 0 && i % 2 === 0) st.done[s.date] = true;
+  });
+  var lastK = Object.keys(st.done).sort().pop();
+  var before = C.buildWeek(p, C.parseDate('2026-11-14')).totalKm;
+  // ۱۰ روز: هنوز وقفه حساب نمی‌شه
+  assert.strictEqual(C.updateGapCap(st, C.addDays(C.parseDate(lastK), 10)), false);
+  var back = C.addDays(C.parseDate(lastK), 20);
+  assert.strictEqual(C.updateGapCap(st, back), true);
+  var g = p.gapCap;
+  assert.ok(g && g.days === 20 && g.base > 0 && g.base < before, JSON.stringify(g) + ' / ' + before);
+  var w0 = C.buildWeek(p, C.weekStart(back)).totalKm, w1 = C.buildWeek(p, C.addDays(C.weekStart(back), 7)).totalKm;
+  assert.ok(w0 <= g.base * 0.8 + 0.5, 'هفته‌ی برگشت ' + w0 + ' از پایه ' + g.base);
+  assert.ok(w1 > w0 && w1 <= w0 * 1.15 + 0.6, 'رشد هفته‌ی بعد ' + w0 + ' → ' + w1);
+  assert.strictEqual(C.updateGapCap(st, back), false, 'دوباره باز کردن همون روز تغییری نمی‌ده');
+  // هنوز برنگشته: هفته‌ی برگشت جلو می‌ره
+  assert.strictEqual(C.updateGapCap(st, C.addDays(back, 7)), true);
+  assert.strictEqual(p.gapCap.start, C.dateKey(C.weekStart(C.addDays(back, 7))));
+  // دویدن تازه: سقف می‌مونه تا خودش تموم بشه یا ۱۲ هفته بگذره
+  st.done[C.dateKey(C.addDays(back, 8))] = true;
+  assert.strictEqual(C.updateGapCap(st, C.addDays(back, 9)), false);
+  assert.ok(p.gapCap);
+  C.updateGapCap(st, C.addDays(back, 7 + 12 * 7));
+  assert.ok(!p.gapCap, 'بعد از ۱۲ هفته پاک می‌شه');
+  // پیاده‌روی و تاریخچه‌ی خالی: کاری نمی‌کنه
+  var e = { profile: profileFor(5), done: {}, doneLog: {}, activities: [] };
+  assert.strictEqual(C.updateGapCap(e, C.parseDate('2026-12-01')), false);
+  // دویدن آزاد هم دویدن حساب می‌شه
+  st.activities.push({ date: C.dateKey(C.addDays(back, 100)), sport: 'run', km: 5 });
+  assert.strictEqual(C.updateGapCap(st, C.addDays(back, 105)), false);
+});
+
+test('توضیح کاهش عمدی حجم هفته: هفته‌ی سبک، تیپر و برگشت بعد از وقفه', function () {
+  var p = profileFor(6, { startDate: '2026-09-26', goal: { type: '21', date: '2027-03-06' } });
+  var seen = {};
+  for (var w = 1; w < 23; w++) {
+    var d = C.weekDrop(p, C.addDays(C.parseDate(p.startDate), w * 7 + 2));
+    var cur = weekAt(p, w), prev = weekAt(p, w - 1);
+    if (d) { seen[d.reason] = 1; assert.ok(d.to <= d.from * 0.9 + 0.01, JSON.stringify(d)); }
+    if (cur.phase.key === 'deload' && cur.totalKm <= prev.totalKm * 0.9) assert.ok(d && d.reason === 'deload', 'هفته‌ی ' + w);
+  }
+  assert.ok(seen.deload && seen.taper, JSON.stringify(seen));
+  assert.strictEqual(C.weekDrop(p, C.parseDate(p.startDate)), null, 'هفته‌ی اول: قبلی نداره');
+  p.gapCap = { last: '2026-10-20', start: '2026-11-07', base: 20, days: 18 };
+  var g = C.weekDrop(p, C.parseDate('2026-11-09'));
+  assert.ok(g && g.reason === 'gap', JSON.stringify(g));
+});
+
+test('روند پیس دویدن آسون: تندتر شدن با همون سختی دیده می‌شه؛ بدون داده‌ی کافی یا RPE بالا نه', function () {
+  var p = profileFor(4), today = C.parseDate('2027-01-30');
+  var st = { profile: p, done: {}, doneLog: {}, postRuns: {}, activities: [] };
+  function run(back, pace, rpe) {
+    var k = C.dateKey(C.addDays(today, -back));
+    st.done[k] = true; st.doneLog[k] = { type: 'easy', km: 6, actual: { km: 6, sec: pace * 6 } };
+    if (rpe) st.postRuns[k] = { rpe: rpe };
+  }
+  [60, 65, 70, 75].forEach(function (b) { run(b, 400, 4); });
+  [3, 8, 13].forEach(function (b) { run(b, 380, 4); });
+  var tr = C.easyPaceTrend(st, today);
+  assert.ok(tr && tr.diff === 20 && tr.now === 380, JSON.stringify(tr));
+  // دویدن‌های اخیر با RPE بالا حساب نمی‌شن → داده‌ی کافی نیست
+  [3, 8].forEach(function (b) { st.postRuns[C.dateKey(C.addDays(today, -b))].rpe = 7; });
+  assert.strictEqual(C.easyPaceTrend(st, today), null);
+  // دویدن آزاد آسون با GPS هم حساب می‌شه
+  st.activities.push({ date: C.dateKey(C.addDays(today, -5)), sport: 'run', kind: 'easy', km: 5, sec: 1900, movingSec: 1880, rpe: 4 });
+  st.activities.push({ date: C.dateKey(C.addDays(today, -10)), sport: 'run', kind: 'easy', km: 5, sec: 1900, rpe: null });
+  tr = C.easyPaceTrend(st, today);
+  assert.ok(tr && tr.diff > 0, JSON.stringify(tr));
+  assert.strictEqual(C.easyPaceTrend({ profile: profileFor(4, { activity: 'walk' }) }, today), null);
+});
+test('«فعلاً نه» روی یادآوری تایم‌تست: یک هفته پنهان، صفحه‌ی فیتنس همچنان نشون می‌ده', function () {
+  var p = profileFor(4), d = C.parseDate('2026-11-14');
+  assert.ok(C.fitnessReminder(p, d));
+  C.snoozeFitnessReminder(p, d);
+  assert.strictEqual(C.fitnessReminder(p, C.addDays(d, 6)), null);
+  assert.ok(C.fitnessReminder(p, C.addDays(d, 6), { all: true }));
+  assert.ok(C.fitnessReminder(p, C.addDays(d, 7)));
+});
+
+test('تست ضعیف‌تر: توضیح با دلیل‌های احتمالی از چک‌این، فقط تا ۱۴ روز', function () {
+  var at = function (v) { return Math.round(C.raceTimeFromVdot(v, 5)); };
+  var p = profileFor(5, { fitnessTests: [{ date: '2026-10-01', distanceKm: 5, timeSec: at(45), kind: 'test' }, { date: '2026-11-10', distanceKm: 5, timeSec: at(43.5), kind: 'test' }] });
+  var st = { profile: p, checkins: { '2026-11-09': { fatigue: 4, sleep: 3 } } };
+  var c = C.weakTestContext(p, st, C.parseDate('2026-11-12'));
+  assert.ok(c && c.from > c.to && c.reasons.indexOf('tired') >= 0, JSON.stringify(c));
+  assert.strictEqual(C.weakTestContext(p, st, C.parseDate('2026-11-30')), null, 'بعد از ۱۴ روز');
+  p.fitnessTests[1].timeSec = at(45.2);
+  assert.strictEqual(C.weakTestContext(p, st, C.parseDate('2026-11-12')), null, 'بهتر یا برابر');
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

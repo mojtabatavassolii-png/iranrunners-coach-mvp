@@ -929,6 +929,9 @@
     fitNotes: {
       title: 'Fitness update',
       register: 'Log a time trial',
+      notNow: 'Not now',
+      paceTrend: 'Progress: at the same effort, your easy-run pace went from {a} to {b} {u} ({n} s faster than two months ago).',
+      snoozed: 'OK, we\'ll remind you again in a week.',
       trendStrong: 'Recurring pattern:',
       trend: { one: 'In the last two weeks, {n} easy run at the planned pace felt hard (RPE above 6).', other: 'In the last two weeks, {n} easy runs at the planned pace felt hard (RPE above 6).' },
       suggestA: 'Based on your latest time trial, your fitness matches',
@@ -1411,7 +1414,18 @@
       left: '{n} {u} to go',
       over: '{n} {u} over plan',
       free: '{n} {u} free runs',
-      min: 'min'
+      min: 'min',
+      drop: {
+        deload: 'Recovery week ({a} → {b} {u}): your body gets stronger during these weeks. Volume picks up where it left off afterwards.',
+        taper: 'Pre-race taper ({a} → {b} {u}): an intentional cut so you\'re fresh on race day, not a loss of fitness.',
+        race: 'Race week: the other days are light so you have energy for the race.',
+        recovery: 'Post-race recovery ({a} → {b} {u}): a few easy days are needed; volume comes back gradually.',
+        return: 'Gradual return after the race: volume grows a little each week.',
+        injury: 'Running is paused because of an injury. This isn\'t a step back, it\'s care.',
+        injuryReturn: 'Gradual return after injury ({a} → {b} {u}): a little more at each stage.',
+        gap: 'After a break we start lower ({a} → {b} {u}) and add a little each week.',
+        days: 'With your current number of days, volume is lower ({a} → {b} {u}) so no session gets too long.'
+      }
     },
     tdays: {
       q: 'How many days a week do you want to train?',
@@ -1438,6 +1452,7 @@
       line: { one: 'Training {n} day a week', other: 'Training {n} days a week' },
       lineLight: { one: '{n} light day', other: '{n} light days' },
       change: 'Change',
+      gapCap: 'After a {d}-day break, this week is {km} km (plan: {plan}). It grows a little each week so your body can readjust without injury.',
       capped: 'With {n} training days, this week is {km} km (instead of {plan}) so no single session gets too long.',
       save: 'Save',
       saved: 'Training days saved.',
@@ -1668,6 +1683,17 @@
       newTestOrPb: 'Log a time trial or new best time'
     },
     fit: {
+      weak: {
+        head: 'This test was a bit slower than the last one (VDOT {a} → {b}). One test doesn\'t show all your fitness; common reasons:',
+        r: {
+          tired: 'You were tired or short on sleep in the days before the test (from your check-ins).',
+          pain: 'You logged pain around the test.',
+          gap: 'You had a break a few weeks ago; your body is still coming back.',
+          day: 'Heat, wind, a hilly route, too short a warm-up or starting too fast can each cost a few seconds per km.'
+        },
+        kept: 'Your level doesn\'t change on one test. Paces now come from this test so workouts match today\'s fitness; test again in 4–6 weeks.',
+        check: 'Paces now come from this test. You\'ll see a level-change suggestion on Home; if you think it was an off day, decline it and test again in a few weeks.'
+      },
       title: 'Fitness and paces',
       help: 'VDOT and time trials',
       entry: { test: 'Time trial', race: 'Race', baseline: 'Baseline best time (at plan creation)', record: 'Best time', step: 'VDOT step' },

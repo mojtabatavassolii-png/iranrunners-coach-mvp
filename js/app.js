@@ -974,7 +974,14 @@
     return '<section class="card week-bar"><div class="wb-head"><span class="hcard-label">' + esc(T('wbar.title')) + '</span><b>' + tt('wbar.of', { d: cv(w.done), p: cv(w.plan), u: u }) + '</b></div>' +
       '<div class="wb-track" role="img" aria-label="' + esc(fa(T('wbar.of', { d: cv(w.done), p: cv(w.plan), u: u }))) + '"><i class="wb-done" style="width:' + pDone.toFixed(1) + '%"></i>' +
       (pOver > 0 ? '<i class="wb-over" style="width:' + pOver.toFixed(1) + '%"></i>' : '') + '</div>' +
-      '<p class="small muted wb-sub">' + sub + '</p></section>';
+      '<p class="small muted wb-sub">' + sub + '</p>' + weekDropNote() + '</section>';
+  }
+  // چرا حجم این هفته کمتر از هفته‌ی قبله (کاهش عمدی برنامه، نه عقب‌گرد)
+  function weekDropNote() {
+    var d = C.weekDrop(state.profile, today());
+    if (!d) return '';
+    var u = T('units.word.' + I.getUnits()), cv = function (x) { return Math.round(dKm(x) * 10) / 10; };
+    return '<p class="small wb-why">' + tt('wbar.drop.' + d.reason, { a: cv(d.from), b: cv(d.to), u: u }) + '</p>';
   }
   // تمرین‌های آزاد یک روز (زیر جزئیات روز در صفحه‌ی برنامه)، با حذف دومرحله‌ای
   var actDelAsk = null;
@@ -1214,6 +1221,8 @@
     // GPS گرم‌شده‌ی صفحه‌ی ثبت (قبل از شروع) با رفتن به صفحه‌ی دیگه خاموش می‌شه
     if (rec && rec.status === 'idle' && (location.hash || '').slice(1) !== 'record') { if (rec.handle) P.gps.stop(rec.handle); rec = null; }
     // تاریخچه‌ی هفتگی برنامه: حجم و ارتفاع همین هفته (برای حد رشد بعد از تغییر هدف یا سطح)
+    // برگشت بعد از وقفه‌ی ۱۴ روز یا بیشتر: هفته‌های برگشت از حجم واقعی قبل از وقفه (قبل از ثبت تاریخچه‌ی هفته)
+    if (state.profile && C.updateGapCap(state, today())) save();
     if (state.profile && C.logWeek(state.profile, today())) save();
     // رکورد تازه سطح رو بالا برده: سطح همراه VDOT بالا می‌ره و پیام تبریک (هر مسیر ثبت رکورد: فیتنس، نتیجه‌ی مسابقه، Health)
     var lvUp = state.profile && !C.isWalk(state.profile) ? C.autoLevelUp(state.profile, today()) : null;
@@ -2525,6 +2534,7 @@
     var html = '<p class="days-line small">' + tt('tdays.line', { n: dc.total }) +
       (dc.extra > 0 ? esc(T('progress.sep')) + tt('tdays.lineLight', { n: dc.extra }) : '') +
       ' <button type="button" class="linklike" data-days-open="1">' + esc(T('tdays.change')) + '</button></p>';
+    if (week && week.gapCap) html += '<p class="small days-capped">' + tt('tdays.gapCap', { d: week.gapCap.days, km: week.gapCap.km, plan: week.gapCap.plan }) + '</p>';
     if (week && week.capped) html += '<p class="small days-capped">' + tt('tdays.capped', { n: week.capped.days, km: week.capped.km, plan: week.capped.plan }) + '</p>';
     return html;
   }
@@ -2967,13 +2977,22 @@
     return html + '</section>';
   }
 
+  // «پیس ایزی‌ات تندتر شده»: پیشرفتی که بدون تایم‌تست هم دیده می‌شه (فقط بهتر شدن نشون داده می‌شه؛ کندتر شدن دلیل‌های زیادی داره مثل گرما)
+  function easyTrendLine(now) {
+    var pt = C.easyPaceTrend(state, now);
+    if (!pt || pt.diff < 5) return '';
+    return tt('fitNotes.paceTrend', { a: paceFmt(pt.before), b: paceFmt(pt.now), n: Math.round(I.pace(pt.diff)), u: T('units.pace.' + I.getUnits()) });
+  }
   // کارت «به‌روزرسانی فیتنس» روی داشبورد: یادآوری تایم‌تست، الگوی RPE بالا، پیشنهاد تغییر سطح
   function fitnessNotesCard(p, now) {
     // همه‌ی موردها (تست فیتنس، روند RPE دویدن آسون، VDOT) مخصوص دویدنه
     if (C.isWalk(p)) return '';
     var items = [];
     var rem = C.fitnessReminder(p, now);
-    if (rem) items.push('<li>' + t(rem.message) + ' <a href="#fitness">' + esc(T('fitNotes.register')) + '</a></li>');
+    if (rem) items.push('<li>' + t(rem.message) + '<div class="actions"><a class="btn btn-outline" href="#fitness">' + esc(T('fitNotes.register')) + '</a>' +
+      ' <button type="button" class="linklike" data-fitrem-snooze="1">' + esc(T('fitNotes.notNow')) + '</button></div></li>');
+    var pt = easyTrendLine(now);
+    if (pt) items.push('<li>' + pt + '</li>');
     var trend = C.easyRpeTrend(state.postRuns, now);
     if (trend >= 2) items.push('<li><strong>' + esc(T('fitNotes.trendStrong')) + '</strong> ' + tt('fitNotes.trend', { n: trend }) + ' ' +
       t(C.EASY_RPE_WARNING) + easyActions() + '</li>');
@@ -2995,6 +3014,11 @@
     return '<section class="card fitness-notes"><h3>' + esc(T('fitNotes.title')) + '</h3><ul>' + items.join('') + '</ul></section>';
   }
 
+  document.addEventListener('click', function (e) {
+    if (!(e.target.closest && e.target.closest('[data-fitrem-snooze]'))) return;
+    C.snoozeFitnessReminder(state.profile, today());
+    save(); showToast(T('fitNotes.snoozed')); route();
+  });
   document.addEventListener('click', function (e) {
     if (!(e.target.closest && e.target.closest('[data-vdot-step]'))) return;
     var p = state.profile, vs = C.vdotStepSuggestion(p, state.postRuns, today());
@@ -6023,7 +6047,7 @@
     var p = state.profile, now = today();
     var z = C.paceZones(p);
     var fit = C.currentFitness(p);
-    var rem = C.fitnessReminder(p, now);
+    var rem = C.fitnessReminder(p, now, { all: true });
     var hr = C.hrZones(p);
     var html = '<section class="card"><h1>' + esc(T('fit.title')) + ' ' + helpLink('fitness', T('fit.help')) + '</h1>' + learnMore(['vdot']);
     if (fit) {
@@ -6036,6 +6060,12 @@
       html += '<p>' + esc(T('fit.none')) + '</p>';
     }
     if (rem && rem.kind === 'stale') html += '<div class="alert alert-adapt" role="status"><p>' + t(rem.message) + '</p></div>';
+    var wtc = C.weakTestContext(p, state, now);
+    if (wtc) html += '<div class="alert alert-adapt weak-test" role="status"><p>' + tt('fit.weak.head', { a: wtc.from.toFixed(1), b: wtc.to.toFixed(1) }) + '</p><ul>' +
+      wtc.reasons.map(function (r) { return '<li>' + tt('fit.weak.r.' + r) + '</li>'; }).join('') + '<li>' + tt('fit.weak.r.day') + '</li></ul>' +
+      '<p>' + tt(wtc.levelKept ? 'fit.weak.kept' : 'fit.weak.check') + '</p></div>';
+    var ptl = easyTrendLine(now);
+    if (ptl) html += '<p class="small fit-trend">' + ptl + '</p>';
 
     if (z && z.easy) {
       var adj = z.easyAdjustSec, P = C.paceSet(p, C.assessLevel(p).level);

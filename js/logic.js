@@ -518,6 +518,25 @@
       return (a.kind === 'baseline' ? 0 : 1) - (b.kind === 'baseline' ? 0 : 1);
     });
   }
+  // تست تازه ضعیف‌تر از قبلی: توضیح و دلیل‌های احتمالی (تا ۱۴ روز بعد از تست، روی صفحه‌ی فیتنس)
+  // { from, to, date, reasons: ['tired'|'gap'|'pain'], levelKept } یا null
+  function weakTestContext(profile, data, today) {
+    var list = fitnessEntries(profile);
+    if (list.length < 2) return null;
+    var last = list[list.length - 1], prev = list[list.length - 2];
+    if (last.kind === 'baseline' || last.kind === 'step' || daysBetween(parseDate(last.date), today) > 14) return null;
+    var a = vdotFromRace(prev.distanceKm, prev.timeSec), b = vdotFromRace(last.distanceKm, last.timeSec);
+    if (!(b < a - 0.5)) return null;
+    var reasons = [], cis = (data && data.checkins) || {};
+    [0, -1, -2].forEach(function (o) {
+      var c = cis[dateKey(addDays(parseDate(last.date), o))];
+      if (c && (Number(c.fatigue) >= 3 || Number(c.sleep) <= 2) && reasons.indexOf('tired') < 0) reasons.push('tired');
+      if (c && c.pain && reasons.indexOf('pain') < 0) reasons.push('pain');
+    });
+    var g = profile.gapCap;
+    if (g && g.start && daysBetween(parseDate(g.start), parseDate(last.date)) < 42) reasons.push('gap');
+    return { from: Math.round(a * 10) / 10, to: Math.round(b * 10) / 10, date: last.date, reasons: reasons, levelKept: !fitnessLevelSuggestion(profile) };
+  }
   function currentFitness(profile) {
     var list = fitnessEntries(profile);
     if (!list.length) return null;
@@ -604,8 +623,11 @@
   }
 
   // یادآوری تایم‌تست
-  function fitnessReminder(profile, today) {
+  // opts.all: صفحه‌ی فیتنس (کاربر خودش رفته) — «فعلاً نه» اونجا اثری نداره
+  var REMINDER_SNOOZE_DAYS = 7;
+  function fitnessReminder(profile, today, opts) {
     if (profile.experience === 'never' || isWalk(profile)) return null;
+    if (!(opts && opts.all) && profile.fitRemSnooze && dateKey(today) < profile.fitRemSnooze) return null;
     var fit = currentFitness(profile);
     // برگشتی بعد از وقفه‌ی طولانی: تایم‌تست اول بعد از چند هفته دویدن آسون (سطح ۱ بعد از ۸ هفته، بقیه بعد از ۴)
     var ri = returnInfo(profile);
@@ -624,6 +646,11 @@
   var LEVEL_DOWN_MARGIN = 2, LEVEL_UP_MARGIN = 0;
   // «فعلاً نه»: پیشنهاد سطح تا تایم‌تست یا مسابقه‌ی بعدی پنهان می‌شه (کلید = همون نتیجه‌ای که پیشنهاد رو ساخته)
   function fitnessKey(e) { return e ? [e.date, e.distanceKm, e.timeSec].join('|') : null; }
+  // «فعلاً نه» روی یادآوری تایم‌تست: یک هفته دیده نمی‌شه
+  function snoozeFitnessReminder(profile, today) {
+    profile.fitRemSnooze = dateKey(addDays(today, REMINDER_SNOOZE_DAYS));
+    return true;
+  }
   function skipLevelSuggestion(profile) {
     var fit = currentFitness(profile);
     if (!fit) return false;
@@ -839,6 +866,71 @@
     n = dressAlt(n, s);
     n.advice = true;
     return n;
+  }
+
+  // ---------- برگشت بعد از وقفه‌ی کوتاه (۱۴ روز یا بیشتر بدون هیچ دویدنی) ----------
+  // بیماری، سفر یا بی‌انگیزگی: شماره‌ی هفته‌ی برنامه جلو رفته ولی بدن نه. هفته‌ی برگشت از میانگین واقعی ۴ هفته‌ی قبل از وقفه
+  // ضرب‌در همون ضریب‌های «دونده‌ی برگشتی» (returnInfo: کمتر از ۹۰ روز ۸۰٪ و هفته‌ای ۱۵٪، تا یک سال ۶۰٪ و ۱۲٪، بیشتر ۵۰٪ و ۱۰٪) شروع می‌شه.
+  // profile.gapCap = { last: آخرین دویدن قبل از وقفه، start: هفته‌ی برگشت، base: میانگین قبل از وقفه، days: طول وقفه }
+  var BREAK_DAYS = 14, GAP_CAP_WEEKS = 12;
+  function gapRamp(days) { return days < 90 ? { frac: 0.8, rate: 1.15 } : days <= 365 ? { frac: 0.6, rate: 1.12 } : { frac: 0.5, rate: 1.1 }; }
+  function gapCapKm(profile, ws) {
+    var g = profile.gapCap;
+    if (!g || !g.start || !(g.base > 0)) return null;
+    var k = Math.floor(daysBetween(parseDate(g.start), ws) / 7);
+    if (k < 0 || k >= GAP_CAP_WEEKS) return null;
+    var r = gapRamp(g.days);
+    return Math.max(5, floor05(g.base * r.frac * Math.pow(r.rate, k)));
+  }
+  function lastRunKey(state, uptoKey) {
+    var off = ['rest', 'none', 'cancelled'], best = null;
+    Object.keys(state.done || {}).forEach(function (k) {
+      if (!state.done[k] || k > uptoKey || (best && k <= best)) return;
+      var l = (state.doneLog || {})[k];
+      if (l && off.indexOf(l.type) >= 0) return;
+      best = k;
+    });
+    (state.activities || []).forEach(function (a) { if (a.sport !== 'walk' && a.date <= uptoKey && (!best || a.date > best)) best = a.date; });
+    return best;
+  }
+  // موقع باز شدن اپ (مثل logWeek): وقفه رو تشخیص می‌ده و gapCap رو می‌سازه یا به‌روز می‌کنه. true اگه پروفایل عوض شد
+  function updateGapCap(state, today) {
+    var p = state.profile;
+    if (!p || isWalk(p)) return false;
+    var tk = dateKey(today), last = lastRunKey(state, tk), cur = p.gapCap;
+    if (cur && daysBetween(parseDate(cur.start), today) >= GAP_CAP_WEEKS * 7) { delete p.gapCap; return true; }
+    if (!last) return false;
+    var gap = daysBetween(parseDate(last), today);
+    if (gap < BREAK_DAYS) return false;
+    var ws = dateKey(weekStart(today));
+    if (cur && cur.last === last) {
+      // هنوز برنگشته: هفته‌ی برگشت جلو می‌ره و طول وقفه به‌روز می‌شه
+      if (cur.start !== ws || cur.days !== gap) { cur.start = ws; cur.days = gap; return true; }
+      return false;
+    }
+    var lw = weekStart(parseDate(last)), sum = 0, n = 0;
+    for (var i = 0; i < 4; i++) {
+      var w0 = addDays(lw, -7 * i);
+      if (weekIndexFor(p, w0) < 0) break;
+      sum += weekDone(p, state, w0).done; n++;
+    }
+    if (!n || !(sum > 0)) return false;
+    p.gapCap = { last: last, start: ws, base: round05(sum / n), days: gap };
+    return true;
+  }
+
+  // کم شدن عمدی حجم این هفته نسبت به هفته‌ی قبل (برای توضیح زیر نوار حجم هفته، تا کاهش حس عقب‌گرد نده)
+  // { reason: deload|taper|race|recovery|return|injury|injuryReturn|gap|days, from, to } یا null
+  var DROP_PHASES = ['deload', 'taper', 'race', 'recovery', 'return', 'injury', 'injuryReturn'];
+  function weekDrop(profile, today) {
+    if (!profile || isWalk(profile)) return null;
+    var ws = weekStart(today), pws = addDays(ws, -7);
+    if (weekIndexFor(profile, pws) < 0) return null;
+    var cur = buildWeek(profile, ws), prev = buildWeek(profile, pws);
+    if (!(prev.totalKm > 0) || cur.totalKm > prev.totalKm * 0.9) return null;
+    var key = cur.phase && cur.phase.key;
+    var reason = cur.gapCap ? 'gap' : DROP_PHASES.indexOf(key) >= 0 ? key : cur.capped ? 'days' : null;
+    return reason ? { reason: reason, from: prev.totalKm, to: cur.totalKm } : null;
   }
 
   // پیشنهاد «برنامه رو با حجم فعلیت تنظیم کنم؟»: سه هفته‌ی کامل آخر زیر ۶۰٪، بدون آسیب فعال، و «فعلاً نه» برای همین هفته زده نشده
@@ -1866,7 +1958,7 @@
         var eq = g.km + g.gain / 100, tf = { technical: 1.15, trail: 1.08, gravel: 1.02, mixed: 1.08 }[g.terrain] || 1.08;
         how += T('s.race.ultraEst', { time: hoursText(riegel(fit.entry.timeSec, fit.entry.distanceKm, eq) * tf / 60), km: Math.round(eq) });
       }
-      return attachWarmup({ type: 'race', km: round05(g.km), hardKm: g.km, target: goalLabel(g), vert: g.gain, rpeOnly: true,
+      return attachWarmup({ type: 'race', km: round05(g.km), hardKm: round05(g.km), target: goalLabel(g), vert: g.gain, rpeOnly: true,
         steps: T('s.race.ultraSteps').slice(),
         how: how }, 'race', level, 'long');
     }
@@ -1876,7 +1968,7 @@
     if (fit) h += T('s.race.pred', { time: formatDuration(riegel(fit.entry.timeSec, fit.entry.distanceKm, d)) });
     if (level <= 1) h += T('s.race.runwalk');
     var rk = level <= 1 ? 'long' : (g.type === '5' || g.type === '10') ? 'short' : g.type === '21' ? 'half' : 'long';
-    return attachWarmup({ type: 'race', km: round05(d), hardKm: d, target: RACE_LABELS[g.type], steps: steps, how: h }, 'race', level, rk);
+    return attachWarmup({ type: 'race', km: round05(d), hardKm: round05(d), target: RACE_LABELS[g.type], steps: steps, how: h }, 'race', level, rk);
   }
 
   // ---------- مسابقه‌های فرعی ----------
@@ -1978,7 +2070,7 @@
     if (fit) h += T('s.race.pred', { time: formatDuration(riegel(fit.entry.timeSec, fit.entry.distanceKm, r.km)) });
     if (level <= 1) h += T('s.race.runwalk');
     var rk = level <= 1 || r.km > 21.2 ? 'long' : r.km <= 10 ? 'short' : 'half';
-    return attachWarmup({ type: 'race', side: true, km: round05(r.km), hardKm: r.km, target: sideRaceLabel(r), steps: T('s.race.steps').slice(), how: h }, 'race', level, rk);
+    return attachWarmup({ type: 'race', side: true, km: round05(r.km), hardKm: round05(r.km), target: sideRaceLabel(r), steps: T('s.race.steps').slice(), how: h }, 'race', level, rk);
   }
   function applySideRaces(profile, s, date, races, ctx, rw, level) {
     if (s.type === 'race' || s.type === 'none') return s; // روز مسابقه‌ی اصلی دست نمی‌خوره
@@ -2205,6 +2297,10 @@
       var logLim = planLogLimit(profile, ws);
       var raceWeek = race && race.date >= ws && race.date <= addDays(ws, 6);
       if (logLim && !raceWeek && !(ipw && ipw.phase === 'ramp') && weeklyKm > logLim.km + 0.5) weeklyKm = Math.max(5, floor05(logLim.km));
+      // برگشت بعد از وقفه‌ی ۱۴ روز یا بیشتر (gapCap، از app.js با updateGapCap): از حجم واقعی قبل از وقفه، بعد رشد هفتگی
+      var gcap = gapCapKm(profile, ws);
+      var gapFrom = null;
+      if (gcap != null && !raceWeek && !(ipw && ipw.phase === 'ramp') && weeklyKm > gcap + 0.5) { gapFrom = weeklyKm; weeklyKm = gcap; }
 
       // ران‌های پشت‌سرهم (اولترا): سطح ۵+، پایه‌ی کافی (۵۰+ کیلومتر، بعد از ۴ هفته)، نه در هفته‌ی ریکاوری، دوره‌ی پایه یا نزدیک مسابقه
       var nearRace = race && race.date >= ws && daysBetween(ws, race.date) <= 20;
@@ -2444,7 +2540,7 @@
       weekIndex: w, start: dateKey(ws), days: days, level: level, tier: tier, goal: goal,
       period: period, periodLabel: period ? PERIOD_LABELS[period] : null,
       phase: injuryWeekPhase(profile, ws) || weekPhase(profile, ws, pr, w, vol),
-      volumeTarget: weeklyKm, capped: cappedKm >= 1 ? { plan: weeklyKm, km: round05(weeklyKm - cappedKm), days: nSessions } : null, b2b: b2bDay !== null, vertCap: hp ? hp.cap : null, hillStage: hp ? hp.stage : null,
+      volumeTarget: weeklyKm, capped: cappedKm >= 1 ? { plan: weeklyKm, km: round05(weeklyKm - cappedKm), days: nSessions } : null, b2b: b2bDay !== null, gapCap: gapFrom != null && profile.gapCap ? { plan: round05(gapFrom), km: weeklyKm, days: profile.gapCap.days } : null, vertCap: hp ? hp.cap : null, hillStage: hp ? hp.stage : null,
       zeroStage: level === 0 ? template._zero : null, zeroFinal: ZERO_FINAL,
       totalKm: round05(totalKm), totalMin: totalMin, vert: vert,
       hardPct: totalKm ? Math.round(hardKm / totalKm * 100) : 0
@@ -3101,6 +3197,32 @@
     var a = log && log.actual;
     return a && a.km > 0 && a.sec > 0 ? a.sec / a.km : null;
   }
+  // ---------- روند پیس دویدن‌های آسون (پیشرفتی که بدون تایم‌تست هم دیده بشه) ----------
+  // میانگین پیس دویدن‌های آسون ۴ هفته‌ی اخیر در برابر ۴ هفته‌ی ۸ تا ۱۲ هفته پیش، فقط با سختی مشابه (RPE ۵ یا کمتر، اگه ثبت شده).
+  // { now, before, diff (ثانیه در کیلومتر، مثبت یعنی تندتر)، n } وقتی هر دو بازه حداقل ۳ دویدن دارن، وگرنه null
+  var PACE_TREND_MIN = 3;
+  function easyPaceTrend(data, today) {
+    if (!data || !data.profile || isWalk(data.profile)) return null;
+    var tk = dateKey(today), a0 = dateKey(addDays(today, -27)), b0 = dateKey(addDays(today, -83)), b1 = dateKey(addDays(today, -56));
+    var A = [], B = [], posts = data.postRuns || {};
+    function put(k, pace, rpe) {
+      if (!pace || pace < 150 || pace > 1200 || (rpe && rpe > 5)) return;
+      if (k >= a0 && k <= tk) A.push(pace); else if (k >= b0 && k <= b1) B.push(pace);
+    }
+    Object.keys(data.doneLog || {}).forEach(function (k) {
+      var l = data.doneLog[k];
+      if (!(data.done || {})[k] || !l || l.type !== 'easy' || !l.actual || !(l.actual.km >= 2)) return;
+      put(k, actualPace(l), posts[k] && Number(posts[k].rpe));
+    });
+    (data.activities || []).forEach(function (x) {
+      if (x.sport === 'walk' || x.kind !== 'easy' || !(x.km >= 2)) return;
+      put(x.date, (x.movingSec || x.sec) / x.km, x.rpe);
+    });
+    if (A.length < PACE_TREND_MIN || B.length < PACE_TREND_MIN) return null;
+    var now = mean(A), before = mean(B);
+    return { now: Math.round(now), before: Math.round(before), diff: Math.round(before - now), n: A.length + B.length };
+  }
+
   // ---------- صبح یا عصر؟ مقایسه‌ی دویدن‌ها بر اساس ساعت شروع ثبت‌شده ----------
   // فقط ایزی ران و لانگ‌ران (شدت مشابه، مقایسه منصفانه‌ست)؛ پیس از مسافت و زمان واقعی، سختی از RPE بعد از جلسه
   var TOD_SLOTS = [['morning', 0, 12], ['afternoon', 12, 17], ['evening', 17, 24]];
@@ -3189,6 +3311,7 @@
   }
   function mean(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : null; }
   // range: تعداد روز آخر (۲۸، ۹۱) یا null برای «از ابتدا»
+  var ANALYTICS_WARMUP_DAYS = 182;
   function analytics(data, today, rangeDays) {
     var p = data.profile;
     if (!p) return null;
@@ -3199,7 +3322,11 @@
     if (from < start) from = start;
     var fromKey = dateKey(from), todayKey = dateKey(today);
     var level = assessLevel(p).level, P = paceSet(p, level), pE = P.pE || 390;
-    var recs = dayRecords(data, start, today);
+    // فقط ۲۶ هفته قبل از شروع بازه لازمه: اثر مقدار اولیه‌ی CTL (ثابت زمانی ۴۲ روز) بعد از ۱۸۲ روز ~۱٪ه.
+    // بدون این، بعد از دو سال هر باز کردن صفحه‌ی پیشرفت همه‌ی روزها رو از اول می‌ساخت.
+    var recStart = rangeDays ? addDays(from, -ANALYTICS_WARMUP_DAYS) : start;
+    if (recStart < start) recStart = start;
+    var recs = dayRecords(data, recStart, today);
     var postRuns = data.postRuns || {};
 
     // ---- بار تمرینی، CTL / ATL / TSB (میانگین نمایی؛ مقدار اولیه از حجم قبلی خود کاربر) ----
@@ -3898,9 +4025,10 @@
     chooseSessionDays: chooseSessionDays, placeQuality: placeQuality, circDist: circDist,
     buildWeek: buildWeek, sessionFor: sessionFor, adaptSession: adaptSession, isHard: isHard, readiness: readiness, weekAdaptSummary: weekAdaptSummary,
     currentFitness: currentFitness, fitnessEntries: fitnessEntries, hrZones: hrZones, easyRunFeedback: easyRunFeedback,
-    easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, fitnessReminder: fitnessReminder,
+    easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, easyPaceTrend: easyPaceTrend, weakTestContext: weakTestContext, fitnessReminder: fitnessReminder, snoozeFitnessReminder: snoozeFitnessReminder,
     makeActivity: makeActivity, addActivity: addActivity, freeInWeek: freeInWeek, weekActual: weekActual, adviceAfterRun: adviceAfterRun,
     overTrend: overTrend, applyPlanAdjust: applyPlanAdjust, longestRun: longestRun, isHardActivity: isHardActivity,
+    updateGapCap: updateGapCap, gapCapKm: gapCapKm, weekDrop: weekDrop,
     sessionRange: sessionRange, SESSION_RANGE: SESSION_RANGE, dayCount: dayCount, daysSuggestion: daysSuggestion, acceptDaysSuggestion: acceptDaysSuggestion, recordCheck: recordCheck,
     fitnessLevelSuggestion: fitnessLevelSuggestion, skipLevelSuggestion: skipLevelSuggestion, applyFitnessLevel: applyFitnessLevel, autoLevelUp: autoLevelUp,
     adherence: adherence, rebaseSuggestion: rebaseSuggestion, applyRebase: applyRebase, logWeek: logWeek, planLogLimit: planLogLimit,

@@ -8,6 +8,7 @@ var clock = require('./lib/clock.js');
 clock.install();
 var C = require('../../js/logic.js');
 var makeRng = require('./lib/rng.js');
+var feeling = require('./feeling.js');
 
 var OFF = ['rest', 'none', 'cancelled'];
 var TEMPER = {
@@ -65,6 +66,8 @@ function simulate(persona, opts) {
   opts = opts || {};
   var DAYS = opts.until || 730, snapEvery = opts.snapEvery || 30;
   var rnd = makeRng(persona.seed), T = TEMPER[persona.traits.temperament];
+  // تصمیم‌های رفتاری تازه از دنباله‌ی تصادفی جدا، تا اضافه شدنشون مسیر بقیه‌ی شبیه‌سازی رو عوض نکنه (مقایسه‌ی قبل/بعد منصفانه بمونه)
+  var rnd2 = makeRng(persona.seed + 7919);
   var prep = prepare(persona), p = prep.profile, d0 = C.parseDate(p.startDate);
   var state = { profile: p, checkins: {}, done: {}, ackPain: {}, postRuns: {}, cycleChoices: {}, doneLog: {}, pains: {} };
   var walk = !!persona.traits.walk;
@@ -84,8 +87,13 @@ function simulate(persona, opts) {
     vdot: persona.hidden.vdot, v0: persona.hidden.vdot, room: persona.hidden.room, vStop: persona.hidden.vdot, offDays: 0,
     atl: 0, ctl: 0, pain: 0, painArea: null, painDays: 0, highPainDays: 0, injuredUntil: null,
     cycleLast: p.cycle && p.cycle.lastStart ? C.parseDate(p.cycle.lastStart) : null, cycleNext: null, realStarts: p.cycle && p.cycle.lastStart ? [p.cycle.lastStart] : [],
-    testPlanned: false, churn: 0, churnWhy: {}, churnTotal: {}, lastChurnDay: -999, offStreak: 0, offStart: null, unmot: 0
+    testPlanned: false, churn: 0, churnWhy: {}, churnTotal: {}, lastChurnDay: -999, offStreak: 0, offStart: null, unmot: 0,
+    mWhy: {}, mRaceHit: false, mRaceMiss: false, mInjured: false, vAtTest: persona.hidden.vdot
   };
+  // حس پیشرفت ماهانه (feeling.js): مقدارهای اول هر ماه
+  var feelings = [];
+  function visVdot() { var f = C.currentFitness(p); return f ? f.vdot : null; }
+  var mStart = { day: 0, hidden: H.vdot, vis: visVdot(), lv: C.assessLevel(p).level };
   var seedKm = Number(p.monthAvgKm) || Number(p.currentWeeklyKm) || 0;
   H.ctl = H.atl = seedKm * 6 * 4 / 7;   // بار روزانه‌ی تقریبی (دقیقه × سختی)
   var cyc = persona.hidden.cycle;
@@ -105,6 +113,7 @@ function simulate(persona, opts) {
   function addChurn(day, pts, why) {
     if (!pts) return;
     H.churn += pts; H.churnWhy[why] = (H.churnWhy[why] || 0) + pts; H.churnTotal[why] = (H.churnTotal[why] || 0) + pts;
+    H.mWhy[why] = (H.mWhy[why] || 0) + pts;
   }
   function easyPaceSec() { return C.raceTimeFromVdot(H.vdot, 10) / 10 * 1.28; }
   function racePred(km) { return C.raceTimeFromVdot(H.vdot, km); }
@@ -143,7 +152,7 @@ function simulate(persona, opts) {
         var until = C.dateKey(C.addDays(d, e.weeks * 7));
         p.injuries = (p.injuries || []).concat([{ id: 'i' + day, area: e.area, label: '', start: k, stopUntil: until, returnDate: null, setbacks: [] }]);
         H.injuredUntil = C.addDays(d, e.weeks * 7); H.pain = 0;
-        events.push({ day: day, kind: 'injury', text: 'آسیب تأییدشده (' + e.area + ')، ' + e.weeks + ' هفته توقف' });
+        events.push({ day: day, kind: 'injury', text: 'آسیب تأییدشده (' + e.area + ')، ' + e.weeks + ' هفته توقف' }); H.mInjured = true;
       } else if (e.type === 'busy' || e.type === 'unmotivated' || e.type === 'sick') {
         events.push({ day: day, kind: e.type, text: { busy: 'شلوغی کاری', unmotivated: 'بی‌انگیزگی', sick: 'بیماری' }[e.type] + ' (' + e.days + ' روز)' });
       }
@@ -169,6 +178,8 @@ function simulate(persona, opts) {
       curWeek = { start: C.dateKey(ws), day: day, weekIndex: bw.weekIndex, level: bw.level, plannedKm: bw.totalKm || 0, plannedMin: bw.totalMin || 0,
         doneKm: 0, doneMin: 0, runs: 0, planned: bw.days.filter(function (x) { return x.date >= k && OFF.indexOf(x.type) < 0; }).length,
         phase: bw.phase && bw.phase.key, painDays: 0, events: [], goal: C.goalInfo(p).type, deload: bw.phase && bw.phase.key === 'deload', longKm: 0, vert: bw.vert || 0 };
+      // توضیح کاهش عمدی حجم زیر نوار هفته (app.js weekDropNote): کاربری که اپ رو باز می‌کنه می‌بینه
+      curWeek.drop = walk ? null : C.weekDrop(p, d);
       weekChecks(bw, day);
       // سطح ۰: جواب سؤال هفتگی «این هفته چطور بود؟» (app.js data-zero-feel)
       if (!walk && bw.level === 0 && bw.weekIndex >= 0 && rnd.chance(T.ci * 0.8)) {
@@ -242,6 +253,7 @@ function simulate(persona, opts) {
       }
     }
     // اپ باز شده (چک‌این): تاریخچه‌ی هفتگی برنامه ثبت می‌شه (app.js route)
+    if ((checked || H.offStreak >= 13) && C.updateGapCap(state, d)) { base = C.sessionFor(p, d); if (curWeek) curWeek.plannedKm = C.buildWeek(p, d).totalKm || 0; }   // app.js route (کسی که بعد از وقفه برمی‌گرده اپ رو باز می‌کنه)
     if (checked && C.logWeek(p, d)) base = C.sessionFor(p, d);
     if (checked && !walk) {
       var au = C.autoLevelUp(p, d);   // app.js route: رکورد تازه (مثلاً نتیجه‌ی مسابقه) سطح رو بالا برده
@@ -266,7 +278,12 @@ function simulate(persona, opts) {
     // ---- پیام‌های تکراری (پیام مربی و یادآوری) ----
     var msgs = [];
     if (r.adaptation && r.adaptation.message) msgs.push(r.adaptation.message);
-    if (!walk) { var fr = C.fitnessReminder(p, d); if (fr) msgs.push(fr.message); }
+    if (!walk) {
+      var fr = C.fitnessReminder(p, d);
+      // «فعلاً نه» روی یادآوری تایم‌تست (کسی که اپ رو باز کرده و فعلاً تست نمی‌ده)
+      if (fr && checked && rnd2.chance(['bored', 'sensitive'].indexOf(persona.traits.temperament) >= 0 ? 0.3 : 0.12)) { C.snoozeFitnessReminder(p, d); fr = null; }
+      if (fr) msgs.push(fr.message);
+    }
     var sgL = walk ? null : C.fitnessLevelSuggestion(p);
     // پیشنهاد سطحی که هنوز روی صفحه‌ست: کاربری که اپ رو باز کرده گاهی «فعلاً نه» می‌زنه (بی‌حوصله و زودرنج بیشتر)
     if (sgL && checked && rnd.chance(['bored', 'sensitive'].indexOf(persona.traits.temperament) >= 0 ? 0.15 : 0.06)) { C.skipLevelSuggestion(p); sgL = null; }
@@ -328,7 +345,7 @@ function simulate(persona, opts) {
         var tkm = C.assessLevel(p).level <= 1 ? 2 : 5;
         var tsec = Math.round(racePred(tkm) * (1 + rnd.normal(0.01, 0.015)) * (fatigue >= 4 ? 1.03 : 1));
         p.fitnessTests = (p.fitnessTests || []).concat([{ date: k, distanceKm: tkm, timeSec: tsec, kind: 'test' }]);   // app.js fitness
-        H.testPlanned = false; lastTestDay = day;
+        H.testPlanned = false; lastTestDay = day; H.vAtTest = H.vdot;
         events.push({ day: day, kind: 'test', text: 'تایم‌تست ' + tkm + ' کیلومتر: ' + C.formatDuration(tsec) + ' (آمادگی پنهان VDOT ' + H.vdot.toFixed(1) + ')' });
         testFollow(day, d, k, tkm, tsec);
       }
@@ -362,7 +379,7 @@ function simulate(persona, opts) {
         var wk2 = rnd.int(3, 5), until2 = C.dateKey(C.addDays(d, wk2 * 7));
         p.injuries = (p.injuries || []).concat([{ id: 'i' + day, area: H.painArea, label: '', start: k, stopUntil: until2, returnDate: null, setbacks: [] }]);
         H.injuredUntil = C.addDays(d, wk2 * 7); H.pain = 0; H.highPainDays = 0;
-        events.push({ day: day, kind: 'injury', text: 'درد بدتر شد ← آسیب تأییدشده (' + H.painArea + ')، ' + wk2 + ' هفته' });
+        events.push({ day: day, kind: 'injury', text: 'درد بدتر شد ← آسیب تأییدشده (' + H.painArea + ')، ' + wk2 + ' هفته' }); H.mInjured = true;
       }
       if (H.pain === 0) { H.painDays = 0; events.push({ day: day, kind: 'painfree', text: 'درد خوب شد' }); }
     } else if (actualSess && !(H.injuredUntil && d < H.injuredUntil)) {
@@ -385,6 +402,28 @@ function simulate(persona, opts) {
 
     days.push({ day: day, date: k, base: base.type, type: s.type, km: sessKm(s), hard: !!s.hard, ran: runToday, ev: todayEvents, pain: H.pain, vdot: r1(H.vdot), ci: !!checked, churn: r1(H.churn) });
     if (day % snapEvery === 0 || day === DAYS - 1) snaps.push({ day: day, date: k, state: JSON.stringify(state) });
+    // ---- حس پیشرفت، هر ۳۰ روز ----
+    if (day % 30 === 29) {
+      var md = days.slice(mStart.day), wk8 = weeks.slice(-8), w4 = wk8.slice(-4), wp = wk8.slice(0, Math.max(0, wk8.length - 4));
+      var sum = function (a, f) { return a.reduce(function (x, y) { return x + (y[f] || 0); }, 0); };
+      var m = {
+        walk: walk, dHidden: H.vdot - mStart.hidden, dHiddenSinceTest: H.vdot - H.vAtTest, vis0: mStart.vis, vis1: visVdot(),
+        lv0: mStart.lv, lv1: C.assessLevel(p).level, km4: sum(w4, 'doneKm'), kmPrev4: wp.length === 4 ? sum(wp, 'doneKm') : 0,
+        min4: sum(w4, 'doneMin'), minPrev4: wp.length === 4 ? sum(wp, 'doneMin') : 0,
+        planned: md.filter(function (x) { return OFF.indexOf(x.type) < 0; }).length, ran: md.filter(function (x) { return x.ran && OFF.indexOf(x.type) < 0; }).length,
+        restByApp: md.filter(function (x) { return OFF.indexOf(x.base) < 0 && OFF.indexOf(x.type) >= 0; }).length,
+        painDays: md.filter(function (x) { return x.pain > 0; }).length, injured: H.mInjured, why: H.mWhy, raceHit: H.mRaceHit, raceMiss: H.mRaceMiss,
+        lastTestAgo: lastTestDay == null ? day : day - lastTestDay,
+        weakCtx: !!H.mWeakCtx,
+        dropExplained: w4.filter(function (x) { return x.drop; }).length,
+        paceTrend: (function () { var t = walk ? null : C.easyPaceTrend(state, d); return t ? t.diff : null; })()
+      };
+      var fe = feeling.monthFeeling(m, persona.traits);
+      fe.day = day; fe.date = k; fe.month = feelings.length + 1; fe.hiddenGain = r1(m.dHidden); fe.visible = m.vis1 != null ? r1(m.vis1) : null; fe.level = m.lv1;
+      feelings.push(fe);
+      mStart = { day: day + 1, hidden: H.vdot, vis: m.vis1, lv: m.lv1 };
+      H.mWhy = {}; H.mRaceHit = false; H.mRaceMiss = false; H.mInjured = false; H.mWeakCtx = false;
+    }
     if (day === 1) {
       perf.week1 = measure('w', function () { C.buildWeek(p, d); }, 30);
       perf.an1 = measure('a', function () { C.analytics(state, d, 56); }, 5);
@@ -585,6 +624,8 @@ function simulate(persona, opts) {
   // بعد از تایم‌تست: پیس‌ها از روز بعد از همین تست میان، پیشنهاد سطح
   function testFollow(day, d, k, km, sec) {
     var fit = C.currentFitness(p);
+    // صفحه‌ی فیتنس بعد از ثبت تست ضعیف‌تر توضیح می‌ده (fit.weak)
+    if (C.weakTestContext(p, state, d)) H.mWeakCtx = true;
     if (!fit || fit.entry.date !== k) F('major', 'pace-after-test', day, 'بعد از تایم‌تست، آمادگی فعلی از تست تازه نیست', { test: k, used: fit && fit.entry && fit.entry.date, kind: fit && fit.entry && fit.entry.kind });
     var sg = C.fitnessLevelSuggestion(p);
     if (sg) {
@@ -617,7 +658,9 @@ function simulate(persona, opts) {
     var sec = Math.round(racePred(km) * (1 + rnd.normal(0, 0.02)) * (std ? 1 : 1.6));
     if (std) p.fitnessTests = (p.fitnessTests || []).concat([{ date: k, distanceKm: km, timeSec: sec, kind: 'race' }]);
     events.push({ day: day, kind: 'race', text: (main ? 'مسابقه‌ی اصلی ' + C.goalLabel(gi) : 'مسابقه‌ی فرعی ' + km + ' کیلومتر') + ': ' + C.formatDuration(sec) });
-    if (main && gi.targetSec && sec > gi.targetSec * 1.05) addChurn(day, persona.traits.temperament === 'competitive' ? 4 : 1, 'missedTarget');
+    if (main && gi.targetSec && sec > gi.targetSec * 1.05) { addChurn(day, persona.traits.temperament === 'competitive' ? 4 : 1, 'missedTarget'); H.mRaceMiss = true; }
+    else if (main && gi.targetSec) H.mRaceHit = true;
+    if (std) { lastTestDay = day; H.vAtTest = H.vdot; }
   }
   // ثبت درد (app.js readPain + savePain)
   function logPain(k, d) {
@@ -635,7 +678,7 @@ function simulate(persona, opts) {
   findList.sort(function (a, b) { return SEV_ORDER[a.sev] - SEV_ORDER[b.sev] || a.day - b.day; });
   return {
     persona: { id: persona.id, title: persona.title, focus: persona.focus, traits: persona.traits, axes: persona.axes || null, seed: persona.seed, startDate: prep.profile.startDate },
-    days: days, weeks: weeks, events: events, findings: findList, churn: churnPts, churnTotal: Object.keys(H.churnTotal).reduce(function (o, k) { o[k] = r1(H.churnTotal[k]); return o; }, {}), snaps: snaps, perf: perf,
+    days: days, weeks: weeks, events: events, findings: findList, feelings: feelings, churn: churnPts, churnTotal: Object.keys(H.churnTotal).reduce(function (o, k) { o[k] = r1(H.churnTotal[k]); return o; }, {}), snaps: snaps, perf: perf,
     end: { level: C.assessLevel(p).level, vdotHidden: r1(H.vdot), fitness: (function () { var f = C.currentFitness(p); return f ? r1(f.vdot) : null; })(),
       tests: (p.fitnessTests || []).length, injuries: (p.injuries || []).length, pains: Object.keys(state.pains).length,
       done: Object.keys(state.done).length, checkins: Object.keys(state.checkins).length, starts: H.realStarts.length,
