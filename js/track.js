@@ -23,10 +23,23 @@
   var STILL_NET = 0.6;     // جابه‌جایی خالص کمتر از ۰٫۶ متر بر ثانیه در پنجره یعنی ایستاده
   var STILL_WIN = 20000, STILL_MIN = 12000;
   var CLEAR_MOVE = 2.5;    // اگه پنجره حرکت روشنی نشون بده (بیش از ۲٫۵ متر بر ثانیه)، سرعت صفرِ اشتباه دستگاه نادیده گرفته می‌شه
+  // هموارسازی مسیر: فیلتر کالمن ساده روی موقعیت (وزن هر نقطه از دقتش). نویز GPS زیگزاگ می‌سازه و هر زیگزاگ
+  // مسافت اضافه؛ مسافت از موقعیت هموارشده حساب می‌شه. KF_Q: عدم‌قطعیت حرکت (متر بر ثانیه)؛ بزرگ‌تر = دنبال کردن سریع‌تر پیچ‌ها
+  var KF_Q = 4;
   var ROUTE_STEP = 8;      // فاصله‌ی نقطه‌های شکل مسیر (متر)
   var ROUTE_TOL = 4;       // ساده‌سازی شکل مسیر برای ذخیره (متر)
 
   function rad(x) { return x * Math.PI / 180; }
+  // یک قدم فیلتر: واریانس با زمان (Q²·dt) زیاد می‌شه و با هر نقطه به نسبت دقتش کم؛ خروجی موقعیت هموارشده
+  function kfStep(st, p) {
+    var acc = Math.max(3, p.acc || 10), k = st.kf;
+    if (!k) { st.kf = { lat: p.lat, lon: p.lon, v: acc * acc, t: p.t }; return { lat: p.lat, lon: p.lon }; }
+    var dt = Math.max(0, (p.t - k.t) / 1000), q = st.kfQ || KF_Q;
+    k.v += dt * q * q;
+    var g = k.v / (k.v + acc * acc);
+    k.lat += g * (p.lat - k.lat); k.lon += g * (p.lon - k.lon); k.v = (1 - g) * k.v; k.t = p.t;
+    return { lat: k.lat, lon: k.lon };
+  }
   // فاصله‌ی دو نقطه روی کره (متر)
   function haversine(a, b) {
     var R = 6371000, dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
@@ -77,16 +90,23 @@
     if (!(p.acc <= (st.relaxed || p.t - st.okAt >= RELAX_MS ? RELAX_ACC : MAX_ACC))) { st.rejected++; return false; }
     st.relaxed = p.acc > MAX_ACC;
     var last = st.last;
-    if (!last) { st.last = { lat: p.lat, lon: p.lon, t: p.t }; st.okAt = p.t; st.points++; st.win = [{ lat: p.lat, lon: p.lon, t: p.t }]; routeAdd(st, p.lat, p.lon, true); return false; }
+    if (!last) { st.kf = null; kfStep(st, p); st.raw = { lat: p.lat, lon: p.lon, t: p.t, acc: p.acc }; st.last = { lat: p.lat, lon: p.lon, t: p.t }; st.okAt = p.t; st.points++; st.win = [{ lat: p.lat, lon: p.lon, t: p.t }]; routeAdd(st, p.lat, p.lon, true); return false; }
     if (p.t <= last.t) return false;
-    var d = haversine(last, p), dt = (p.t - last.t) / 1000;
-    if (d / dt > MAX_SPEED) {
+    // پرش: نسبت به نقطه‌ی خام قبلی (نه موقعیت هموارشده که کمی عقب‌تره)
+    // جابه‌جایی منهای دقت دو نقطه (نویز عادی GPS پرش حساب نشه؛ پرش واقعی مثل ۵۰۰ متر در یک ثانیه همچنان رد می‌شه)
+    var raw = st.raw || last, d = haversine(raw, p), dt = (p.t - raw.t) / 1000;
+    if (!(dt > 0)) return false;
+    if (Math.max(0, d - (p.acc || 0) - (raw.acc || 0)) / dt > MAX_SPEED) {
       st.rejected++;
-      if (++st.jumps >= JUMP_RESET) { st.last = { lat: p.lat, lon: p.lon, t: p.t }; st.okAt = p.t; st.jumps = 0; st.win = []; routeAdd(st, p.lat, p.lon, true); }
+      if (++st.jumps >= JUMP_RESET) { st.kf = null; kfStep(st, p); st.raw = { lat: p.lat, lon: p.lon, t: p.t, acc: p.acc }; st.last = { lat: p.lat, lon: p.lon, t: p.t }; st.okAt = p.t; st.jumps = 0; st.win = []; routeAdd(st, p.lat, p.lon, true); }
       return false;
     }
     st.jumps = 0;
     st.okAt = p.t;
+    // از اینجا به بعد مسافت و شکل مسیر از موقعیت هموارشده
+    var fp = kfStep(st, p);
+    st.raw = { lat: p.lat, lon: p.lon, t: p.t, acc: p.acc };
+    d = haversine(last, fp);
     st.win.push({ lat: p.lat, lon: p.lon, t: p.t });
     while (st.win.length > 2 && p.t - st.win[0].t > STILL_WIN) st.win.shift();
     if (d < Math.max(MIN_STEP, (p.acc || 0) / 2)) {
@@ -107,9 +127,9 @@
     var before = st.dist;
     st.dist += d;
     if (d / dt >= MOVING) st.movingMs += dt * 1000;
-    st.last = { lat: p.lat, lon: p.lon, t: p.t };
+    st.last = { lat: fp.lat, lon: fp.lon, t: p.t };
     st.points++;
-    routeAdd(st, p.lat, p.lon, false);
+    routeAdd(st, fp.lat, fp.lon, false);
     st.recent.push({ t: p.t, d: st.dist });
     while (st.recent.length > 2 && p.t - st.recent[0].t > WINDOW_MS) st.recent.shift();
     // اسپلیت هر کیلومتر کامل: زمان فعال تا اون لحظه، با درون‌یابی داخل همین قطعه
@@ -120,7 +140,7 @@
       var prev = st.splits.reduce(function (s, x) { return s + x; }, 0);
       st.splits.push(Math.round(at / 1000 - prev));
       st.kmMarks = st.kmMarks || [];
-      st.kmMarks.push([r5(last.lat + frac * (p.lat - last.lat)), r5(last.lon + frac * (p.lon - last.lon))]);
+      st.kmMarks.push([r5(last.lat + frac * (fp.lat - last.lat)), r5(last.lon + frac * (fp.lon - last.lon))]);
     }
     return true;
   }
@@ -130,7 +150,7 @@
     st.activeMs += Math.max(0, now - st.segStart);
     st.paused = true;
     // فاصله‌ی بین محل توقف و محل ادامه حساب نمی‌شه
-    st.last = null; st.recent = []; st.jumps = 0; st.win = []; st.okAt = null; st.spd = [];
+    st.last = null; st.recent = []; st.jumps = 0; st.win = []; st.okAt = null; st.spd = []; st.kf = null; st.raw = null;
   }
   function resume(st, now) {
     if (!st.paused) return;

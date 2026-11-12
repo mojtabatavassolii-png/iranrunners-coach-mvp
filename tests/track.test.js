@@ -154,7 +154,8 @@ test('شکل مسیر: نقطه هر ۸ متر، تکه‌ی تازه بعد ا�
   // خط مستقیم بعد از ساده‌سازی فقط دو سر داره
   var seg0 = K.decode(out.segs[0]);
   assert.strictEqual(seg0.length, 2);
-  assert.ok(Math.abs(seg0[0][0] - 35.7) < 1e-5 && Math.abs(seg0[1][0] - e.lat) < 2e-5, JSON.stringify(seg0));
+  // سر آخر مسیر هموارشده چند متر عقب‌تر از آخرین نقطه‌ی خامه (تأخیر فیلتر)
+  assert.ok(Math.abs(seg0[0][0] - 35.7) < 1e-5 && Math.abs(seg0[1][0] - e.lat) < 6e-5, JSON.stringify(seg0));
   assert.strictEqual(K.decode(out.km).length, 1);
   // رمزگذاری استاندارد polyline (نمونه‌ی مستندات گوگل)
   assert.strictEqual(K.encode([[38.5, -120.2], [40.7, -120.95], [43.252, -126.453]]), '_p~iF~ps|U_ulLnnqC_mqNvxq`@');
@@ -171,6 +172,21 @@ test('ساده‌سازی مسیر پیچ‌ها رو نگه می‌داره', f
   for (i = 1; i <= 20; i++) pts.push([lat + 100 / M, lon + (100 - i * 5) / kx]);
   var s = K.simplify(pts, 4);
   assert.strictEqual(s.length, 4);
+});
+
+test('هموارسازی: زیگزاگ نویز GPS (۸ متر چپ و راست) مسافت رو بیش از ۵٪ بالا نمی‌بره؛ پیچ‌های تند حفظ می‌شن', function () {
+  var t0 = 1e12, st = K.create(t0), lat = 35.7, lon = 51.4, kx = 111195 * Math.cos(35.7 * Math.PI / 180);
+  // ۱۰ دقیقه مستقیم به شمال با ۳ متر بر ثانیه، هر نقطه یک در میون ۸ متر به شرق و غرب (دقت ۱۰ متر)
+  for (var i = 0; i <= 600; i++) K.add(st, { lat: lat + 3 * i / M, lon: lon + (i % 2 ? 8 : -8) / kx, acc: 10, t: t0 + i * 1000 });
+  assert.ok(st.dist > 1800 * 0.97 && st.dist < 1800 * 1.05, st.dist);
+  // بدون فیلتر (برای مقایسه): همین مسیر خیلی بیشتر می‌شد
+  var raw = 0;
+  for (i = 1; i <= 600; i++) raw += K.haversine({ lat: lat + 3 * (i - 1) / M, lon: lon + ((i - 1) % 2 ? 8 : -8) / kx }, { lat: lat + 3 * i / M, lon: lon + (i % 2 ? 8 : -8) / kx });
+  assert.ok(raw > st.dist * 1.5, raw + ' vs ' + st.dist);
+  // رفت و برگشت ۲۰۰ متری (دور زدن): مسافت تقریباً کامل
+  var st2 = K.create(t0);
+  for (i = 0; i <= 140; i++) { var y = i <= 70 ? 3 * i : 3 * (140 - i); K.add(st2, { lat: lat + y / M, lon: lon + (i <= 70 ? 0 : 10 / kx), acc: 5, t: t0 + i * 1000 }); }
+  assert.ok(st2.dist > 420 * 0.93 && st2.dist < 420 * 1.05, st2.dist);
 });
 
 console.log(passed + ' تست ثبت GPS موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));
