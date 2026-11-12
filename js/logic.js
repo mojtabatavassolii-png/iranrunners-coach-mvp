@@ -729,6 +729,10 @@
     var fit = currentFitness(profile);
     if (!fit) return null;
     var before = assessLevel(profile).level;
+    // تعداد روز تمرین با عوض شدن سطح خودبه‌خود زیاد نمی‌شه: همون تعداد فعلی ثابت می‌مونه و اگه سطح تازه روز بیشتری
+    // پیشنهاد می‌کنه، فقط پیشنهاد داده می‌شه (daysSuggestion)
+    var dcBefore = dayCount(profile, before, (profile.days || []).length);
+    if (!(Number(profile.runDays) >= 1)) profile.runDays = dcBefore.total;
     var km = weeklyVolume(profile, Math.max(0, buildWeek(profile, today).weekIndex), true).km;
     // حداکثر ۱۰٪ بالاتر از بیشترین حجم برنامه‌ی این هفته و دو هفته‌ی قبل (مثلاً بعد از مسابقه، برگشت تدریجی حذف نشه)
     var recent = 0;
@@ -740,7 +744,44 @@
     profile.volumeReason = null;
     if (returnInfo(profile)) { profile.gap = 'now'; profile.gapDays = 0; profile.xtrain = null; profile.walkMinNow = null; }
     profile.startDate = dateKey(today);
-    return { from: before, to: assessLevel(profile).level, km: km };
+    var after = assessLevel(profile).level, rAfter = sessionRange(after);
+    profile.daysSuggest = after > before && Number(profile.runDays) < rAfter.def ? { level: after } : null;
+    return { from: before, to: after, km: km, days: daysSuggestion(profile) };
+  }
+  // پیشنهاد روز بیشتر بعد از بالا رفتن سطح (فقط پیشنهاد؛ با «آره» یا «فعلاً نه» برداشته می‌شه)
+  function daysSuggestion(profile) {
+    var sg = profile.daysSuggest;
+    if (!sg || isWalk(profile)) return null;
+    var lv = assessLevel(profile).level, r = sessionRange(lv), cur = dayCount(profile, lv, (profile.days || []).length).total;
+    if (lv !== sg.level || cur >= r.def) return null;
+    return { level: lv, from: cur, to: r.def, range: r, needDays: (profile.days || []).length < r.def };
+  }
+  function acceptDaysSuggestion(profile, add) {
+    var sg = daysSuggestion(profile);
+    profile.daysSuggest = null;
+    if (!sg || !add) return null;
+    profile.runDays = sg.to;
+    return sg;
+  }
+
+  // ---------- اعتبار رکورد ----------
+  // رکورد تازه (تایم‌تست یا مسابقه) قبل از ثبت: جهش بزرگ VDOT (بیش از ۵ واحد نسبت به رکورد واقعی ۱۲ هفته‌ی اخیر)، پرش دو سطح یا بیشتر،
+  // یا دویدن ثبت‌شده با GPS گوشی در همون روز با مسافت نزدیک (GPS ممکنه مسافت رو ۲ تا ۱۰٪ بیشتر نشون بده) → تأیید از کاربر
+  var RECORD_JUMP = 5;
+  function recordCheck(profile, entry, data) {
+    if (!entry || !(entry.distanceKm > 0) || !(entry.timeSec > 0)) return null;
+    var v = vdotFromRace(entry.distanceKm, entry.timeSec), out = { vdot: v, reasons: [] };
+    var real = fitnessEntries(profile).filter(function (t) { return (t.kind === 'test' || t.kind === 'race' || t.kind === 'baseline') && t.date <= entry.date; });
+    var prev = real.length ? real[real.length - 1] : null;
+    if (prev && daysBetween(parseDate(prev.date), parseDate(entry.date)) <= 84) {
+      var pv = vdotFromRace(prev.distanceKm, prev.timeSec);
+      if (v - pv > RECORD_JUMP) { out.reasons.push('jump'); out.prev = pv; }
+    }
+    var lv = isWalk(profile) ? null : assessLevel(profile).level;
+    if (lv != null && levelFromVdot(v) - lv >= 2) { out.reasons.push('levels'); out.from = lv; out.to = levelFromVdot(v); }
+    var log = data && data.doneLog && data.doneLog[entry.date];
+    if (log && log.src === 'gps' && log.actual && log.actual.km && Math.abs(log.actual.km - entry.distanceKm) <= Math.max(0.5, entry.distanceKm * 0.3)) out.reasons.push('gps');
+    return out.reasons.length ? out : null;
   }
 
   // ---------- ضرایب احتیاط ----------
@@ -771,6 +812,38 @@
       if (chosen.length < n && avail.indexOf(d) >= 0 && chosen.indexOf(d) < 0) chosen.push(d);
     });
     return chosen.sort(function (a, b) { return a - b; });
+  }
+
+  // تعداد روز تمرین هفته: کاربر (runDays) یا پیشنهاد سطح، محدود به روزهای آزاد. core: جلسه‌های اصلی (تا پیشنهاد سطح)، extra: روز سبک
+  function dayCount(profile, level, availN, walk) {
+    var r = sessionRange(level, walk), want = Number(profile.runDays) >= 1 ? Math.min(7, Math.round(Number(profile.runDays))) : r.def;
+    var total = Math.min(availN, want), core = Math.min(total, r.def);
+    return { total: total, core: core, extra: total - core, range: r, want: want, avail: availN };
+  }
+  // روزهای بیشتر از پیشنهاد سطح: ترجیحاً روزی که فرداش جلسه‌ی سخت نیست.
+  // دویدن سبک (۸٪ حجم هفته، ۳ تا ۵ کیلومتر) فقط از سطح ۲، بدون آسیب فعال، اگه کاربر کراس رو نخواسته و دویدن‌های آسون
+  // بعد از کم شدن هنوز حداقل ۳ کیلومتر بمونن؛ وگرنه کراس‌ترینینگ. easyAlloc همین‌جا کم می‌شه (حجم کل ثابت)
+  function planExtraDays(profile, ws, avail, used, n, hardDays, level, easyAlloc, weeklyKm) {
+    var free = avail.filter(function (d) { return used.indexOf(d) < 0; });
+    var hardNext = function (d) { return hardDays.indexOf((d + 1) % 7) >= 0 ? 1 : 0; };
+    var days = free.sort(function (a, b) { return hardNext(a) - hardNext(b) || a - b; }).slice(0, n);
+    var inj = !!(profile.injuries && profile.injuries.length && injuryPhase(profile, addDays(ws, 3)));
+    var km = weeklyKm ? clamp(round05(weeklyKm * 0.08), 3, 5) : 0, out = { days: {}, km: km, inj: inj };
+    var keys = easyAlloc ? Object.keys(easyAlloc) : [];
+    days.forEach(function (d) {
+      var pool = keys.reduce(function (x, k) { return x + easyAlloc[k]; }, 0);
+      var run = level >= 2 && profile.extraDay !== 'cross' && !inj && km && keys.length && pool - km >= 3 * keys.length;
+      if (run) {
+        // از بزرگ‌ترین دویدن‌های آسون، نیم‌کیلومتر به نیم‌کیلومتر
+        for (var left = km; left > 0.01;) {
+          var big = keys.slice().sort(function (a, b) { return easyAlloc[b] - easyAlloc[a]; })[0];
+          if (easyAlloc[big] - 0.5 < 3) break;
+          easyAlloc[big] -= 0.5; left -= 0.5;
+        }
+      }
+      out.days[d] = run ? 'light' : 'cross';
+    });
+    return out;
   }
 
   // جای جلسات سخت: حداقل ۴۸ ساعت بین دو جلسه‌ی سخت (هیچ روز سختی مجاور روز سخت دیگه نیست، حلقوی: جمعه↔شنبه)،
@@ -1931,10 +2004,12 @@
     var pr = progression(W);
     var race = raceInfo(profile);
     var avail = (profile.days || []).map(satToRel);
-    var nSessions = Math.min(avail.length, L.sessions);
+    // تعداد جلسه: انتخاب خود کاربر (runDays) یا پیشنهاد سطح؛ بیشتر از پیشنهاد = «روز سبک» (پایین‌تر)، بدون حجم بیشتر
+    var dc = dayCount(profile, level, avail.length);
+    var nSessions = dc.core;
     var sessionDays = chooseSessionDays(avail, nSessions);
     var longDay = sessionDays.indexOf(6) >= 0 ? 6 : sessionDays[sessionDays.length - 1];
-    var days = [], weeklyKm = null, template = {}, vol = null, workouts = null, period = null, b2bDay = null, hp = null, easyAlloc = null;
+    var days = [], weeklyKm = null, template = {}, vol = null, workouts = null, period = null, b2bDay = null, hp = null, easyAlloc = null, cappedKm = 0, exPlan = null;
 
     // ضریب برگشت بعد از مسابقه برای کل هفته (۰٫۷، ۰٫۷۷، ... تا ۱)
     var rfWeek = race && race.date < ws ? returnFactor(daysBetween(addDays(ws, 6), race.date)) : 1;
@@ -2078,13 +2153,36 @@
       var qKm = qSum();
       var easyDays = sessionDays.filter(function (d) { return nSessions < 2 || (d !== longDay && d !== b2bDay && !qSessions[d]); });
       var remaining = weeklyKm - longKm - b2bKm - qKm;
+      // روز آسونی نمونده (مثلاً ۳ روز: دو جلسه‌ی کیفی و لانگ‌ران) و حجم باقی‌مونده کم نیست: آخرین جلسه‌ی کیفی آسون می‌شه،
+      // نه اینکه باقی‌مونده روی لانگ‌ران بره (قبلاً لانگ‌ران سطح ۵ با ۳ روز تا ۵۳ کیلومتر می‌رسید)
+      if (!easyDays.length && nSessions >= 2 && remaining >= 3 && qDays.length) {
+        var qd = qDays.pop(); delete qSessions[qd];
+        qKm = qSum(); easyDays = [qd]; remaining = weeklyKm - longKm - b2bKm - qKm;
+      }
       while (easyDays.length && remaining / easyDays.length < 3) easyDays.splice(easyDays.length - 1, 1);
-      if (!easyDays.length && nSessions >= 2 && remaining > 0) { longKm = round05(longKm + remaining); remaining = 0; }
+      if (!easyDays.length && nSessions >= 2 && remaining > 0) { longKm = round05(Math.min(longCap, longKm + remaining)); remaining = 0; }
+      // کمتر از حداقل روزهای سطح: لانگ‌ران همون سهم عادیش از هفته می‌مونه (بالا نمی‌ره) و هر دویدن آسون ازش کوتاه‌تره؛
+      // بقیه‌ی حجم با این تعداد روز جا نمی‌شه و از هفته کم می‌شه
+      var belowMin = nSessions >= 2 && nSessions < sessionRange(level).min;
+      if (belowMin && easyDays.length && remaining / easyDays.length * LONG_OVER_EASY > longKm) {
+        // جلسه‌ی تا ۵ کیلومتر هیچ‌وقت «بیش از حد بلند» نیست؛ حجم‌های خیلی کم (مثلاً بعد از تنظیم با حجم فعلی) دست نمی‌خورن
+        var capB = Math.max(5, floor05(longKm / LONG_OVER_EASY));
+        if (remaining > capB * easyDays.length + 0.25) { cappedKm = round05(remaining - capB * easyDays.length); remaining = capB * easyDays.length; }
+      }
       // لانگ‌ران حداقل ۱۵٪ از جلسه‌ی آسون بلندتره (مگه اینکه جلسه‌ی آسون دوجلسه‌ای باشه یا سقف لانگ‌ران اجازه نده)
-      if (easyDays.length && nSessions >= 2 && !workouts.doubles && remaining / easyDays.length * LONG_OVER_EASY > longKm) {
+      if (!belowMin && easyDays.length && nSessions >= 2 && !workouts.doubles && remaining / easyDays.length * LONG_OVER_EASY > longKm) {
         var pool = longKm + remaining;
         longKm = Math.min(Math.max(longKm, longCap), Math.ceil(pool * LONG_OVER_EASY / (easyDays.length + LONG_OVER_EASY) * 2) / 2);
         remaining = pool - longKm;
+      }
+      // سقف هر جلسه: لانگ‌ران حداکثر سقف سطح؛ هر دویدن آسون حداکثر هم‌اندازه‌ی لانگ‌ران و ۷۵٪ سقف لانگ‌ران سطح.
+      // حجمی که با این تعداد روز جا نمی‌شه از هفته کم می‌شه (capped)، نه اینکه یک جلسه بیش از حد بلند بشه.
+      // (Daniels: لانگ‌ران حداکثر ۲۵ تا ۳۰٪ حجم هفته؛ جهش ناگهانی طول یک جلسه خطر آسیب رو بالا می‌بره)
+      longKm = Math.min(longKm, longCap);
+      var sesCap = Math.max(3, floor05(Math.min(longCap * EASY_OF_LONGCAP, Math.max(longKm, 3))));
+      if (easyDays.length && remaining > sesCap * easyDays.length + 0.25) {
+        cappedKm = round05(cappedKm + remaining - sesCap * easyDays.length);
+        remaining = sesCap * easyDays.length;
       }
       easyAlloc = {};
       if (easyDays.length) {
@@ -2094,6 +2192,8 @@
       }
 
       var hardDays = Object.keys(qSessions).map(Number).concat(nSessions >= 2 ? hardFixed : []);
+      // روز سبک: حجمش از دویدن‌های آسون همین هفته کم می‌شه، پس حجم کل هفته عوض نمی‌شه
+      if (dc.extra > 0) exPlan = planExtraDays(profile, ws, avail, sessionDays.concat(b2bDay !== null ? [b2bDay] : []), dc.extra, hardDays, level, easyAlloc, weeklyKm);
       var safeEasy = easyDays.filter(function (d) { return hardDays.indexOf((d + 1) % 7) < 0; });
       var accentDay = (workouts.strides || workouts.hills || workouts.hillStrides) ? safeEasy[0] : undefined;
       // سرازیری ملایم روی یک روز آسون دیگه؛ اگه نبود، آخر همون جلسه‌ی استراید سربالایی
@@ -2121,6 +2221,21 @@
         }
       });
     }
+    // روزهای بیشتر از پیشنهاد سطح (از قبل تعیین شده در exPlan): دویدن سبک یا کراس‌ترینینگ
+    if (dc.extra > 0) {
+      if (!exPlan) exPlan = planExtraDays(profile, ws, avail, sessionDays, dc.extra, [], level, null, 0);
+      Object.keys(exPlan.days).forEach(function (d) {
+        if (exPlan.days[d] === 'light') {
+          var lr = makeEasy(exPlan.km, zones, T('tdays.lightNote'));
+          lr.light = true; lr.variant = T('tdays.lightVariant');
+          template[d] = { session: lr };
+        } else {
+          var cx = makeCross(T(exPlan.inj ? 'tdays.crossInjury' : 'tdays.crossNote'), exPlan.inj);
+          cx.extra = true;
+          template[d] = { session: cx };
+        }
+      });
+    }
 
     var side = otherRaces(profile), rtrDays = null;
     // اولین جلسه‌ی کل برنامه (هفته‌ی شروع) نه لانگ‌رانه نه تمرین شدید: یک دویدن آسون هم‌اندازه‌ی روزهای آسون
@@ -2131,9 +2246,9 @@
       var date = addDays(ws, i);
       var s;
       if (date < start) s = { type: 'none', km: null, hardKm: 0, target: '—', steps: [], how: T('s.notStarted') };
+      else if (template[i] && template[i].session) s = JSON.parse(JSON.stringify(template[i].session));
       else if (template._zero !== undefined && template[i]) s = makeWalkRun(template._zero);
       else if (template._rw && template[i]) s = makeRunWalk(template._rw, 1);
-      else if (template[i]) s = JSON.parse(JSON.stringify(template[i].session));
       else s = makeRest();
       if (race && s.type !== 'none') s = applyRace(profile, s, date, race, ctx, template._rw, level);
       if (side.length) s = applySideRaces(profile, s, date, side, ctx, template._rw, level);
@@ -2174,7 +2289,7 @@
       weekIndex: w, start: dateKey(ws), days: days, level: level, tier: tier, goal: goal,
       period: period, periodLabel: period ? PERIOD_LABELS[period] : null,
       phase: injuryWeekPhase(profile, ws) || weekPhase(profile, ws, pr, w, vol),
-      volumeTarget: weeklyKm, b2b: b2bDay !== null, vertCap: hp ? hp.cap : null, hillStage: hp ? hp.stage : null,
+      volumeTarget: weeklyKm, capped: cappedKm >= 1 ? { plan: weeklyKm, km: round05(weeklyKm - cappedKm), days: nSessions } : null, b2b: b2bDay !== null, vertCap: hp ? hp.cap : null, hillStage: hp ? hp.stage : null,
       zeroStage: level === 0 ? template._zero : null, zeroFinal: ZERO_FINAL,
       totalKm: round05(totalKm), totalMin: totalMin, vert: vert,
       hardPct: totalKm ? Math.round(hardKm / totalKm * 100) : 0
@@ -3143,7 +3258,7 @@
     var start = parseDate(profile.startDate);
     var avail = (profile.days || []).map(satToRel);
     // حداقل یک روز استراحت کامل در هفته
-    var nS = Math.min(avail.length, L.ses, 6);
+    var nS = Math.min(dayCount(profile, level, avail.length, true).total, 6);
     var sessionDays = chooseSessionDays(avail, nS);
     var vol = walkWeeklyMin(profile, W, a), total = vol.min, wg = walkGoalInfo(profile);
     // رویداد پیاده‌روی: پیاده‌روی بلند از سطح ۴، سقفش تا ۸۰٪ مدت رویداد (حداکثر ۱۸۰ دقیقه)
@@ -3342,6 +3457,19 @@
   var PACE_LEVEL = 3;
   // لانگ‌ران حداقل این ضریب از جلسه‌ی آسون بلندتره
   var LONG_OVER_EASY = 1.15;
+  var EASY_OF_LONGCAP = 0.75;   // سقف یک دویدن آسون: ۷۵٪ سقف لانگ‌ران سطح
+
+  // ---------- تعداد جلسه‌ی هفتگی هر سطح ----------
+  // min: کمترین تعدادی که حجم معمول سطح بدون جلسه‌ی بیش از حد بلند جا بشه (لانگ‌ران حداکثر ۳۰ تا ۳۵٪ هفته و زیر سقف سطح،
+  // بقیه‌ی جلسه‌ها حدود ۲۵٪)؛ سطح‌های پایین حداقل ۳ جلسه با یک روز استراحت بینشون (ACSM: ۳ تا ۵ روز؛ Couch to 5K: ۳ جلسه).
+  // def: تعداد پیشنهادی (همون سقف قبلی برنامه). بیشتر از def: روز اضافه «سبک» (دویدن ریکاوری کوتاه یا کراس‌ترینینگ)، بدون حجم بیشتر.
+  // max: حد امن؛ بیشتر از اون فقط با هشدار. پیاده‌روی: WHO ۱۵۰ دقیقه در هفته پخش در چند روز، حداقل یک روز استراحت کامل.
+  var SESSION_RANGE = { 0: [3, 3, 4], 1: [3, 3, 4], 2: [3, 4, 5], 3: [3, 4, 5], 4: [4, 5, 6], 5: [4, 5, 6], 6: [5, 6, 7], 7: [5, 6, 7], 8: [6, 7, 7], 9: [6, 7, 7], 10: [6, 7, 7] };
+  function sessionRange(level, walk) {
+    // پیاده‌روی: پیشنهاد = همون تعداد قبلی هر سطح؛ سطح ۱ و ۲ حداکثر ۵، بقیه ۶ (یک روز استراحت کامل)
+    var wl = walk && WALK_LEVELS[level], r = walk ? [3, wl ? wl.ses : 3, level <= 2 ? 5 : 6] : (SESSION_RANGE[level] || SESSION_RANGE[10]);
+    return { min: r[0], def: r[1], max: r[2] };
+  }
   // حداقل حجم هفتگی اوج و لانگ‌ران لازم برای تموم کردن راحت هر مسافت (برنامه‌های مبتدی دنیلز و هیگدن)
   var PLAN_NEEDS = { '5': { km: 12, long: 6, ses: 3 }, '10': { km: 30, long: 12, ses: 4 }, '21': { km: 40, long: 18, ses: 4 }, '42': { km: 55, long: 30, ses: 5 } };
   // آماده‌سازی اختصاصی بعد از رسیدن به حجم لازم (فاز کیفی و تیپر)؛ برای تموم کردن مسافت کوتاه‌تر، چون خود افزایش حجم آماده‌سازیه
@@ -3613,6 +3741,7 @@
     buildWeek: buildWeek, sessionFor: sessionFor, adaptSession: adaptSession, isHard: isHard, readiness: readiness, weekAdaptSummary: weekAdaptSummary,
     currentFitness: currentFitness, fitnessEntries: fitnessEntries, hrZones: hrZones, easyRunFeedback: easyRunFeedback,
     easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, fitnessReminder: fitnessReminder,
+    sessionRange: sessionRange, SESSION_RANGE: SESSION_RANGE, dayCount: dayCount, daysSuggestion: daysSuggestion, acceptDaysSuggestion: acceptDaysSuggestion, recordCheck: recordCheck,
     fitnessLevelSuggestion: fitnessLevelSuggestion, skipLevelSuggestion: skipLevelSuggestion, applyFitnessLevel: applyFitnessLevel, autoLevelUp: autoLevelUp,
     adherence: adherence, rebaseSuggestion: rebaseSuggestion, applyRebase: applyRebase, logWeek: logWeek, planLogLimit: planLogLimit,
     EASY_ADJUST_MAX: EASY_ADJUST_MAX,

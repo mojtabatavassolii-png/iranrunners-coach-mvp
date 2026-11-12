@@ -2105,3 +2105,15 @@ button.help-link { padding: 0; cursor: pointer; font-family: inherit; }
 .learn-pop-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; background: inherit; border-bottom: 1px solid var(--border); }
 .learn-pop-head h2 { margin: 0; font-size: 1.05rem; }
 .learn-pop .learn-body { padding: 4px 16px 16px; text-align: start; }
+
+/* روزهای تمرین: شمارنده، توضیح‌ها، خط زیر آمار هفته و پنل تغییر */
+.days-ctl .stepper { display: flex; align-items: center; gap: 12px; }
+.days-ctl .stepper .btn-icon { min-width: 44px; min-height: 44px; font-size: var(--fs-lg); border: 1px solid var(--border); border-radius: 50%; }
+.days-ctl .days-n { min-width: 72px; text-align: center; font-weight: 700; font-size: var(--fs-lg); }
+.days-ctl .days-range { margin-block: 6px 0; }
+.days-notes { margin-block-start: 6px; padding: 8px 12px; border-radius: 10px; background: var(--surface-2, var(--surface)); border-inline-start: 3px solid var(--warning); }
+.days-notes p { margin: 2px 0; }
+.days-kind { border: 0; padding: 0; margin: 8px 0 0; }
+.days-line { margin: 10px 0 0; color: var(--text-secondary); }
+.days-capped { margin: 4px 0 0; padding: 6px 10px; border-radius: 8px; border-inline-start: 3px solid var(--warning); background: var(--surface-2, var(--surface)); }
+.days-panel h2 { margin-block-start: 0; }

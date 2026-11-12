@@ -1588,6 +1588,8 @@
         '</div></div></div>' +
         '<fieldset class="onb-sub"><legend>' + esc(T('onb.daysQ')) + req + '</legend><div class="chips">' +
         C.WEEK_ORDER.map(function (i) { return chip('days', i, C.DAY_NAMES[i], days.indexOf(i) >= 0); }).join('') + '</div></fieldset>' +
+        '<fieldset class="onb-sub"><legend>' + esc(T('tdays.q')) + '</legend><div data-days-box="onb" id="onb-days-box"' + (p.runDays ? ' data-touched="1"' : '') + '>' +
+        daysCtl(null, p.runDays || 4, days.length, false) + '</div></fieldset>' +
         '<fieldset class="onb-sub"><legend>' + esc(T('onb.locsQ')) + req + '</legend><div class="chips">' +
         Object.keys(C.LOCATION_LABELS).map(function (k) { return chip('locations', k, C.LOCATION_LABELS[k], locs.indexOf(k) >= 0); }).join('') + '</div></fieldset>' +
         '<fieldset class="onb-sub"><legend>' + esc(T('onb.hrQ')) + '</legend>' + hrFields(p) + '</fieldset>') +
@@ -1751,9 +1753,22 @@
       var v = form.cycleStart.value;
       document.getElementById('cystart-fa').textContent = v && I.getCalendar() === 'jalali' ? T('onb.raceDateEq', { d: faDate(v) }) : '';
     }
+    // تعداد روز تمرین: بازه از سطحی که همین فرم نشون می‌ده؛ تا کاربر عدد رو عوض نکرده، پیشنهاد سطح
+    function syncDays() {
+      var box = document.getElementById('onb-days-box');
+      if (!box) return;
+      var inp = readLevelInputs(), avail = form.querySelectorAll('input[name=days]:checked').length;
+      if (inp && !box.dataset.touched) {
+        var a = C.assessLevel(inp), cur = box.querySelector('input[name=runDays]');
+        if (cur) cur.value = C.sessionRange(a.level, !!a.walk).def;
+      }
+      var ex = form.querySelector('input[name=extraDay]:checked');
+      daysBoxSync(box, inp ? Object.assign(inp, { extraDay: ex ? ex.value : (p.extraDay || null), injuries: p.injuries }) : null, avail, false);
+    }
+    form.addEventListener('days-change', syncDays);
     form.addEventListener('input', syncLevel);
-    form.addEventListener('change', function () { syncRace(); syncLevel(); syncDate(); syncCycle(); });
-    syncRace(); syncLevel(); syncDate(); syncCycle();
+    form.addEventListener('change', function () { syncRace(); syncLevel(); syncDate(); syncCycle(); syncDays(); });
+    syncRace(); syncLevel(); syncDate(); syncCycle(); syncDays();
 
     // ---------- مرحله‌ها: نشانگر پیشرفت، رفت‌وبرگشت و انیمیشن ----------
     var cur = 1, maxSeen = editing ? ONB_STEPS : 1, busy = false;
@@ -1929,6 +1944,7 @@
         // تاریخچه‌ی برنامه می‌مونه، مگه اینکه کاربر حجم فعلیش رو عوض کرده باشه (عدد تازه‌ی خودش مبناست)
         planLog: p.planLog && Number(p.currentWeeklyKm) === Number(curKm) && Number(p.lastWeekKm) === Number(volP.lastWeekKm) && Number(p.monthAvgKm) === Number(volP.monthAvgKm) ? p.planLog : undefined,
         levelHold: p.levelHold && Number(p.currentWeeklyKm) === Number(curKm) && Number(p.lastWeekKm) === Number(volP.lastWeekKm) && Number(p.monthAvgKm) === Number(volP.monthAvgKm) ? p.levelHold : null,
+        runDays: Number(fd.get('runDays')) || null, extraDay: fd.get('extraDay') || p.extraDay || null, daysSuggest: p.daysSuggest || null,
         uid: p.uid || newUid(),
         createdAt: p.createdAt || new Date().toISOString()
       };
@@ -2165,6 +2181,146 @@
       esc(T(done ? 'today.doneDone' : 'today.done')) + '</button>';
   }
 
+  // =====================================================================
+  // تعداد روز تمرین در هفته (فرم اولیه و صفحه‌ی برنامه): بازه‌ی سطح، روز سبک، کم شدن حجم زیر حداقل
+  // =====================================================================
+  var daysOpen = false;
+  // n: تعداد انتخابی؛ prof: پروفایل (یا ورودی‌های فرم)؛ availN: تعداد روزهای آزاد؛ withKm: حجم واقعی زیر حداقل رو حساب کن
+  function daysCtl(prof, n, availN, withKm) {
+    var a = prof ? C.assessLevel(prof) : null, walk = !!(a && a.walk), r = a ? C.sessionRange(a.level, walk) : null;
+    var html = '<div class="days-ctl"><div class="stepper" role="group" aria-label="' + esc(T('tdays.q')) + '">' +
+      '<button type="button" class="btn btn-icon" data-days-step="-1" aria-label="' + esc(T('tdays.less')) + '"' + (n <= 1 ? ' disabled' : '') + '>−</button>' +
+      '<output class="days-n" aria-live="polite">' + tt('tdays.n', { n: n }) + '</output>' +
+      '<button type="button" class="btn btn-icon" data-days-step="1" aria-label="' + esc(T('tdays.more')) + '"' + (n >= 7 ? ' disabled' : '') + '>+</button>' +
+      '<input type="hidden" name="runDays" value="' + n + '"></div>';
+    html += '<p class="small muted days-range">' + (r ? tt(walk ? 'tdays.rangeWalk' : 'tdays.range', { n: a.level, a: r.min, b: r.max, d: r.def }) : esc(T('tdays.rangeWait'))) + '</p>';
+    var notes = [], eff = Math.min(n, availN || 0);
+    if (availN && availN < n) notes.push(tt('tdays.availFew', { a: availN }));
+    if (r && eff) {
+      if (eff < r.min && !walk) {
+        var km = null;
+        if (withKm && prof.startDate) {
+          try {
+            // همون هفته‌ای که صفحه‌ی برنامه نشون می‌ده (هفته‌ی جاری، یا هفته‌ی شروع اگه برنامه هنوز شروع نشده)
+            var st0 = C.parseDate(prof.startDate), at = today() < st0 ? st0 : today();
+            var mk = function (o) { return C.buildWeek(Object.assign({}, prof, o), at).totalKm; };
+            km = { km: mk({ runDays: eff }), plan: mk({ runDays: r.def, days: [0, 1, 2, 3, 4, 5, 6] }) };
+          } catch (e) { km = null; }
+        }
+        notes.push(km && km.plan > km.km ? tt('tdays.belowKm', { n: eff, km: km.km, plan: km.plan }) : tt('tdays.below', { n: a.level, a: r.min }));
+      }
+      if (eff > r.def) {
+        notes.push(tt(walk ? 'tdays.extraWalk' : 'tdays.extra', { d: r.def }));
+        if (eff > r.max) notes.push(tt('tdays.above', { n: a.level, b: r.max }));
+        var inj = prof.injuries && prof.injuries.length && C.injuryPhase(prof, today());
+        if (inj) notes.push(esc(T('tdays.injury')));
+      }
+    }
+    html += notes.length ? '<div class="days-notes" role="status">' + notes.map(function (x) { return '<p class="small">' + x + '</p>'; }).join('') + '</div>' : '';
+    // نوع روز اضافه (از سطح ۲ دویدن)
+    if (r && !walk && a.level >= 2 && eff > r.def) {
+      var ex = (prof && prof.extraDay) || 'light';
+      html += '<fieldset class="days-kind"><legend class="small">' + esc(T('tdays.kindQ')) + '</legend><div class="chips">' +
+        ['light', 'cross'].map(function (k) { return '<label class="chip"><input type="radio" name="extraDay" value="' + k + '"' + (ex === k ? ' checked' : '') + '><span>' + esc(T('tdays.kind.' + k)) + '</span></label>'; }).join('') +
+        '</div></fieldset>';
+    }
+    return html + '</div>';
+  }
+  // باکس روز تمرین رو با مقدار فعلی دوباره می‌سازه
+  function daysBoxSync(box, prof, availN, withKm) {
+    if (!box) return;
+    var inp = box.querySelector('input[name=runDays]'), ex = box.querySelector('input[name=extraDay]:checked');
+    var n = inp ? Number(inp.value) : Number(box.dataset.n) || 3;
+    if (ex && prof) prof = Object.assign({}, prof, { extraDay: ex.value });
+    box.innerHTML = daysCtl(prof, n, availN, withKm);
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-days-step]');
+    if (!b) return;
+    var box = b.closest('[data-days-box]'), inp = box && box.querySelector('input[name=runDays]');
+    if (!inp) return;
+    inp.value = Math.max(1, Math.min(7, Number(inp.value) + Number(b.dataset.daysStep)));
+    box.dataset.touched = '1';
+    box.dispatchEvent(new Event('days-change', { bubbles: true }));
+  });
+  // خط «تمرین N روز در هفته · تغییر» و توضیح حجم کم‌شده، زیر آمار هفته
+  function daysLine(p, week) {
+    var a = C.assessLevel(p), dc = C.dayCount(p, a.level, (p.days || []).length, !!a.walk);
+    var html = '<p class="days-line small">' + tt('tdays.line', { n: dc.total }) +
+      (dc.extra > 0 ? esc(T('progress.sep')) + tt('tdays.lineLight', { n: dc.extra }) : '') +
+      ' <button type="button" class="linklike" data-days-open="1">' + esc(T('tdays.change')) + '</button></p>';
+    if (week && week.capped) html += '<p class="small days-capped">' + tt('tdays.capped', { n: week.capped.days, km: week.capped.km, plan: week.capped.plan }) + '</p>';
+    return html;
+  }
+  function daysPanel(p) {
+    var a = C.assessLevel(p), dc = C.dayCount(p, a.level, (p.days || []).length, !!a.walk);
+    return '<form class="card days-panel" id="days-form"><h2>' + esc(T('tdays.title')) + '</h2>' +
+      '<fieldset class="onb-sub"><legend>' + esc(T('tdays.q')) + '</legend><div data-days-box="plan"' + (p.runDays ? ' data-touched="1"' : '') + '>' + daysCtl(p, p.runDays ? dc.want : dc.total, (p.days || []).length, true) + '</div></fieldset>' +
+      '<fieldset class="onb-sub"><legend>' + esc(T('onb.daysQ')) + '</legend><div class="chips">' +
+      C.WEEK_ORDER.map(function (i) { return '<label class="chip"><input type="checkbox" name="days" value="' + i + '"' + ((p.days || []).indexOf(i) >= 0 ? ' checked' : '') + '><span>' + esc(C.DAY_NAMES[i]) + '</span></label>'; }).join('') +
+      '</div><p class="small muted">' + esc(T('tdays.availHint')) + '</p></fieldset>' +
+      '<p class="form-errors" id="days-err" role="alert" hidden></p>' +
+      '<div class="actions"><button type="submit" class="btn btn-primary">' + esc(T('tdays.save')) + '</button>' +
+      '<button type="button" class="btn btn-ghost" data-days-cancel="1">' + esc(T('app.cancel')) + '</button></div></form>';
+  }
+  function daysPanelProfile(form) {
+    var p = state.profile, sel = Array.prototype.map.call(form.querySelectorAll('input[name=days]:checked'), function (x) { return Number(x.value); });
+    var ex = form.querySelector('input[name=extraDay]:checked');
+    return Object.assign({}, p, { days: sel.sort(), extraDay: ex ? ex.value : p.extraDay });
+  }
+  document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-days-open]')) { daysOpen = true; route(); var f = document.getElementById('days-form'); if (f) f.scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
+    if (e.target.closest && e.target.closest('[data-days-cancel]')) { daysOpen = false; route(); }
+  });
+  document.addEventListener('days-change', function (e) {
+    var form = e.target.closest && e.target.closest('#days-form');
+    if (!form) return;
+    var pp = daysPanelProfile(form);
+    daysBoxSync(form.querySelector('[data-days-box]'), pp, pp.days.length, true);
+  });
+  document.addEventListener('change', function (e) {
+    var form = e.target.closest && e.target.closest('#days-form');
+    if (!form || !(e.target.name === 'days' || e.target.name === 'extraDay')) return;
+    var pp = daysPanelProfile(form), box = form.querySelector('[data-days-box]');
+    // تا عدد دستی عوض نشده: تعداد = روزهای آزاد، حداکثر پیشنهاد سطح
+    if (e.target.name === 'days' && !box.dataset.touched) {
+      var a = C.assessLevel(pp), inp = box.querySelector('input[name=runDays]');
+      if (inp) inp.value = Math.max(1, Math.min(pp.days.length, C.sessionRange(a.level, !!a.walk).def));
+    }
+    daysBoxSync(form.querySelector('[data-days-box]'), pp, pp.days.length, true);
+  });
+  document.addEventListener('submit', function (e) {
+    if (!e.target || e.target.id !== 'days-form') return;
+    e.preventDefault();
+    var form = e.target, pp = daysPanelProfile(form), n = Number(form.querySelector('input[name=runDays]').value);
+    var err = document.getElementById('days-err');
+    if (!pp.days.length) { err.hidden = false; err.textContent = T('onb.err.days'); return; }
+    var p = state.profile;
+    p.days = pp.days; p.runDays = n; p.extraDay = pp.extraDay || null;
+    // پیشنهاد روز بعد از بالا رفتن سطح با همین انتخاب برداشته می‌شه
+    if (p.daysSuggest) p.daysSuggest = null;
+    daysOpen = false;
+    save(); showToast(T('tdays.saved')); route();
+  });
+  // پیشنهاد روز بیشتر بعد از بالا رفتن سطح (در کارت به‌روزرسانی فیتنس)
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-days-sg]');
+    if (!b) return;
+    var p = state.profile, sg = C.daysSuggestion(p);
+    if (b.dataset.daysSg === 'pick') { daysOpen = true; location.hash = '#plan'; route(); return; }
+    C.acceptDaysSuggestion(p, b.dataset.daysSg === 'yes');
+    save();
+    if (b.dataset.daysSg === 'yes' && sg) showToast(fa(T('tdays.sgDone', { n: sg.to })));
+    route();
+  });
+
+  // رکورد مشکوک: دلیل‌ها + اینکه با زدن دوباره‌ی «ثبت» قبول می‌شه
+  function recordCheckText(chk) {
+    return fa(chk.reasons.map(function (r) {
+      return r === 'jump' ? T('recChk.jump', { d: (chk.vdot - chk.prev).toFixed(1) }) : r === 'levels' ? T('recChk.levels', { a: chk.from, b: chk.to }) : T('recChk.gps');
+    }).join(' ') + ' ' + T('recChk.confirm'));
+  }
+
   function renderPlan() {
     var p = state.profile;
     var now = today();
@@ -2229,6 +2385,7 @@
       (zero || week.walk ? '' : '<div class="stat stat-ratio"><span>' + esc(T('week.ratio')) + ' ' + helpLink('week', T('week.ratioHelp')) + '</span><b dir="ltr">' + fa(100 - week.hardPct) + ' / ' + fa(week.hardPct) + '</b>' +
       '<div class="ratio-bar" aria-hidden="true"><i style="width:' + (100 - week.hardPct) + '%"></i></div></div>') +
       '</div>' + learnMore(zero || week.walk ? ['tenpct'] : ['eighty', 'tenpct']);
+    html += daysLine(p, week) + (daysOpen ? daysPanel(p) : '');
 
     var keys = week.days.map(function (d) { return d.date; });
     if (keys.indexOf(selectedDay) < 0) {
@@ -2545,6 +2702,11 @@
     if (vs) items.push('<li>' + tt('fitNotes.step', { n: vs.weeks, a: vs.from.toFixed(1), b: vs.to.toFixed(1) }) +
       '<div class="actions"><button type="button" class="btn btn-outline" data-vdot-step="1">' + esc(T('fitNotes.stepApply')) + '</button>' +
       ' <a href="#fitness">' + esc(T('fitNotes.stepTest')) + '</a></div></li>');
+    var dsg = C.daysSuggestion(p);
+    if (dsg) items.push('<li>' + tt('tdays.sg', { n: dsg.level, d: dsg.to, c: dsg.from }) +
+      '<div class="actions">' + (dsg.needDays ? '<button type="button" class="btn btn-outline" data-days-sg="pick">' + esc(T('tdays.sgPick')) + '</button>'
+        : '<button type="button" class="btn btn-outline" data-days-sg="yes">' + esc(T('tdays.sgYes')) + '</button>') +
+      '<button type="button" class="btn btn-ghost" data-days-sg="no">' + esc(T('fitNotes.later')) + '</button></div></li>');
     var sg = C.fitnessLevelSuggestion(p);
     if (sg) items.push('<li>' + esc(T('fitNotes.suggestA')) + ' <strong>' + tt('fitNotes.suggestLevel', { n: sg.to }) + '</strong> ' + tt('fitNotes.suggestB', { from: sg.from }) + ' ' +
       esc(T(sg.up ? 'fitNotes.up' : 'fitNotes.down')) +
@@ -3400,6 +3562,9 @@
     var tm = C.parseTime(rf.rtime.value), rkm = Number(rf.dataset.km), rdate = rf.dataset.date, v = tm ? rkm / (tm / 3600) : 0;
     if (!tm) return fail(T('race.resultErr'));
     if (v > 26 || v < 2) return fail(fa(T('fit.err.impossible', { km: rkm, d: C.describeDuration(tm) })));
+    // رکورد مشکوک (جهش بزرگ، پرش دو سطح، یا GPS گوشی همون روز): یک بار تأیید
+    var rchk = C.recordCheck(p, { date: rdate, distanceKm: rkm, timeSec: tm }, state), rkey = rdate + '|' + rkm + '|' + tm;
+    if (rchk && rf.dataset.recConfirm !== rkey) { rf.dataset.recConfirm = rkey; return fail(recordCheckText(rchk)); }
     // نتیجه‌ی هدف فرعی یا اصلی = داده‌ی تازه: VDOT، پیس‌ها و تخمین‌ها از همین به‌روز می‌شن
     p.fitnessTests = (p.fitnessTests || []).concat([{ date: rdate, distanceKm: rkm, timeSec: tm, kind: rf.dataset.kind === 'test' ? 'test' : 'race' }]);
     // رکورد تازه = پیس‌ها از نو (مثل ثبت تایم‌تست)
@@ -4803,7 +4968,8 @@
       '<div class="cele-dots" aria-hidden="true">' + dots + '</div><div class="cele-ico" aria-hidden="true">' + fa(r.to) + '</div>' +
       '<h2 id="cele-title">' + esc(T('levelUp.title')) + '</h2>' +
       '<p id="cele-text">' + tt('levelUp.text', { km: e.distanceKm, t: C.formatDuration(e.timeSec), v: r.vdot.toFixed(1), from: r.from, to: r.to }) + '</p>' +
-      '<div class="cele-next"><small>' + esc(T('levelUp.planTitle')) + '</small><b>' + tt('levelUp.plan', { to: r.to, km: r.km }) + '</b></div>' +
+      '<div class="cele-next"><small>' + esc(T('levelUp.planTitle')) + '</small><b>' + tt('levelUp.plan', { to: r.to, km: r.km }) + '</b>' +
+      (r.days ? '<p class="small">' + tt('levelUp.days', { d: r.days.to, c: r.days.from }) + '</p>' : '') + '</div>' +
       '<button type="button" class="btn btn-primary btn-block" data-cele-close="1">' + esc(T('levelUp.cont')) + '</button></div></div>';
     document.body.classList.add('modal-open');
     var btn = modalRoot.querySelector('[data-cele-close]');
@@ -5677,6 +5843,8 @@
       if (!tm) { err.hidden = false; err.textContent = T('fit.err.time'); return; }
       if (v > 26 || v < 3) { err.hidden = false; err.textContent = fa(T('fit.err.impossible', { km: km, d: C.describeDuration(tm) })); return; }
       if (!date || date > todayKey) { err.hidden = false; err.textContent = T('fit.err.date'); return; }
+      var rchk = C.recordCheck(p, { date: date, distanceKm: km, timeSec: tm }, state), rkey = date + '|' + km + '|' + tm;
+      if (rchk && form.dataset.recConfirm !== rkey) { form.dataset.recConfirm = rkey; err.hidden = false; err.textContent = recordCheckText(rchk); return; }
       var before = C.paceZones(p);
       p.fitnessTests = (p.fitnessTests || []).concat([{ date: date, distanceKm: km, timeSec: tm, kind: kind === 'race' ? 'race' : 'test' }]);
       // تایم‌تست تازه = پیس‌ها از نو؛ تنظیم دستی قبلی دیگه لازم نیست

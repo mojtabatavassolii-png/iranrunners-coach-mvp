@@ -22,6 +22,7 @@ function profileFor(n, over) {
     startDate: '2026-09-26' // شنبه
   }, over || {});
 }
+function isHardType(t) { return ['tempo', 'interval', 'fartlek', 'hills', 'threshold', 'race'].indexOf(t) >= 0; }
 function weekAt(p, w) { return C.buildWeek(p, C.addDays(C.parseDate(p.startDate), w * 7)); }
 function allDays(p, weeks) {
   var out = [];
@@ -89,9 +90,38 @@ test('هفته‌ی اول دقیقاً هم‌اندازه‌ی حجم فعلی
   [2, 3, 4, 5, 6, 7, 8, 9, 10].forEach(function (n) {
     [[0, 1, 2, 3, 4, 5, 6], [0, 2, 3, 4, 6]].forEach(function (days) {
       var wk = weekAt(profileFor(n, { days: days }), 0);
+      // کمتر از حداقل روزهای سطح (مثلاً سطح ۸ با ۵ روز): حجمی که جا نمی‌شه کم می‌شه و اعلام می‌شه
+      if (days.length < C.sessionRange(n).min) { assert(wk.totalKm <= KM_FOR[n] + 0.5 && wk.capped, 'L' + n + ' days=' + days + ' → ' + wk.totalKm); return; }
       assert(Math.abs(wk.totalKm - KM_FOR[n]) <= 0.5, 'L' + n + ' days=' + days + ' → ' + wk.totalKm);
     });
   });
+});
+
+test('هیچ جلسه‌ای از سقفش بلندتر نمی‌شه، با هر تعداد روز (لانگ‌ران ≤ سقف سطح، دویدن آسون ≤ ۷۵٪ اون)', function () {
+  var sets = [[0, 3], [0, 2, 4], [0, 2, 4, 6], [0, 1, 3, 4, 6], [0, 1, 2, 3, 4, 6], [0, 1, 2, 3, 4, 5, 6]];
+  ['5', '10', '21', '42'].forEach(function (g) {
+    [2, 3, 4, 5, 6, 7, 8, 9, 10].forEach(function (n) {
+      sets.forEach(function (days) {
+        var p = profileFor(n, { days: days, goal: { type: g, date: null } }), cap = C.LEVELS[n].longCap;
+        for (var w = 0; w < 16; w++) {
+          weekAt(p, w).days.forEach(function (d) {
+            if (!d.km || d.type === 'race') return;
+            var lim = d.type === 'long' ? cap : (isHardType(d.type) ? cap : cap * 0.75);
+            assert(d.km <= lim + 0.5, g + ' L' + n + ' ' + days.length + 'd w' + w + ' ' + d.type + ' ' + d.km + ' > ' + lim);
+          });
+        }
+      });
+    });
+  });
+});
+test('کمتر از حداقل روزهای سطح: حجم کم می‌شه و اعلام می‌شه؛ در بازه‌ی سطح، حجم کامل', function () {
+  var two = weekAt(profileFor(3, { days: [0, 3] }), 4), four = weekAt(profileFor(3, { days: [0, 1, 3, 5] }), 4);
+  assert(two.capped && two.capped.km < four.totalKm, JSON.stringify(two.capped) + ' / ' + four.totalKm);
+  assert.strictEqual(four.capped, null);
+  var r = C.sessionRange(3);
+  assert.deepStrictEqual([r.min, r.def, r.max], [3, 4, 5]);
+  // پیشنهاد هر سطح = همون سقف قبلی برنامه (کاربران فعلی تغییری نمی‌بینن)
+  for (var n = 0; n <= 10; n++) assert.strictEqual(C.sessionRange(n).def, C.LEVELS[n].sessions, 'L' + n);
 });
 
 test('قانون ۱۰٪ روی حجم واقعی جلسات، همه‌ی سطوح', function () {
@@ -1980,4 +2010,76 @@ test('«ادامه از حجم فعلی» حجم رو کم می‌کنه ولی 
   C.autoLevelUp(p, C.parseDate('2026-11-21'));
   assert.strictEqual(p.levelHold, null);
 });
+
+// ---------- تعداد روز تمرین (runDays) ----------
+function typesOf(wk) { return wk.days.map(function (d) { return d.type === 'rest' ? (d.cross ? 'X' : '-') : (d.light ? 'L' : d.type); }); }
+test('روز تمرین: بیشتر از پیشنهاد سطح = روز سبک کوتاه، حجم کل هفته همون می‌مونه', function () {
+  var all = [0, 1, 2, 3, 4, 5, 6];
+  for (var w = 0; w < 8; w++) {
+    var base = weekAt(profileFor(3, { days: all }), w);
+    [5, 6].forEach(function (rd) {
+      var wk = weekAt(profileFor(3, { days: all, runDays: rd }), w);
+      var runs = wk.days.filter(function (d) { return d.km > 0; }), cross = wk.days.filter(function (d) { return d.cross && d.extra; });
+      // اگه حجم دویدن‌های آسون برای جدا کردن یک روز سبک دیگه کافی نیست، اون روز کراس‌ترینینگه
+      assert.strictEqual(runs.length + cross.length, rd, 'w' + w + ' rd' + rd + ' ' + typesOf(wk));
+      assert.ok(Math.abs(wk.totalKm - base.totalKm) <= 0.5, 'w' + w + ' rd' + rd + ' ' + wk.totalKm + ' vs ' + base.totalKm);
+      var light = runs.filter(function (d) { return d.light; });
+      assert.strictEqual(light.length + cross.length, rd - 4);
+      if (w >= 4 && !wk.phase.key.match(/deload/)) assert.strictEqual(cross.length, 0, 'w' + w + ' ' + typesOf(wk));
+      light.forEach(function (d) { assert.ok(d.km >= 3 && d.km <= 5 && !d.hard, d.km); });
+      runs.filter(function (d) { return d.type === 'easy' && !d.light; }).forEach(function (d) { assert.ok(d.km >= 3, 'easy ' + d.km); });
+    });
+  }
+  // ترجیح کراس‌ترینینگ
+  var cx = weekAt(profileFor(3, { days: all, runDays: 6, extraDay: 'cross' }), 4);
+  assert.strictEqual(cx.days.filter(function (d) { return d.cross && d.extra; }).length, 2);
+  assert.ok(Math.abs(cx.totalKm - weekAt(profileFor(3, { days: all }), 4).totalKm) <= 0.5);
+  // بدون انتخاب: همون رفتار قبلی (حداکثر = پیشنهاد سطح)
+  assert.strictEqual(weekAt(profileFor(3, { days: all }), 2).days.filter(function (d) { return d.km > 0; }).length, 4);
+  // روزهای آزاد کمتر از انتخاب: تعداد = روزهای آزاد
+  assert.strictEqual(weekAt(profileFor(3, { days: [0, 2, 4], runDays: 5 }), 2).days.filter(function (d) { return d.km > 0; }).length, 3);
+});
+test('روز تمرین: سطح ۰ و ۱ و آسیب فعال، روز اضافه کراس‌ترینینگه نه دویدن', function () {
+  var all = [0, 1, 2, 3, 4, 5, 6];
+  [0, 1].forEach(function (n) {
+    var wk = weekAt(profileFor(n, { days: all, runDays: 4 }), 2);
+    assert.strictEqual(wk.days.filter(function (d) { return d.cross && d.extra; }).length, 1, 'L' + n + ' ' + typesOf(wk));
+  });
+  var q = injP('2026-10-26', '2026-11-02');
+  q.days = all; q.runDays = 6;
+  for (var w = 0; w < 14; w++) {
+    var day = C.addDays(C.parseDate('2026-11-02'), w * 7), ip = C.injuryPhase(q, day);
+    if (!ip || ip.phase !== 'ramp') continue;
+    var wk = C.buildWeek(q, day);
+    assert.ok(!wk.days.some(function (d) { return d.light; }), 'no light run during injury ' + typesOf(wk));
+    return;
+  }
+  assert.fail('no ramp week');
+});
+test('بالا رفتن سطح: تعداد روز خودبه‌خود زیاد نمی‌شه؛ فقط پیشنهاد، با «آره» یا «فعلاً نه»', function () {
+  var p = profileFor(3, { days: [0, 1, 2, 3, 4, 5, 6], startDate: '2026-09-26' });
+  assert.strictEqual(C.dayCount(p, 3, 7).total, 4);
+  p.fitnessTests = [{ date: '2026-11-05', distanceKm: 5, timeSec: hms(0, 21, 30), kind: 'test' }];
+  var r = C.applyFitnessLevel(p, C.parseDate('2026-11-07'));
+  assert.ok(r.to > 3, 'level up ' + r.to);
+  assert.strictEqual(p.runDays, 4, 'kept');
+  var wk = C.buildWeek(p, C.parseDate('2026-11-14'));
+  assert.strictEqual(wk.days.filter(function (d) { return d.km > 0; }).length, 4);
+  var sg = C.daysSuggestion(p);
+  assert.ok(sg && sg.from === 4 && sg.to === C.sessionRange(r.to).def, JSON.stringify(sg));
+  var q = JSON.parse(JSON.stringify(p));
+  C.acceptDaysSuggestion(q, false);
+  assert.strictEqual(C.daysSuggestion(q), null); assert.strictEqual(q.runDays, 4);
+  C.acceptDaysSuggestion(p, true);
+  assert.strictEqual(p.runDays, sg.to); assert.strictEqual(C.daysSuggestion(p), null);
+});
+test('اعتبار رکورد: جهش بزرگ VDOT، پرش دو سطح و رکورد هم‌روز با GPS تأیید می‌خوان', function () {
+  var p = profileFor(3, { pb: { distanceKm: 5, timeSec: hms(0, 27, 0), date: '2026-10-01' } });
+  assert.strictEqual(C.recordCheck(p, { date: '2026-11-01', distanceKm: 5, timeSec: hms(0, 26, 0), kind: 'test' }, {}), null);
+  var big = C.recordCheck(p, { date: '2026-11-01', distanceKm: 5, timeSec: hms(0, 20, 0), kind: 'test' }, {});
+  assert.ok(big && big.reasons.indexOf('jump') >= 0 && big.reasons.indexOf('levels') >= 0, JSON.stringify(big));
+  var gps = C.recordCheck(p, { date: '2026-11-01', distanceKm: 5, timeSec: hms(0, 26, 0), kind: 'test' }, { doneLog: { '2026-11-01': { src: 'gps', actual: { km: 5.2, sec: 1560 } } } });
+  assert.deepStrictEqual(gps.reasons, ['gps']);
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));
