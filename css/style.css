@@ -48,6 +48,8 @@ body { text-align: justify; text-justify: inter-word; }
 .onb-step .sub-legend, .onb-step legend, .onb-step .field > label { text-align: start; }
 /* متن‌های راهنمای چندخطی که بعداً اضافه شدن، مثل بقیه‌ی متن‌های بلند دوطرفه (UX10-06) */
 #walkmin-field small.muted, #ci-pain .pain-consent-box p.small { text-align: justify; }
+/* یادداشت «حجم با این تعداد روز جا نمی‌شه» در کادر باریک با عدد و پرانتز: دوطرفه فاصله‌ی ۳۵ پیکسلی می‌انداخت (بازبینی ۱۱، UX11-02) */
+.days-capped { text-align: start; }
 :lang(en) p, :lang(en) li, :lang(en) dd, :lang(en) small { hyphens: auto; -webkit-hyphens: auto; }
 /* روی گوشی ستون متن فهرست‌های راهنما و مقاله‌ها پهن‌تر، تا فاصله‌های تراز دوطرفه کم بشن */
 @media (max-width: 599px) {
@@ -2142,6 +2144,8 @@ button.help-link { padding: 0; cursor: pointer; font-family: inherit; }
 .chip-btn.is-on { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
 .rpe-row .chip-btn { padding: 6px 0; min-width: 40px; }
 .advice-card .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* فهرست کارت‌های توصیه (مثل «زوده»): تورفتگی کمتر، تا خط‌ها در گوشی کوچک پهن‌تر و فاصله‌های تراز دوطرفه کمتر باشن (UX11-01) */
+.advice-card ul { padding-inline-start: 18px; margin: 8px 0; }
 .advice-list { margin: 4px 0 8px; padding-inline-start: 20px; }
 .free-acts { margin-block-start: 12px; border-block-start: 1px solid var(--border); padding-block-start: 8px; }
 .free-acts h4 { margin: 0 0 4px; }
@@ -2171,3 +2175,5 @@ button.help-link { padding: 0; cursor: pointer; font-family: inherit; }
 #rec-map .leaflet-control-attribution a { display: inline-flex; align-items: center; min-height: 24px; color: var(--text); text-decoration: underline; }
 /* UX10-02: دکمه‌های متنی صفحه‌ی برنامه با ناحیه‌ی لمس ۴۴px */
 .days-line .linklike, #day-panel > .linklike.small { display: inline-flex; align-items: center; min-height: 44px; padding-inline: 4px; }
+/* «تغییر» کنار روزهای تمرین: عرض لمس هم حداقل ۴۴ پیکسل (UX11-04) */
+.days-line .linklike { min-width: 44px; justify-content: center; }

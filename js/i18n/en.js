@@ -917,7 +917,7 @@
       doneMin: '{n} min done',
       plannedMin: 'Original plan: {n} min',
       vert: 'Climb: +{n} m',
-      ratio: 'Easy / hard ratio',
+      ratio: 'Easy / hard ratio',   // no-break spaces around "/" (UX11-03)
       ratioHelp: 'The 80/20 rule',
       daysAria: 'Days of the week',
       minUnit: 'min',
