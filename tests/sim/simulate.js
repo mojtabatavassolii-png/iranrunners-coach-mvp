@@ -606,7 +606,9 @@ function simulate(persona, opts) {
     var max8 = full.slice(-12).filter(function (w) { return RACEY.indexOf(w.phase) < 0; }).reduce(function (m, w) { return Math.max(m, w.plannedKm); }, 0);
     if (bw.totalKm <= max8 + 0.5) baseW = [];
     // هفته‌های اول: حجم فعلی خود کاربر هم مبناست (هفته‌ی اول گاهی کمتر از حجم واقعی کاربره)
-    if (bw.weekIndex <= 2 && bw.totalKm <= (Number(persona.profile.currentWeeklyKm) || 0) * 1.1 + 1) baseW = [];
+    // (حجم فعلی = بیشترِ میانگین و هفته‌ی آخری که کاربر در فرم گفته؛ موتور هم هر دو رو در نظر می‌گیره)
+    var statedKm = Math.max(Number(persona.profile.currentWeeklyKm) || 0, Number(persona.profile.lastWeekKm) || 0);
+    if (bw.weekIndex <= 2 && bw.totalKm <= statedKm * 1.1 + 1) baseW = [];
     if (bw.weekIndex >= 0 && baseW.length && bw.totalKm > 0 && ph !== 'race' && !injNear) {
       var m1 = Math.max.apply(null, baseW.map(function (w) { return w.plannedKm; })), m2 = base2.length ? Math.max.apply(null, base2.map(function (w) { return w.plannedKm; })) : m1;
       var why = sideWk ? { why: 'side' } : levelLog.filter(function (x) { return day - x.day < 7; })[0] || (lastGoalChange && day - lastGoalChange.day < 7 ? { why: 'goal' } : null);
@@ -635,7 +637,7 @@ function simulate(persona, opts) {
     w.doneKm = r1(w.doneKm); w.doneMin = Math.round(w.doneMin);
     // آخرین نسخه‌ی برنامه‌ی هفته که کاربر دیده (اگه وسط هفته هدف یا سطح عوض شده، همونی که اپ در تاریخچه ثبت کرده)
     var lg = p.planLog && p.planLog[w.start];
-    if (lg) { w.plannedKm = lg.km; w.vert = lg.vert; }
+    if (lg) { w.plannedKm = lg.km; w.vert = lg.vert; if (lg.min > 0) w.plannedMin = lg.min; }   // پیاده‌روی: دقیقه‌ی آخرین نسخه‌ی دیده‌شده
     weeks.push(w);
     // برنامه بدون توجه به انجام‌نشده‌ها جلو می‌ره؟ (۶ هفته‌ی پشت‌سرهم زیر ۶۰٪، ولی حجم برنامه بالا رفته)
     var last6 = weeks.slice(-6);

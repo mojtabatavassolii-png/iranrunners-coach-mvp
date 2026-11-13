@@ -2567,4 +2567,20 @@ test('پیاده‌روی: رشد دقیقه‌ها با تاریخچه (قبو�
   assert.ok(C.planLogLimit && p.planLog && Object.keys(p.planLog).length >= 10, 'دقیقه‌های پیاده‌روی ثبت می‌شن');
 });
 
+test('پیاده‌روی با تاریخچه: دقیقه‌ها با شروع وسط هفته پایین نمی‌افتن و به برنامه می‌رسن (نه پرش، نه پسرفت)', function () {
+  // شروع چهارشنبه (هفته‌ی شروع ناقص)، ۱۵۰ دقیقه در هفته
+  var p = { activity: 'walk', walkExp: '3to12m', walkMin: 150, walk30: 'yes', age: 23, days: [0, 1, 2, 3, 4, 5], startDate: '2026-09-30', walkGoal: { kind: 'health' } };
+  var free = Object.assign({}, p), d0 = C.weekStart(C.parseDate(p.startDate)), last = 0, prevNonDl = 0;
+  for (var w = 0; w < 16; w++) {
+    var d = C.addDays(d0, w * 7);
+    C.logWeek(p, d);
+    var m = C.buildWeek(p, d).totalMin, ph = C.buildWeek(p, d).phase.key;
+    if (w >= 2 && ph !== 'deload') { assert.ok(m >= prevNonDl - 0.1, 'هفته‌ی ' + w + ' پسرفت: ' + prevNonDl + ' → ' + m); prevNonDl = m; }
+    if (w === 1) prevNonDl = m;
+    last = m;
+  }
+  var ref = C.buildWeek(free, C.addDays(d0, 15 * 7)).totalMin;
+  assert.ok(last >= ref * 0.9, 'بعد از ۱۵ هفته ' + last + ' از ' + ref);
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

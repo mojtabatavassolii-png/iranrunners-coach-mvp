@@ -1434,28 +1434,37 @@
   // (قبلاً ۴ هفته بود: کاربری که یک ماه اپ رو باز نکرده ولی کم تمرین کرده بود، یک‌باره به حجم کامل برنامه برمی‌گشت)
   var PLAN_LOG_GAP_WEEKS = 12;
   // پله‌های رشد برای هفته‌های ثبت‌نشده‌ی بین آخرین ثبت و این هفته: برای هفته‌های آینده (پیش‌نمایش برنامه) همه‌ی پله‌ها؛
-  // برای هفته‌ی جاری و گذشته حداکثر ۲ پله (معلوم نیست کاربر در هفته‌هایی که اپ رو باز نکرده تمرین کرده یا نه)
+  // برای هفته‌ی جاری و گذشته فقط یک پله (معلوم نیست کاربر در هفته‌هایی که اپ رو باز نکرده تمرین کرده یا نه،
+  // و هفته‌ی ثبت‌نشده ممکنه هفته‌ی سبک بوده باشه)
   function logGapSteps(ws, g) {
     var cur = weekStart(parseDate(dateKey(new Date())));
-    return ws > cur ? g : Math.min(g, 2);
+    return ws > cur ? g : 1;
   }
   function planLogLimit(profile, ws) {
     var log = profile.planLog;
     if (!log) return null;
-    var g = 1;
-    while (g <= PLAN_LOG_GAP_WEEKS && !log[dateKey(addDays(ws, -7 * g))]) g++;
+    // هفته‌ی شروع ناقص (intro) مبنا نیست و پله‌ی رشد هم حساب نمی‌شه (فقط هفته‌های ثبت‌نشده پله دارن)
+    // اگه تنها سابقه همون هفته‌ی شروعه (مثلاً بعد از دو-پیاده که مسافت نداره)، همون مبناست
+    var anyFull = false;
+    for (var q = 1; q <= PLAN_LOG_GAP_WEEKS; q++) { var eq = log[dateKey(addDays(ws, -7 * q))]; if (eq && eq.ph !== 'intro') { anyFull = true; break; } }
+    var g = 1, miss = 0, okR = function (e) { return e && (e.ph !== 'intro' || !anyFull); };
+    while (g <= PLAN_LOG_GAP_WEEKS && !okR(log[dateKey(addDays(ws, -7 * g))])) { if (!log[dateKey(addDays(ws, -7 * g))]) miss++; g++; }
     if (g > PLAN_LOG_GAP_WEEKS) return null;
     var e3 = [], e12 = [], s4 = 0;
     for (var i = 1; i <= 12; i++) {
       var e = log[dateKey(addDays(ws, -7 * i))];
-      if (!e) continue;
+      if (!okR(e)) continue;
       if (i >= g && i < g + 3) e3.push(e);
       if (i <= 4) s4 = Math.max(s4, e.sv || 0);
       if (e.ph !== 'race' && e.ph !== 'taper') e12.push(e);
     }
     if (!e3.length) return null;
     var mx = function (arr, f) { return arr.reduce(function (x, y) { return Math.max(x, y[f] || 0); }, 0); };
-    return { km: Math.max(mx(e3, 'km') * Math.pow(1.1, logGapSteps(ws, g)), mx(e12, 'km')), v3: mx(e3, 'vert'), v12: mx(e12, 'vert'), s4: s4, s12: mx(e12, 'sv'), gap: g - 1 };
+    // فقط هفته‌ی شروع ناقص ثبت شده: مبنا بیشترِ همون هفته و حجم فعلی‌ای که کاربر در فرم گفته (هفته‌ی ناقص به‌تنهایی خیلی کمه)
+    var baseR = mx(e3, 'km');
+    // (بعد از تغییر خودکار سطح، حجم فعلی پروفایل رو خود اپ نوشته، نه کاربر؛ اون موقع فقط همون هفته‌ی شروع مبناست)
+    if (!anyFull && !profile.levelChange) baseR = Math.max(baseR, Number(profile.currentWeeklyKm) || 0);
+    return { km: Math.max(baseR * Math.pow(1.1, logGapSteps(ws, miss + 1)), mx(e12, 'km')), v3: mx(e3, 'vert'), v12: mx(e12, 'vert'), s4: s4, s12: mx(e12, 'sv'), gap: g - 1 };
   }
   // منوی کیفی اولترا با مرحله‌ی تپه هماهنگ می‌شه
   function adaptHillSpecs(specs, hp, goal, tier) {
@@ -3811,18 +3820,23 @@
     var log = profile.planLog;
     if (!log) return null;
     var g = 1;
-    while (g <= PLAN_LOG_GAP_WEEKS && !(log[dateKey(addDays(ws, -7 * g))] && log[dateKey(addDays(ws, -7 * g))].min > 0)) g++;
+    // هفته‌ی شروع ناقص (intro) مبنا نیست: فقط روزهای باقی‌مونده رو داره و حد رو بی‌جهت پایین می‌آورد
+    var anyFullW = false;
+    for (var q = 1; q <= PLAN_LOG_GAP_WEEKS; q++) { var eq = log[dateKey(addDays(ws, -7 * q))]; if (eq && eq.min > 0 && eq.ph !== 'intro') { anyFullW = true; break; } }
+    var okE = function (e) { return e && e.min > 0 && (e.ph !== 'intro' || !anyFullW); }, miss = 0;
+    while (g <= PLAN_LOG_GAP_WEEKS && !okE(log[dateKey(addDays(ws, -7 * g))])) { if (!log[dateKey(addDays(ws, -7 * g))]) miss++; g++; }
     if (g > PLAN_LOG_GAP_WEEKS) return null;
     var mx3 = 0, mx8 = 0;
     for (var i = 1; i <= 8; i++) {
       var e = log[dateKey(addDays(ws, -7 * i))];
-      if (!e || !(e.min > 0)) continue;
+      if (!okE(e)) continue;
       if (i >= g && i < g + 3) mx3 = Math.max(mx3, e.min);
       if (e.ph !== 'deload') mx8 = Math.max(mx8, e.min);
     }
     if (!mx3) return null;
+    if (!anyFullW) mx3 = Math.max(mx3, Number(profile.walkMin) || 0);   // مثل دویدن: فقط هفته‌ی شروع ناقص ثبت شده
     var v = mx3;
-    for (var k = 0, gs = logGapSteps(ws, g); k < gs; k++) v = Math.max(v + 5, v * rate);
+    for (var k = 0, gs = logGapSteps(ws, miss + 1); k < gs; k++) v = Math.max(v + 5, v * rate);
     return Math.max(Math.floor(v / 5) * 5, mx8);
   }
   function buildWalkWeek(profile, anyDateInWeek) {
@@ -3885,12 +3899,24 @@
       template[d] = sx;
     });
     // هفته‌ی محدودشده (وقفه یا تاریخچه): حداقل طول جلسه‌ها و پیاده‌روی بلند نباید هفته رو از حد بالاتر ببرن؛ بلندترین جلسه‌ها کوتاه می‌شن (تا ۱۰ دقیقه)
+    var sumT = function () { return sessionDays.reduce(function (x, d) { return x + (template[d].minutes || 0); }, 0); };
+    // جلسه‌های اندازه‌ثابت (اینتروال قدرتی، پیاده‌روی بلند) هم نباید جمع هفته رو از حد تاریخچه بالاتر ببرن
+    if (wLim != null && !evWeek && !histCap && gapFromW == null && sumT() > wLim + 2) { total = wLim; histCap = true; }
     if (gapFromW != null || histCap) {
-      var sumT = function () { return sessionDays.reduce(function (x, d) { return x + (template[d].minutes || 0); }, 0); };
+      // کمتر از حد (گرد شدن جلسه‌ها به پایین): دقیقه‌های باقی‌مونده ۵ دقیقه ۵ دقیقه به کوتاه‌ترین جلسه‌ها (تا سقف بازه‌ی سطح)،
+      // وگرنه رشد هفتگی با گرد کردن از بین می‌رفت و حد هر هفته پایین‌تر می‌اومد
+      for (var tf = 0; tf < 40 && sumT() + 5 <= total; tf++) {
+        var sm = sessionDays.filter(function (d) { return template[d].type === 'walkEasy' || template[d].type === 'walkBrisk' || template[d].type === 'walkLong'; })
+          .sort(function (x, y) { return (template[x].minutes || 0) - (template[y].minutes || 0); })[0];
+        if (sm === undefined || (template[sm].type !== 'walkLong' && template[sm].minutes + 5 > L.len[1])) break;
+        var t1 = template[sm], nm1 = t1.minutes + 5;
+        template[sm] = t1.type === 'walkLong' ? makeWalkLong(nm1, profile) : t1.type === 'walkBrisk' ? makeWalkBrisk(nm1, profile, L) : makeWalkEasy(nm1, profile);
+      }
       for (var tr = 0; tr < 40 && sumT() > total + 2; tr++) {
         var big = sessionDays.slice().sort(function (x, y) { return (template[y].minutes || 0) - (template[x].minutes || 0); })[0];
-        if (!big || (template[big].minutes || 0) <= 10 || template[big].type === 'walkPower') break;
+        if (!big || (template[big].minutes || 0) <= 10) break;
         var t0 = template[big], nm = t0.minutes - 5;
+        if (t0.type === 'walkPower') { template[big] = makeWalkBrisk(Math.max(10, r5(nm)), profile, L); continue; }
         template[big] = t0.type === 'walkLong' ? makeWalkLong(nm, profile) : t0.type === 'walkBrisk' ? makeWalkBrisk(nm, profile, L) : makeWalkEasy(nm, profile);
       }
     }
