@@ -332,6 +332,38 @@ test('پیاده‌روی: فرم با تایمر، هدف سلامتی و آم�
   await expect(page.locator('#g-checkin')).toHaveCount(0);
 });
 
+// ---------- کارت‌های خانه: «زوده» برای ماراتن فرعی و پشتیبان ماهانه ----------
+test('کارت‌های خانه: «زوده» برای ماراتن فرعی نزدیک و یادآوری پشتیبان ماهانه', async ({ page }) => {
+  await page.addInitScript(() => { try { navigator.canShare = () => false; } catch (e) { /* */ } });
+  await onboard(page, { last: 10, avg: 10, goal: 'none', days: [0, 2, 4] });
+  // داده‌ی ساختگی: برنامه از ۴۰ روز پیش، ۶ چک‌این، ماراتن فرعی ۳۰ روز دیگه
+  await page.evaluate(() => {
+    const K = 'iranrunners-coach-mvp-v1', s = JSON.parse(localStorage.getItem(K)), C = window.CoachLogic;
+    const today = new Date(); const t0 = C.parseDate(C.dateKey(today));
+    s.profile.startDate = C.dateKey(C.addDays(t0, -40));
+    for (let i = 0; i < 6; i++) s.checkins[C.dateKey(C.addDays(t0, -38 + i * 3))] = { fatigue: 2, sleep: 4, pain: false };
+    s.profile.races = [{ id: 'm1', name: 'ماراتن آزمایشی', km: 42.195, date: C.dateKey(C.addDays(t0, 30)), kind: 'race', mode: 'race' }];
+    localStorage.setItem(K, JSON.stringify(s));
+  });
+  await page.reload();
+  await expect(page.locator('.early-race')).toBeVisible();
+  await expect(page.locator('.early-race')).toContainText('ماراتن آزمایشی');
+  await page.locator('[data-early-race]').click();
+  await expect(page.locator('.early-race')).toHaveCount(0);
+  // پشتیبان: «یک ماه بعد» کارت رو می‌بنده؛ گرفتن فایل تاریخ پشتیبان رو ثبت می‌کنه
+  await expect(page.locator('.backup-rem')).toBeVisible();
+  await page.locator('[data-backup-later]').click();
+  await expect(page.locator('.backup-rem')).toHaveCount(0);
+  await page.evaluate(() => { const K = 'iranrunners-coach-mvp-v1', s = JSON.parse(localStorage.getItem(K)); delete s.backupSnooze; localStorage.setItem(K, JSON.stringify(s)); });
+  await page.reload();
+  const dl = page.waitForEvent('download');
+  await page.locator('.backup-rem [data-backup-export]').click();
+  await dl;
+  await expect(page.locator('.backup-rem')).toHaveCount(0);
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('iranrunners-coach-mvp-v1')));
+  expect(st.backupAt).toBeTruthy();
+});
+
 // ---------- ۱۲. ثبت دویدن با GPS (مرورگر؛ موقعیت ساختگی Playwright) ----------
 // حرکت به سمت شمال، هر ثانیه ۶ متر؛ وسطش صفحه دوباره بار می‌شه (ثبت ناتموم باید برگرده)، بعد ذخیره
 test('ثبت با GPS: شروع، بازگشت بعد از بستن صفحه، پایان و ذخیره در جلسه‌ی امروز', async ({ page, context, browserName }) => {

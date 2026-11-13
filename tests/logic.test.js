@@ -1944,11 +1944,24 @@ test('تاریخچه‌ی هفتگی برنامه: ثبت، نگه‌داشتن 
   for (var i = 1; i <= 3; i++) q.planLog[C.dateKey(C.addDays(ws, -7 * i))] = { km: 20, vert: 0, sv: 0, ph: 'return' };
   var lim = C.buildWeek(q, ws).totalKm;
   assert.ok(free > 30 && lim <= 22.5, 'بدون تاریخچه ' + free + '، با تاریخچه ' + lim);
-  // برگشت به حجم عادیِ قبل (۱۲ هفته‌ی اخیر) آزاده
+  // برگشت به حجم عادیِ قبل (۱۲ هفته‌ی اخیر) آزاده، ولی هفته‌ی سبک (این هفته) از ۸۵٪ هفته‌های عادی اخیر بیشتر نمی‌شه
   q.planLog[C.dateKey(C.addDays(ws, -7 * 6))] = { km: free, vert: 0, sv: 0, ph: 'build' };
-  assert.strictEqual(C.buildWeek(q, ws).totalKm, free);
-  // هفته‌ی قبلی ثبت نشده (کاربر اپ رو باز نکرده یا هفته‌های جلوتر): بدون حد
+  assert.strictEqual(C.buildWeek(q, ws).phase.key, 'deload');
+  assert.ok(C.buildWeek(q, ws).totalKm <= 20 * 0.85 + 0.5, 'هفته‌ی سبک بعد از سه هفته‌ی ۲۰ کیلومتری: ' + C.buildWeek(q, ws).totalKm);
+  var ws2 = C.addDays(ws, 7), free2 = C.buildWeek(Object.assign({}, q, { planLog: {} }), ws2).totalKm;
+  var q2 = Object.assign({}, q, { planLog: {} });
+  for (i = 1; i <= 3; i++) q2.planLog[C.dateKey(C.addDays(ws2, -7 * i))] = { km: 20, vert: 0, sv: 0, ph: 'return' };
+  q2.planLog[C.dateKey(C.addDays(ws2, -7 * 6))] = { km: free2, vert: 0, sv: 0, ph: 'build' };
+  assert.strictEqual(C.buildWeek(q2, ws2).totalKm, free2, 'هفته‌ی عادی: برگشت به حجم عادی قبل');
+  // هفته‌ی قبلی ثبت نشده (کاربر یک هفته اپ رو باز نکرده): حد از آخرین هفته‌ی ثبت‌شده، ۱۰٪ برای هر هفته‌ی بینش (۲۰ × ۱٫۲۱)
   delete q.planLog[C.dateKey(C.addDays(ws, -7 * 6))]; delete q.planLog[C.dateKey(C.addDays(ws, -7))];
+  var lim2 = C.buildWeek(q, ws).totalKm;
+  assert.ok(lim2 <= 24.5 && lim2 < free, 'یک هفته ثبت نشده: ' + lim2);
+  // ۵ هفته بدون ثبت: هنوز حد (۲۰ × ۱٫۱ به توان ۵ ≈ ۳۲)؛ بیشتر از ۱۲ هفته: بدون حد
+  q.planLog = {}; q.planLog[C.dateKey(C.addDays(ws, -7 * 5))] = { km: 20, vert: 0, sv: 0, ph: 'build' };
+  var lim5 = C.buildWeek(q, ws).totalKm;
+  assert.ok(lim5 <= 33 && lim5 < free, '۵ هفته ثبت نشده: ' + lim5);
+  q.planLog = {}; q.planLog[C.dateKey(C.addDays(ws, -7 * 13))] = { km: 20, vert: 0, sv: 0, ph: 'build' };
   assert.strictEqual(C.buildWeek(q, ws).totalKm, free);
 });
 test('شبیه‌ساز ۱۰: پایین‌آوردن سطح با یک تست کمی ضعیف‌تر پیشنهاد نمی‌شه؛ با دو تست یا تست خیلی ضعیف‌تر چرا', function () {
@@ -2496,9 +2509,62 @@ test('روزهای کمتر از حداقل سطح: سهم لانگ‌ران ا�
         var mx3 = Math.max.apply(null, hist.slice(-3)), mx12 = Math.max.apply(null, hist.slice(-12));
         assert.ok(wk.totalKm <= Math.max(mx3 * 1.1, mx12) + 1, 'L' + n + ' w' + w + ' ' + hist.slice(-3) + ' → ' + wk.totalKm);
       }
+      // هفته‌ی سبک: حداکثر ۸۵٪ بیشترین هفته‌ی عادی ۳ هفته‌ی قبل
+      if (w < 7 && wk.phase.key === 'deload' && hist.length) {
+        var nd = hist.slice(-3).filter(function (x, j, a) { return true; });
+        assert.ok(wk.totalKm <= Math.max.apply(null, nd) * 0.85 + 0.5, 'L' + n + ' w' + w + ' deload ' + wk.totalKm + ' / ' + nd);
+      }
       hist.push(wk.totalKm);
     }
   });
+});
+
+test('«زوده» برای هدف اصلی بیشتر از ۳۰ کیلومتر هم', function () {
+  var p = profileFor(2, { days: [0, 2, 4] }), today = C.addDays(C.parseDate(p.startDate), 21);
+  p.goal = { type: '42', date: C.dateKey(C.addDays(today, 30)) };
+  var er = C.earlyRace(p, today);
+  assert.ok(er && er.main && er.daysTo === 30, JSON.stringify(er));
+  p.goal = { type: '21', date: C.dateKey(C.addDays(today, 30)) };
+  assert.strictEqual(C.earlyRace(p, today), null, 'نیمه‌ماراتن اصلی: هشدار نیست');
+});
+
+test('هفته‌ی مسابقه‌ی فرعی کوتاه: کل هفته با مسابقه از حجم برنامه بیشتر نمی‌شه', function () {
+  [3, 4, 6].forEach(function (n) {
+    var p = profileFor(n, { days: [0, 2, 4, 6] }), ws = C.addDays(C.parseDate(p.startDate), 5 * 7);
+    for (var k = 0; k < 7; k++) {
+      var d = C.addDays(ws, k);
+      p.races = [{ id: 's1', km: 10, date: C.dateKey(d), kind: 'race', mode: 'race' }];
+      var wk = C.buildWeek(p, d);
+      assert.ok(wk.totalKm <= wk.volumeTarget + 0.5, 'L' + n + ' day ' + k + ': ' + wk.totalKm + ' / ' + wk.volumeTarget);
+      assert.ok(wk.days.some(function (x) { return x.type === 'race'; }));
+    }
+  });
+});
+
+test('چرخه: چند ثبت جاافتاده پشت‌سرهم طول معمول رو خراب نمی‌کنه (فاصله‌ی ۶۴ روزه = دو چرخه)', function () {
+  var p = cycleProfile('2028-10-31');
+  p.cycle.starts = ['2027-10-11', '2027-11-10', '2027-12-13', '2028-02-08', '2028-03-04', '2028-04-30', '2028-07-31', '2028-08-28', '2028-10-31'];
+  var s = C.cycleStats(p, C.parseDate('2028-11-04'));
+  assert.deepStrictEqual(s.flags, ['missed'], JSON.stringify(s));
+  assert.ok(s.missed.some(function (m) { return m.days === 64; }));
+});
+
+test('پیاده‌روی: رشد دقیقه‌ها با تاریخچه (قبول سطح بعدی پرش نمی‌ده)، گرد کردن به پایین، هفته‌ی سبک کمتر از هفته‌های قبل', function () {
+  var p = { activity: 'walk', walkExp: '3to12m', walkMin: 80, walk30: 'yes', age: 47, days: [0, 2, 4, 6], startDate: '2026-09-26', walkGoal: { kind: 'health' } };
+  var d0 = C.parseDate(p.startDate), hist = [];
+  for (var w = 0; w < 16; w++) {
+    var d = C.addDays(d0, w * 7);
+    if (w === 8) { p.walkMin = 200; p.walkExp = 'gt1y'; }   // مثل قبول پیشنهاد سطح بعدی (دو سطح بالاتر)
+    C.logWeek(p, d);
+    var wk = C.buildWeek(p, d), m = wk.totalMin;
+    if (hist.length) {
+      var mx3 = Math.max.apply(null, hist.slice(-3));
+      assert.ok(m <= Math.max(mx3 * 1.1, mx3 + 5) + 2, 'هفته‌ی ' + w + ': ' + hist.slice(-3) + ' → ' + m);
+      if (wk.phase.key === 'deload') assert.ok(m <= mx3 * 0.85 + 2, 'هفته‌ی سبک ' + w + ': ' + m);
+    }
+    hist.push(m);
+  }
+  assert.ok(C.planLogLimit && p.planLog && Object.keys(p.planLog).length >= 10, 'دقیقه‌های پیاده‌روی ثبت می‌شن');
 });
 
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

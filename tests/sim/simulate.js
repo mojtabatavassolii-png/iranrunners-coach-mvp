@@ -155,8 +155,17 @@ function simulate(persona, opts) {
         events.push({ day: day, kind: 'injury', text: 'آسیب تأییدشده (' + e.area + ')، ' + e.weeks + ' هفته توقف' }); H.mInjured = true;
       } else if (e.type === 'busy' || e.type === 'unmotivated' || e.type === 'sick') {
         events.push({ day: day, kind: e.type, text: { busy: 'شلوغی کاری', unmotivated: 'بی‌انگیزگی', sick: 'بیماری' }[e.type] + ' (' + e.days + ' روز)' });
+        // شلوغی کاری: کاربر روزهای تمرین رو به ۳ روز کم می‌کنه و بعدش برمی‌گردونه (رشد حجم بعد از اضافه کردن روز سنجیده می‌شه)
+        if (e.type === 'busy' && !walk && (p.days || []).length > 3 && !H.daysBackup) {
+          H.daysBackup = { days: p.days.slice(), until: day + e.days };
+          p.days = [p.days[0], p.days[Math.floor(p.days.length / 2)], p.days[p.days.length - 1]];
+          events.push({ day: day, kind: 'days', text: 'روزهای تمرین: ' + H.daysBackup.days.length + ' ← ۳' });
+        }
       }
     });
+    if (H.daysBackup && day >= H.daysBackup.until) {
+      p.days = H.daysBackup.days; events.push({ day: day, kind: 'days', text: 'روزهای تمرین برگشت: ۳ ← ' + p.days.length }); H.daysBackup = null;
+    }
     if (travel && (day % persona.traits.travelEvery) === persona.traits.travelEvery - 6) events.push({ day: day, kind: 'travel', text: 'سفر ۶ روزه' });
 
     // ---- چرخه‌ی واقعی و ثبت شروع پریود ----
@@ -550,7 +559,17 @@ function simulate(persona, opts) {
   function weekChecks(bw, day) {
     if (bw.days.length !== 7) F('critical', 'week-len', day, 'هفته ۷ روز نداره', { n: bw.days.length });
     for (var i = 1; i < bw.days.length; i++) if (C.daysBetween(C.parseDate(bw.days[i - 1].date), C.parseDate(bw.days[i].date)) !== 1) { F('critical', 'week-dates', day, 'تاریخ‌های هفته پشت‌سرهم نیستن', { days: bw.days.map(function (x) { return x.date; }) }); break; }
-    if (walk) return;
+    if (walk) {
+      // پیاده‌روی: دقیقه‌های هفته حداکثر ۱۰٪ (۶۰+ سال ۵٪) بیشتر از بیشترین ۳ هفته‌ی قبل، حداقل ۵ دقیقه (قاعده‌ی walkWeeklyMin)؛
+      // هفته‌ی رویداد پیاده‌روی و برگشت به دقیقه‌های ۸ هفته‌ی اخیر رشد تازه نیست
+      var fullW = weeks.filter(function (w) { return w.weekIndex >= 0 && w.start < bw.start && w.plannedMin > 0; });
+      var l3 = fullW.slice(-3), evW = bw.days.some(function (x) { return x.type === 'walkEvent'; });
+      var rate = Number(p.age) >= 60 ? 1.05 : 1.1, mx3 = l3.length ? Math.max.apply(null, l3.map(function (w) { return w.plannedMin; })) : 0;
+      var mx8 = fullW.slice(-8).reduce(function (m, w) { return Math.max(m, w.plannedMin); }, 0);
+      if (bw.weekIndex >= 1 && mx3 > 0 && !evW && bw.totalMin > Math.max(mx3 * rate, mx3 + 5) + 5 && bw.totalMin > mx8 + 1)
+        F(bw.totalMin < 60 ? 'minor' : 'major', 'walk-week', day, 'رشد دقیقه‌ی پیاده‌روی هفتگی بیشتر از قاعده', { from: mx3, to: bw.totalMin, phase: bw.phase && bw.phase.key, gap: bw.gapCap || null });
+      return;
+    }
     var L = C.LEVELS[bw.level], longD = bw.days.filter(function (x) { return x.type === 'long'; })[0];
     if (longD && L && L.longCap) {
       var cap = C.goalInfo(p).category === 'ultra' ? 45 : L.longCap;
@@ -620,7 +639,9 @@ function simulate(persona, opts) {
     weeks.push(w);
     // برنامه بدون توجه به انجام‌نشده‌ها جلو می‌ره؟ (۶ هفته‌ی پشت‌سرهم زیر ۶۰٪، ولی حجم برنامه بالا رفته)
     var last6 = weeks.slice(-6);
-    if (last6.length === 6 && !walk && !(H.rebaseShown != null && day - H.rebaseShown <= 42) && last6[5].plannedKm >= 8 && last6.every(function (x) { return x.plannedKm > 5 && x.doneKm < x.plannedKm * 0.6; }) && last6[5].plannedKm > last6[0].plannedKm * 1.1)
+    // زیر میانگین ۸ کیلومتر در هفته موتور عمداً پیشنهاد تنظیم با حجم واقعی نمی‌ده (adherence: نزدیک کف حداقل جلسه‌ها)، اینجا هم سنجیده نمی‌شه
+    var avg6 = last6.reduce(function (x, w) { return x + w.plannedKm; }, 0) / Math.max(1, last6.length);
+    if (last6.length === 6 && !walk && !(H.rebaseShown != null && day - H.rebaseShown <= 42) && last6[5].plannedKm >= 8 && avg6 >= 8 && last6.every(function (x) { return x.plannedKm > 5 && x.doneKm < x.plannedKm * 0.6; }) && last6[5].plannedKm > last6[0].plannedKm * 1.1)
       F('major', 'plan-ignores-missed', day, 'شش هفته زیر ۶۰٪ برنامه، ولی حجم برنامه همچنان بالا رفته', { planned: last6.map(function (x) { return x.plannedKm; }), done: last6.map(function (x) { return x.doneKm; }) });
     // آمادگی پنهان
     if (w.runs === 0) { H.offDays += 7; H.vdot = Math.max(H.v0 - 6, H.vStop * C.detrainFactor(Math.min(H.offDays, 70), false)); }
@@ -701,7 +722,7 @@ function simulate(persona, opts) {
 
   findList.sort(function (a, b) { return SEV_ORDER[a.sev] - SEV_ORDER[b.sev] || a.day - b.day; });
   // opts.keepProfile: پروفایل پایانی (فقط برای بازتولید یک ایراد در اسکریپت؛ در گزارش نیست)
-  if (opts.keepProfile) Object.defineProperty(opts, 'profile', { value: p, enumerable: false, configurable: true });
+  if (opts.keepProfile) { Object.defineProperty(opts, 'profile', { value: p, enumerable: false, configurable: true }); Object.defineProperty(opts, 'state', { value: state, enumerable: false, configurable: true }); }
   return {
     persona: { id: persona.id, title: persona.title, focus: persona.focus, traits: persona.traits, axes: persona.axes || null, seed: persona.seed, startDate: prep.profile.startDate },
     days: days, weeks: weeks, events: events, findings: findList, feelings: feelings, churn: churnPts, churnTotal: Object.keys(H.churnTotal).reduce(function (o, k) { o[k] = r1(H.churnTotal[k]); return o; }, {}), snaps: snaps, perf: perf,

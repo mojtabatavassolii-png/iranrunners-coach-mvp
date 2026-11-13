@@ -389,6 +389,7 @@
         runwalk: ' Stick to your run-walk routine; the only goal is to reach the finish healthy.'
       },
       race2: {
+        weekEase: 'Race week ({race}): this run is shorter so the week, race included, stays within the plan.',
         howTest: 'Time trial: full warm-up, then the whole distance at the hardest effort you can hold evenly. Log the result to update your paces and estimates.',
         howTrain: 'As training: run at controlled effort (around your main-goal pace or a little slower), not a record attempt; the main plan continues without a taper.',
         mini: 'Mini-taper before {race}: a little lighter, but the short fast session stays so you stay sharp.',
@@ -1422,6 +1423,7 @@
       advice: 'If you can, pick a shorter distance or a later race so the plan has time.',
       stop: 'If you take part: set no time goal, start slowly, and stop on sharp pain or limping.',
       race: 'Your side race',
+      mainRace: 'Your main race',
       ok: 'Got it',
       goal: 'Goals and races'
     },

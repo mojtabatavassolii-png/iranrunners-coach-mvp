@@ -143,6 +143,24 @@ const SCREENS = [
   // آموزش پیاده‌روی
   ['walk-learn', '#learn', async (p) => { await asWalker(p); await p.evaluate(() => { location.hash = '#learn'; }); await p.waitForTimeout(500); }],
   ['walk-article', '#learn', async (p) => { await asWalker(p); await p.evaluate(() => { location.hash = '#learn/walkSafe'; }); await p.waitForTimeout(500); }],
+  // بازبینی ۱۱: کارت‌های تازه‌ی خانه (زوده و پشتیبان ماهانه)، پیام «حجم با این تعداد روز جا نمی‌شه»، راهنمای پیاده‌روی
+  ['home-cards', '#home', async (p) => {
+    await p.evaluate(([K, today]) => {
+      const s = JSON.parse(localStorage.getItem(K)), C = window.CoachLogic;
+      s.profile.races = [{ id: 'm1', name: 'ماراتن آزمایشی', km: 42.2, date: C.dateKey(C.addDays(C.parseDate(today), 30)), kind: 'race', mode: 'race' }];
+      delete s.backupAt; delete s.backupSnooze;
+      localStorage.setItem(K, JSON.stringify(s));
+    }, [KEY, TODAY]);
+    await p.reload(); await p.waitForTimeout(600);
+  }],
+  ['plan-capped', '#plan', async (p) => {
+    await p.evaluate(([K]) => { const s = JSON.parse(localStorage.getItem(K)); s.profile.days = [1, 4]; localStorage.setItem(K, JSON.stringify(s)); }, [KEY]);
+    await p.reload(); await p.waitForTimeout(500); await setPlanView(p, 'week');
+  }],
+  ['walk-guide', '#learn', async (p) => {
+    await asWalker(p); await p.evaluate(() => { location.hash = '#learn'; }); await p.waitForTimeout(500);
+    await p.click('a.learn-item[data-guide="walkWeek"]'); await p.waitForTimeout(600);
+  }],
   // صفحه‌ی «شروع» (دکمه‌ی وسط: ثبت آزاد، قبل از شروع). آخر فهرست، چون حالت ثبت در مرورگر می‌مونه
   ['record', '#home', async (p) => { await p.click('#tabbar a[data-tab="record"]'); await p.waitForTimeout(700); }],
 ];

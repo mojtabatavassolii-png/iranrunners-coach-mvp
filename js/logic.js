@@ -1414,10 +1414,12 @@
   // اون حساب دوباره با چیزی که واقعاً بهش نشون داده شده فرق داره. حد رشد از همین تاریخچه میاد.
   var PLAN_LOG_WEEKS = 26;
   function logWeek(profile, today) {
-    if (!profile || isWalk(profile)) return false;
+    if (!profile) return false;
     var ws = weekStart(today), bw = buildWeek(profile, today);
-    if (!(bw.totalKm > 0 || bw.vert > 0)) return false;
-    var e = { km: bw.totalKm || 0, vert: bw.vert || 0, sv: bw.days.reduce(function (x, d) { return Math.max(x, d.type === 'race' ? 0 : (d.vert || 0)); }, 0),
+    // پیاده‌روی: دقیقه‌ی هفته (حد رشد walkLogLimit)
+    if (isWalk(profile) ? !(bw.totalMin > 0) : !(bw.totalKm > 0 || bw.vert > 0)) return false;
+    var e = isWalk(profile) ? { km: 0, min: bw.totalMin, vert: 0, sv: 0, ph: (bw.phase && bw.phase.key) || null }
+      : { km: bw.totalKm || 0, vert: bw.vert || 0, sv: bw.days.reduce(function (x, d) { return Math.max(x, d.type === 'race' ? 0 : (d.vert || 0)); }, 0),
       ph: (bw.phase && bw.phase.key) || null };
     var log = profile.planLog = profile.planLog || {}, k = dateKey(ws), before = JSON.stringify(log[k] || null);
     log[k] = e;
@@ -1426,21 +1428,34 @@
     return JSON.stringify(e) !== before;
   }
   // حدها از تاریخچه: بیشترین ۳ هفته‌ی قبل × ۱۱۰٪، یا برگشت به بیشترین هفته‌ی عادی ۱۲ هفته‌ی اخیر (مثلاً حجم قبل از مسابقه)
+  // اگه هفته‌ی قبل ثبت نشده (اپ یک هفته باز نشده، یا هفته‌ی جلوتر از امروز)، از آخرین هفته‌ی ثبت‌شده تا ۴ هفته قبل حساب می‌شه،
+  // با ۱۰٪ برای هر هفته‌ی بینش (همون رشدی که برنامه اجازه می‌داد)؛ قبلاً حد کلاً برداشته می‌شد و حجم کامل برنامه یک‌باره برمی‌گشت.
+  // تا ۱۲ هفته بدون ثبت (هر هفته‌ی بینش یک پله‌ی ۱۰٪)؛ بیشتر: بدون حد (برگشت بعد از وقفه‌ی بی‌تمرین رو gapCap جدا مدیریت می‌کنه).
+  // (قبلاً ۴ هفته بود: کاربری که یک ماه اپ رو باز نکرده ولی کم تمرین کرده بود، یک‌باره به حجم کامل برنامه برمی‌گشت)
+  var PLAN_LOG_GAP_WEEKS = 12;
+  // پله‌های رشد برای هفته‌های ثبت‌نشده‌ی بین آخرین ثبت و این هفته: برای هفته‌های آینده (پیش‌نمایش برنامه) همه‌ی پله‌ها؛
+  // برای هفته‌ی جاری و گذشته حداکثر ۲ پله (معلوم نیست کاربر در هفته‌هایی که اپ رو باز نکرده تمرین کرده یا نه)
+  function logGapSteps(ws, g) {
+    var cur = weekStart(parseDate(dateKey(new Date())));
+    return ws > cur ? g : Math.min(g, 2);
+  }
   function planLogLimit(profile, ws) {
     var log = profile.planLog;
-    // فقط وقتی هفته‌ی درست قبلی ثبت شده (هفته‌های جلوتر از امروز یا بعد از یک هفته غیبت، بدون حد)
-    if (!log || !log[dateKey(addDays(ws, -7))]) return null;
+    if (!log) return null;
+    var g = 1;
+    while (g <= PLAN_LOG_GAP_WEEKS && !log[dateKey(addDays(ws, -7 * g))]) g++;
+    if (g > PLAN_LOG_GAP_WEEKS) return null;
     var e3 = [], e12 = [], s4 = 0;
     for (var i = 1; i <= 12; i++) {
       var e = log[dateKey(addDays(ws, -7 * i))];
       if (!e) continue;
-      if (i <= 3) e3.push(e);
+      if (i >= g && i < g + 3) e3.push(e);
       if (i <= 4) s4 = Math.max(s4, e.sv || 0);
       if (e.ph !== 'race' && e.ph !== 'taper') e12.push(e);
     }
     if (!e3.length) return null;
     var mx = function (arr, f) { return arr.reduce(function (x, y) { return Math.max(x, y[f] || 0); }, 0); };
-    return { km: Math.max(mx(e3, 'km') * 1.1, mx(e12, 'km')), v3: mx(e3, 'vert'), v12: mx(e12, 'vert'), s4: s4, s12: mx(e12, 'sv') };
+    return { km: Math.max(mx(e3, 'km') * Math.pow(1.1, logGapSteps(ws, g)), mx(e12, 'km')), v3: mx(e3, 'vert'), v12: mx(e12, 'vert'), s4: s4, s12: mx(e12, 'sv'), gap: g - 1 };
   }
   // منوی کیفی اولترا با مرحله‌ی تپه هماهنگ می‌شه
   function adaptHillSpecs(specs, hp, goal, tier) {
@@ -2142,10 +2157,13 @@
   function earlyRace(profile, today) {
     if (!profile || isWalk(profile)) return null;
     var tk = dateKey(today);
-    var list = otherRaces(profile).filter(function (r) { return r.kind === 'race' && r.key >= tk && daysBetween(today, r.date) <= 35; });
+    // هدف اصلی (بیشتر از ۳۰ کیلومتر) هم، کنار مسابقه‌های فرعی
+    var main = raceInfo(profile), all = otherRaces(profile).filter(function (r) { return r.kind === 'race'; });
+    if (main) all.push({ id: 'main', km: main.km, key: dateKey(main.date), date: main.date, name: null, main: true });
+    var list = all.filter(function (r) { return r.key >= tk && daysBetween(today, r.date) <= 35; }).sort(function (a, b) { return a.key < b.key ? -1 : 1; });
     for (var i = 0; i < list.length; i++) {
       var r = list[i], rd = raceReadiness(profile, r.km, r.date, today);
-      if (rd) return Object.assign(rd, { id: r.id, raceKey: r.key, name: r.name, daysTo: Math.round(daysBetween(today, r.date)),
+      if (rd) return Object.assign(rd, { id: r.id, raceKey: r.key, name: r.name, main: !!r.main, daysTo: Math.round(daysBetween(today, r.date)),
         seen: (profile.earlyRaceSeen || []).indexOf(r.key + '|' + r.km) >= 0 });
     }
     return null;
@@ -2440,6 +2458,13 @@
       var logLim = planLogLimit(profile, ws);
       var raceWeek = race && race.date >= ws && race.date <= addDays(ws, 6);
       if (logLim && !raceWeek && !(ipw && ipw.phase === 'ramp') && weeklyKm > logLim.km + 0.5) weeklyKm = Math.max(5, floor05(logLim.km));
+      // هفته‌ی سبک واقعاً سبک: حداکثر ۸۵٪ بیشترین هفته‌ی غیرسبک ۳ هفته‌ی اخیر (تاریخچه). «برگشت به بیشترین هفته‌ی ۱۲ هفته‌ی اخیر»
+      // نباید هفته‌ی سبک رو از هفته‌های عادی قبلش بزرگ‌تر کنه (مثلاً بعد از تنظیم با حجم واقعی: ۵، ۵، ۵ و بعد هفته‌ی سبک ۸)
+      if (logLim && pr.deload && !raceWeek && profile.planLog) {
+        var refDl = 0;
+        for (var ldl = 1; ldl <= 3; ldl++) { var eDl = profile.planLog[dateKey(addDays(ws, -7 * ldl))]; if (eDl && ['deload', 'race', 'taper', 'recovery'].indexOf(eDl.ph) < 0) refDl = Math.max(refDl, eDl.km || 0); }
+        if (refDl > 0 && weeklyKm > refDl * 0.85 + 0.5) weeklyKm = Math.max(5, floor05(refDl * 0.85));
+      }
       // برگشت بعد از وقفه‌ی ۱۴ روز یا بیشتر (gapCap، از app.js با updateGapCap): از حجم واقعی قبل از وقفه، بعد رشد هفتگی
       var gcap = gapCapKm(profile, ws);
       var gapFrom = null;
@@ -2615,6 +2640,20 @@
           remaining += qSessions[qd2].km; delete qSessions[qd2];
           easyDays.push(qd2); qKm = qSum();
         }
+        // هفته‌ی سبک با روزهای کم: حجمش واقعاً کمتر از هفته‌های عادی اخیر (تاریخچه‌ی برنامه) باشه، حداکثر ۸۵٪ بیشترینشون.
+        // (با روزهای کم حجم هفته به اندازه‌ی جلسه‌ی کیفی بستگی داره و هفته‌ی سبک گاهی از هفته‌ی قبلش بیشتر می‌شد)
+        if (pr.deload && profile.planLog) {
+          var refB = 0;
+          for (var lb = 1; lb <= 3; lb++) { var eB = profile.planLog[dateKey(addDays(ws, -7 * lb))]; if (eB && eB.ph !== 'deload' && eB.ph !== 'race' && eB.ph !== 'taper') refB = Math.max(refB, eB.km || 0); }
+          var capDl = refB > 0 ? round05(refB * 0.85) : 0, actDl = longKm + qKm + remaining;
+          if (capDl > 0 && actDl > capDl + 0.25) {
+            var cutDl = actDl - capDl, fromE = Math.min(cutDl, Math.max(0, remaining - 3 * easyDays.length));
+            remaining -= fromE; cutDl -= fromE;
+            if (cutDl > 0) { var nl = Math.min(longKm, Math.max(5, round05(longKm - cutDl))); cutDl -= longKm - nl; longKm = nl; }
+            if (cutDl > 0.25 && qDays.length) { var qd3 = qDays.pop(); delete qSessions[qd3]; qKm = qSum(); }
+            cappedKm = round05(cappedKm + (actDl - (longKm + qKm + remaining)));
+          }
+        }
       }
       var sesCap = Math.max(3, floor05(Math.min(longCap * EASY_OF_LONGCAP, Math.max(longKm, 3))));
       if (easyDays.length && remaining > sesCap * easyDays.length + 0.25) {
@@ -2718,6 +2757,27 @@
       days.push(s);
     }
 
+    // هفته‌ی مسابقه‌ی فرعی: مسابقه معمولاً روی روز استراحت میاد و کل مسافتش به هفته اضافه می‌شد (تا +۵۰٪).
+    // اضافه از دویدن‌های آسون همون هفته کم می‌شه (هر کدوم حداقل ۳ کیلومتر، وگرنه استراحت)، تا کل هفته از حجم برنامه بیشتر نشه
+    var sideRaceDay = days.filter(function (s) { return s.type === 'race' && s.side; })[0];
+    if (sideRaceDay && weeklyKm > 0) {
+      var over = days.reduce(function (x, s) { return x + (s.km || 0); }, 0) - weeklyKm;
+      var easyIdx = days.map(function (s, i) { return s.type === 'easy' && s.km ? i : -1; }).filter(function (i) { return i >= 0; })
+        .sort(function (a, b) { return Math.abs(a - days.indexOf(sideRaceDay)) - Math.abs(b - days.indexOf(sideRaceDay)); });
+      easyIdx.forEach(function (i) {
+        if (over <= 0.25) return;
+        var e = days[i], cut = Math.min(over, e.km);
+        var nk = round05(e.km - cut);
+        var keep = { date: e.date, dayName: e.dayName, dayShort: e.dayShort };
+        var ns = nk >= 3 ? makeEasy(nk, zones, T('s.race2.weekEase', { race: sideRaceLabel(otherRaces(profile).filter(function (r) { return r.key === sideRaceDay.date; })[0] || { km: sideRaceDay.km }) })) : makeRest(T('s.race2.weekEase', { race: sideRaceLabel(otherRaces(profile).filter(function (r) { return r.key === sideRaceDay.date; })[0] || { km: sideRaceDay.km }) }));
+        over -= e.km - (ns.km || 0);
+        Object.assign(ns, keep);
+        ns.label = TYPE_INFO[ns.type].label + (ns.variant ? ' (' + ns.variant + ')' : '');
+        ns.hard = isHard(ns.type);
+        Object.defineProperty(ns, '_ctx', { value: ctx, enumerable: false, configurable: true, writable: true });
+        days[i] = ns;
+      });
+    }
     var totalKm = days.reduce(function (x, s) { return x + (s.km || 0); }, 0);
     var hardKm = days.reduce(function (x, s) { return x + (s.type === 'race' ? 0 : (s.hardKm || 0)); }, 0);
     var totalMin = days.reduce(function (x, s) { return x + (s.minutes || 0); }, 0);
@@ -3188,7 +3248,17 @@
     var manual = clamp(Number(c.cycleLen) || 28, 21, 45);
     var okRaw = raw.slice(-6).filter(function (g) { return g >= 21 && g <= 45; });
     // طول معمول: میانه‌ی فاصله‌های عادی اخیر (حداقل ۲ تا)، وگرنه عددی که کاربر وارد کرده
-    var L0 = okRaw.length >= 2 ? median(okRaw) : manual, tol = Math.max(5, L0 * 0.2), gaps = [], missed = [];
+    var L0 = okRaw.length >= 2 ? median(okRaw) : manual;
+    // دور دوم: تکه‌های فاصله‌های خیلی بلند (بالای ۴۵ روز) که با این طول به ۲ یا ۳ تکه‌ی عادی تقسیم می‌شن هم در میانه حساب می‌شن؛
+    // وگرنه با چند ثبت جاافتاده فقط یکی دو فاصله‌ی سالم می‌مونه و طول معمول (و تشخیص ثبت جاافتاده) غلط درمیاد
+    // (فقط تکه‌هایی که خودشون در بازه‌ی مجاز طول اولیه هستن؛ فاصله‌ی واقعاً نامنظم طول معمول رو جابه‌جا نمی‌کنه)
+    var okAll = okRaw.slice(), tol0 = Math.max(5, L0 * 0.2);
+    raw.slice(-6).forEach(function (g) {
+      var n0 = Math.round(g / L0);
+      if (g > 45 && n0 >= 2 && n0 <= 3 && Math.abs(g / n0 - L0) <= tol0) for (var q = 0; q < n0; q++) okAll.push(g / n0);
+    });
+    if (okAll.length >= 3) L0 = median(okAll);
+    var tol = Math.max(5, L0 * 0.2), gaps = [], missed = [];
     raw.forEach(function (g, j) {
       var n = Math.round(g / L0);
       // نه فقط بالای ۴۵ روز: با چرخه‌ی کوتاه (مثلاً ۲۱ تا ۲۳ روز) یک ثبت جاافتاده فاصله‌ی ۴۲ تا ۴۵ روز می‌سازه؛
@@ -3734,6 +3804,27 @@
     s.strength = { min: 25, moves: T('walk.strengthMoves') };
     return s;
   }
+  // حد رشد پیاده‌روی از تاریخچه‌ی برنامه (مثل planLogLimit دویدن): دقیقه‌ی هفته حداکثر ۱۰٪ (۶۰+ سال ۵٪، حداقل ۵ دقیقه) بیشتر از
+  // بیشترین ۳ هفته‌ی ثبت‌شده‌ی قبل (برای هر هفته‌ی ثبت‌نشده‌ی بینش یک پله)، یا برگشت به بیشترین هفته‌ی ۸ هفته‌ی اخیر.
+  // بدون این حد، قبول پیشنهاد سطح بعدی (حداقل طول جلسه‌های سطح تازه) دقیقه‌ها رو یک‌باره تا ۸۰٪ بالا می‌برد
+  function walkLogLimit(profile, ws, rate) {
+    var log = profile.planLog;
+    if (!log) return null;
+    var g = 1;
+    while (g <= PLAN_LOG_GAP_WEEKS && !(log[dateKey(addDays(ws, -7 * g))] && log[dateKey(addDays(ws, -7 * g))].min > 0)) g++;
+    if (g > PLAN_LOG_GAP_WEEKS) return null;
+    var mx3 = 0, mx8 = 0;
+    for (var i = 1; i <= 8; i++) {
+      var e = log[dateKey(addDays(ws, -7 * i))];
+      if (!e || !(e.min > 0)) continue;
+      if (i >= g && i < g + 3) mx3 = Math.max(mx3, e.min);
+      if (e.ph !== 'deload') mx8 = Math.max(mx8, e.min);
+    }
+    if (!mx3) return null;
+    var v = mx3;
+    for (var k = 0, gs = logGapSteps(ws, g); k < gs; k++) v = Math.max(v + 5, v * rate);
+    return Math.max(Math.floor(v / 5) * 5, mx8);
+  }
   function buildWalkWeek(profile, anyDateInWeek) {
     var a = assessWalkLevel(profile), L = a.info, level = a.level;
     var ws = weekStart(anyDateInWeek), w = weekIndexFor(profile, ws), W = Math.max(0, w);
@@ -3747,6 +3838,16 @@
     var gcapW = gapCapKm(profile, ws), gapFromW = null;
     var evWeek = wg.kind === 'event' && wg.date && wg.date >= dateKey(ws) && wg.date <= dateKey(addDays(ws, 6));
     if (gcapW != null && !evWeek && total > gcapW) { gapFromW = total; total = gcapW; }
+    var wLim = walkLogLimit(profile, ws, a.cautious ? 1.05 : 1.1), histCap = false;
+    if (wLim != null && !evWeek && total > wLim + 2) { total = wLim; histCap = true; }
+    // هفته‌ی سبک: حداکثر ۸۵٪ بیشترین هفته‌ی غیرسبک ۳ هفته‌ی اخیر (مثل دویدن)
+    if (vol.deload && profile.planLog && !evWeek) {
+      var refW = 0;
+      for (var lw = 1; lw <= 3; lw++) { var eW = profile.planLog[dateKey(addDays(ws, -7 * lw))]; if (eW && eW.min > 0 && eW.ph !== 'deload') refW = Math.max(refW, eW.min); }
+      // هفته‌های اخیر ثبت نشدن (اپ باز نشده): آخرین هفته‌ی غیرسبک ثبت‌شده تا ۱۲ هفته قبل
+      for (lw = 4; !refW && lw <= PLAN_LOG_GAP_WEEKS; lw++) { eW = profile.planLog[dateKey(addDays(ws, -7 * lw))]; if (eW && eW.min > 0 && eW.ph !== 'deload') refW = eW.min; }
+      if (refW > 0 && total > refW * 0.85 + 2) { total = Math.max(10, Math.floor(refW * 0.85 / 5) * 5); histCap = true; }
+    }
     // رویداد پیاده‌روی: پیاده‌روی بلند از سطح ۴، سقفش تا ۸۰٪ مدت رویداد (حداکثر ۱۸۰ دقیقه)
     var longCap = L.long, evMin = wg.kind === 'event' ? wg.minutes : 0;
     if (evMin && L.n >= 4) longCap = Math.max(L.long || 45, Math.min(180, r5(evMin * 0.8)));
@@ -3754,7 +3855,7 @@
     var longMin = longDay !== null ? Math.min(longCap, r5(total * (evMin ? 0.35 : 0.3))) : 0;
     // هفته‌ی سبک: اینتروال‌ها تند می‌شن
     // برگشت از وقفه هم مثل هفته‌ی سبک: بدون اینتروال قدرتی
-    var easeW = vol.deload || gapFromW != null;
+    var easeW = vol.deload || gapFromW != null || histCap;   // هفته‌ی محدودشده با تاریخچه هم: اینتروال قدرتی (اندازه‌ی ثابت) نه
     var nPower = easeW ? 0 : L.power, nBrisk = L.brisk + (easeW ? L.power : 0);
     // «پیاده‌روی سریع‌تر»: از سطح ۳ یک جلسه‌ی تند بیشتر
     if (wg.kind === 'faster' && L.n >= 3) nBrisk++;
@@ -3768,10 +3869,11 @@
     var pDays = nPower ? placeQuality(sessionDays, hardFixed, specs.filter(function (x) { return x === 'power'; }).length) : [];
     var rest = others.filter(function (d) { return pDays.indexOf(d) < 0; });
     var bDays = rest.slice(0, specs.length - pDays.length);
-    var each = r5((total - longMin) / Math.max(1, others.length));
+    // جلسه‌ها به ۵ دقیقه‌ی پایین‌تر گرد می‌شن (گرد کردن به بالا با ۵ جلسه تا ۱۲ دقیقه به هفته اضافه می‌کرد و رشد ۱۰٪ رو ۱۷٪ می‌کرد)
+    var each = Math.max(5, Math.floor((total - longMin) / Math.max(1, others.length) / 5) * 5);
     // هفته‌ی سبک می‌تونه زیر کف بازه‌ی جلسه بره تا واقعاً سبک باشه
     // برگشت از وقفه: کف طول جلسه‌ی سطح نباید سقف هفته رو دور بزنه
-    each = Math.max(gapFromW != null ? 10 : vol.deload ? r5(L.len[0] * 0.75) : L.len[0], Math.min(L.len[1], each));
+    each = Math.max(gapFromW != null || histCap ? 10 : vol.deload ? r5(L.len[0] * 0.75) : L.len[0], Math.min(L.len[1], each));
     var hardDays = pDays.concat(hardFixed);
     var template = {};
     sessionDays.forEach(function (d) {
@@ -3782,6 +3884,16 @@
       else sx = makeWalkEasy(each, profile);
       template[d] = sx;
     });
+    // هفته‌ی محدودشده (وقفه یا تاریخچه): حداقل طول جلسه‌ها و پیاده‌روی بلند نباید هفته رو از حد بالاتر ببرن؛ بلندترین جلسه‌ها کوتاه می‌شن (تا ۱۰ دقیقه)
+    if (gapFromW != null || histCap) {
+      var sumT = function () { return sessionDays.reduce(function (x, d) { return x + (template[d].minutes || 0); }, 0); };
+      for (var tr = 0; tr < 40 && sumT() > total + 2; tr++) {
+        var big = sessionDays.slice().sort(function (x, y) { return (template[y].minutes || 0) - (template[x].minutes || 0); })[0];
+        if (!big || (template[big].minutes || 0) <= 10 || template[big].type === 'walkPower') break;
+        var t0 = template[big], nm = t0.minutes - 5;
+        template[big] = t0.type === 'walkLong' ? makeWalkLong(nm, profile) : t0.type === 'walkBrisk' ? makeWalkBrisk(nm, profile, L) : makeWalkEasy(nm, profile);
+      }
+    }
     // قدرتی روی روزهای آسون که فرداشون روز سخت نیست؛ جایگزین دوچرخه/شنا روی یک روز آسون دیگه (سطح ۸+)
     var easyDays = sessionDays.filter(function (d) { return template[d].type === 'walkEasy' || template[d].type === 'walkBrisk'; });
     var strDays = easyDays.filter(function (d) { return hardDays.indexOf((d + 1) % 7) < 0 && hardDays.indexOf(d) < 0; });

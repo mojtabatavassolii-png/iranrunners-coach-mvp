@@ -968,7 +968,7 @@
     if (!r || r.seen) return '';
     var u = T('units.word.' + I.getUnits());
     return '<section class="card advice-card early-race" role="status"><div class="hcard-top"><span class="hcard-label">' + esc(T('earlyRace.title')) + '</span>' + learnQ('goals') + '</div>' +
-      '<p>' + tt('earlyRace.head', { name: r.name || T('earlyRace.race'), km: kmU(r.km), u: u, n: r.daysTo }) + '</p>' +
+      '<p>' + tt('earlyRace.head', { name: r.name || T(r.main ? 'earlyRace.mainRace' : 'earlyRace.race'), km: kmU(r.km), u: u, n: r.daysTo }) + '</p>' +
       '<ul><li>' + tt('earlyRace.need', { nk: kmU(r.needKm), nl: kmU(r.needLong), u: u }) + '</li><li>' + (r.rw ? tt('earlyRace.haveRw') : tt('earlyRace.have', { pk: kmU(r.peakKm), pl: kmU(r.peakLong), u: u })) + '</li>' +
       '<li>' + tt('earlyRace.advice') + '</li><li>' + tt('earlyRace.stop') + '</li></ul>' +
       '<div class="actions"><button type="button" class="btn btn-outline" data-early-race="ok">' + esc(T('earlyRace.ok')) + '</button>' +
