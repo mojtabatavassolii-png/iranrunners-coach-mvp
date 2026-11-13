@@ -2434,13 +2434,16 @@ test('یادآوری ماهانه‌ی پشتیبان: ۳۰ روز، حداقل 
   assert.strictEqual(C.backupDue({ profile: { startDate: '2026-12-10' }, checkins: data.checkins, done: data.done }, C.parseDate('2026-12-01')), null, 'برنامه هنوز شروع نشده');
 });
 
-test('آمادگی مسابقه‌ی فرعی: حجم کم برای ماراتن «زوده»، برای مسافت‌های کوتاه‌تر هشدار نیست؛ کارت خانه و «متوجه شدم»', function () {
+test('آمادگی مسابقه‌ی فرعی: حجم کم برای بیشتر از ۳۰ کیلومتر «زوده»، برای مسافت‌های کوتاه‌تر هشدار نیست؛ کارت خانه و «متوجه شدم»', function () {
   var p = profileFor(2, { days: [0, 2, 4] }), today = C.addDays(C.parseDate(p.startDate), 21);
   var mar = C.dateKey(C.addDays(today, 30)), fiveK = C.dateKey(C.addDays(today, 20));
   var rd = C.raceReadiness(p, 42.195, mar, today);
   assert.ok(rd && rd.key === '42' && rd.needKm === C.PLAN_NEEDS['42'].km && rd.peakKm < rd.needKm, JSON.stringify(rd));
   assert.strictEqual(C.raceReadiness(p, 5, fiveK, today), null, '۵ کیلومتر با حجم سطح ۲ آماده‌ست');
-  assert.strictEqual(C.raceReadiness(p, 21.0975, C.dateKey(C.addDays(today, 30)), today), null, 'فقط ماراتن و بلندتر');
+  assert.strictEqual(C.raceReadiness(p, 21.0975, C.dateKey(C.addDays(today, 30)), today), null, 'نیمه‌ماراتن: هشدار نیست');
+  assert.strictEqual(C.raceReadiness(p, 30, C.dateKey(C.addDays(today, 30)), today), null, '۳۰ کیلومتر خودش: هشدار نیست');
+  assert.ok(C.raceReadiness(p, 32, C.dateKey(C.addDays(today, 30)), today), 'بیشتر از ۳۰ کیلومتر: هشدار');
+  assert.ok(C.raceReadiness(p, 50, C.dateKey(C.addDays(today, 30)), today), 'اولترا: هشدار');
   var q = profileFor(8), mq = C.addDays(C.parseDate(q.startDate), 21);
   assert.strictEqual(C.raceReadiness(q, 42.195, C.dateKey(C.addDays(mq, 30)), mq), null, 'سطح ۸ برای ماراتن آماده‌ست');
   // بررسی هنگام افزودن و کارت خانه
@@ -2471,6 +2474,30 @@ test('سهم لانگ‌ران (دنیلز) بدون آماده‌سازی نی�
         assert.ok(lg.km <= Math.max(wk.volumeTarget * 0.35, other * 1.15) + 1, 'L' + n + ' ' + days.length + 'd w' + w + ' long ' + lg.km + ' / ' + wk.totalKm + ' other ' + other);
       }
     });
+  });
+});
+
+test('روزهای کمتر از حداقل سطح: سهم لانگ‌ران از حجم واقعی، ۸۰/۲۰ برقرار، و بعد از اضافه کردن روز رشد حداکثر ۱۰٪', function () {
+  [5, 6, 8].forEach(function (n) {
+    var p = profileFor(n, { days: [1, 3, 5] }), hist = [];
+    for (var w = 0; w < 14; w++) {
+      var d = C.addDays(C.parseDate(p.startDate), w * 7);
+      if (w === 7) p.days = [0, 1, 2, 4, 5];
+      C.logWeek(p, d);
+      var wk = C.buildWeek(p, d), lg = wk.days.filter(function (x) { return x.type === 'long'; })[0];
+      var hard = wk.days.reduce(function (x, s) { return x + (s.hardKm || 0); }, 0);
+      assert.ok(hard <= wk.totalKm * 0.2 + 0.6, 'L' + n + ' w' + w + ' hard ' + hard + ' / ' + wk.totalKm);
+      if (w < 7 && lg && wk.totalKm >= 20) {
+        var other = wk.days.reduce(function (m, x) { return x !== lg && x.km ? Math.max(m, x.km) : m; }, 0);
+        assert.ok(lg.km <= Math.max(wk.totalKm * 0.35, other * 1.15) + 1, 'L' + n + ' w' + w + ' long ' + lg.km + ' / ' + wk.totalKm);
+      }
+      // بعد از اضافه کردن روز: حداکثر ۱۱۰٪ بیشترین ۳ هفته‌ی قبل، یا برگشت به بیشترین هفته‌ی ۱۲ هفته‌ی اخیر (قاعده‌ی planLogLimit)، نه پرش به حجم کامل برنامه
+      if (w >= 7) {
+        var mx3 = Math.max.apply(null, hist.slice(-3)), mx12 = Math.max.apply(null, hist.slice(-12));
+        assert.ok(wk.totalKm <= Math.max(mx3 * 1.1, mx12) + 1, 'L' + n + ' w' + w + ' ' + hist.slice(-3) + ' → ' + wk.totalKm);
+      }
+      hist.push(wk.totalKm);
+    }
   });
 });
 

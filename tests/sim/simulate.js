@@ -583,8 +583,8 @@ function simulate(persona, opts) {
     var preRace = normal12.length ? Math.max.apply(null, normal12.map(function (w) { return w.plannedKm; })) : 0;
     var racey12 = full.slice(-12).some(function (w) { return RACEY.indexOf(w.phase) >= 0; });
     if (racey12 && bw.totalKm <= preRace + 0.5) baseW = [];
-    // برگشت به حجمی که در ۸ هفته‌ی اخیر برنامه بوده (مثلاً بعد از افت اطراف مسابقه‌ی فرعی) رشد تازه نیست
-    var max8 = full.slice(-8).reduce(function (m, w) { return Math.max(m, w.plannedKm); }, 0);
+    // برگشت به حجمی که در ۱۲ هفته‌ی اخیر برنامه بوده (مثلاً بعد از افت اطراف مسابقه‌ی فرعی) رشد تازه نیست؛ همون پنجره‌ی موتور (planLogLimit)
+    var max8 = full.slice(-12).filter(function (w) { return RACEY.indexOf(w.phase) < 0; }).reduce(function (m, w) { return Math.max(m, w.plannedKm); }, 0);
     if (bw.totalKm <= max8 + 0.5) baseW = [];
     // هفته‌های اول: حجم فعلی خود کاربر هم مبناست (هفته‌ی اول گاهی کمتر از حجم واقعی کاربره)
     if (bw.weekIndex <= 2 && bw.totalKm <= (Number(persona.profile.currentWeeklyKm) || 0) * 1.1 + 1) baseW = [];

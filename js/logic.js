@@ -2115,10 +2115,11 @@
   // آمادگی برای مسافت یک مسابقه (هدف فرعی): حجم هفتگی و بلندترین دویدنی که برنامه تا هفته‌ی قبل از مسابقه بهش می‌رسه
   // (از ۴ هفته‌ی قبل تا هفته‌ی قبل از مسابقه، حداکثر ۲۶ هفته جلوتر) در برابر PLAN_NEEDS همون مسافت
   // (حداقل حجم اوج و لانگ‌ران برنامه‌های مبتدی دنیلز و هیگدن برای تموم کردن راحت ماراتن).
-  // فقط ماراتن و بلندتر (تصمیم مالک محصول)؛ بیشتر از ماراتن: حداقل‌های ماراتن. خروجی null (آماده یا نامعلوم) یا { key, needKm, needLong, peakKm, peakLong }
-  var EARLY_MIN_KM = 42;
+  // فقط مسافت‌های بیشتر از ۳۰ کیلومتر (تصمیم مالک محصول)، با حداقل‌های ماراتن (نزدیک‌ترین مسافت استاندارد بلندتر برای ۳۰ تا ۴۲ کیلومتر؛
+  // اولترا: حداقل‌های ماراتن). خروجی null (آماده یا نامعلوم) یا { key, needKm, needLong, peakKm, peakLong }
+  var EARLY_MIN_KM = 30;
   function raceReadiness(profile, km, date, today) {
-    if (!profile || isWalk(profile) || !(km >= EARLY_MIN_KM)) return null;
+    if (!profile || isWalk(profile) || !(km > EARLY_MIN_KM)) return null;
     var d = typeof date === 'string' ? parseDate(date) : date;
     if (!d || d < today) return null;
     var key = '42', need = PLAN_NEEDS[key];
@@ -2586,6 +2587,33 @@
         if (shareKm < longKm) {
           remaining += longKm - shareKm; longKm = shareKm;
           if (!nE && remaining > 0) { cappedKm = round05(cappedKm + remaining); remaining = 0; }
+        }
+      }
+      // روزهای کمتر از حداقل سطح: سهم لانگ‌ران نسبت به حجمی که واقعاً اجرا می‌شه (نه حجم برنامه‌ریزی‌شده)، با همون قاعده‌ی دنیلز؛
+      // دویدن آسون حداکثر لانگ‌ران ÷ ۱٫۱۵ و لانگ‌ران حداقل ۱۵٪ بلندتر از جلسه‌ی کیفی. بقیه‌ی حجم حذف و اعلام می‌شه (capped).
+      // کم شدن حجم آسیب‌زا نیست؛ وقتی روزها بیشتر بشه، حد رشد از تاریخچه‌ی برنامه (planLogLimit، ۱۰٪ در هفته) حجم رو آروم بالا می‌بره
+      if (!longPrep && belowMin && b2bDay === null && nSessions >= 2) {
+        for (var outer = 0; outer < 4; outer++) {
+          var maxQb = Object.keys(qSessions).reduce(function (m, k) { return Math.max(m, qSessions[k].km || 0); }, 0);
+          for (var it = 0; it < 8; it++) {
+            var capE = Math.max(5, floor05(longKm / LONG_OVER_EASY));
+            var easyTot = easyDays.length ? Math.min(remaining, capE * easyDays.length) : 0;
+            var tgt = Math.max(5, round05(LONG_OVER_EASY * maxQb), round05((longKm + qKm + easyTot) * longShare));
+            if (tgt >= longKm - 0.25) break;
+            remaining += longKm - tgt; longKm = tgt;
+          }
+          var capE2 = Math.max(5, floor05(longKm / LONG_OVER_EASY));
+          if (easyDays.length && remaining > capE2 * easyDays.length + 0.25) { cappedKm = round05(cappedKm + remaining - capE2 * easyDays.length); remaining = capE2 * easyDays.length; }
+          else if (!easyDays.length && remaining > 0) { cappedKm = round05(cappedKm + remaining); remaining = 0; }
+          // ۸۰/۲۰ نسبت به همین حجم کمتر: اول بخش تند لانگ‌ران، بعد آخرین جلسه‌ی کیفی به دویدن آسون تبدیل می‌شه
+          var actualB = longKm + qKm + remaining, hardB = Object.keys(qSessions).reduce(function (x, k) { return x + qSessions[k].hardKm; }, 0);
+          var segHard = Math.min(floor05(longSegKm), floor05(longKm * 0.4));
+          if (hardB + segHard <= actualB * 0.2 + 1e-9) break;
+          if (segHard > 0) { longSegKm = 0; if (hardB <= actualB * 0.2 + 1e-9) break; }
+          if (!qDays.length) break;
+          var qd2 = qDays.pop();
+          remaining += qSessions[qd2].km; delete qSessions[qd2];
+          easyDays.push(qd2); qKm = qSum();
         }
       }
       var sesCap = Math.max(3, floor05(Math.min(longCap * EASY_OF_LONGCAP, Math.max(longKm, 3))));
