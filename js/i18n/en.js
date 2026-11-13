@@ -579,8 +579,9 @@
       activity: { run: 'Running', runSub: 'Running plans from zero to marathon', walk: 'Walking', walkSub: 'Walking plans from easy to power walking' },
       walkExpQ: 'How long have you been walking regularly?',
       walkExp: { never: 'Not regularly', lt3m: 'Under 3 months', '3to12m': '3 to 12 months', gt1y: 'Over a year' },
-      walkMin: 'How many minutes a week do you usually walk?',
-      walkMinHint: 'Average of the last 4 weeks; purposeful walks only, not short errands. For example 3 × 20 minutes = 60.',
+      walkMin: 'How long do you usually walk each week?',
+      walkMinRead: '= {n} minutes a week',
+      walkMinHint: 'Average of the last 4 weeks; purposeful walks only, not short errands. For example 3 × 20 minutes = 1 hour (1:00).',
       walk30Q: 'Can you walk briskly for 30 minutes without stopping?',
       pbWalk: 'Walking needs no best time; your level comes from your history and weekly minutes.',
       walkStartPreview: 'The plan starts at about {n} minutes a week and grows a little each week.',
@@ -683,7 +684,7 @@
       submitNew: 'Build my plan',
       toastEdit: 'Plan updated.',
       toastNew: 'Your plan is ready!',
-      err: { firstName: 'Enter your first name (at least 2 letters).', lastName: 'Enter your last name (at least 2 letters).', walkExp: 'Tell us how long you have been walking regularly.', walkMin: 'Enter your weekly walking minutes between 0 and 2000.', walk30: 'Tell us whether you can walk 30 minutes non-stop.',
+      err: { firstName: 'Enter your first name (at least 2 letters).', lastName: 'Enter your last name (at least 2 letters).', walkExp: 'Tell us how long you have been walking regularly.', walkMin: 'Choose your weekly walking time with the timer (up to 33 hours).', walk30: 'Tell us whether you can walk 30 minutes non-stop.',
         km: 'Enter how many {uw} you currently run per week on average (a number from 0 to {max}).',
         lastWeek: 'Enter last week\'s volume (0 to {max} {u}; enter 0 if you didn\'t run).',
         monthAvg: 'Enter last month\'s average weekly volume (0 to {max} {u}).',
@@ -800,7 +801,7 @@
       pcSaved: 'Saved for the period starting {d}.',
       pcReset: 'The period starting {d} is back to your default.',
       pcDefaultSaved: 'Default for period days saved.',
-      pcEstimate: 'Dates are estimates; tapping "My period started today" on the Today page makes them more accurate.'
+      pcEstimate: 'Dates are estimates; tapping "My period started today" on the Home page makes them more accurate.'
     },
     plan: { week: 'Weekly view', month: 'Monthly view', viewAria: 'Plan view' },
     month: {
@@ -1288,6 +1289,7 @@
       min150: { t: '150 minutes a week', big: '150', short: 'WHO recommendation', desc: 'Reach the minimum recommended activity for health: 150 minutes of brisk walking a week.' },
       steps: { t: 'Daily steps', big: 'Steps', short: 'A step target every day', desc: 'Hit a set number of steps each day; read them from your phone or watch and log them.' },
       faster: { t: 'Walk faster', big: 'Pace', short: 'Speed and endurance', desc: 'More brisk sessions in your plan so you cover more ground for the same effort.' },
+      health: { t: 'Health', big: 'Health', short: 'Regular activity', desc: 'A balanced walking plan for regular activity, with no distance or speed target; weekly volume grows gradually.' },
       event: { t: 'Walking event', big: 'Event', short: 'A set distance', desc: 'Get ready for a 5 to 42 km walk; your weekly long walk grows step by step.' },
       run: { t: 'Get ready to run', big: 'Run', short: 'Next step: running', desc: 'We build your walking base so you can start running with confidence.' },
       eta: 'Estimated arrival: {a} to {b} weeks', stepsQ: 'Daily step target', eventKmQ: 'Event distance', dateQ: 'Event date (optional)',
@@ -1318,7 +1320,7 @@
     wpath: {
       none: 'Your path: no goal yet', noneSub: 'Pick a walking goal to see your path',
       weekMin: 'This week: {n} min', stepsAvg: 'Average steps, last 7 days: {n} of {t}',
-      faster: 'More brisk sessions each week', event: 'Event in {n} days ({d})', tight: 'Tight; build up gently'
+      faster: 'More brisk sessions each week', health: 'A little more each week; your walking level shows your progress', event: 'Event in {n} days ({d})', tight: 'Tight; build up gently'
     },
     stepsCard: {
       title: 'Today\'s steps', target: 'Target: {n} steps', label: 'Steps today', ph: 'e.g. 7500', save: 'Save',
@@ -1521,13 +1523,17 @@
     },
     health: {
       title: 'Pain, injury and cycle',
+      titleNC: 'Pain and injury',
       rowSub: 'Log pain, confirmed injury, gradual return',
       disclaimer: 'Gaam does not diagnose; for anything serious, see a doctor or physiotherapist.',
       privacy: 'Pain, injury and cycle data are stored only with your consent and only on this device, never sent anywhere, and can be deleted at any time.',
+      privacyNC: 'Pain and injury data are stored only with your consent and only on this device, never sent anywhere, and can be deleted at any time.',
       consentTitle: 'Consent for health data',
       consentText: 'Pain, injuries and your menstrual cycle are sensitive health data. Gaam keeps them only with your explicit consent.',
+      consentTextNC: 'Pain and injuries are sensitive health data. Gaam keeps them only with your explicit consent.',
       consentList: ['Stored only on this device, never shared, and deletable any time.'],
       consentShort: 'I agree that my health data (pain, injury and cycle) is stored only on this device',
+      consentShortNC: 'I agree that my health data (pain and injury) is stored only on this device',
       consentAsk: 'To adjust your plan to where and how much it hurts, we need your consent first. Without it, you can still just write where it hurts.',
       consentBtn: 'Continue', consentHint: 'Tick the box above to continue.',
       statusTitle: 'Current status', noIssue: 'No active pain or injury logged.',
@@ -1588,7 +1594,7 @@
         },
         evidence: ''
       },
-      wipeTitle: 'Delete health data', wipeText: 'All pain logs, injuries, cycle history and your consent are deleted. The rest of your plan and training stays.',
+      wipeTitle: 'Delete health data', wipeText: 'All pain logs, injuries, cycle history and your consent are deleted. The rest of your plan and training stays.', wipeTextNC: 'All pain logs, injuries and your consent are deleted. The rest of your plan and training stays.',
       wipeBtn: 'Delete all health data', wipeConfirm: 'Are you sure? This cannot be undone.', wipeYes: 'Yes, delete', wiped: 'Health data deleted.'
     },
     race: {
@@ -1859,7 +1865,8 @@
       cycleOn: 'Cycle adaptation is on', cycleOff: 'Cycle adaptation is off', cycleNA: 'Only for female users',
       cycleHint: 'Menstrual cycle settings become available when "female" is selected as sex in the setup form.',
       personSub: '{age} years old, level {n}',
-      dangerTitle: 'Delete all data', dangerText: 'Everything is removed from this device: profile, plan, check-ins, workouts and results, health data (pain, injury, cycle), running form reports, profile photo, the set-aside profile and settings. Gaam has no server, so no other copy remains. This can\'t be undone.',
+      dangerHc: ' (pain, injury, cycle)', dangerHcNC: ' (pain and injury)',
+      dangerTitle: 'Delete all data', dangerText: 'Everything is removed from this device: profile, plan, check-ins, workouts and results, health data{hc}, running form reports, profile photo, the set-aside profile and settings. Gaam has no server, so no other copy remains. This can\'t be undone.',
       wipeAck: 'I understand this can\'t be undone.'
     },
 
@@ -1963,7 +1970,7 @@
       loginLink: 'Already have data? Restore from a backup file'
     },
     jdate: { day: 'Day', month: 'Month', year: 'Year' },
-    tabs: { aria: 'Main sections', home: 'Today', plan: 'Plan', progress: 'Progress', learn: 'Learn', profile: 'Profile', record: 'Free run' },
+    tabs: { aria: 'Main sections', home: 'Home', plan: 'Plan', progress: 'Progress', learn: 'Learn', profile: 'Profile', record: 'Start' },
     nameCard: { title: 'Complete your name', save: 'Save', later: 'Later' },
     home: {
       greetName: '{g}, {name}',
@@ -2074,7 +2081,7 @@
       adh: {
         title: 'Plan adherence', desc: '',
         rate: 'completed', of: '{n} of {total} sessions', count: { one: '{n} session ({p}%)', other: '{n} sessions ({p}%)' }, pct: '{n}%',
-        completed: 'As planned', adapted: 'Adapted (fatigue, sleep or cycle)', pain: 'Cancelled for pain', missed: 'Not done',
+        completed: 'As planned', adapted: 'Adapted (fatigue, sleep or cycle)', adaptedNC: 'Adapted (fatigue or sleep)', pain: 'Cancelled for pain', missed: 'Not done',
         empty: 'No past sessions yet'
       }
     },

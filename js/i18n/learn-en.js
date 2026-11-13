@@ -3,10 +3,11 @@
   var d = {
     title: 'Learn',
     intro: '',
+    walkSoon: 'Learning articles about walking will be added here soon.',
     listAria: 'Articles',
     guideSub: 'Levels, the week, check-in, goals and privacy',
     readMin: '{n} min read',
-    backTo: { home: 'Back to today', progress: 'Back to progress', list: 'All articles', article: 'Previous article', plan: 'Back to plan', fitness: 'Back to fitness', checkin: 'Back to check-in', race: 'Back to race goal', guide: 'Back to guide', profile: 'Back to profile', other: 'Back' },
+    backTo: { home: 'Back to home', progress: 'Back to progress', list: 'All articles', article: 'Previous article', plan: 'Back to plan', fitness: 'Back to fitness', checkin: 'Back to check-in', race: 'Back to race goal', guide: 'Back to guide', profile: 'Back to profile', other: 'Back' },
     more: 'Learn more:',
     others: 'More articles',
     guideTag: 'How the app works',

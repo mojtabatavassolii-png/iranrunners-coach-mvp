@@ -1030,6 +1030,9 @@ body.has-tabbar .toast { bottom: calc(86px + env(safe-area-inset-bottom, 0px)); 
 .onb-step-head h2 { margin: 0 0 6px; font-size: var(--fs-xl); text-align: center; outline: none; }
 .onb-step-head .muted { margin: 0 auto; max-width: 30em; font-size: var(--fs-base); text-align: center; }
 .onb-step .sub-legend:first-child { margin-top: 0; }
+/* متن سؤال‌های فرم اولیه (همه‌ی مرحله‌ها، دویدن و پیاده‌روی): یک استایل مشترک برای سؤال‌های چندگزینه‌ای (sub-legend)،
+   گروه‌ها (legend) و برچسب فیلدها، تا اندازه و وزن یکسان باشه */
+.onb-step .sub-legend, .onb-step legend, .onb-step .field > label { font-size: var(--fs-base); font-weight: 700; line-height: 1.5; }
 .onb-sub { margin-top: 14px; }
 .onb-injury { margin-top: 18px; }
 .onb-step #level-preview { margin-top: 16px; }

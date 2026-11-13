@@ -103,6 +103,9 @@ test('چک‌لیست شروع: قدم‌ها و رفتن به چک‌این', a
   const card = page.locator('.ob-check');
   await expect(card).toBeVisible();
   await expect(card).toContainText('۳ از ۵');
+  // فقط موارد انجام‌نشده (۲ از ۵)
+  await expect(card.locator('.ob-list > li')).toHaveCount(2);
+  await expect(card.locator('.ob-list > li.is-done')).toHaveCount(0);
   await card.locator('a[href="#checkin"]').first().click();
   await expect(page).toHaveURL(/#checkin/);
   await expect(page.locator('#ci-form')).toBeVisible();
@@ -111,7 +114,10 @@ test('چک‌لیست شروع: قدم‌ها و رفتن به چک‌این', a
 // ---------- ۴. انتخاب هدف ----------
 test('انتخاب هدف: هدف اصلی در چک‌لیست و صفحه‌ی مسابقه و هدف', async ({ page }) => {
   await onboard(page, { goal: '21', goalInDays: 120 });
-  await expect(page.locator('body')).toContainText('هدف اول: نیمه‌ماراتن');
+  // مورد انجام‌شده («هدف اول: نیمه‌ماراتن») در چک‌لیست خانه دیگه نمایش داده نمی‌شه؛ فقط کارهای مونده
+  await expect(page.locator('.ob-check')).toBeVisible();
+  await expect(page.locator('.ob-check')).not.toContainText('نیمه‌ماراتن');
+  await expect(page.locator('.ob-check a[href="#race"]')).toHaveCount(0);
   await page.evaluate(() => { location.hash = '#race'; });
   await expect(page.locator('#app h1')).toBeVisible();
   await expect(page.locator('#app')).toContainText('نیمه‌ماراتن');
@@ -308,10 +314,12 @@ test('ثبت با GPS: شروع، بازگشت بعد از بستن صفحه، �
   // صفحه بسته و باز شد: ثبت متوقف‌شده برمی‌گرده
   await page.reload();
   await expect(page.locator('.rec-card .alert')).toContainText('ناتموم');
-  // در خانه یک نوار ثبت متوقف‌شده هست که به همین صفحه برمی‌گرده
+  // خانه اعلان «ثبت متوقف شده» نداره؛ نقطه‌ی قرمز دکمه‌ی وسط («شروع») به همین ثبت برمی‌گرده
   await page.evaluate(() => { location.hash = '#home'; });
-  await expect(page.locator('.rec-banner')).toContainText('ثبت متوقف شده');
-  await page.locator('.rec-banner').click();
+  await expect(page.locator('.hcard-today')).toBeVisible();
+  await expect(page.locator('.rec-banner')).toHaveCount(0);
+  await expect(page.locator('#tabbar')).toHaveClass(/is-rec-live/);
+  await page.locator('#tabbar a[data-tab="record"]').click();
   await expect(page).toHaveURL(/#record/);
   await page.locator('[data-rec="resume"]').click();
   await walk(8);

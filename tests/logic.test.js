@@ -2343,4 +2343,28 @@ test('چرخه‌ی کوتاه با یک ثبت جاافتاده (فاصله‌�
   assert.ok(C.cycleStats({ cycle: { starts: st2 } }, C.addDays(d2, 5)).flags.indexOf('variable') >= 0);
 });
 
+test('چرخه فقط برای جنسیت زن؛ مرد، «نمی‌گم» و بدون جنسیت هیچ داده‌ی چرخه‌ای نمی‌گیرن', function () {
+  var cyc = { enabled: true, lastStart: '2026-11-01', cycleLen: 28, periodLen: 5, starts: [] };
+  ['male', 'na', undefined].forEach(function (sx) {
+    var p = profileFor(4, { sex: sx, cycle: cyc });
+    assert.strictEqual(C.cycleAllowed(p), false, String(sx));
+    assert.strictEqual(C.cycleInfo(p, C.parseDate('2026-11-10')), null, String(sx));
+  });
+  var f = profileFor(4, { sex: 'female', cycle: cyc });
+  assert.ok(C.cycleAllowed(f) && C.cycleInfo(f, C.parseDate('2026-11-10')));
+});
+test('هدف پیاده‌روی «سلامتی»: در فرم اولیه به‌جای «رویداد»؛ برنامه مثل بدون هدف خاص', function () {
+  assert.ok(C.WALK_GOALS_ONB.indexOf('health') >= 0 && C.WALK_GOALS_ONB.indexOf('event') < 0);
+  assert.ok(C.WALK_GOALS.indexOf('health') >= 0 && C.WALK_GOALS.indexOf('event') >= 0, 'رویداد هنوز در صفحه‌ی هدف');
+  var base = { activity: 'walk', age: 55, walkExp: '3to12m', walkMin: 90, walk30: 'yes', days: [0, 2, 4, 6], startDate: '2026-11-14' };
+  var h = Object.assign({}, base, { walkGoal: { kind: 'health' } }), n = Object.assign({}, base);
+  assert.strictEqual(C.walkGoalInfo(h).kind, 'health');
+  for (var w = 0; w < 6; w++) {
+    var d = C.addDays(C.parseDate('2026-11-14'), 7 * w);
+    assert.deepStrictEqual(C.buildWalkWeek(h, d).days.map(function (x) { return x.type + x.minutes; }), C.buildWalkWeek(n, d).days.map(function (x) { return x.type + x.minutes; }));
+  }
+  var gp = C.walkPath(h, C.parseDate('2026-11-20'));
+  assert.ok(!gp.none && gp.status === undefined);
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

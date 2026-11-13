@@ -760,7 +760,7 @@
     var s = rec.free ? null : recSession(rec.key), st = rec.st, now = Date.now(), u = T('units.word.' + I.getUnits());
     var target = !s ? '' : s.km ? t(s.target) : (s.minutes ? tt('home.minutes', { n: s.minutes }) : '');
     var html = '<section class="card rec-card"><p class="eyebrow">' + esc(T('rec.title')) + '</p>' +
-      '<h1 class="rec-head">' + (s ? badge(s.type, s.label) : esc(T('free.title'))) + (target ? ' <span class="rec-target">' + target + '</span>' : '') + '</h1>';
+      '<h1 class="rec-head">' + (s ? badge(s.type, s.label) : esc(T('tabs.record'))) + (target ? ' <span class="rec-target">' + target + '</span>' : '') + '</h1>';
     if (!P.gps.supported()) {
       app.innerHTML = html + '<p class="form-errors" role="alert">' + esc(T('rec.unavailable')) + '</p></section>';
       return;
@@ -1127,10 +1127,12 @@
     return '<a class="btn ' + (cls || 'btn-primary') + ' btn-block rec-entry" href="#record">' + esc(T(recLive() ? 'rec.continue' : 'rec.entry')) + '</a>';
   }
   // ثبت در حال انجام: یک نوار در خانه
+  // نوار «در حال ثبت» روی خانه. ثبتِ متوقف‌شده روی خانه اعلان نداره؛ نقطه‌ی قرمز دکمه‌ی «شروع» و
+  // «ادامه‌ی ثبت با GPS» در کارت امروز به همون ثبت برمی‌گردن، و پیامش در صفحه‌ی ثبت می‌مونه.
   function recBanner() {
-    if (!recLive()) return '';
+    if (!recLive() || rec.status !== 'run') return '';
     var st = rec.st, now = Date.now();
-    return '<a class="card rec-banner" href="#record"><span class="rec-dot" aria-hidden="true"></span><span><b>' + esc(T(rec.status === 'run' ? 'rec.liveRun' : 'rec.livePause')) + '</b> ' +
+    return '<a class="card rec-banner" href="#record"><span class="rec-dot" aria-hidden="true"></span><span><b>' + esc(T('rec.liveRun')) + '</b> ' +
       fa(dKm(Math.floor(st.dist / 10) / 100).toFixed(2)) + ' ' + esc(T('units.word.' + I.getUnits())) + T('progress.sep') + recClock(K.elapsed(st, now) / 1000) + '</span></a>';
   }
 
@@ -1751,7 +1753,7 @@
         '<input type="file" id="avatar-file" accept="image/*" class="sr-only">' +
         '<button type="button" class="linklike small" data-avatar-remove="1"' + (getAvatar() ? '' : ' hidden') + '>' + esc(T('profile.photoRemove')) + '</button></div>' +
         '</div></div>' +
-        '<p class="sub-legend">' + esc(T('cycle.sexQ')) + ' ' + learnQ('cycle') + '</p><div class="chips">' +
+        '<p class="sub-legend">' + esc(T('cycle.sexQ')) + '</p><div class="chips">' +
         ['female', 'male', 'na'].map(function (k) { return chip('sex', k, T('cycle.sex.' + k), p.sex === k, 'radio'); }).join('') + '</div>' +
         '<small class="muted">' + esc(T('cycle.sexHint')) + '</small>') +
 
@@ -1762,7 +1764,7 @@
         '<div class="field"><label for="height">' + esc(T('onb.height')) + req + '</label><input id="height" name="heightCm" type="number" inputmode="numeric" min="120" max="230" required value="' + esc(p.heightCm || '') + '"></div>' +
         '<div class="field"><label for="weight">' + esc(T('onb.weight')) + req + '</label><input id="weight" name="weightKg" type="number" inputmode="decimal" min="30" max="250" required value="' + esc(p.weightKg || '') + '"></div>' +
         '</div>' +
-        '<fieldset id="cycle-fieldset" class="onb-sub" hidden><legend>' + esc(T('cycle.title')) + '</legend>' +
+        '<fieldset id="cycle-fieldset" class="onb-sub" hidden><legend>' + esc(T('cycle.title')) + ' ' + learnQ('cycle') + '</legend>' +
         '<p class="small">' + esc(T('cycle.intro')) + '</p>' +
         '<label class="check-row"><input type="checkbox" id="cyon" name="cycleOn"' + (cyc.enabled ? ' checked' : '') + '> <span>' + esc(T('cycle.enable')) + '</span></label>' +
         '<div id="cycle-fields" hidden>' +
@@ -1786,8 +1788,10 @@
         '<div id="walk-fields3" hidden>' +
         '<p class="sub-legend">' + esc(T('onb.walkExpQ')) + req + '</p><div class="chips">' +
         ['never', 'lt3m', '3to12m', 'gt1y'].map(function (k) { return chip('walkExp', k, T('onb.walkExp.' + k), p.walkExp === k, 'radio'); }).join('') + '</div>' +
-        '<div class="field" id="walkmin-field"><label for="walkmin">' + esc(T('onb.walkMin')) + req + '</label>' +
-        '<input id="walkmin" name="walkMin" type="number" inputmode="numeric" min="0" max="2000" step="5" value="' + esc(p.walkMin != null ? p.walkMin : '') + '">' +
+        // میزان پیاده‌روی هفتگی با تایمر (ساعت و دقیقه)؛ مقدار به دقیقه ذخیره و برای سطح استفاده می‌شه (مثل قبل)
+        '<div class="field" id="walkmin-field"><label for="walkmin-btn">' + esc(T('onb.walkMin')) + req + '</label>' +
+        tpo({ id: 'walkmin', name: 'walkMin', mode: 'hm', sec: (p.walkMin || 0) * 60, touched: p.walkMin != null, maxH: 33, aria: T('onb.walkMin') }) +
+        '<small class="muted" id="walkmin-read">' + (p.walkMin != null ? esc(fa(T('onb.walkMinRead', { n: p.walkMin }))) : '') + '</small>' +
         '<small class="muted">' + esc(T('onb.walkMinHint')) + '</small></div>' +
         '<div id="walk30-block"><p class="sub-legend">' + esc(T('onb.walk30Q')) + req + '</p><div class="chips">' +
         chip('walk30', 'yes', T('app.yes'), p.walk30 === 'yes', 'radio') + chip('walk30', 'no', T('app.no'), p.walk30 === 'no', 'radio') + '</div></div>' +
@@ -1859,7 +1863,8 @@
         '<div class="field"><label for="sdate">' + esc(T('onb.startDate')) + '</label><input id="sdate" name="startDate" type="date" min="' + (editing && p.startDate && p.startDate < todayKey ? p.startDate : todayKey) + '" max="' + C.dateKey(C.addDays(today(), START_MAX_DAYS)) + '" value="' + esc(p.startDate || todayKey) + '">' +
         '<small class="muted" id="sdate-fa"></small><small class="muted">' + esc(T('onb.startDateHint')) + '</small></div>' +
         '<div id="walk-goal5" hidden><p class="sub-legend">' + esc(T('wgoal.onbQ')) + '</p><div class="chips chips-stack">' +
-        ['none'].concat(C.WALK_GOALS).map(function (k) { return chip('walkGoal', k, k === 'none' ? T('wgoal.later') : walkGoalTitle(k), ((p.walkGoal && p.walkGoal.kind) || 'none') === k, 'radio'); }).join('') + '</div>' +
+        // گزینه‌های فرم اولیه؛ کسی که الان هدف «رویداد» داره، همون گزینه رو هم می‌بینه تا با ویرایش فرم پاک نشه
+        ['none'].concat(C.WALK_GOALS_ONB, p.walkGoal && p.walkGoal.kind === 'event' ? ['event'] : []).map(function (k) { return chip('walkGoal', k, k === 'none' ? T('wgoal.later') : walkGoalTitle(k), ((p.walkGoal && p.walkGoal.kind) || 'none') === k, 'radio'); }).join('') + '</div>' +
         '<small class="muted">' + esc(T('wgoal.onbHint')) + '</small></div>' +
         '<div id="run-goal5"><div class="field"><label for="gtype">' + esc(T('onb.goalType')) + '</label><select id="gtype" name="goalType">' +
         // ترتیب صریح (کلیدهای عددی در Object.keys جلو می‌افتن)
@@ -1938,13 +1943,17 @@
       form.gapIdx.setAttribute('aria-valuetext', fa(gl));
     }
     function isWalkForm() { var e = form.querySelector('input[name=activity]:checked'); return !!e && e.value === 'walk'; }
+    // سقف تایمر پیاده‌روی هفتگی: ۳۳:۵۹
+    var WALK_MIN_MAX = 33 * 60 + 59;
     // پیاده‌روی: سابقه، دقیقه‌ی هفتگی، توان ۳۰ دقیقه‌ی پیوسته (بی‌سابقه = «نه»)
     function readWalk() {
       var ex = form.querySelector('input[name=walkExp]:checked'), w3 = form.querySelector('input[name=walk30]:checked');
-      var raw = String(form.walkMin.value || '').trim(), m = raw === '' ? null : Number(raw);
+      // تایمر: «h:mm» → دقیقه
+      var raw = String(form.walkMin.value || '').trim(), hm = raw.split(':').map(Number);
+      var m = raw === '' || hm.some(isNaN) ? null : (hm.length === 2 ? hm[0] * 60 + hm[1] : hm[0]);
       var never = !!ex && ex.value === 'never';
       return { exp: ex ? ex.value : null, min: never ? 0 : m, w30: never ? 'no' : (w3 ? w3.value : null), never: never,
-        ok: !!ex && (never || (m !== null && m >= 0 && m <= 2000 && !!w3)) };
+        ok: !!ex && (never || (m !== null && m >= 0 && m <= WALK_MIN_MAX && !!w3)) };
     }
     // حجم: هفته‌ی اخیر و میانگین ماه؛ اگه افت شدید باشه، دلیلش لازمه
     function readVolume() {
@@ -1989,6 +1998,7 @@
       document.getElementById('walk-goal5').hidden = !walk;
       var wk = readWalk();
       document.getElementById('walkmin-field').hidden = wk.never;
+      document.getElementById('walkmin-read').textContent = wk.min != null && !wk.never ? fa(T('onb.walkMinRead', { n: wk.min })) : '';
       document.getElementById('walk30-block').hidden = wk.never;
       if (!editing) document.getElementById('onb-kicker').textContent = T(walk ? 'onb.titleNewWalk' : 'onb.titleNew');
       // عنوان مرحله‌های ۳ و ۴ با نوع ورزش
@@ -2172,7 +2182,7 @@
       if (walkAct) {
         // پیاده‌روی: سابقه، دقیقه‌ی هفتگی و توان ۳۰ دقیقه
         if (!walkIn.exp) E(3, T('onb.err.walkExp'));
-        else if (!walkIn.never && !(walkIn.min !== null && walkIn.min >= 0 && walkIn.min <= 2000)) E(3, T('onb.err.walkMin'));
+        else if (!walkIn.never && !(walkIn.min !== null && walkIn.min >= 0 && walkIn.min <= WALK_MIN_MAX)) E(3, T('onb.err.walkMin'));
         else if (!walkIn.never && !walkIn.w30) E(3, T('onb.err.walk30'));
         never = true;
       } else
@@ -3101,7 +3111,7 @@
     if (!state.healthConsent) {
       return '<div class="pain-fields" id="' + px + '-pain">' +
         '<div class="pain-consent-box"><p class="small">' + esc(T('health.consentAsk')) + '</p>' +
-        '<label class="check-row pain-consent"><input type="checkbox" name="healthConsent" data-pain-consent="1"> <span>' + esc(T('health.consentShort')) + '</span></label></div>' +
+        '<label class="check-row pain-consent"><input type="checkbox" name="healthConsent" data-pain-consent="1"> <span>' + esc(hT('consentShort')) + '</span></label></div>' +
         where + '<div class="pain-details" hidden>' + area + painDetailRest(chips, e) + '</div></div>';
     }
     return '<div class="pain-fields" id="' + px + '-pain">' + area + where + painDetailRest(chips, e) + '</div>';
@@ -3150,12 +3160,12 @@
   var healthOpen = { pain: false, injury: false, wipe: false };
   function renderHealth() {
     var p = state.profile, now = today(), key = C.dateKey(now);
-    var html = '<header class="page-head"><h1>' + esc(T('health.title')) + '</h1></header>' +
+    var html = '<header class="page-head"><h1>' + esc(hT('title')) + '</h1></header>' +
       '<p class="alert alert-note health-disc" role="note">' + esc(T('health.disclaimer')) + '</p>';
     if (!state.healthConsent) {
-      html += '<section class="card health-consent"><h2>' + esc(T('health.consentTitle')) + '</h2><p>' + esc(T('health.consentText')) + '</p>' +
+      html += '<section class="card health-consent"><h2>' + esc(T('health.consentTitle')) + '</h2><p>' + esc(hT('consentText')) + '</p>' +
         '<ul class="small">' + T('health.consentList').map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' +
-        '<label class="check-row"><input type="checkbox" id="hc-ok"> <span>' + esc(T('health.consentShort')) + '</span></label>' +
+        '<label class="check-row"><input type="checkbox" id="hc-ok"> <span>' + esc(hT('consentShort')) + '</span></label>' +
         '<button type="button" class="btn btn-primary" data-health-consent="1" disabled aria-describedby="hc-hint">' + esc(T('health.consentBtn')) + '</button>' +
         '<p class="small muted" id="hc-hint">' + esc(T('health.consentHint')) + '</p></section>';
       app.innerHTML = html;
@@ -3186,9 +3196,9 @@
     // آسیب تأییدشده
     html += injuryCard(p, now);
     // چرخه
-    if (p.sex === 'female') html += cycleHealthCard(p, now);
+    if (C.cycleAllowed(p)) html += cycleHealthCard(p, now);
     // حذف داده‌ها
-    html += '<section class="card danger-zone"><b>' + esc(T('health.wipeTitle')) + '</b><p class="small">' + esc(T('health.wipeText')) + '</p>' +
+    html += '<section class="card danger-zone"><b>' + esc(T('health.wipeTitle')) + '</b><p class="small">' + esc(hT('wipeText')) + '</p>' +
       (healthOpen.wipe ? '<div class="alert confirm-box confirm-danger" role="alertdialog"><p>' + esc(T('health.wipeConfirm')) + '</p><div class="actions">' +
         '<button type="button" class="btn btn-danger-outline" data-health-wipe="yes">' + esc(T('health.wipeYes')) + '</button><button type="button" class="btn btn-ghost" data-health-wipe="no">' + esc(T('app.cancel')) + '</button></div></div>'
         : '<button type="button" class="btn btn-danger-outline" data-health-wipe="ask">' + esc(T('health.wipeBtn')) + '</button>') + '</section>';
@@ -3238,6 +3248,8 @@
       '<a class="btn btn-outline" href="#race">' + esc(T('health.impact.opt.new')) + '</a></div>';
     return html + '</section>';
   }
+  // متن‌های عمومی صفحه‌ی سلامت: برای کسی که چرخه براش نمایش داده نمی‌شه، نسخه‌ی بدون چرخه (کلید ...NC)
+  function hT(k) { return T('health.' + k + (C.cycleAllowed(state.profile) ? '' : 'NC')); }
   function cycleHealthCard(p, now) {
     var c = p.cycle || {};
     var html = '<section class="card"><h2>' + esc(T('health.cyc.title')) + '</h2>';
@@ -3667,7 +3679,7 @@
   function racePainNote(now) {
     var ep = C.painEpisode(state.pains, state.checkins, now), race = C.raceInfo(state.profile);
     if (!ep || !race || race.date < now || ['moderate', 'severe'].indexOf(ep.tier) < 0 || ep.days < 7 || C.injuryPhase(state.profile, now)) return '';
-    return '<section class="card alert-adapt impact-card"><p>' + esc(fa(T('health.painGoal', { n: ep.days }))) + '</p><a class="btn btn-outline" href="#health">' + esc(T('health.title')) + '</a></section>';
+    return '<section class="card alert-adapt impact-card"><p>' + esc(fa(T('health.painGoal', { n: ep.days }))) + '</p><a class="btn btn-outline" href="#health">' + esc(hT('title')) + '</a></section>';
   }
   var raceAddOpen = false, raceDraft = null;
   function goalList(p) {
@@ -4774,7 +4786,6 @@
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
       '<h1>' + esc(p && p.name ? T('home.greetName', { g: T(greetKey()), name: p.name }) : T(greetKey())) + '</h1></header>' + nameCard() + recBanner() + gapRaceCard() + adviceCards() + homeToday(base, r.session, ci, key, r) + weekBar() + freeButton() + homeChecklist(now);
     app.innerHTML = '<div class="home">' + html + '</div>';
-    collapseChecklist();
   }
   // کاربرهای قبلی بدون نام یا نام خانوادگی: یک بار و بی‌مزاحمت (با «بعداً» دیگه نشون داده نمی‌شه؛ از پروفایل هم می‌شه کاملش کرد)
   function nameCard() {
@@ -5007,9 +5018,9 @@
       var avg = got.length ? Math.round(got.reduce(function (x, d) { return x + d.steps; }, 0) / got.length) : 0;
       gp.frac = Math.min(1, avg / gp.goal.steps);
       lines.push(T('wpath.stepsAvg', { n: fa(avg.toLocaleString('en-US')), t: fa(gp.goal.steps.toLocaleString('en-US')) }));
-    } else if (gp.goal.kind === 'faster') {
+    } else if (gp.goal.kind === 'faster' || gp.goal.kind === 'health') {
       gp.frac = Math.min(1, (gp.level - 1) / 9);
-      lines.push(T('wpath.faster'));
+      lines.push(T('wpath.' + gp.goal.kind));
     } else {
       if (gp.daysLeft != null) lines.push(T('wpath.event', { n: gp.daysLeft, d: faDate(gp.goal.date) }));
       lines.push(walkEta(gp));
@@ -5234,36 +5245,20 @@
     var close = '<button type="button" class="ob-close" data-ob-close="1" aria-label="' + esc(T('start.close')) + '"><span aria-hidden="true">×</span></button>';
     var head = '<div class="hcard-top"><span class="hcard-label">' + esc(T('start.title')) + '</span><span class="ob-count">' + tt('start.count', { a: n, b: steps.length }) + '</span>' + close + '</div>' +
       '<div class="ob-bar" aria-hidden="true"><i style="width:' + Math.round(n / steps.length * 100) + '%"></i></div>';
+    // همه انجام شد: کل بخش از خانه حذف می‌شه (بدون کارت «همه انجام شد»)
     if (n === steps.length) {
-      // فقط همون باری که آخرین مورد کامل شد دیده می‌شه، بعد خودش جمع می‌شه (collapseChecklist) و دیگه برنمی‌گرده
-      if (c.completedAt) return '';
-      c.completedAt = key; save();
-      return '<section class="card hcard ob-check ob-complete" aria-live="polite">' + head +
-        '<div class="ob-done"><span class="ob-tick" aria-hidden="true">✓</span><span><b>' + esc(T('start.allDone')) + '</b><small>' + esc(T('start.allDoneSub')) + '</small></span></div></section>';
+      if (!c.completedAt) { c.completedAt = key; save(); }
+      return '';
     }
-    var next = steps.filter(function (x) { return !x.done; })[0];
-    return '<section class="card hcard ob-check" aria-label="' + esc(T('start.title')) + '">' + head + '<ul class="ob-list">' + steps.map(function (x) {
+    // فقط موارد انجام‌نشده؛ هر مورد بعد از انجام شدن دیگه دیده نمی‌شه
+    var todo = steps.filter(function (x) { return !x.done; }), next = todo[0];
+    return '<section class="card hcard ob-check" aria-label="' + esc(T('start.title')) + '">' + head + '<ul class="ob-list">' + todo.map(function (x) {
       var cls = (x.done ? 'is-done' : '') + (x === next ? ' ob-next' : ''), inner = '<span class="ob-tick" aria-hidden="true">' + (x.done ? '✓' : '') + '</span>' +
         '<span class="ob-txt"><b>' + t(x.title) + '</b>' + (x.sub ? '<small>' + t(x.sub) + '</small>' : '') + '</span>';
       var sr = '<span class="sr-only">' + esc(T(x.done ? 'start.srDone' : 'start.srTodo')) + '</span>';
       return '<li class="' + cls.trim() + '">' + (x.done || !x.href ? '<div class="ob-row">' + inner + sr + '</div>'
         : '<a class="ob-row" href="' + x.href + '"' + (x.attr || '') + '>' + inner + sr + chevron(isRtl() ? 'left' : 'right') + '</a>') + '</li>';
     }).join('') + '</ul></section>';
-  }
-  // کارت «همه انجام شد»: حدود ۳ ثانیه دیده می‌شه، بعد آروم جمع و محو می‌شه (با «کاهش حرکت»: بدون انیمیشن حذف می‌شه)
-  function collapseChecklist() {
-    var card = app.querySelector('.ob-complete');
-    if (!card) return;
-    setTimeout(function () {
-      if (!card.isConnected) return;
-      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { card.remove(); return; }
-      card.style.maxHeight = card.offsetHeight + 'px';
-      void card.offsetHeight;
-      card.classList.add('ob-collapse');
-      var gone = function () { if (card.parentNode) card.remove(); };
-      card.addEventListener('transitionend', function (ev) { if (ev.propertyName === 'max-height') gone(); });
-      setTimeout(gone, 900);
-    }, 3000);
   }
   app.addEventListener('click', function (e) {
     var b = e.target.closest('[data-ob-close]');
@@ -5387,6 +5382,7 @@
   // محور y بدون عدد، وقتی هنوز هیچ مقداری نیست
   var BLANK_Y = { min: 0, max: 1, ticks: [0, 0.5, 1], fmt: function () { return ''; } };
 
+  function adhKey(k) { return k === 'adapted' && !C.cycleAllowed(state.profile) ? 'adaptedNC' : k; }
   function renderProgress() {
     var SEP = T('progress.sep');
     var rk = RANGES.hasOwnProperty(settings.progressRange) ? settings.progressRange : '3m';
@@ -5854,12 +5850,12 @@
       var pct = function (n) { return Math.round(n / A.planned * 100); };
       var doneN = A.completed + A.adapted;
       body = '<div class="adh-hero"><b dir="ltr">' + tt('progress.adh.pct', { n: pct(doneN) }) + '</b><span>' + esc(T('progress.adh.rate')) + SEP + tt('progress.adh.of', { n: doneN, total: A.planned }) + '</span></div>' +
-        '<div class="adh-bar" role="img" aria-label="' + esc(keys.map(function (k) { return T('progress.adh.' + k) + ' ' + pct(A[k]) + '%'; }).join('، ')) + '">' +
+        '<div class="adh-bar" role="img" aria-label="' + esc(keys.map(function (k) { return T('progress.adh.' + adhKey(k)) + ' ' + pct(A[k]) + '%'; }).join('، ')) + '">' +
         keys.filter(function (k) { return A[k]; }).map(function (k) {
-          return '<i title="' + esc(T('progress.adh.' + k)) + '" style="flex:' + A[k] + ';background:' + STATUS[k] + '"></i>';
+          return '<i title="' + esc(T('progress.adh.' + adhKey(k))) + '" style="flex:' + A[k] + ';background:' + STATUS[k] + '"></i>';
         }).join('') + '</div>' +
         '<ul class="adh-legend">' + keys.map(function (k) {
-          return '<li><i class="ch-key ch-key-bar" style="background:' + STATUS[k] + '"></i><span>' + esc(T('progress.adh.' + k)) + '</span><b>' + tt('progress.adh.count', { n: A[k], p: pct(A[k]) }) + '</b></li>';
+          return '<li><i class="ch-key ch-key-bar" style="background:' + STATUS[k] + '"></i><span>' + esc(T('progress.adh.' + adhKey(k))) + '</span><b>' + tt('progress.adh.count', { n: A[k], p: pct(A[k]) }) + '</b></li>';
         }).join('') + '</ul>';
     }
     return progCard('adh', T('progress.adh.title'), T('progress.adh.desc'), body);
@@ -5927,6 +5923,16 @@
     ['train', ['eighty', 'types', 'fartleks', 'warmup', 'g:week', 'g:sessions', 'g:places']], ['injury', ['tenpct', 'freeruns', 'g:checkin']],
     ['goals', ['goals', 'g:goals']], ['progress', ['progress']], ['cycle', ['cycle', 'g:cycle']], ['data', ['g:data']]
   ];
+  // کدوم مطلب برای این کاربر دیده می‌شه (k: شناسه‌ی مقاله یا «g:» + بخش راهنما):
+  // مسیر پیاده‌روی: فقط مطالب پیاده‌روی و مطالب عمومی غیرِدویدنی (WALK_LEARN)؛ مطالب دویدن فقط برای مسیر دویدن.
+  // چرخه‌ی قاعدگی: فقط وقتی جنسیت زن انتخاب شده (C.cycleAllowed)
+  var WALK_LEARN = ['g:data'];
+  function learnVisible(k) {
+    var p = state.profile;
+    if ((k === 'cycle' || k === 'g:cycle') && !C.cycleAllowed(p)) return false;
+    if (p && C.isWalk(p)) return WALK_LEARN.indexOf(k) >= 0;
+    return true;
+  }
   // «؟» کنار موارد پیچیده: مطلب آموزش همون‌جا در یک پنجره باز می‌شه (فرم یا صفحه‌ی فعلی از دست نمی‌ره)
   function learnQ(id) {
     var l = T('app.helpAbout', { t: learnTitle(id) });
@@ -5980,11 +5986,12 @@
     if (s && s.depth > 0) { e.preventDefault(); history.back(); }
   });
   function renderLearn(id) {
-    if (id && LEARN_ORDER.indexOf(id) < 0) id = null;
+    if (id && (LEARN_ORDER.indexOf(id) < 0 || !learnVisible(id))) id = null;
     var html;
     if (!id) {
-      html = '<header class="page-head"><h1>' + esc(T('learn.title')) + '</h1></header>' +
-        LEARN_GROUPS.map(function (g) {
+      var walkNote = state.profile && C.isWalk(state.profile) ? '<p class="page-intro">' + esc(T('learn.walkSoon')) + '</p>' : '';
+      html = '<header class="page-head"><h1>' + esc(T('learn.title')) + '</h1></header>' + walkNote +
+        LEARN_GROUPS.map(function (g) { return [g[0], g[1].filter(learnVisible)]; }).filter(function (g) { return g[1].length; }).map(function (g) {
           return '<section class="learn-group"><h2 class="learn-gh">' + esc(T('learn.groups.' + g[0])) + '</h2><ul class="learn-list">' + g[1].map(function (k) {
             if (k.indexOf('g:') === 0) {
               var gid = k.slice(2);
@@ -5998,7 +6005,7 @@
         }).join('');
     } else {
       var a = T('learn.articles.' + id);
-      var others = LEARN_ORDER.filter(function (k) { return k !== id; });
+      var others = LEARN_ORDER.filter(function (k) { return k !== id && learnVisible(k); });
       html = '<article class="card learn-article"><p>' + learnBack() + '</p>' +
         '<h1>' + esc(a.title) + '</h1><p class="small muted">' + tt('learn.readMin', { n: readMinutes(a.body) }) + '</p>' +
         '<p class="lead">' + esc(a.summary) + '</p><div class="learn-body">' + a.body + '</div></article>' +
@@ -6037,7 +6044,7 @@
   }
 
   function renderGuide() {
-    var secs = guideSections();
+    var secs = guideSections().filter(function (s) { return learnVisible('g:' + s[0]); });
     var html = '<section class="card"><h1>' + esc(T('guide.title')) + '</h1><nav class="guide-toc" aria-label="' + esc(T('guide.tocAria')) + '"><ol>' +
       secs.map(function (s) { return '<li><a href="#guide" data-guide="' + s[0] + '">' + esc(s[1]) + '</a></li>'; }).join('') +
       '</ol></nav></section>' +
@@ -6227,7 +6234,7 @@
   // نوع تقویم و روز شروع هفته؛ مستقل از زبان، ذخیره روی دستگاه
   function cycleSettings() {
     var p = state.profile;
-    if (!p || p.sex !== 'female') return '';
+    if (!C.cycleAllowed(p)) return '';
     var c = p.cycle || {};
     return '<label class="check-row"><input type="checkbox" id="set-cycle"' + (c.enabled ? ' checked' : '') + (c.lastStart ? '' : ' disabled') + '> <span>' + esc(T('cycle.settingsEnabled')) + '</span></label>' +
       '<label class="check-row"><input type="checkbox" id="set-cymark"' + (settings.cycleMarkers !== false ? ' checked' : '') + (c.enabled ? '' : ' disabled') + '> <span>' + esc(T('cycle.settingsMarkers')) + '</span></label>' +
@@ -6365,7 +6372,7 @@
         ['#settings', 'bell', T('remind.title'), remindSub(), 'remind']] : [
         weekBar(true) ? ['#plan', 'plans', T('wbar.title'), weekBar(true)] : null,
         ['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgress')],
-        ['#health', 'health', T('health.title'), healthRowSub()],
+        ['#health', 'health', hT('title'), healthRowSub()],
         ['#race', 'flag', T('race.pageTitle'), g.type !== 'none' ? C.goalLabel(g) + (race && race.date >= now ? T('progress.sep') + T('profile.goalIn', { n: Math.round(C.daysBetween(now, race.date)) }) : '') : T('profile.goalSetShort')],
         ['#plans', 'plans', T('plans.title'), T('plans.linkSub')],
         ['#fitness', 'watch', T('profile.linkFitness'), fit ? 'VDOT ' + fit.vdot.toFixed(1) + (fitAdj ? T('progress.sep') + T('profile.fitnessAdjusted') : '') : T('profile.registerTest')],
@@ -6374,7 +6381,7 @@
       listGroup(T('profile.groups.prefs'), [
         ['#settings', 'lang', T('settingsPage.lang'), (I.getLang() === 'fa' ? 'فارسی' : 'English') + T('progress.sep') + T('units.' + I.getUnits()), 'lang'],
         ['#settings', 'cal', T('settingsPage.cal'), T('settings.' + I.getCalendar()), 'cal'],
-        ['#settings', 'health', T('settingsPage.health'), T(p.sex === 'female' ? ((p.cycle || {}).enabled ? 'settingsPage.cycleOn' : 'settingsPage.cycleOff') : 'settingsPage.cycleNA'), 'health'],
+        C.cycleAllowed(p) ? ['#settings', 'health', T('settingsPage.health'), T((p.cycle || {}).enabled ? 'settingsPage.cycleOn' : 'settingsPage.cycleOff'), 'health'] : null,
         ['#settings', 'person', T('settingsPage.person'), T('settingsPage.personSub', { age: p.age, n: lv.level }), 'person'],
         // اپ نیتیو نصب لازم نداره
         P.isNative ? null : ['#settings', 'install', T('install.title'), T('install.short.' + installMode()), 'install'],
@@ -6542,14 +6549,13 @@
         '<div class="field"><label for="set-ws">' + esc(T('settings.weekStart')) + '</label>' +
         sel('set-ws', 'weekStart', settings.weekStart, [['auto', T('settings.auto')], ['sat', D[0]], ['sun', D[1]], ['mon', D[2]]]) + '</div></div>' +
         '<p class="small muted">' + esc(T('settings.note')) + '</p>') +
-      // ۳. سلامت و چرخه
-      setSection('health', 'health', T('settingsPage.health'),
-        esc(p.sex === 'female' ? T(c.enabled ? 'settingsPage.cycleOn' : 'settingsPage.cycleOff') : T('settingsPage.cycleNA')),
-        (p.sex === 'female' ? cycleSettings() +
+      // ۳. چرخه (فقط وقتی جنسیت زن انتخاب شده؛ C.cycleAllowed)
+      (C.cycleAllowed(p) ? setSection('health', 'health', T('settingsPage.health'),
+        esc(T(c.enabled ? 'settingsPage.cycleOn' : 'settingsPage.cycleOff')),
+        cycleSettings() +
           (c.lastStart ? '<p class="small muted">' + tt('cycle.profileOn', { len: c.cycleLen, p: c.periodLen }) + T('progress.sep') + esc(T('profile.cycleLast', { d: faDate(c.lastStart) })) + '</p>' : '') +
-          '<a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.cycleEdit')) + '</a>'
-          : '<p class="small muted">' + esc(T('settingsPage.cycleHint')) + '</p><a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.editOnb')) + '</a>') +
-        '<p class="small muted">' + esc(T('health.privacy')) + '</p><a class="btn btn-outline" href="#health">' + esc(T('health.title')) + '</a>') +
+          '<a class="btn btn-outline" href="#onboarding" data-onb-focus="cycle">' + esc(T('profile.cycleEdit')) + '</a>' +
+        '<p class="small muted">' + esc(hT('privacy')) + '</p><a class="btn btn-outline" href="#health">' + esc(hT('title')) + '</a>') : '') +
       '</div><p class="group-label" role="heading" aria-level="2">' + esc(T('settingsPage.account')) + '</p><div class="set-list">' +
       // ۴. اطلاعات شخصی
       setSection('person', 'person', T('settingsPage.person'), tt('settingsPage.personSub', { age: p.age, n: lv.level }),
@@ -6573,7 +6579,7 @@
       row('days', esc(C.WEEK_ORDER.filter(function (d) { return p.days.indexOf(d) >= 0; }).map(function (d) { return C.DAY_NAMES[d]; }).join(T('app.listSep')))) +
       row('locs', esc(p.locations.map(function (l) { return C.LOCATION_LABELS[l]; }).join(T('app.listSep')))) +
       (p.sex ? row('sex', esc(T('cycle.sex.' + p.sex))) : '') +
-      (p.sex === 'female' ? row('cycle', p.cycle && p.cycle.enabled ? tt('cycle.profileOn', { len: p.cycle.cycleLen, p: p.cycle.periodLen }) : muted('cycle.profileOff')) : '') +
+      (C.cycleAllowed(p) ? row('cycle', p.cycle && p.cycle.enabled ? tt('cycle.profileOn', { len: p.cycle.cycleLen, p: p.cycle.periodLen }) : muted('cycle.profileOff')) : '') +
       row('injury', p.injury ? t(p.injury) : muted('profile.notRecorded')) +
       row('goal', g.type !== 'none' ? t(C.goalLabel(g)) + (g.date ? ' — ' + esc(faDate(g.date)) : ' <span class="muted small">' + esc(T('profile.noDate')) + '</span>') : muted('profile.noGoal')) +
       row('pb', p.pb ? tt('profile.pbVal', { d: distName(p.pb.distanceKm) }) + ' <span dir="ltr">' + fa(C.formatDuration(p.pb.timeSec)) + '</span>' : muted('profile.notRecorded')) +
@@ -6595,7 +6601,7 @@
         '<label class="check-row"><input type="checkbox" data-backup-ack="1"> <span>' + esc(T('backup.importAck')) + '</span></label>' +
         '<div class="actions"><button type="button" class="btn btn-primary" data-backup-apply="settings" disabled>' + esc(T('backup.importYes')) + '</button>' +
         '<button type="button" class="btn btn-ghost" data-backup-cancel="1">' + esc(T('app.cancel')) + '</button></div></div></div>' +
-        '<div class="danger-zone"><b>' + esc(T('settingsPage.dangerTitle')) + '</b><p class="small">' + esc(T('settingsPage.dangerText')) + '</p>' +
+        '<div class="danger-zone"><b>' + esc(T('settingsPage.dangerTitle')) + '</b><p class="small">' + esc(T('settingsPage.dangerText', { hc: T(C.cycleAllowed(p) ? 'settingsPage.dangerHc' : 'settingsPage.dangerHcNC') })) + '</p>' +
         '<button type="button" class="btn btn-danger-outline" id="wipe">' + esc(T('profile.wipe')) + '</button></div>' +
         '<div id="confirm-box" class="alert confirm-box confirm-danger" role="alertdialog" aria-live="polite" hidden>' +
         '<p id="confirm-text"></p>' +

@@ -1,7 +1,7 @@
 /*
  * انتخاب‌گر زمان با برگه‌ی پایین صفحه / Time picker in a bottom sheet.
  * فیلد یک دکمه است که مقدار رو نشون می‌ده؛ با لمسش برگه‌ای با «لغو / تأیید» و چرخ‌های ساعت، دقیقه و ثانیه باز می‌شه.
- * دو حالت: مدت (h:mm:ss) و ساعت روز (HH:MM). مقدار نهایی در یک input مخفی نگه داشته می‌شه تا خوندن فرم‌ها دست نخوره.
+ * سه حالت: مدت (h:mm:ss)، مدت ساعت و دقیقه (hm: h:mm، مثلاً دقیقه‌های هفتگی پیاده‌روی) و ساعت روز (HH:MM). مقدار نهایی در یک input مخفی نگه داشته می‌شه تا خوندن فرم‌ها دست نخوره.
  * هر چرخ یک اسکرول بومی با scroll-snap است تا روی موبایل مثل چرخ‌های iOS و اندروید نرم و با شتاب بچرخه.
  * تا وقتی کاربر «تأیید» نزده، مقدار خالیه (مقدار پیش‌فرض فقط نقطه‌ی شروع چرخ‌هاست).
  */
@@ -15,12 +15,12 @@
   function pad2(n) { return n < 10 ? '0' + n : String(n); }
   function fmt(v) { return v.h + ':' + pad2(v.m) + ':' + pad2(v.s); }
   // «۱:۲۵:۰۷» یا «۲۵:۰۷» برای مدت، «۱۸:۰۰» برای ساعت روز
-  function show(mode, v) { return mode === 'clock' ? pad2(v.h) + ':' + pad2(v.m) : (v.h ? fmt(v) : v.m + ':' + pad2(v.s)); }
+  function show(mode, v) { return mode === 'clock' ? pad2(v.h) + ':' + pad2(v.m) : mode === 'hm' ? v.h + ':' + pad2(v.m) : (v.h ? fmt(v) : v.m + ':' + pad2(v.s)); }
   // مقدار input مخفی → {h,m,s}
   function parse(mode, str) {
     var p = String(str || '').split(':').map(Number);
     if (!str || p.some(isNaN)) return null;
-    if (mode === 'clock') return { h: p[0] || 0, m: p[1] || 0, s: 0 };
+    if (mode === 'clock' || mode === 'hm') return { h: p[0] || 0, m: p[1] || 0, s: 0 };
     if (p.length === 2) p.unshift(0);
     return { h: p[0] || 0, m: p[1] || 0, s: p[2] || 0 };
   }
@@ -28,10 +28,12 @@
   // opts: { id, name, mode ('dur'|'clock'), sec, value, touched, maxH, title, aria, attrs, preview,
   //         labels: {h,m,s, item: {h,m,s} ('{n}h'), choose, done, cancel}, digits(fn) }
   function html(o) {
-    var mode = o.mode === 'clock' ? 'clock' : 'dur', L = o.labels || {}, dg = o.digits || digitsFn;
+    var mode = o.mode === 'clock' || o.mode === 'hm' ? o.mode : 'dur', L = o.labels || {}, dg = o.digits || digitsFn;
     var start = mode === 'clock' ? parse('clock', o.value) || { h: 7, m: 0, s: 0 } : split(o.sec);
-    var set = mode === 'clock' ? !!o.value : !!(o.touched && o.sec);
-    var val = !set ? '' : mode === 'clock' ? show('clock', start) : fmt(start);
+    if (mode === 'hm') start.s = 0;
+    // hm: صفر هم مقدار معتبره (مثلاً «۰:۰۰» دقیقه پیاده‌روی)، فقط وقتی کاربر انتخاب کرده باشه
+    var set = mode === 'clock' ? !!o.value : mode === 'hm' ? !!o.touched : !!(o.touched && o.sec);
+    var val = !set ? '' : mode === 'dur' ? fmt(start) : show(mode, start);
     var cfg = { mode: mode, maxH: mode === 'clock' ? 23 : (o.maxH || 35), title: o.title || o.aria || '', aria: o.aria || '', labels: L };
     var text = set ? dg(show(mode, start)) : (L.choose || '');
     return '<div class="tpick' + (set ? ' is-set' : '') + '" id="' + esc(o.id) + '-picker" data-start="' + esc(JSON.stringify(start)) + '" data-cfg="' + esc(JSON.stringify(cfg)) + '">' +
@@ -136,7 +138,7 @@
     if (!sheet) build();
     var c = cfgOf(pick), L = c.labels || {}, it = L.item || {};
     var v = parse(c.mode, pick.querySelector('input[type=hidden]').value) || startOf(pick);
-    var units = c.mode === 'clock' ? ['h', 'm'] : ['h', 'm', 's'], max = { h: c.maxH, m: 59, s: 59 };
+    var units = c.mode === 'clock' || c.mode === 'hm' ? ['h', 'm'] : ['h', 'm', 's'], max = { h: c.maxH, m: 59, s: 59 };
     current = pick; lastFocus = document.activeElement;
     sheet.querySelector('#tp-title').textContent = c.title;
     sheet.querySelector('[data-tp-cancel]').textContent = L.cancel || 'Cancel';
@@ -167,7 +169,7 @@
     if (ok && pick) {
       var c = cfgOf(pick), v = { h: 0, m: 0, s: 0 };
       wheels().forEach(function (w) { v[w.dataset.unit] = w._target != null ? w._target : idxOf(w); });
-      write(pick, c.mode === 'clock' ? pad2(v.h) + ':' + pad2(v.m) : (v.h || v.m || v.s) ? fmt(v) : '');
+      write(pick, c.mode === 'clock' ? pad2(v.h) + ':' + pad2(v.m) : c.mode === 'hm' ? v.h + ':' + pad2(v.m) : (v.h || v.m || v.s) ? fmt(v) : '');
     }
     sheet.classList.remove('is-open');
     sheet.hidden = true;

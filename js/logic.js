@@ -3076,10 +3076,13 @@
   }
   function cycleSettings(profile) {
     var c = profile && profile.cycle;
-    if (!c || !c.enabled || !c.lastStart || profile.sex !== 'female') return null;
+    if (!c || !c.enabled || !c.lastStart || !cycleAllowed(profile)) return null;
     var st = cycleStarts(profile), L = cycleStats(profile).length, P = clamp(Number(c.periodLen) || 5, 2, 10);
     return { start: parseDate(st[st.length - 1]), L: L, P: Math.min(P, L - 10) };
   }
+  // هر چیزی درباره‌ی چرخه‌ی قاعدگی (فرم، چک‌این، برنامه، تنظیمات، آموزش، متن‌های سلامت) فقط وقتی جنسیت «زن» انتخاب شده؛
+  // مرد یا «ترجیح می‌دم نگم» یا هنوز انتخاب‌نشده: هیچ بخشی، گزینه‌ای یا متنی از چرخه نمایش داده نمی‌شه
+  function cycleAllowed(profile) { return !!profile && profile.sex === 'female'; }
   function cycleInfo(profile, date) {
     var c = cycleSettings(profile);
     if (!c) return null;
@@ -3665,7 +3668,10 @@
   // ---------- اهداف پیاده‌روی ----------
   // min150: ۱۵۰ دقیقه در هفته (WHO)، faster: پیاده‌روی سریع‌تر، event: رویداد پیاده‌روی یا کوهپیمایی (تاریخ اختیاری)،
   // steps: قدم روزانه، run: آماده شدن برای شروع دویدن
-  var WALK_GOALS = ['min150', 'steps', 'faster', 'event', 'run'];
+  // «health» (سلامتی): برنامه‌ی متعادل بدون هدف مسافت یا سرعت؛ موتور مثل حالت بدون هدف خاص رفتار می‌کنه.
+  // فرم اولیه به‌جای «رویداد پیاده‌روی» این رو نشون می‌ده (WALK_GOALS_ONB)؛ «رویداد» از صفحه‌ی هدف پیاده‌روی در دسترسه
+  var WALK_GOALS = ['min150', 'steps', 'faster', 'health', 'event', 'run'];
+  var WALK_GOALS_ONB = ['min150', 'steps', 'faster', 'health', 'run'];
   var WALK_EVENT_KM = [5, 10, 21.1, 42.2];
   function walkGoalInfo(profile) {
     var g = profile && profile.walkGoal;
@@ -4071,7 +4077,7 @@
     persianDayIndex: persianDayIndex, dayIndex: persianDayIndex, setWeekStart: setWeekStart, getWeekStart: getWeekStart, satToRel: satToRel, parseTime: parseTime, formatDuration: formatDuration, describeDuration: describeDuration,
     otherRaces: otherRaces, sideRaceWindow: sideRaceWindow, raceDistLabel: raceDistLabel, MAX_RACES: MAX_RACES,
     PAIN_AREAS: PAIN_AREAS, PAIN_WHEN: PAIN_WHEN, PAIN_FLAGS: PAIN_FLAGS, painTier: painTier, painEpisode: painEpisode, painAdjust: painAdjust,
-    injuryPhase: injuryPhase, injuryImpact: injuryImpact, RTR: RTR, cycleStats: cycleStats, cycleStarts: cycleStarts, logPeriodStart: logPeriodStart,
+    injuryPhase: injuryPhase, injuryImpact: injuryImpact, RTR: RTR, cycleStats: cycleStats, cycleAllowed: cycleAllowed, cycleStarts: cycleStarts, logPeriodStart: logPeriodStart,
     miniTaper: miniTaper, sideCheck: sideCheck, sideBlocked: sideBlocked, keyLongRuns: keyLongRuns, SIDE_BLOCK_DAYS: SIDE_BLOCK_DAYS,
     riegel: riegel, vdotFromRace: vdotFromRace, raceTimeFromVdot: raceTimeFromVdot,
     levelFromKm: levelFromKm, levelFromVdot: levelFromVdot, assessLevel: assessLevel,
@@ -4096,7 +4102,7 @@
     ZERO_FINAL: ZERO_FINAL, zeroStage: zeroStage, volumeInfo: volumeInfo, volumeGap: volumeGap,
     ULTRA_CLASS_INFO: ULTRA_CLASS_INFO, ultraClass: ultraClass, minPrepWeeks: minPrepWeeks, paceSet: paceSet,
     planSuggestion: planSuggestion, goalPath: goalPath,
-    isWalk: isWalk, walkGoalInfo: walkGoalInfo, walkPath: walkPath, walkLevelSuggestion: walkLevelSuggestion, walkDoneShare: walkDoneShare, walkWeeksTo: walkWeeksTo, WALK_GOALS: WALK_GOALS, WALK_EVENT_KM: WALK_EVENT_KM, daySteps: daySteps, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
+    isWalk: isWalk, walkGoalInfo: walkGoalInfo, walkPath: walkPath, walkLevelSuggestion: walkLevelSuggestion, walkDoneShare: walkDoneShare, walkWeeksTo: walkWeeksTo, WALK_GOALS: WALK_GOALS, WALK_GOALS_ONB: WALK_GOALS_ONB, WALK_EVENT_KM: WALK_EVENT_KM, daySteps: daySteps, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
     effectiveSession: effectiveSession, prevCheckin: prevCheckin, dressAlt: dressAlt, cycleMoveTarget: cycleMoveTarget,
     returnInfo: returnInfo, GAP_STEPS: GAP_STEPS, gapDaysOf: gapDaysOf, gapText: gapText, detrainFactor: detrainFactor, experienceFromMonths: experienceFromMonths, HISTORY_STEPS: HISTORY_STEPS, MONTHS_FROM_EXP: MONTHS_FROM_EXP, GAP_KEYS: GAP_KEYS, XTRAIN_KEYS: XTRAIN_KEYS,
     PACE_LEVEL: PACE_LEVEL, PLAN_NEEDS: PLAN_NEEDS, vdotStepWeeks: vdotStepWeeks,
