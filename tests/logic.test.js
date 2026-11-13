@@ -845,9 +845,13 @@ test('برنامه به انگلیسی: هیچ متن فارسی در جلسه�
 test('بخش آموزش: مقاله‌های دوزبانه با ساختار و طول یکسان', function () {
   var lf = require('../js/i18n/learn-fa.js'), le = require('../js/i18n/learn-en.js');
   // هشت مقاله‌ی علمی (۳۰۰ تا ۵۰۰ کلمه) و سه مقاله‌ی راهنما (توضیح‌هایی که از صفحه‌ها به آموزش منتقل شدن)
+  // + هشت مقاله‌ی پیاده‌روی (فقط مسیر پیاده‌روی؛ هر کدوم با منبع)
   var ids = ['vdot', 'rpe', 'eighty', 'types', 'fartleks', 'tenpct', 'warmup', 'cycle'], refs = ['returning', 'goals', 'progress', 'freeruns'];
-  assert.deepStrictEqual(Object.keys(lf.articles), ids.concat(refs));
-  assert.deepStrictEqual(Object.keys(le.articles), ids.concat(refs));
+  var walk = ['walk150', 'walkIntensity', 'walkSteps', 'walkLong', 'walkProgress', 'walkGear', 'walkSafe', 'walkToRun'];
+  var order = ['returning', 'goals', 'progress'].concat(walk, ['freeruns']);
+  refs = refs.concat(walk);
+  assert.deepStrictEqual(Object.keys(lf.articles), ids.concat(order));
+  assert.deepStrictEqual(Object.keys(le.articles), ids.concat(order));
   assert.deepStrictEqual(Object.keys(lf).sort(), Object.keys(le).sort());
   function words(html) {
     return html.replace(/<p class="learn-src">[\s\S]*?<\/p>/, '').replace(/<[^>]+>/g, ' ').split(/\s+/).filter(function (w) { return /[\p{L}\p{N}]/u.test(w); }).length;

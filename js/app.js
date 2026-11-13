@@ -5916,22 +5916,26 @@
   // =====================================================================
   // آموزش: مقاله‌های کوتاه علمی (محتوا از js/i18n/learn-*.js)، هر مقاله در #learn/<شناسه>
   // =====================================================================
-  var LEARN_ORDER = ['vdot', 'rpe', 'eighty', 'types', 'fartleks', 'tenpct', 'warmup', 'cycle', 'returning', 'goals', 'progress', 'freeruns'];
+  var WALK_ARTICLES = ['walk150', 'walkSteps', 'walkIntensity', 'walkProgress', 'walkLong', 'walkGear', 'walkSafe', 'walkToRun'];
+  var LEARN_ORDER = ['vdot', 'rpe', 'eighty', 'types', 'fartleks', 'tenpct', 'warmup', 'cycle', 'returning', 'goals', 'progress', 'freeruns'].concat(WALK_ARTICLES);
   // فهرست آموزش، موضوع‌بندی‌شده: مقاله‌ها و بخش‌های راهنمای کار با برنامه (g:) کنار هم
   var LEARN_GROUPS = [
     ['start', ['g:start', 'returning', 'g:levels']], ['pace', ['vdot', 'rpe', 'g:fitness', 'g:intensity']],
     ['train', ['eighty', 'types', 'fartleks', 'warmup', 'g:week', 'g:sessions', 'g:places']], ['injury', ['tenpct', 'freeruns', 'g:checkin']],
-    ['goals', ['goals', 'g:goals']], ['progress', ['progress']], ['cycle', ['cycle', 'g:cycle']], ['data', ['g:data']]
+    ['goals', ['goals', 'g:goals']], ['progress', ['progress']], ['cycle', ['cycle', 'g:cycle']],
+    // مسیر پیاده‌روی
+    ['walkWhy', ['walk150', 'walkSteps']], ['walkHow', ['walkIntensity', 'walkProgress', 'walkLong']], ['walkCare', ['walkGear', 'walkSafe']], ['walkNext', ['walkToRun']],
+    ['data', ['g:data']]
   ];
   // کدوم مطلب برای این کاربر دیده می‌شه (k: شناسه‌ی مقاله یا «g:» + بخش راهنما):
-  // مسیر پیاده‌روی: فقط مطالب پیاده‌روی و مطالب عمومی غیرِدویدنی (WALK_LEARN)؛ مطالب دویدن فقط برای مسیر دویدن.
-  // چرخه‌ی قاعدگی: فقط وقتی جنسیت زن انتخاب شده (C.cycleAllowed)
-  var WALK_LEARN = ['g:data'];
+  // مسیر پیاده‌روی: فقط مطالب پیاده‌روی و مطالب عمومی غیرِدویدنی (WALK_LEARN)؛ مطالب دویدن فقط برای مسیر دویدن،
+  // و مطالب پیاده‌روی فقط برای مسیر پیاده‌روی. چرخه‌ی قاعدگی: فقط وقتی جنسیت زن انتخاب شده (C.cycleAllowed)
+  var WALK_LEARN = WALK_ARTICLES.concat(['g:data']);
   function learnVisible(k) {
     var p = state.profile;
     if ((k === 'cycle' || k === 'g:cycle') && !C.cycleAllowed(p)) return false;
     if (p && C.isWalk(p)) return WALK_LEARN.indexOf(k) >= 0;
-    return true;
+    return WALK_ARTICLES.indexOf(k) < 0;
   }
   // «؟» کنار موارد پیچیده: مطلب آموزش همون‌جا در یک پنجره باز می‌شه (فرم یا صفحه‌ی فعلی از دست نمی‌ره)
   function learnQ(id) {
@@ -5955,7 +5959,9 @@
   var SESSION_LEARN = {
     easy: ['eighty', 'rpe'], long: ['eighty', 'rpe'], runwalk: ['tenpct', 'rpe'], walkrun: ['tenpct', 'rpe'],
     tempo: ['types', 'vdot', 'warmup'], interval: ['types', 'vdot', 'warmup'], reps: ['types', 'vdot', 'warmup'],
-    fartlek: ['fartleks', 'types', 'warmup'], hills: ['types', 'warmup'], race: ['vdot', 'warmup']
+    fartlek: ['fartleks', 'types', 'warmup'], hills: ['types', 'warmup'], race: ['vdot', 'warmup'],
+    walkEasy: ['walkIntensity', 'walk150'], walkBrisk: ['walkIntensity', 'walkGear'], walkPower: ['walkIntensity', 'walkGear'],
+    walkLong: ['walkLong', 'walkGear'], walkEvent: ['walkLong']
   };
   function learnTitle(id) { return T('learn.articles.' + id + '.title'); }
   function learnMore(ids) {
@@ -5989,8 +5995,7 @@
     if (id && (LEARN_ORDER.indexOf(id) < 0 || !learnVisible(id))) id = null;
     var html;
     if (!id) {
-      var walkNote = state.profile && C.isWalk(state.profile) ? '<p class="page-intro">' + esc(T('learn.walkSoon')) + '</p>' : '';
-      html = '<header class="page-head"><h1>' + esc(T('learn.title')) + '</h1></header>' + walkNote +
+      html = '<header class="page-head"><h1>' + esc(T('learn.title')) + '</h1></header>' +
         LEARN_GROUPS.map(function (g) { return [g[0], g[1].filter(learnVisible)]; }).filter(function (g) { return g[1].length; }).map(function (g) {
           return '<section class="learn-group"><h2 class="learn-gh">' + esc(T('learn.groups.' + g[0])) + '</h2><ul class="learn-list">' + g[1].map(function (k) {
             if (k.indexOf('g:') === 0) {

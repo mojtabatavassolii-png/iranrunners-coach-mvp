@@ -3,7 +3,6 @@
   var d = {
     title: 'Learn',
     intro: '',
-    walkSoon: 'Learning articles about walking will be added here soon.',
     listAria: 'Articles',
     guideSub: 'Levels, the week, check-in, goals and privacy',
     readMin: '{n} min read',
@@ -11,7 +10,7 @@
     more: 'Learn more:',
     others: 'More articles',
     guideTag: 'How the app works',
-    groups: { start: 'Getting started and levels', pace: 'Pace and fitness', train: 'Training', injury: 'Injury prevention', goals: 'Goals and plans', progress: 'Progress', cycle: 'Menstrual cycle', data: 'Data and privacy' },
+    groups: { start: 'Getting started and levels', pace: 'Pace and fitness', train: 'Training', injury: 'Injury prevention', goals: 'Goals and plans', progress: 'Progress', cycle: 'Menstrual cycle', data: 'Data and privacy', walkWhy: 'Walking and health', walkHow: 'Intensity and the plan', walkCare: 'Safety and gear', walkNext: 'Next step' },
     articles: {
       vdot: {
         title: 'VDOT and the Jack Daniels method',
@@ -261,6 +260,149 @@
           '<li><b>Time of day:</b> easy and long runs with a recorded start time, grouped by time of day. This is correlation only; weather, sleep and fatigue matter too, and more logged runs make it more reliable.</li>' +
           '<li><b>Adherence:</b> of the sessions planned in this range (up to today), how many you actually did.</li></ul>' +
           '<p class="learn-src"><b>Sources:</b> Banister et al. (1975), impulse-response model; Foster et al. (2001), <i>J Strength Cond Res</i> 15(1):109 (session RPE).</p>'
+      },
+      // ---------- Walking articles (shown only on the walking path) ----------
+      walk150: {
+        title: 'Why 150 minutes a week?',
+        summary: 'The World Health Organization\'s physical activity recommendation, and where walking fits in.',
+        body:
+          '<h2>What does the recommendation say?</h2>' +
+          '<p>The WHO guidelines (2020) recommend that adults do at least <b>150 to 300 minutes of moderate-intensity aerobic activity</b> a week (such as brisk walking), or 75 to 150 minutes of vigorous activity, or a mix of the two. The same amounts are recommended for people aged 65 and over.</p>' +
+          '<ul><li><b>Some is better than none:</b> if you are not at 150 minutes yet, any activity beats sitting. Start small and build up gradually.</li>' +
+          '<li><b>Splitting it up is fine:</b> the 2020 guidelines dropped the requirement for bouts of at least 10 minutes; several shorter walks a day count too.</li>' +
+          '<li><b>Strength training:</b> at least 2 days a week of exercise for the major muscle groups.</li>' +
+          '<li><b>65 and over:</b> in addition, at least 3 days a week of activity focused on balance and strength, to help prevent falls.</li>' +
+          '<li><b>Sit less:</b> replacing sitting time with activity of any intensity is also recommended.</li></ul>' +
+          '<h2>What is "moderate intensity"?</h2>' +
+          '<p>Your breathing is a little faster; you can talk but not sing. See "Walking intensity and the talk test" for details.</p>' +
+          '<h2>In this plan</h2>' +
+          '<ul><li>Walking level 5 ("Health recommendation") is about reaching 150 minutes a week, and the "150 minutes a week" goal steers your plan toward it.</li>' +
+          '<li>From level 6, strength training after your walk is added to the plan.</li>' +
+          '<li>The weekly volume chart on the Progress page shows the 150-minute line.</li></ul>' +
+          '<p class="learn-src"><b>Sources:</b> Bull et al. (2020), <i>Br J Sports Med</i> 54:1451–1462; WHO, <i>Guidelines on physical activity and sedentary behaviour</i> (2020).</p>'
+      },
+      walkIntensity: {
+        title: 'Walking intensity and the talk test',
+        summary: 'The plan\'s three intensities (easy, brisk, power) and simple ways to judge them without a smartwatch.',
+        body:
+          '<h2>The talk test</h2>' +
+          '<p>The simplest way to judge intensity is to talk while you walk. Research shows the talk test lines up well with the ventilatory threshold (the point where breathing gets hard).</p>' +
+          '<ul><li><b>Easy:</b> you can chat comfortably, even sing.</li>' +
+          '<li><b>Brisk (moderate):</b> full sentences, but no singing.</li>' +
+          '<li><b>Very brisk (vigorous):</b> only a few words before you need a breath.</li></ul>' +
+          '<h2>Rating of perceived exertion (RPE)</h2>' +
+          '<p>On a 1 to 10 scale, ask yourself how hard it feels: easy 3 to 4, brisk 5 to 6, power intervals 7 to 8.</p>' +
+          '<h2>Counting steps per minute</h2>' +
+          '<p>Count your steps for 15 seconds and multiply by 4. In the CADENCE-Adults study of adults aged 21 to 40, about <b>100 steps a minute</b> marked moderate intensity and about <b>130 steps a minute</b> marked vigorous intensity. These are averages that shift with height, age and fitness, so use them alongside the talk test.</p>' +
+          '<h2>In this plan</h2>' +
+          '<ul><li><b>Easy:</b> most sessions, plus warm-ups and cool-downs.</li>' +
+          '<li><b>Brisk:</b> about 100 to 120 steps a minute; from level 3, starting with short 2-minute segments.</li>' +
+          '<li><b>Power intervals:</b> 130 steps or more with an active arm swing; from level 7.</li>' +
+          '<li>Two hard days (intervals or a long walk) never come back to back.</li></ul>' +
+          '<p class="learn-src"><b>Sources:</b> Persinger et al. (2004), <i>Med Sci Sports Exerc</i> (talk test); Tudor-Locke et al. (2019), <i>Int J Behav Nutr Phys Act</i> 16:8 (CADENCE-Adults); Borg (1982), <i>Med Sci Sports Exerc</i>.</p>'
+      },
+      walkSteps: {
+        title: 'Daily steps: how many are enough?',
+        summary: 'Where 10,000 steps came from, and what research says about daily steps.',
+        body:
+          '<h2>Where did 10,000 steps come from?</h2>' +
+          '<p>Not from a scientific study. It goes back to a Japanese pedometer from the 1960s whose name meant "10,000-step meter". Later research showed the right number is not the same for everyone.</p>' +
+          '<h2>What does research say?</h2>' +
+          '<p>A meta-analysis of 15 cohorts with about 47,000 adults (Paluch et al., 2022) found that more daily steps went with a lower risk of death in later years, up to a point where the extra benefit levelled off: about <b>6,000 to 8,000</b> steps a day for people 60 and over, and about <b>8,000 to 10,000</b> for people under 60.</p>' +
+          '<ul><li>This is a statistical association, not proof that the steps themselves were the cause.</li>' +
+          '<li>In the same study, once total steps were taken into account, stepping speed showed no clear association; the total mattered more.</li></ul>' +
+          '<h2>How do I add steps?</h2>' +
+          '<ul><li>Check your usual average over a few days first, then build up gradually; for example 1,000 more steps a day every few weeks.</li>' +
+          '<li>Everyday steps (stairs, walking short trips) count too.</li></ul>' +
+          '<h2>In this plan</h2>' +
+          '<ul><li>With the "Daily steps" goal you pick a target between 6,000 and 12,000 (default 8,000).</li>' +
+          '<li>Read each day\'s steps from your phone or watch and log them on Home; the steps chart on the Progress page shows them against your target line.</li></ul>' +
+          '<p class="learn-src"><b>Sources:</b> Paluch et al. (2022), <i>Lancet Public Health</i> 7:e219–e228; Tudor-Locke &amp; Bassett (2004), <i>Sports Med</i> 34:1–8.</p>'
+      },
+      walkLong: {
+        title: 'Long walks and getting ready for an event',
+        summary: 'How the weekly long walk grows, and the final weeks before a walking event.',
+        body:
+          '<h2>The long walk</h2>' +
+          '<p>From level 6 you have one walk each week that is longer than the rest: up to 60 minutes at levels 6 and 7, 75 at level 8, 90 at level 9 and 120 at level 10. Keep it steady, at an easy to slightly brisk pace.</p>' +
+          '<ul><li>Bring water; for more than 60 minutes, bring a small snack too.</li>' +
+          '<li>Try shoes and socks on shorter walks first, not on a long walk or event day.</li>' +
+          '<li>There is no hard session the day after a long walk.</li></ul>' +
+          '<h2>Walking events</h2>' +
+          '<p>With the "Walking event" goal (on the walking goal page) you choose the distance (5, 10, 21 or 42 km) and the date:</p>' +
+          '<ul><li>The final week is about 70% of the volume, with no intervals.</li>' +
+          '<li>Rest the day before and the day after the event.</li>' +
+          '<li>On the day, start easy and pick up the pace in the second half if you feel good.</li></ul>' +
+          '<h2>Warning signs</h2>' +
+          '<p>Blisters, sharp pain or limping mean shorten or stop the session. Dizziness, chest pain or unusual shortness of breath mean stop right away and see a doctor.</p>' +
+          '<p class="learn-src"><b>Sources:</b> Garber et al. (2011), <i>Med Sci Sports Exerc</i> 43:1334–1359 (ACSM); Sawka et al. (2007), <i>Med Sci Sports Exerc</i> 39:377–390 (fluid replacement).</p>'
+      },
+      walkProgress: {
+        title: 'Building up walking gradually',
+        summary: 'Why walking volume grows step by step, and how the plan does it.',
+        body:
+          '<h2>Why gradually?</h2>' +
+          '<p>Heart and lungs adapt to training within a few weeks, but muscles, tendons and joints adapt more slowly. Sudden jumps in duration or intensity, especially for beginners, raise the chance of pain and injury. The American College of Sports Medicine (ACSM) also recommends increasing frequency, duration and intensity gradually.</p>' +
+          '<p>The "at most 10% more each week" rule is a common, cautious rule of thumb, not a number research has pinned down exactly; that is why the plan also listens to how your body feels in check-ins.</p>' +
+          '<h2>In this plan</h2>' +
+          '<ul><li>The first week is close to what you walk now.</li>' +
+          '<li>Each week grows by at most 10%; for people 60 and over by at most 5%, starting one level lower.</li>' +
+          '<li>Every fourth week is lighter.</li>' +
+          '<li>Two hard days never come back to back, and there is at least one rest day a week.</li>' +
+          '<li>When you have reached your level\'s ceiling for two full weeks and done most sessions, the next level is suggested.</li></ul>' +
+          '<p class="learn-src"><b>Sources:</b> Garber et al. (2011), <i>Med Sci Sports Exerc</i> 43:1334–1359 (ACSM); Bull et al. (2020), <i>Br J Sports Med</i> 54:1451–1462.</p>'
+      },
+      walkGear: {
+        title: 'Shoes, warm-up and cool-down',
+        summary: 'Choosing comfortable shoes, and a few easy minutes at the start and end of each session.',
+        body:
+          '<h2>Shoes</h2>' +
+          '<ul><li><b>Comfort comes first:</b> a shoe that feels comfortable from the start and does not press anywhere. Research on sports shoes suggests perceived comfort is a better guide than technical features such as pronation control.</li>' +
+          '<li>Leave room for your toes. A common tip is to try shoes on late in the day, when feet are slightly larger.</li>' +
+          '<li>Wear new shoes on a few short walks before a long one.</li>' +
+          '<li>Sports socks without rough seams that wick moisture (rather than plain cotton) lower the chance of blisters.</li></ul>' +
+          '<h2>Warm-up</h2>' +
+          '<p>A few minutes of easy walking before the brisk part raises your heart rate and breathing gradually and warms up your muscles. Long static stretching before exercise is not needed.</p>' +
+          '<h2>Cool-down</h2>' +
+          '<p>A few minutes of easy walking at the end brings your breathing back to normal. Evidence that cooling down prevents next-day soreness is weak, but an easy finish feels better.</p>' +
+          '<h2>In this plan</h2>' +
+          '<p>Brisk and power-interval sessions include a few minutes of easy warm-up and cool-down, listed in the session details.</p>' +
+          '<p class="learn-src"><b>Sources:</b> Nigg et al. (2015), <i>Br J Sports Med</i> 49:1290–1294 (shoe comfort); Bishop (2003), <i>Sports Med</i>; Behm et al. (2016), <i>Appl Physiol Nutr Metab</i>; Van Hooren &amp; Peake (2018), <i>Sports Med</i>.</p>'
+      },
+      walkSafe: {
+        title: 'Walking in later life and with joint pain',
+        summary: 'Safety tips for people 60 and over, and for anyone with knee or hip pain.',
+        body:
+          '<h2>Before you start</h2>' +
+          '<p>If you have heart disease, diabetes or kidney disease, or you get chest pain, dizziness or unusual shortness of breath during activity, talk to your doctor before starting or stepping up.</p>' +
+          '<h2>60 and over</h2>' +
+          '<ul><li>The same 150 minutes is recommended for people 65 and over, plus at least 3 days a week of balance and strength training to help prevent falls.</li>' +
+          '<li>If you are not there yet, be as active as your condition allows.</li>' +
+          '<li>Shoes with non-slip soles, a flat and well-lit route, and on very hot or icy days a better time of day or an indoor space.</li></ul>' +
+          '<h2>Knee or hip pain (osteoarthritis)</h2>' +
+          '<p>Clinical guidelines (American College of Rheumatology and OARSI, 2019) count exercise, including walking, as a core treatment for knee and hip osteoarthritis. Some discomfort while walking can be normal; however:</p>' +
+          '<ul><li>If pain keeps getting worse during the walk, or is worse than usual a few hours later and into the next morning, walk less next time.</li>' +
+          '<li>Sudden swelling, a joint locking or limping means stop and see a doctor or physiotherapist.</li></ul>' +
+          '<h2>In this plan</h2>' +
+          '<ul><li>For people 60 and over, weekly growth is at most 5% and the plan starts one level lower.</li>' +
+          '<li>If you log pain in your check-in, that day\'s session is made lighter or cancelled.</li>' +
+          '<li>Gaam does not diagnose and does not replace a doctor or physiotherapist.</li></ul>' +
+          '<p class="learn-src"><b>Sources:</b> Bull et al. (2020), <i>Br J Sports Med</i> 54:1451–1462; Kolasinski et al. (2020), <i>Arthritis Care Res</i> 72:149–162 (ACR 2019); Bannuru et al. (2019), <i>Osteoarthritis Cartilage</i> 27:1578–1589 (OARSI); Riebe et al. (2015), <i>Med Sci Sports Exerc</i> 47:2473–2479.</p>'
+      },
+      walkToRun: {
+        title: 'From walking to running',
+        summary: 'When and how to start running: mixing running and walking.',
+        body:
+          '<h2>When are you ready?</h2>' +
+          '<p>In running, the force on your legs with each step is roughly two to three times body weight, compared with about once in walking. That is why it helps to build a walking base first.</p>' +
+          '<ul><li>When you reach walking level 5 (about 120 to 150 minutes a week), you will see a suggestion to start running.</li>' +
+          '<li>With the "Get ready to run" goal, the plan works toward 120 minutes of walking a week; 150 if you cannot yet walk briskly for 30 minutes without stopping.</li></ul>' +
+          '<h2>Run-walk</h2>' +
+          '<p>Start with short running segments between walking, for example 1 minute of easy running and 2 minutes of walking, then gradually lengthen the running and shorten the walking. Keep the running easy: you should be able to say full sentences. If running causes pain, going back to a few more weeks of walking is fine.</p>' +
+          '<h2>In this plan</h2>' +
+          '<ul><li>Saying "yes" on the running suggestion card replaces your walking plan with the running plan from scratch (run-walk, starting at 1 minute running and 2 minutes walking); your training history is kept.</li>' +
+          '<li>At the end of each week we ask how it went; if it was too hard, the same stage is repeated.</li></ul>' +
+          '<p class="learn-src"><b>Sources:</b> Nilsson &amp; Thorstensson (1989), <i>Acta Physiol Scand</i> 136:217–227 (ground reaction forces in walking and running); Garber et al. (2011), <i>Med Sci Sports Exerc</i> 43:1334–1359.</p>'
       },
       freeruns: {
         title: 'Free runs and plan suggestions',
