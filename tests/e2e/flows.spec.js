@@ -237,6 +237,9 @@ test('پشتیبان: گرفتن فایل، حذف همه‌چیز و بازگر
 // ---------- ۱۱. اتصال به Health Connect (اپ نیتیو با Capacitor ساختگی) ----------
 // افزونه‌های نیتیو در مرورگر نیستن؛ یک Capacitor ساختگی با یک دویدن امروز صبح و یک دوچرخه‌سواری
 test('سلامت (نیتیو ساختگی): اتصال، ثبت خودکار دویدن امروز، برداشتن و ثبت نشدن دوباره', async ({ page }) => {
+  // تاریخ ثابت: شنبه‌ی آینده ساعت ۱۰ (شروع هفته؛ با این برنامه روز اول همیشه جلسه داره، مستقل از روز اجرای تست)
+  const fixed = addDays((6 + 7 - new Date().getDay()) % 7 || 7); fixed.setHours(10, 0, 0, 0);
+  await page.clock.setFixedTime(fixed);
   await page.addInitScript(() => {
     const ok = (v) => Promise.resolve(v), prefs = {}, now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 30);
@@ -281,6 +284,52 @@ test('سلامت (نیتیو ساختگی): اتصال، ثبت خودکار د�
   // قطع اتصال
   await page.locator('#set-sync [data-health-off]').click();
   await expect(page.locator('#set-sync [data-health-connect]')).toBeVisible();
+});
+
+// ---------- پیاده‌روی: فرم با تایمر دقیقه، هدف «سلامتی»، آموزش فقط پیاده‌روی ----------
+test('پیاده‌روی: فرم با تایمر، هدف سلامتی و آموزش مخصوص پیاده‌روی', async ({ page }) => {
+  await enter(page);
+  await chip(page, 'activity', 'walk');
+  await page.fill('#fname', 'پیاده'); await page.fill('#lname', 'آزمایشی');
+  await next(page);
+  await page.fill('#age', '55'); await page.fill('#height', '170'); await page.fill('#weight', '80');
+  await next(page);
+  await chip(page, 'walkExp', '3to12m');
+  // دقیقه‌ی هفتگی با تایمر (ساعت و دقیقه): ۱ ساعت و ۳۰ دقیقه = ۹۰ دقیقه، با صفحه‌کلید روی چرخ‌ها
+  await page.locator('#walkmin-btn').click();
+  const wh = page.locator('.tp-cols [data-unit="h"]'), wm = page.locator('.tp-cols [data-unit="m"]');
+  await expect(wh).toBeVisible();
+  await wh.focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowDown');
+  await wm.focus(); await page.keyboard.press('Home'); for (let i = 0; i < 3; i++) await page.keyboard.press('PageDown');
+  await page.waitForTimeout(700);
+  await page.locator('[data-tp-done]').click();
+  await expect(page.locator('#walkmin')).toHaveValue('1:30');
+  await expect(page.locator('#walkmin-read')).not.toBeEmpty();
+  await chip(page, 'walk30', 'yes');
+  await expect(page.locator('.onb-dot[data-goto-step="3"]')).toHaveAttribute('aria-label', /پیاده‌روی/);
+  await next(page);
+  await expect(page.locator('#level-preview .level-card')).toBeVisible();
+  await next(page);
+  await expect(page.locator('#walk-goal5')).toBeVisible();
+  for (const d of [0, 2, 4, 6]) await chip(page, 'days', String(d));
+  await chip(page, 'locations', 'park');
+  await chip(page, 'walkGoal', 'health');
+  await page.click('#onb-next');
+  await expect(page).toHaveURL(/#home/, { timeout: 15000 });
+  await expect(page.locator('.hcard-today')).toBeVisible();
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('iranrunners-coach-mvp-v1')));
+  expect(st.profile.activity).toBe('walk');
+  expect(Number(st.profile.walkMin)).toBe(90);
+  expect(st.profile.walkGoal && st.profile.walkGoal.kind).toBe('health');
+  // آموزش: مطالب و راهنمای پیاده‌روی هست، مطالب دویدن (مثل VDOT) و راهنمای دویدن نیست
+  await page.evaluate(() => { location.hash = '#learn'; });
+  await expect(page.locator('a.learn-item[href="#learn/walk150"]')).toBeVisible();
+  await expect(page.locator('a.learn-item[data-guide="walkStart"]')).toBeVisible();
+  await expect(page.locator('a.learn-item[href="#learn/vdot"]')).toHaveCount(0);
+  await expect(page.locator('a.learn-item[data-guide="start"]')).toHaveCount(0);
+  await page.locator('a.learn-item[data-guide="walkCheckin"]').click();
+  await expect(page.locator('#g-walkCheckin')).toHaveAttribute('open', '');
+  await expect(page.locator('#g-checkin')).toHaveCount(0);
 });
 
 // ---------- ۱۲. ثبت دویدن با GPS (مرورگر؛ موقعیت ساختگی Playwright) ----------

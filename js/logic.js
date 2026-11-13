@@ -664,6 +664,24 @@
     profile.fitRemSnooze = dateKey(addDays(today, REMINDER_SNOOZE_DAYS));
     return true;
   }
+  // یادآوری‌هایی که مدت زیادی بی‌جواب روی صفحه موندن خودشون جمع می‌شن (مثل «فعلاً نه»):
+  // یادآوری تایم‌تست بعد از ۷ روز (یک هفته بعد برمی‌گرده)، پیشنهاد پایین آوردن سطح بعد از ۱۴ روز (با تست تازه برمی‌گرده).
+  // موقع باز شدن اپ صدا زده می‌شه (app.js route)؛ true اگه پروفایل عوض شد
+  var NUDGE_REM_DAYS = 7, NUDGE_LEVEL_DAYS = 14;
+  function ageNudges(profile, today) {
+    if (!profile || isWalk(profile)) return false;
+    var k = dateKey(today), ch = false;
+    if (fitnessReminder(profile, today)) {
+      if (!profile.fitRemSince) { profile.fitRemSince = k; ch = true; }
+      else if (daysBetween(parseDate(profile.fitRemSince), today) >= NUDGE_REM_DAYS) { snoozeFitnessReminder(profile, today); delete profile.fitRemSince; ch = true; }
+    } else if (profile.fitRemSince) { delete profile.fitRemSince; ch = true; }
+    var sg = fitnessLevelSuggestion(profile), sk = sg && !sg.up ? sg.from + '>' + sg.to : null;
+    if (sk) {
+      if (!profile.lvSugSince || profile.lvSugSince.k !== sk) { profile.lvSugSince = { k: sk, d: k }; ch = true; }
+      else if (daysBetween(parseDate(profile.lvSugSince.d), today) >= NUDGE_LEVEL_DAYS) { skipLevelSuggestion(profile); delete profile.lvSugSince; ch = true; }
+    } else if (profile.lvSugSince) { delete profile.lvSugSince; ch = true; }
+    return ch;
+  }
   function skipLevelSuggestion(profile) {
     var fit = currentFitness(profile);
     if (!fit) return false;
@@ -892,10 +910,10 @@
 
   // ---------- برگشت بعد از وقفه‌ی کوتاه (۱۴ روز یا بیشتر بدون هیچ دویدنی) ----------
   // بیماری، سفر یا بی‌انگیزگی: شماره‌ی هفته‌ی برنامه جلو رفته ولی بدن نه. هفته‌ی برگشت از میانگین واقعی ۴ هفته‌ی قبل از وقفه
-  // ضرب‌در همون ضریب‌های «دونده‌ی برگشتی» (returnInfo: کمتر از ۹۰ روز ۸۰٪ و هفته‌ای ۱۵٪، تا یک سال ۶۰٪ و ۱۲٪، بیشتر ۵۰٪ و ۱۰٪) شروع می‌شه.
+  // ضرب‌در ضریب‌های «دونده‌ی برگشتی» (returnInfo) شروع می‌شه: کمتر از ۹۰ روز ۸۰٪ و هفته‌ای ۱۰٪ (نه ۱۵٪: دوهفته‌ای از ۳۰٪ بیشتر می‌شد)، تا یک سال ۶۰٪ و ۱۲٪، بیشتر ۵۰٪ و ۱۰٪.
   // profile.gapCap = { last: آخرین دویدن قبل از وقفه، start: هفته‌ی برگشت، base: میانگین قبل از وقفه، days: طول وقفه }
   var BREAK_DAYS = 14, GAP_CAP_WEEKS = 12;
-  function gapRamp(days) { return days < 90 ? { frac: 0.8, rate: 1.15 } : days <= 365 ? { frac: 0.6, rate: 1.12 } : { frac: 0.5, rate: 1.1 }; }
+  function gapRamp(days) { return days < 90 ? { frac: 0.8, rate: 1.1 } : days <= 365 ? { frac: 0.6, rate: 1.12 } : { frac: 0.5, rate: 1.1 }; }
   function gapCapKm(profile, ws) {
     var g = profile.gapCap;
     if (!g || !g.start || !(g.base > 0)) return null;
@@ -904,23 +922,35 @@
     var r = gapRamp(g.days), steps = 0, st = parseDate(g.start);
     // هفته‌ی سبک (deload) پله‌ی رشد حساب نمی‌شه، وگرنه هفته‌ی بعدش نسبت به خود هفته‌ی سبک خیلی می‌پرید
     for (var i = 0; i < k; i++) { var wi = weekIndexFor(profile, addDays(st, 7 * i)); if (!(wi >= 0 && progression(wi).deload)) steps++; }
-    return Math.max(5, floor05(g.base * r.frac * Math.pow(r.rate, steps)));
+    var v = g.base * r.frac * Math.pow(r.rate, steps);
+    // پیاده‌رو: پایه و سقف به دقیقه‌ی هفتگی (گرد به ۵ دقیقه)؛ دونده: کیلومتر
+    return isWalk(profile) ? Math.max(10, Math.round(v / 5) * 5) : Math.max(5, floor05(v));
   }
   function lastRunKey(state, uptoKey) {
-    var off = ['rest', 'none', 'cancelled'], best = null;
+    var off = ['rest', 'none', 'cancelled'], best = null, walk = isWalk(state.profile);
     Object.keys(state.done || {}).forEach(function (k) {
       if (!state.done[k] || k > uptoKey || (best && k <= best)) return;
       var l = (state.doneLog || {})[k];
       if (l && off.indexOf(l.type) >= 0) return;
       best = k;
     });
-    (state.activities || []).forEach(function (a) { if (a.sport !== 'walk' && a.date <= uptoKey && (!best || a.date > best)) best = a.date; });
+    (state.activities || []).forEach(function (a) { if ((walk || a.sport !== 'walk') && a.date <= uptoKey && (!best || a.date > best)) best = a.date; });
     return best;
   }
+  function walkWeekDoneMin(profile, data, ws) {
+    var m = 0;
+    buildWalkWeek(profile, ws).days.forEach(function (s) {
+      if (!s.minutes || ['rest', 'none', 'cancelled'].indexOf(s.type) >= 0 || !(data.done || {})[s.date]) return;
+      var l = doneSession((data.doneLog || {})[s.date] || s); m += l.realMin || l.minutes || s.minutes;
+    });
+    freeInWeek(data, ws).forEach(function (a) { m += (a.movingSec || a.sec || 0) / 60; });
+    return m;
+  }
   // موقع باز شدن اپ (مثل logWeek): وقفه رو تشخیص می‌ده و gapCap رو می‌سازه یا به‌روز می‌کنه. true اگه پروفایل عوض شد
+  // (دونده: کیلومتر هفتگی؛ پیاده‌رو: دقیقه‌ی هفتگی)
   function updateGapCap(state, today) {
     var p = state.profile;
-    if (!p || isWalk(p)) return false;
+    if (!p) return false;
     var tk = dateKey(today), last = lastRunKey(state, tk), cur = p.gapCap;
     if (cur && daysBetween(parseDate(cur.start), today) >= GAP_CAP_WEEKS * 7) { delete p.gapCap; return true; }
     if (!last) return false;
@@ -936,7 +966,7 @@
     for (var i = 0; i < 4; i++) {
       var w0 = addDays(lw, -7 * i);
       if (weekIndexFor(p, w0) < 0) break;
-      sum += weekDone(p, state, w0).done; n++;
+      sum += isWalk(p) ? walkWeekDoneMin(p, state, w0) : weekDone(p, state, w0).done; n++;
     }
     if (!n || !(sum > 0)) return false;
     p.gapCap = { last: last, start: ws, base: round05(sum / n), days: gap };
@@ -964,6 +994,23 @@
     if (r) profile.gapRaceSeen = r.key + '|' + profile.gapCap.last;
     return !!r;
   }
+
+  // یادآوری ماهانه‌ی پشتیبان: داده‌ها فقط روی همین دستگاهن. وقتی ۳۰ روز از آخرین پشتیبان (یا از شروع برنامه) گذشته،
+  // دست‌کم ۵ ثبت (چک‌این یا جلسه‌ی انجام‌شده) هست و کاربر در ۳۰ روز اخیر «بعداً» نزده. خروجی { days, never } یا null
+  var BACKUP_REM_DAYS = 30, BACKUP_REM_MIN = 5;
+  function backupDue(data, today) {
+    var p = data && data.profile;
+    if (!p || !p.startDate) return null;
+    var tk = dateKey(today);
+    if (data.backupSnooze && data.backupSnooze > tk) return null;
+    var n = Object.keys(data.checkins || {}).length + Object.keys(data.done || {}).length;
+    if (n < BACKUP_REM_MIN) return null;
+    var ref = data.backupAt || p.startDate;
+    if (ref > tk) return null;
+    var days = Math.round(daysBetween(parseDate(ref), today));
+    return days >= BACKUP_REM_DAYS ? { days: days, never: !data.backupAt } : null;
+  }
+  function snoozeBackup(data, today) { data.backupSnooze = dateKey(addDays(today, BACKUP_REM_DAYS)); }
 
   // کم شدن عمدی حجم این هفته نسبت به هفته‌ی قبل (برای توضیح زیر نوار حجم هفته، تا کاهش حس عقب‌گرد نده)
   // { reason: deload|taper|race|recovery|return|injury|injuryReturn|gap|days, from, to } یا null
@@ -2065,6 +2112,49 @@
     var peak = longs.reduce(function (m, x) { return Math.max(m, x.km); }, 0);
     return longs.filter(function (x) { return x.km >= peak * 0.9 && x.date > now && daysBetween(x.date, main.date) <= 56; });
   }
+  // آمادگی برای مسافت یک مسابقه (هدف فرعی): حجم هفتگی و بلندترین دویدنی که برنامه تا هفته‌ی قبل از مسابقه بهش می‌رسه
+  // (از ۴ هفته‌ی قبل تا هفته‌ی قبل از مسابقه، حداکثر ۲۶ هفته جلوتر) در برابر PLAN_NEEDS همون مسافت
+  // (حداقل حجم اوج و لانگ‌ران برنامه‌های مبتدی دنیلز و هیگدن برای تموم کردن راحت ماراتن).
+  // فقط ماراتن و بلندتر (تصمیم مالک محصول)؛ بیشتر از ماراتن: حداقل‌های ماراتن. خروجی null (آماده یا نامعلوم) یا { key, needKm, needLong, peakKm, peakLong }
+  var EARLY_MIN_KM = 42;
+  function raceReadiness(profile, km, date, today) {
+    if (!profile || isWalk(profile) || !(km >= EARLY_MIN_KM)) return null;
+    var d = typeof date === 'string' ? parseDate(date) : date;
+    if (!d || d < today) return null;
+    var key = '42', need = PLAN_NEEDS[key];
+    var base = Object.assign({}, profile, { races: (profile.races || []).filter(function (r) { return r && r.date !== dateKey(d); }) });
+    var raceWs = weekStart(d), from = addDays(weekStart(today), -28), last = addDays(raceWs, -7);
+    if (last > addDays(weekStart(today), 26 * 7)) return null;   // خیلی دور: برنامه هنوز فرصت داره
+    var start = parseDate(profile.startDate), peakKm = 0, peakLong = 0;
+    for (var ws = from; ws <= last; ws = addDays(ws, 7)) {
+      if (addDays(ws, 6) < start) continue;
+      var w = buildWeek(base, ws);
+      if (w.phase && w.phase.key === 'intro') { peakKm = Math.max(peakKm, w.volumeTarget || 0); }
+      else peakKm = Math.max(peakKm, w.totalKm || 0);
+      w.days.forEach(function (x) { if (x.type !== 'race' && x.km) peakLong = Math.max(peakLong, x.km); });
+    }
+    if (peakKm >= need.km && peakLong >= need.long) return null;
+    // جلسه‌های دو و پیاده مسافت ندارن: برنامه هنوز دویدن پیوسته نداره (rw)
+    return { key: key, km: km, needKm: need.km, needLong: need.long, peakKm: round05(peakKm), peakLong: round05(peakLong), rw: !(peakKm > 0) };
+  }
+  // کارت «زوده» برای مسابقه‌ی فرعی نزدیک (تا ۳۵ روز) که برنامه تا اون روز به حداقل‌های استاندارد مسافتش نمی‌رسه
+  function earlyRace(profile, today) {
+    if (!profile || isWalk(profile)) return null;
+    var tk = dateKey(today);
+    var list = otherRaces(profile).filter(function (r) { return r.kind === 'race' && r.key >= tk && daysBetween(today, r.date) <= 35; });
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i], rd = raceReadiness(profile, r.km, r.date, today);
+      if (rd) return Object.assign(rd, { id: r.id, raceKey: r.key, name: r.name, daysTo: Math.round(daysBetween(today, r.date)),
+        seen: (profile.earlyRaceSeen || []).indexOf(r.key + '|' + r.km) >= 0 });
+    }
+    return null;
+  }
+  function seenEarlyRace(profile, today) {
+    var r = earlyRace(profile, today);
+    if (!r) return false;
+    profile.earlyRaceSeen = (profile.earlyRaceSeen || []).concat([r.raceKey + '|' + r.km]).slice(-10);
+    return true;
+  }
   // بررسی یک هدف فرعی پیش از اضافه شدن: block = در دو هفته‌ی آخر (اضافه نمی‌شه)، issues = هشدار با پیشنهاد جایگزین
   // r: { id, km, date (Date یا yyyy-mm-dd), mode }
   function sideCheck(profile, r, opt) {
@@ -2094,8 +2184,13 @@
       var need = first ? miniTaper(o.km).post + mt.light : mt.post + miniTaper(o.km).light;
       if (gapO < need) out.issues.push({ code: 'overlap', id: o.id, name: sideRaceLabel(o), days: gapO });
     });
+    // آمادگی: برنامه تا روز مسابقه به حداقل‌های استاندارد این مسافت نمی‌رسه (عوض کردن تاریخ با چند هفته معمولاً حلش نمی‌کنه، پس در جست‌وجوی تاریخ جایگزین نیست)
+    if (!out.block && !opt.noSuggest) {
+      var rd = raceReadiness(profile, km, d, now);
+      if (rd) out.issues.push(Object.assign({ code: 'early' }, rd));
+    }
     out.ok = !out.issues.length;
-    if (!out.ok && !opt.noSuggest) {
+    if (!out.ok && !opt.noSuggest && out.issues.some(function (i) { return i.code !== 'early'; })) {
       var K2 = opt.keyLongs || keyLongRuns(profile, now);
       // در دو هفته‌ی آخر: فقط تاریخ‌های زودتر (هدف فرعی معمولاً برای سنجیدن آمادگی قبل از مسابقه‌ی اصلیه)
       (out.block ? [-7, -14, -21, -28, -35, -42] : [-7, 7, -14, 14, -21, 21, -28, 28]).some(function (off) {
@@ -2477,6 +2572,22 @@
       // حجمی که با این تعداد روز جا نمی‌شه از هفته کم می‌شه (capped)، نه اینکه یک جلسه بیش از حد بلند بشه.
       // (Daniels: لانگ‌ران حداکثر ۲۵ تا ۳۰٪ حجم هفته؛ جهش ناگهانی طول یک جلسه خطر آسیب رو بالا می‌بره)
       longKm = Math.min(longKm, longCap);
+      // سهم لانگ‌ران از هفته: در آماده‌سازی نیمه‌ماراتن، ماراتن و اولترا استاندارد خود مسابقه (سقف لانگ‌ران مسافت، RACE_LONG_CAP)؛
+      // بقیه (بدون مسابقه، ۵ و ۱۰ کیلومتر، و بعد از مسابقه) قاعده‌ی دنیلز: حداکثر longShare (۲۵ تا ۳۰٪، با ۳ جلسه ۳۵٪).
+      // با روزهای کم، لانگ‌ران فقط تا جایی بالاتر از این سهم می‌ره که هنوز ۱۵٪ از بلندترین جلسه‌ی دیگه بلندتر باشه (LONG_OVER_EASY)؛
+      // اضافه‌ی بیشتر به دویدن‌های آسون می‌ره و اگه روز آسونی نیست از هفته کم می‌شه (حجم روی یک جلسه جمع نمی‌شه)
+      var longPrep = race && isLongRace(race.key) && race.date >= ws;
+      if (!longPrep && nSessions >= 2 && b2bDay === null && longKm > weeklyKm * longShare + 0.25) {
+        var maxQ = Object.keys(qSessions).reduce(function (m, k) { return Math.max(m, qSessions[k].km || 0); }, 0);
+        var nE = easyDays.length, pool2 = longKm + remaining;
+        // دویدن آسون خودش سقف داره (EASY_OF_LONGCAP)؛ لانگ‌ران فقط ۱۵٪ بیشتر از دویدن آسونی لازمه که واقعاً ممکنه
+        var needL = Math.max(LONG_OVER_EASY * maxQ, nE ? Math.min(LONG_OVER_EASY * pool2 / (nE + LONG_OVER_EASY), LONG_OVER_EASY * longCap * EASY_OF_LONGCAP) : 0);
+        var shareKm = Math.min(longKm, Math.max(3, round05(weeklyKm * longShare), round05(needL)));
+        if (shareKm < longKm) {
+          remaining += longKm - shareKm; longKm = shareKm;
+          if (!nE && remaining > 0) { cappedKm = round05(cappedKm + remaining); remaining = 0; }
+        }
+      }
       var sesCap = Math.max(3, floor05(Math.min(longCap * EASY_OF_LONGCAP, Math.max(longKm, 3))));
       if (easyDays.length && remaining > sesCap * easyDays.length + 0.25) {
         cappedKm = round05(cappedKm + remaining - sesCap * easyDays.length);
@@ -2631,6 +2742,15 @@
       if (s.type === 'rest') return s;
       if (rw) return makeRunWalk(rw, 0.5, T('s.taper.recoveryWeekRw'));
       return makeEasy((s.km || 4) * 0.5, zones, T('s.taper.recoveryWeek'));
+    }
+    // بعد از هفته‌ی اول تا آخر ریکاوری مسافت (miniTaper.post: ماراتن ۱۴ روز، نیمه ۶): بدون لانگ‌ران و جلسه‌ی شدید، مثل ریکاوری هدف فرعی.
+    // لانگ‌ران آسون و نصف می‌شه (مثل روزهای ۴ تا ۷)، تا هفته‌ی ریکاوری یک دویدن بلند وسط حجم کم‌شده نداشته باشه
+    if (diff < -7 && -diff <= miniTaper(race.km).post && s.type !== 'rest') {
+      var rn = T('s.taper.recoveryWeek');
+      if (rw) return isHard(s.type) ? makeRunWalk(rw, 0.8, rn) : s;
+      if (s.type === 'long') return makeEasy((s.km || 4) * 0.5, zones, rn);
+      if (isHard(s.type)) return makeEasy((s.km || 5) * 0.8, zones, rn);
+      return s;
     }
     // برگشت تدریجی بعد از مسابقه در buildWeek روی حجم کل هفته اعمال می‌شه
     if (diff < 0) return s;
@@ -3595,13 +3715,19 @@
     var nS = Math.min(dayCount(profile, level, avail.length, true).total, 6);
     var sessionDays = chooseSessionDays(avail, nS);
     var vol = walkWeeklyMin(profile, W, a), total = vol.min, wg = walkGoalInfo(profile);
+    // برگشت بعد از وقفه‌ی ۱۴ روز یا بیشتر (gapCap، به دقیقه)؛ هفته‌ی رویداد پیاده‌روی نه (مسافت رویداد کم نمی‌شه)
+    var gcapW = gapCapKm(profile, ws), gapFromW = null;
+    var evWeek = wg.kind === 'event' && wg.date && wg.date >= dateKey(ws) && wg.date <= dateKey(addDays(ws, 6));
+    if (gcapW != null && !evWeek && total > gcapW) { gapFromW = total; total = gcapW; }
     // رویداد پیاده‌روی: پیاده‌روی بلند از سطح ۴، سقفش تا ۸۰٪ مدت رویداد (حداکثر ۱۸۰ دقیقه)
     var longCap = L.long, evMin = wg.kind === 'event' ? wg.minutes : 0;
     if (evMin && L.n >= 4) longCap = Math.max(L.long || 45, Math.min(180, r5(evMin * 0.8)));
     var longDay = longCap && nS >= 4 ? (sessionDays.indexOf(6) >= 0 ? 6 : sessionDays[sessionDays.length - 1]) : null;
     var longMin = longDay !== null ? Math.min(longCap, r5(total * (evMin ? 0.35 : 0.3))) : 0;
     // هفته‌ی سبک: اینتروال‌ها تند می‌شن
-    var nPower = vol.deload ? 0 : L.power, nBrisk = L.brisk + (vol.deload ? L.power : 0);
+    // برگشت از وقفه هم مثل هفته‌ی سبک: بدون اینتروال قدرتی
+    var easeW = vol.deload || gapFromW != null;
+    var nPower = easeW ? 0 : L.power, nBrisk = L.brisk + (easeW ? L.power : 0);
     // «پیاده‌روی سریع‌تر»: از سطح ۳ یک جلسه‌ی تند بیشتر
     if (wg.kind === 'faster' && L.n >= 3) nBrisk++;
     var specs = [];
@@ -3616,7 +3742,8 @@
     var bDays = rest.slice(0, specs.length - pDays.length);
     var each = r5((total - longMin) / Math.max(1, others.length));
     // هفته‌ی سبک می‌تونه زیر کف بازه‌ی جلسه بره تا واقعاً سبک باشه
-    each = Math.max(vol.deload ? r5(L.len[0] * 0.75) : L.len[0], Math.min(L.len[1], each));
+    // برگشت از وقفه: کف طول جلسه‌ی سطح نباید سقف هفته رو دور بزنه
+    each = Math.max(gapFromW != null ? 10 : vol.deload ? r5(L.len[0] * 0.75) : L.len[0], Math.min(L.len[1], each));
     var hardDays = pDays.concat(hardFixed);
     var template = {};
     sessionDays.forEach(function (d) {
@@ -3662,6 +3789,7 @@
     return {
       weekIndex: w, start: dateKey(ws), days: days, level: level, tier: 'W', goal: goalInfo(profile), walk: true,
       period: null, periodLabel: null, phase: phase, volumeTarget: null, minutesTarget: total, atCeiling: vol.atCeiling, b2b: false,
+      gapCap: gapFromW != null && profile.gapCap ? { plan: gapFromW, min: total, days: profile.gapCap.days } : null,
       zeroStage: null, zeroFinal: ZERO_FINAL, totalKm: 0, totalMin: totalMin, vert: 0, hardPct: 0
     };
   }
@@ -4078,7 +4206,7 @@
     otherRaces: otherRaces, sideRaceWindow: sideRaceWindow, raceDistLabel: raceDistLabel, MAX_RACES: MAX_RACES,
     PAIN_AREAS: PAIN_AREAS, PAIN_WHEN: PAIN_WHEN, PAIN_FLAGS: PAIN_FLAGS, painTier: painTier, painEpisode: painEpisode, painAdjust: painAdjust,
     injuryPhase: injuryPhase, injuryImpact: injuryImpact, RTR: RTR, cycleStats: cycleStats, cycleAllowed: cycleAllowed, cycleStarts: cycleStarts, logPeriodStart: logPeriodStart,
-    miniTaper: miniTaper, sideCheck: sideCheck, sideBlocked: sideBlocked, keyLongRuns: keyLongRuns, SIDE_BLOCK_DAYS: SIDE_BLOCK_DAYS,
+    miniTaper: miniTaper, sideCheck: sideCheck, raceReadiness: raceReadiness, earlyRace: earlyRace, seenEarlyRace: seenEarlyRace, sideBlocked: sideBlocked, keyLongRuns: keyLongRuns, SIDE_BLOCK_DAYS: SIDE_BLOCK_DAYS,
     riegel: riegel, vdotFromRace: vdotFromRace, raceTimeFromVdot: raceTimeFromVdot,
     levelFromKm: levelFromKm, levelFromVdot: levelFromVdot, assessLevel: assessLevel,
     paceZones: paceZones, bmi: bmi, progression: progression, weeklyVolumeKm: weeklyVolumeKm,
@@ -4086,10 +4214,10 @@
     chooseSessionDays: chooseSessionDays, placeQuality: placeQuality, circDist: circDist,
     buildWeek: buildWeek, sessionFor: sessionFor, adaptSession: adaptSession, isHard: isHard, readiness: readiness, weekAdaptSummary: weekAdaptSummary,
     currentFitness: currentFitness, fitnessEntries: fitnessEntries, hrZones: hrZones, easyRunFeedback: easyRunFeedback,
-    easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, easyPaceTrend: easyPaceTrend, weakTestContext: weakTestContext, fitnessReminder: fitnessReminder, snoozeFitnessReminder: snoozeFitnessReminder,
+    easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, easyPaceTrend: easyPaceTrend, ageNudges: ageNudges, weakTestContext: weakTestContext, fitnessReminder: fitnessReminder, snoozeFitnessReminder: snoozeFitnessReminder,
     makeActivity: makeActivity, addActivity: addActivity, freeInWeek: freeInWeek, weekActual: weekActual, adviceAfterRun: adviceAfterRun,
     overTrend: overTrend, applyPlanAdjust: applyPlanAdjust, longestRun: longestRun, isHardActivity: isHardActivity,
-    updateGapCap: updateGapCap, gapCapKm: gapCapKm, weekDrop: weekDrop, raceAfterGap: raceAfterGap, seenRaceAfterGap: seenRaceAfterGap,
+    updateGapCap: updateGapCap, gapCapKm: gapCapKm, weekDrop: weekDrop, raceAfterGap: raceAfterGap, seenRaceAfterGap: seenRaceAfterGap, backupDue: backupDue, snoozeBackup: snoozeBackup, BACKUP_REM_DAYS: BACKUP_REM_DAYS,
     sessionRange: sessionRange, SESSION_RANGE: SESSION_RANGE, dayCount: dayCount, daysSuggestion: daysSuggestion, acceptDaysSuggestion: acceptDaysSuggestion, recordCheck: recordCheck,
     fitnessLevelSuggestion: fitnessLevelSuggestion, skipLevelSuggestion: skipLevelSuggestion, applyFitnessLevel: applyFitnessLevel, autoLevelUp: autoLevelUp,
     adherence: adherence, rebaseSuggestion: rebaseSuggestion, applyRebase: applyRebase, logWeek: logWeek, planLogLimit: planLogLimit,

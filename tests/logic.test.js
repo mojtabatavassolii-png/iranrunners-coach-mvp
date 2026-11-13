@@ -117,7 +117,8 @@ test('هیچ جلسه‌ای از سقفش بلندتر نمی‌شه، با ه�
 test('کمتر از حداقل روزهای سطح: حجم کم می‌شه و اعلام می‌شه؛ در بازه‌ی سطح، حجم کامل', function () {
   var two = weekAt(profileFor(3, { days: [0, 3] }), 4), four = weekAt(profileFor(3, { days: [0, 1, 3, 5] }), 4);
   assert(two.capped && two.capped.km < four.totalKm, JSON.stringify(two.capped) + ' / ' + four.totalKm);
-  assert.strictEqual(four.capped, null);
+  // در بازه‌ی سطح: حجم کامل، یا حداکثر ۵٪ کمتر فقط به‌خاطر سهم دنیلز لانگ‌ران (اضافه روی لانگ‌ران جمع نمی‌شه)
+  assert.ok(!four.capped || four.capped.km >= four.capped.plan * 0.95, JSON.stringify(four.capped));
   var r = C.sessionRange(3);
   assert.deepStrictEqual([r.min, r.def, r.max], [3, 4, 5]);
   // پیشنهاد هر سطح = همون سقف قبلی برنامه (کاربران فعلی تغییری نمی‌بینن)
@@ -2369,6 +2370,108 @@ test('هدف پیاده‌روی «سلامتی»: در فرم اولیه به�
   }
   var gp = C.walkPath(h, C.parseDate('2026-11-20'));
   assert.ok(!gp.none && gp.status === undefined);
+});
+
+test('پیاده‌رو بعد از وقفه‌ی ۱۴ روز یا بیشتر: هفته‌ی برگشت از دقیقه‌های واقعی قبل از وقفه', function () {
+  var p = { activity: 'walk', age: 55, walkExp: 'gt1y', walkMin: 200, walk30: 'yes', days: [0, 1, 2, 3, 4, 5, 6], startDate: '2026-09-26', walkGoal: { kind: 'health' } };
+  var st = { profile: p, done: {}, doneLog: {}, activities: [] };
+  // ۴ هفته حدود نصف جلسه‌ها انجام شده
+  for (var w = 0; w < 4; w++) C.buildWalkWeek(p, C.addDays(C.parseDate(p.startDate), 7 * w)).days.forEach(function (s, i) {
+    if (s.minutes && ['rest', 'none'].indexOf(s.type) < 0 && i % 2 === 0) st.done[s.date] = true;
+  });
+  var lastK = Object.keys(st.done).sort().pop(), back = C.addDays(C.parseDate(lastK), 20);
+  var before = C.buildWalkWeek(p, back).totalMin;
+  assert.strictEqual(C.updateGapCap(st, back), true);
+  var g = p.gapCap;
+  assert.ok(g && g.base > 0 && g.base < before && g.days === 20, JSON.stringify(g) + ' / ' + before);
+  var w0 = C.buildWalkWeek(p, C.weekStart(back)), w1 = C.buildWalkWeek(p, C.addDays(C.weekStart(back), 7));
+  assert.ok(w0.gapCap && w0.totalMin <= g.base * 0.8 + 10, 'هفته‌ی برگشت ' + w0.totalMin + ' از پایه ' + g.base);
+  // رشد هفتگی محدود (هفته‌ی سبکِ برنامه می‌تونه کمتر هم باشه) و بدون اینتروال قدرتی در هفته‌های برگشت
+  assert.ok(w1.totalMin <= w0.totalMin * 1.2 + 10, w0.totalMin + ' → ' + w1.totalMin);
+  assert.ok(!w0.days.some(function (x) { return x.type === 'walkPower'; }), 'بدون اینتروال قدرتی');
+  // پیاده‌روی آزاد هم «فعالیت» حساب می‌شه: وقفه‌ی تازه‌ای ساخته نمی‌شه
+  st.activities.push({ date: C.dateKey(C.addDays(back, 60)), sport: 'walk', sec: 1800 });
+  assert.strictEqual(C.updateGapCap(st, C.addDays(back, 65)), false);
+});
+
+test('یادآوری بی‌جواب: تایم‌تست بعد از ۷ روز و پیشنهاد پایین آوردن سطح بعد از ۱۴ روز خودشون جمع می‌شن', function () {
+  var p = profileFor(4), d = C.parseDate('2026-11-14');
+  assert.ok(C.fitnessReminder(p, d));
+  C.ageNudges(p, d); C.ageNudges(p, C.addDays(d, 3));
+  assert.ok(C.fitnessReminder(p, C.addDays(d, 6)), 'هنوز دیده می‌شه');
+  C.ageNudges(p, C.addDays(d, 7));
+  assert.strictEqual(C.fitnessReminder(p, C.addDays(d, 8)), null, 'بعد از ۷ روز جمع شد');
+  assert.ok(C.fitnessReminder(p, C.addDays(d, 14)), 'یک هفته بعد برمی‌گرده');
+  // پیشنهاد پایین آوردن سطح
+  var at = function (v) { return Math.round(C.raceTimeFromVdot(v, 5)); };
+  var q = profileFor(6, { pb: { distanceKm: 5, timeSec: at(46), date: '2026-09-20' } }), lvl = C.assessLevel(q).level, low = 0;
+  for (var v = 60; v > 20; v -= 0.1) if (C.levelFromVdot(v) < lvl) { low = v + 0.1; break; }
+  q.fitnessTests = [{ date: '2026-10-10', distanceKm: 5, timeSec: at(low - 2.5), kind: 'test' }];
+  assert.ok(C.fitnessLevelSuggestion(q));
+  C.ageNudges(q, C.parseDate('2026-10-11'));
+  C.ageNudges(q, C.parseDate('2026-10-20'));
+  assert.ok(C.fitnessLevelSuggestion(q), '۹ روز: هنوز');
+  C.ageNudges(q, C.parseDate('2026-10-25'));
+  assert.strictEqual(C.fitnessLevelSuggestion(q), null, '۱۴ روز: جمع شد');
+});
+
+test('یادآوری ماهانه‌ی پشتیبان: ۳۰ روز، حداقل ثبت، «یک ماه بعد» و بعد از پشتیبان', function () {
+  var d0 = '2026-09-01', data = { profile: { startDate: d0 }, checkins: {}, done: {} };
+  var at = function (k) { return C.backupDue(data, C.parseDate(k)); };
+  for (var i = 0; i < 4; i++) data.checkins['2026-09-0' + (i + 2)] = { fatigue: 2 };
+  assert.strictEqual(at('2026-10-15'), null, 'کمتر از ۵ ثبت: یادآوری نیست');
+  data.done['2026-09-08'] = true;
+  assert.strictEqual(at('2026-09-25'), null, 'کمتر از ۳۰ روز از شروع');
+  var r = at('2026-10-01');
+  assert.ok(r && r.never && r.days === 30, '۳۰ روز از شروع، بدون پشتیبان');
+  C.snoozeBackup(data, C.parseDate('2026-10-01'));
+  assert.strictEqual(at('2026-10-20'), null, '«یک ماه بعد»');
+  assert.ok(at('2026-10-31'), 'بعد از یک ماه برمی‌گرده');
+  data.backupAt = '2026-10-31'; delete data.backupSnooze;
+  assert.strictEqual(at('2026-11-20'), null, 'پشتیبان تازه');
+  r = at('2026-12-01');
+  assert.ok(r && !r.never && r.days === 31, '۳۱ روز از آخرین پشتیبان');
+  assert.strictEqual(C.backupDue({ profile: { startDate: '2026-12-10' }, checkins: data.checkins, done: data.done }, C.parseDate('2026-12-01')), null, 'برنامه هنوز شروع نشده');
+});
+
+test('آمادگی مسابقه‌ی فرعی: حجم کم برای ماراتن «زوده»، برای مسافت‌های کوتاه‌تر هشدار نیست؛ کارت خانه و «متوجه شدم»', function () {
+  var p = profileFor(2, { days: [0, 2, 4] }), today = C.addDays(C.parseDate(p.startDate), 21);
+  var mar = C.dateKey(C.addDays(today, 30)), fiveK = C.dateKey(C.addDays(today, 20));
+  var rd = C.raceReadiness(p, 42.195, mar, today);
+  assert.ok(rd && rd.key === '42' && rd.needKm === C.PLAN_NEEDS['42'].km && rd.peakKm < rd.needKm, JSON.stringify(rd));
+  assert.strictEqual(C.raceReadiness(p, 5, fiveK, today), null, '۵ کیلومتر با حجم سطح ۲ آماده‌ست');
+  assert.strictEqual(C.raceReadiness(p, 21.0975, C.dateKey(C.addDays(today, 30)), today), null, 'فقط ماراتن و بلندتر');
+  var q = profileFor(8), mq = C.addDays(C.parseDate(q.startDate), 21);
+  assert.strictEqual(C.raceReadiness(q, 42.195, C.dateKey(C.addDays(mq, 30)), mq), null, 'سطح ۸ برای ماراتن آماده‌ست');
+  // بررسی هنگام افزودن و کارت خانه
+  var chk = C.sideCheck(p, { id: 'x', km: 42.195, date: mar, mode: 'race' }, { now: today });
+  assert.ok(chk.issues.some(function (i) { return i.code === 'early'; }));
+  p.races = [{ id: 'm1', km: 42.195, date: mar, kind: 'race', mode: 'race' }];
+  var er = C.earlyRace(p, today);
+  assert.ok(er && !er.seen && er.daysTo === 30);
+  C.seenEarlyRace(p, today);
+  assert.ok(C.earlyRace(p, today).seen, 'بعد از «متوجه شدم» دیده‌شده');
+  assert.strictEqual(C.earlyRace(Object.assign({}, p, { races: [{ id: 'm2', km: 42.195, date: C.dateKey(C.addDays(today, 60)), kind: 'race', mode: 'race' }] }), today), null, 'بیشتر از ۳۵ روز: کارت نیست');
+});
+test('بعد از ماراتن اصلی: تا ۱۴ روز لانگ‌ران و جلسه‌ی شدید نیست', function () {
+  var p = profileFor(5, { goal: { type: '42', date: '2027-01-14' } });
+  for (var k = 8; k <= 14; k++) {
+    var d = C.addDays(C.parseDate('2027-01-14'), k), s = C.buildWeek(p, d).days.filter(function (x) { return x.date === C.dateKey(d); })[0];
+    assert.ok(s.type === 'easy' || s.type === 'rest', 'روز ' + k + ': ' + s.type);
+  }
+});
+test('سهم لانگ‌ران (دنیلز) بدون آماده‌سازی نیمه و ماراتن: حداکثر سهم، یا فقط ۱۵٪ بلندتر از بقیه با روزهای کم', function () {
+  [2, 3, 4, 5, 6].forEach(function (n) {
+    [[1, 3, 5], [0, 2, 4, 6], [0, 1, 2, 3, 4, 5]].forEach(function (days) {
+      var p = profileFor(n, { days: days });
+      for (var w = 1; w < 10; w++) {
+        var wk = weekAt(p, w), lg = wk.days.filter(function (d) { return d.type === 'long'; })[0];
+        if (!lg || wk.totalKm < 20) continue;
+        var other = wk.days.reduce(function (m, d) { return d !== lg && d.km ? Math.max(m, d.km) : m; }, 0);
+        assert.ok(lg.km <= Math.max(wk.volumeTarget * 0.35, other * 1.15) + 1, 'L' + n + ' ' + days.length + 'd w' + w + ' long ' + lg.km + ' / ' + wk.totalKm + ' other ' + other);
+      }
+    });
+  });
 });
 
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

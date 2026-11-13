@@ -949,6 +949,35 @@
       '<div class="actions"><button type="button" class="btn btn-outline" data-gap-race="ok">' + esc(T('gapRace.ok')) + '</button>' +
       ' <a class="btn btn-ghost" href="#race">' + esc(T('gapRace.goal')) + '</a></div></section>';
   }
+  // یادآوری ماهانه‌ی پشتیبان (C.backupDue): کارت کوچک پایین صفحه‌ی خانه
+  function backupCard() {
+    var b = C.backupDue(state, today());
+    if (!b) return '';
+    return '<section class="card backup-rem" role="status"><div class="hcard-top"><span class="hcard-label">' + esc(T('backupRem.title')) + '</span></div>' +
+      '<p class="small">' + esc(fa(T(b.never ? 'backupRem.never' : 'backupRem.since', { n: b.days }))) + '</p>' +
+      '<div class="actions"><button type="button" class="btn btn-outline" data-backup-export="1">' + esc(T('backup.export')) + '</button>' +
+      ' <button type="button" class="btn btn-ghost" data-backup-later="1">' + esc(T('backupRem.later')) + '</button></div></section>';
+  }
+  document.addEventListener('click', function (e) {
+    if (!(e.target.closest && e.target.closest('[data-backup-later]'))) return;
+    C.snoozeBackup(state, today()); save(); route();
+  });
+  // مسابقه‌ی فرعی نزدیک که برنامه تا اون روز به حداقل‌های استاندارد مسافتش نمی‌رسه (C.earlyRace)
+  function earlyRaceCard() {
+    var r = state.profile && C.earlyRace(state.profile, today());
+    if (!r || r.seen) return '';
+    var u = T('units.word.' + I.getUnits());
+    return '<section class="card advice-card early-race" role="status"><div class="hcard-top"><span class="hcard-label">' + esc(T('earlyRace.title')) + '</span>' + learnQ('goals') + '</div>' +
+      '<p>' + tt('earlyRace.head', { name: r.name || T('earlyRace.race'), km: kmU(r.km), u: u, n: r.daysTo }) + '</p>' +
+      '<ul><li>' + tt('earlyRace.need', { nk: kmU(r.needKm), nl: kmU(r.needLong), u: u }) + '</li><li>' + (r.rw ? tt('earlyRace.haveRw') : tt('earlyRace.have', { pk: kmU(r.peakKm), pl: kmU(r.peakLong), u: u })) + '</li>' +
+      '<li>' + tt('earlyRace.advice') + '</li><li>' + tt('earlyRace.stop') + '</li></ul>' +
+      '<div class="actions"><button type="button" class="btn btn-outline" data-early-race="ok">' + esc(T('earlyRace.ok')) + '</button>' +
+      ' <a class="btn btn-ghost" href="#race">' + esc(T('earlyRace.goal')) + '</a></div></section>';
+  }
+  document.addEventListener('click', function (e) {
+    if (!(e.target.closest && e.target.closest('[data-early-race]'))) return;
+    C.seenEarlyRace(state.profile, today()); save(); route();
+  });
   document.addEventListener('click', function (e) {
     if (!(e.target.closest && e.target.closest('[data-gap-race]'))) return;
     C.seenRaceAfterGap(state.profile, today()); save(); route();
@@ -1240,6 +1269,8 @@
     // تاریخچه‌ی هفتگی برنامه: حجم و ارتفاع همین هفته (برای حد رشد بعد از تغییر هدف یا سطح)
     // برگشت بعد از وقفه‌ی ۱۴ روز یا بیشتر: هفته‌های برگشت از حجم واقعی قبل از وقفه (قبل از ثبت تاریخچه‌ی هفته)
     if (state.profile && C.updateGapCap(state, today())) save();
+    // یادآوری‌های بی‌جواب طولانی خودشون جمع می‌شن
+    if (state.profile && C.ageNudges(state.profile, today())) save();
     if (state.profile && C.logWeek(state.profile, today())) save();
     // رکورد تازه سطح رو بالا برده: سطح همراه VDOT بالا می‌ره و پیام تبریک (هر مسیر ثبت رکورد: فیتنس، نتیجه‌ی مسابقه، Health)
     var lvUp = state.profile && !C.isWalk(state.profile) ? C.autoLevelUp(state.profile, today()) : null;
@@ -1426,7 +1457,10 @@
 
   // لینک «؟» کنار هر بخش → صفحه‌ی آموزش، با باز شدن همون قسمت
   var guideTarget = null;
+  // مسیر پیاده‌روی: بخش‌های دویدنی راهنما (شروع، سطح، هفته، چک‌این) به نسخه‌ی پیاده‌روی همون بخش می‌رن
+  var WALK_GUIDE_MAP = { start: 'walkStart', levels: 'walkWeek', week: 'walkWeek', checkin: 'walkCheckin' };
   function helpLink(section, label) {
+    if (state.profile && C.isWalk(state.profile) && WALK_GUIDE_MAP[section]) section = WALK_GUIDE_MAP[section];
     var l = esc(label || T('app.help'));
     return '<a class="help-link" href="#guide" data-guide="' + section + '" aria-label="' + l + '" title="' + l + '">' + esc(T('app.helpMark')) + '</a>';
   }
@@ -1553,6 +1587,9 @@
       data: { state: state, avatar: av, settings: st ? JSON.parse(st) : null, lang: lg } };
   }
   function exportBackup() {
+    // تاریخ آخرین پشتیبان (برای یادآوری ماهانه)؛ قبل از ساختن فایل، تا نسخه‌ی بازگردانی‌شده هم همین تاریخ رو داشته باشه
+    state.backupAt = C.dateKey(today()); delete state.backupSnooze; save();
+    if (/^#home/.test(location.hash || '#home')) setTimeout(route, 0);
     var name = 'gaam-backup-' + C.dateKey(new Date()) + '.json';
     var blob = new Blob([JSON.stringify(backupData())], { type: 'application/json' });
     // گوشی: منوی اشتراک (ذخیره در Files، درایو، پیام‌رسان)؛ وگرنه دانلود
@@ -2005,6 +2042,9 @@
       [3, 4].forEach(function (n) {
         document.getElementById('onb-step-title-' + n).textContent = T('onb.steps.' + n + (walk ? '.tw' : '.t'));
         document.getElementById('onb-step-title-' + n).nextElementSibling.textContent = T('onb.steps.' + n + (walk ? '.subw' : '.sub'));
+        // نام مرحله در برچسب نقطه‌های پیشرفت (صفحه‌خوان) هم با نوع ورزش
+        var dot = document.querySelector('.onb-dot[data-goto-step="' + n + '"]');
+        if (dot) dot.setAttribute('aria-label', T('onb.stepOf', { n: n, total: ONB_STEPS }) + T('progress.sep') + T('onb.steps.' + n + (walk ? '.tw' : '.t')));
       });
       document.getElementById('runner-fields').hidden = never;
       document.getElementById('zero-note').hidden = !never;
@@ -2564,7 +2604,8 @@
     var html = '<p class="days-line small">' + tt('tdays.line', { n: dc.total }) +
       (dc.extra > 0 ? esc(T('progress.sep')) + tt('tdays.lineLight', { n: dc.extra }) : '') +
       ' <button type="button" class="linklike" data-days-open="1">' + esc(T('tdays.change')) + '</button></p>';
-    if (week && week.gapCap) html += '<p class="small days-capped">' + tt('tdays.gapCap', { d: week.gapCap.days, km: week.gapCap.km, plan: week.gapCap.plan }) + '</p>';
+    if (week && week.gapCap) html += '<p class="small days-capped">' + (week.walk ? tt('tdays.gapCapWalk', { d: week.gapCap.days, n: week.gapCap.min, plan: week.gapCap.plan })
+      : tt('tdays.gapCap', { d: week.gapCap.days, km: week.gapCap.km, plan: week.gapCap.plan })) + '</p>';
     if (week && week.capped) html += '<p class="small days-capped">' + tt('tdays.capped', { n: week.capped.days, km: week.capped.km, plan: week.capped.plan }) + '</p>';
     return html;
   }
@@ -3596,9 +3637,11 @@
       case 'keyLong': return T('race.issue.keyLong', { km: i.km, d: faDate(i.date) });
       case 'afterMain': return T('race.issue.afterMain', { n: i.days });
       case 'overlap': return T('race.issue.overlap', { g: i.name, n: i.days });
+      case 'early': return T(i.rw ? 'race.issue.earlyRw' : 'race.issue.early', { nk: kmU(i.needKm), nl: kmU(i.needLong), pk: kmU(i.peakKm), pl: kmU(i.peakLong), u: T('units.word.' + I.getUnits()) });
     }
     return '';
   }
+  function kmU(k) { return fa(Math.round(dKm(k) * 10) / 10); }
   function sideSig(c) { return c.issues.map(function (i) { return i.code + (i.date || ''); }).join(','); }
   // هشدار و پیشنهاد جایگزین (روی فهرست یا داخل فرم افزودن)
   function sideWarnHtml(c, id, inForm) {
@@ -4789,7 +4832,7 @@
     // آمادگی، پیشرفت هفته و نکته‌های فیتنس/قدم‌ها → پیشرفت؛ چرخه → برنامه؛ نصب → پروفایل؛ اهداف و مسیر → مسابقه و اهداف
     void p;
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
-      '<h1>' + esc(p && p.name ? T('home.greetName', { g: T(greetKey()), name: p.name }) : T(greetKey())) + '</h1></header>' + nameCard() + recBanner() + gapRaceCard() + adviceCards() + homeToday(base, r.session, ci, key, r) + weekBar() + freeButton() + homeChecklist(now);
+      '<h1>' + esc(p && p.name ? T('home.greetName', { g: T(greetKey()), name: p.name }) : T(greetKey())) + '</h1></header>' + nameCard() + recBanner() + gapRaceCard() + earlyRaceCard() + adviceCards() + homeToday(base, r.session, ci, key, r) + weekBar() + freeButton() + homeChecklist(now) + backupCard();
     app.innerHTML = '<div class="home">' + html + '</div>';
   }
   // کاربرهای قبلی بدون نام یا نام خانوادگی: یک بار و بی‌مزاحمت (با «بعداً» دیگه نشون داده نمی‌شه؛ از پروفایل هم می‌شه کاملش کرد)
@@ -5929,18 +5972,19 @@
     ['train', ['eighty', 'types', 'fartleks', 'warmup', 'g:week', 'g:sessions', 'g:places']], ['injury', ['tenpct', 'freeruns', 'g:checkin']],
     ['goals', ['goals', 'g:goals']], ['progress', ['progress']], ['cycle', ['cycle', 'g:cycle']],
     // مسیر پیاده‌روی
-    ['walkWhy', ['walk150', 'walkSteps']], ['walkHow', ['walkIntensity', 'walkProgress', 'walkLong']], ['walkCare', ['walkGear', 'walkSafe']], ['walkNext', ['walkToRun']],
+    ['walkUse', ['g:walkStart', 'g:walkWeek', 'g:walkCheckin']], ['walkWhy', ['walk150', 'walkSteps']], ['walkHow', ['walkIntensity', 'walkProgress', 'walkLong']], ['walkCare', ['walkGear', 'walkSafe']], ['walkNext', ['walkToRun']],
     ['data', ['g:data']]
   ];
   // کدوم مطلب برای این کاربر دیده می‌شه (k: شناسه‌ی مقاله یا «g:» + بخش راهنما):
   // مسیر پیاده‌روی: فقط مطالب پیاده‌روی و مطالب عمومی غیرِدویدنی (WALK_LEARN)؛ مطالب دویدن فقط برای مسیر دویدن،
   // و مطالب پیاده‌روی فقط برای مسیر پیاده‌روی. چرخه‌ی قاعدگی: فقط وقتی جنسیت زن انتخاب شده (C.cycleAllowed)
-  var WALK_LEARN = WALK_ARTICLES.concat(['g:data']);
+  var WALK_GUIDE = ['g:walkStart', 'g:walkWeek', 'g:walkCheckin'];
+  var WALK_LEARN = WALK_ARTICLES.concat(WALK_GUIDE, ['g:data']);
   function learnVisible(k) {
     var p = state.profile;
     if ((k === 'cycle' || k === 'g:cycle') && !C.cycleAllowed(p)) return false;
     if (p && C.isWalk(p)) return WALK_LEARN.indexOf(k) >= 0;
-    return WALK_ARTICLES.indexOf(k) < 0;
+    return WALK_ARTICLES.indexOf(k) < 0 && WALK_GUIDE.indexOf(k) < 0;
   }
   // «؟» کنار موارد پیچیده: مطلب آموزش همون‌جا در یک پنجره باز می‌شه (فرم یا صفحه‌ی فعلی از دست نمی‌ره)
   function learnQ(id) {
@@ -6028,7 +6072,7 @@
   // =====================================================================
   // راهنما: همه‌ی توضیح‌ها یک‌جا، بخش به بخش (محتوا از دیکشنری)
   // =====================================================================
-  var GUIDE_ORDER = ['start', 'levels', 'week', 'sessions', 'intensity', 'fitness', 'checkin', 'goals', 'cycle', 'places', 'data'];
+  var GUIDE_ORDER = ['start', 'walkStart', 'levels', 'week', 'walkWeek', 'sessions', 'intensity', 'fitness', 'checkin', 'walkCheckin', 'goals', 'cycle', 'places', 'data'];
   function guideSections() {
     var levelRows = C.LEVELS.map(function (L) {
       return '<tr><td>' + fa(L.n) + '</td><td>' + esc(L.name) + '</td><td dir="ltr">' + fa(L.km[1] === Infinity ? L.km[0] + '+' : L.km[1] === 0 ? '0' : L.km[0] + '–' + L.km[1]) + '</td><td>' + esc(L.tier) + '</td></tr>';

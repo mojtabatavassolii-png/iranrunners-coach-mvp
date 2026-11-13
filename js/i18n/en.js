@@ -1413,6 +1413,18 @@
       yes: 'Accept', no: 'No', ok: 'OK',
       done: 'The plan for these days was updated.'
     },
+    earlyRace: {
+      title: 'Too early: readiness for this distance',
+      head: '{name} ({km} {u}) is in {n} days.',
+      need: 'Standard preparation plans (Daniels and Higdon) usually build to about {nk} {u} a week and a longest run of about {nl} {u} to finish this distance comfortably.',
+      have: 'Your plan reaches about {pk} {u} a week and a longest run of {pl} {u} by race day.',
+      haveRw: 'By race day your plan is still run-walk, without continuous running of this length.',
+      advice: 'If you can, pick a shorter distance or a later race so the plan has time.',
+      stop: 'If you take part: set no time goal, start slowly, and stop on sharp pain or limping.',
+      race: 'Your side race',
+      ok: 'Got it',
+      goal: 'Goals and races'
+    },
     gapRace: {
       title: 'Race after a break',
       race: 'Your race',
@@ -1468,6 +1480,7 @@
       line: { one: 'Training {n} day a week', other: 'Training {n} days a week' },
       lineLight: { one: '{n} light day', other: '{n} light days' },
       change: 'Change',
+      gapCapWalk: 'After a {d}-day break, this week is {n} minutes of walking (plan: {plan}). It grows a little each week so your body can readjust.',
       gapCap: 'After a {d}-day break, this week is {km} km (plan: {plan}). It grows a little each week so your body can readjust without injury.',
       capped: 'With {n} training days, this week is {km} km (instead of {plan}) so no single session gets too long.',
       save: 'Save',
@@ -1615,7 +1628,9 @@
         spacing: 'Only {n} days before your main race; this distance needs about {m} weeks in between for full recovery.',
         keyLong: 'Clashes with your key {km} km long run ({d}); this goal\'s mini-taper or recovery would shorten it.',
         afterMain: '{n} days after your main race; you are still recovering.',
-        overlap: 'Only {n} days from "{g}"; the recovery of one overlaps the taper of the other.'
+        overlap: 'Only {n} days from "{g}"; the recovery of one overlaps the taper of the other.',
+        early: 'Too early: standard plans usually build to about {nk} a week and a long run of about {nl} {u} to finish this distance comfortably; your plan reaches {pk} a week and a longest run of {pl} {u} by then.',
+        earlyRw: 'Too early: standard plans usually build to about {nk} a week and a long run of about {nl} {u} to finish this distance comfortably; by then your plan is still run-walk.'
       },
       opt: { move: 'Move to {d}', train: 'As training', keep: 'Keep as is', keepAdd: 'Add anyway', saved: 'Secondary goal updated.' },
       tilesTitle: 'Distance goals', tilesHint: '',
@@ -1969,6 +1984,12 @@
       saveFailed: 'This browser doesn\'t have enough storage for this file.',
       loginLink: 'Already have data? Restore from a backup file'
     },
+    backupRem: {
+      title: 'Monthly backup',
+      never: 'Your data is stored only on this device and you have not made a backup yet. Make a backup file and keep it somewhere safe.',
+      since: 'It has been {n} days since your last backup. Your data is stored only on this device; make a fresh backup file.',
+      later: 'In a month'
+    },
     jdate: { day: 'Day', month: 'Month', year: 'Year' },
     tabs: { aria: 'Main sections', home: 'Home', plan: 'Plan', progress: 'Progress', learn: 'Learn', profile: 'Profile', record: 'Start' },
     nameCard: { title: 'Complete your name', save: 'Save', later: 'Later' },
@@ -2208,6 +2229,33 @@
             '<li>Small markers on the calendar show the phases and can be switched off in Settings.</li></ul>'
         },
         places: { title: 'Training location tips', body: '<ul>{tips}</ul>' },
+        walkStart: {
+          title: 'Walking quick start: what do I do each day?',
+          body: '<ol><li><b>Check in before you walk</b>: fatigue, sleep and pain. If needed, today\'s walk becomes shorter or gentler automatically.</li>' +
+            '<li>See <b>today\'s walk</b> on the Plan page. The walking plan is in minutes, not kilometres; each session shows its type (easy, brisk, power intervals, long) and intensity.</li>' +
+            '<li>Then tap <b>"I did it"</b>. If you recorded it with the Start button, your real time is counted.</li>' +
+            '<li>Record walks you do outside the plan too; they count towards the week\'s minutes.</li></ol>' +
+            '<p>Some headings have a <span class="help-link" aria-hidden="true">?</span> next to them; tap it to jump to the explanation for that part.</p>'
+        },
+        walkWeek: {
+          title: 'The weekly walking plan and its rules',
+          body: '<ul><li><b>Week one</b> starts from your current minutes (up to your level\'s ceiling). If you start mid-week, week one only covers the remaining days.</li>' +
+            '<li><b>Slow growth:</b> at most 10% more minutes each week (5% if you are 60 or older), up to your level\'s ceiling.</li>' +
+            '<li><b>Easy week:</b> every fourth week has fewer minutes, and power intervals are replaced by brisk walking.</li>' +
+            '<li><b>No hard days back to back:</b> power intervals and the long walk never fall on neighbouring days, and every week has at least one full rest day.</li>' +
+            '<li><b>Sessions are added with your level:</b> brisk walking from level 3, the long walk and strength work from level 6, power intervals from level 7.</li>' +
+            '<li><b>Reaching your level\'s ceiling:</b> after two full weeks at your level\'s ceiling with most sessions done, you see a next-level suggestion; accepting it is up to you.</li>' +
+            '<li><b>Coming back after a break:</b> if no walk was recorded for 14 days or more, weekly minutes restart below your pre-break amount, grow gradually, and there are no power intervals until then.</li></ul>'
+        },
+        walkCheckin: {
+          title: 'Check-in and walking adjustments',
+          body: '<p>Adjustments are graded and also take your recent check-ins into account:</p>' +
+            '<ul><li><b>Mild</b> (fatigue 3 or one night of poor sleep): power intervals and the long walk get a little shorter; other sessions stay the same.</li>' +
+            '<li><b>Moderate</b> (fatigue 4, two nights of poor sleep, or fatigue 3 for several days): the session gets shorter, and a brisk or power session becomes easy.</li>' +
+            '<li><b>Serious</b> (fatigue 5, very poor sleep several nights in a row, or high fatigue for several days): active rest instead of a walk.</li>' +
+            '<li>Sleep hours in the check-in are optional; under 6 hours counts as poor sleep.</li>' +
+            '<li><b>Pain</b> → depending on how bad it is, today\'s walk becomes easier and shorter, is swapped for low-impact activity, or is cancelled, and the message "{pain}" is shown.</li></ul>'
+        },
         data: {
           title: 'Data and privacy',
           body: '<ul><li>All your information is stored only in this browser and is never sent to any server.</li>' +

@@ -10,7 +10,7 @@
     more: 'Learn more:',
     others: 'More articles',
     guideTag: 'How the app works',
-    groups: { start: 'Getting started and levels', pace: 'Pace and fitness', train: 'Training', injury: 'Injury prevention', goals: 'Goals and plans', progress: 'Progress', cycle: 'Menstrual cycle', data: 'Data and privacy', walkWhy: 'Walking and health', walkHow: 'Intensity and the plan', walkCare: 'Safety and gear', walkNext: 'Next step' },
+    groups: { start: 'Getting started and levels', pace: 'Pace and fitness', train: 'Training', injury: 'Injury prevention', goals: 'Goals and plans', progress: 'Progress', cycle: 'Menstrual cycle', data: 'Data and privacy', walkUse: 'Using the walking plan', walkWhy: 'Walking and health', walkHow: 'Intensity and the plan', walkCare: 'Safety and gear', walkNext: 'Next step' },
     articles: {
       vdot: {
         title: 'VDOT and the Jack Daniels method',

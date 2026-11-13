@@ -256,6 +256,7 @@ function simulate(persona, opts) {
     }
     // اپ باز شده (چک‌این): تاریخچه‌ی هفتگی برنامه ثبت می‌شه (app.js route)
     if ((checked || H.offStreak >= 13) && C.updateGapCap(state, d)) { base = C.sessionFor(p, d); if (curWeek) curWeek.plannedKm = C.buildWeek(p, d).totalKm || 0; }   // app.js route (کسی که بعد از وقفه برمی‌گرده اپ رو باز می‌کنه)
+    if (checked && C.ageNudges(p, d)) base = C.sessionFor(p, d);   // app.js route
     if (checked && C.logWeek(p, d)) base = C.sessionFor(p, d);
     if (checked && !walk) {
       var au = C.autoLevelUp(p, d);   // app.js route: رکورد تازه (مثلاً نتیجه‌ی مسابقه) سطح رو بالا برده
@@ -554,7 +555,17 @@ function simulate(persona, opts) {
     if (longD && L && L.longCap) {
       var cap = C.goalInfo(p).category === 'ultra' ? 45 : L.longCap;
       if (longD.km > cap + 0.5) F('major', 'long-cap', day, 'لانگ‌ران از سقف سطح بیشتره', { km: longD.km, cap: cap, level: bw.level });
-      if (bw.totalKm >= 20 && longD.km > bw.totalKm * 0.5 + 0.5) F('minor', 'long-share', day, 'لانگ‌ران بیش از نصف حجم هفته', { long: longD.km, week: bw.totalKm });
+      // سهم لانگ‌ران: آماده‌سازی نیمه، ماراتن یا اولترا → استاندارد مسابقه (سقف لانگ‌ران مسافت، بالا با long-cap)؛
+      // بقیه → قاعده‌ی دنیلز (۲۵ تا ۳۰٪، با ۳ جلسه در هفته تا ۳۵٪). هفته‌ی شروع ناقص: نسبت به حجم کامل هفته
+      var gk = C.goalInfo(p), phk = bw.phase && bw.phase.key;
+      var longPrep = (gk.type === '21' || gk.type === '42' || gk.category === 'ultra') && ['recovery', 'return'].indexOf(phk) < 0;
+      // هفته‌ی شروع ناقص و هفته‌ی ریکاوری (روزهای اولش استراحت بعد از مسابقه‌ست): نسبت به حجم کامل هفته
+      // روزهای کمتر از حداقل سطح (capped): لانگ‌ران سهم عادیش از حجم برنامه‌ریزی‌شده رو داره و بقیه‌ی حجم حذف و اعلام می‌شه
+      var wkVol = phk === 'intro' || phk === 'recovery' || bw.capped ? Math.max(bw.totalKm, bw.volumeTarget || 0) : bw.totalKm;
+      // با روزهای کم: لانگ‌ران تا ۱۵٪ بلندتر از بلندترین جلسه‌ی دیگه مجازه (حتی اگه از سهم دنیلز بیشتر بشه)
+      var maxOther = bw.days.reduce(function (m, x) { return x !== longD && x.type !== 'race' && x.km > 0 ? Math.max(m, x.km) : m; }, 0);
+      var nSes = bw.days.filter(function (x) { return x.km > 0 && x.type !== 'race'; }).length;
+      if (!longPrep && wkVol >= 20 && longD.km > Math.max(wkVol * 0.35, maxOther * 1.15) + 1) F('minor', 'long-share', day, 'لانگ‌ران بیش از سهم دنیلز از حجم هفته', { long: longD.km, week: wkVol, phase: phk, n: nSes });
     }
     // رشد حجم: نسبت به بیشترین حجم ۳ هفته‌ی کامل قبل (هفته‌ی سبک با «بیشترین» خنثی می‌شه).
     // اطراف مسابقه‌ی اصلی (تیپر، مسابقه، ریکاوری، برگشت) مبنا حجم قبل از تیپره؛ هفته‌ی شروعِ ناقص مبنا نیست.
@@ -584,6 +595,11 @@ function simulate(persona, opts) {
       var retPh = ph === 'return' || last3.some(function (w) { return w.phase === 'return'; });
       if (retPh && !why) why = { why: 'return' };
       var sv = why && (why.why === 'side' || why.why === 'return') || bw.totalKm < 12 ? 'minor' : 'major';   // زیر ۱۲ کیلومتر: حداقل اندازه‌ی جلسه‌ها، نه رشد واقعی
+      // مسابقه‌ی فرعی‌ای که برنامه براش آماده نیست: کارت «زوده» (C.earlyRace) از ۳۵ روز قبل نشون داده می‌شه → فقط اطلاع
+      if (why && why.why === 'side') {
+        var sr = bw.days.filter(function (x) { return x.type === 'race'; })[0];
+        if (sr && C.raceReadiness(p, sr.km, sr.date, C.addDays(C.parseDate(sr.date), -35))) sv = 'info';
+      }
       if (m1 > 0 && bw.totalKm > m1 * 1.15 + 1) F(sv, 'vol-week' + (why ? '-' + why.why : ''), day, 'رشد حجم هفتگی بیشتر از ۱۵٪' + (why ? ' (' + lab[why.why] + ')' : ''), { from: m1, to: bw.totalKm, pct: Math.round((bw.totalKm / m1 - 1) * 100), phase: ph });
       else if (!aroundRace && m2 > 0 && bw.totalKm > m2 * 1.3 + 1) F(sv, 'vol-2week' + (why ? '-' + why.why : ''), day, 'رشد حجم دوهفته‌ای بیشتر از ۳۰٪', { from: m2, to: bw.totalKm, pct: Math.round((bw.totalKm / m2 - 1) * 100), phase: ph });
     }
@@ -684,6 +700,8 @@ function simulate(persona, opts) {
   }
 
   findList.sort(function (a, b) { return SEV_ORDER[a.sev] - SEV_ORDER[b.sev] || a.day - b.day; });
+  // opts.keepProfile: پروفایل پایانی (فقط برای بازتولید یک ایراد در اسکریپت؛ در گزارش نیست)
+  if (opts.keepProfile) Object.defineProperty(opts, 'profile', { value: p, enumerable: false, configurable: true });
   return {
     persona: { id: persona.id, title: persona.title, focus: persona.focus, traits: persona.traits, axes: persona.axes || null, seed: persona.seed, startDate: prep.profile.startDate },
     days: days, weeks: weeks, events: events, findings: findList, feelings: feelings, churn: churnPts, churnTotal: Object.keys(H.churnTotal).reduce(function (o, k) { o[k] = r1(H.churnTotal[k]); return o; }, {}), snaps: snaps, perf: perf,

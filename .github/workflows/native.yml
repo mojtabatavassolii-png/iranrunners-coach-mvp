@@ -49,6 +49,13 @@ jobs:
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Cache the Android system image
+        # دانلود system image شبیه‌ساز یک بار وسط اجرا شکست خورد (اجرای v135)؛ با کش فقط بار اول دانلود می‌شه.
+        # sdkmanager وقتی پوشه‌ی همین نسخه (با package.xml) سر جاشه دوباره دانلود نمی‌کنه.
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/android/sdk/system-images/android-34/google_apis/x86_64
+          key: android-sysimg-34-google_apis-x86_64-v1
       - name: Run on the Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
