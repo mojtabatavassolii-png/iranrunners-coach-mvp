@@ -44,6 +44,10 @@ body.modal-open { overflow: hidden; }
 body { text-align: justify; text-justify: inter-word; }
 /* استثناها: خط‌هایی با برچسب یا لینک‌های پشت‌سرهم، و ستون‌های خیلی باریک (تراز دوطرفه اون‌جا فاصله‌ی بزرگ بین کلمه‌ها می‌سازه) */
 .learn-more, .card.checkin > p.muted, .learn-item .learn-text, .level-note, .learn-body .learn-src { text-align: start; }
+/* سؤال‌های فرم اولیه مثل عنوان‌ان (۱ تا ۲ خط، پررنگ): تراز دوطرفه بین کلمه‌هاشون فاصله‌ی زیاد می‌نداخت (بازبینی ۱۰، UX10-03) */
+.onb-step .sub-legend, .onb-step legend, .onb-step .field > label { text-align: start; }
+/* متن‌های راهنمای چندخطی که بعداً اضافه شدن، مثل بقیه‌ی متن‌های بلند دوطرفه (UX10-06) */
+#walkmin-field small.muted, #ci-pain .pain-consent-box p.small { text-align: justify; }
 :lang(en) p, :lang(en) li, :lang(en) dd, :lang(en) small { hyphens: auto; -webkit-hyphens: auto; }
 /* روی گوشی ستون متن فهرست‌های راهنما و مقاله‌ها پهن‌تر، تا فاصله‌های تراز دوطرفه کم بشن */
 @media (max-width: 599px) {
@@ -290,13 +294,15 @@ textarea { resize: vertical; }
 .week-title p { margin: 0; font-size: var(--fs-md); }
 /* «برگشت به این هفته/ماه»: ناحیه‌ی لمس ۴۴ پیکسلی بدون تغییر ظاهر */
 .week-title .linklike { display: inline-block; padding: 10px 4px; margin: -10px -4px; }
-.week-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 16px 0; }
+.week-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
 .week-empty { margin: 16px 0; padding: 12px 14px; border-radius: 12px; background: var(--primary-soft); color: var(--text); line-height: 1.8; }
-@media (min-width: 720px) { .week-stats { grid-template-columns: repeat(4, 1fr); } }
-.stat { background: var(--surface-elevated); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; }
+@media (min-width: 720px) { .week-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.stat { background: var(--surface-elevated); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; }
 .stat span { color: var(--text-secondary); font-size: var(--fs-sm); }
-/* برچسب و آیکون راهنما در یک خط (آیکون تنها به خط بعد نره) */
-.stat > span { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+/* برچسب کاشی می‌تونه بشکنه (ستون‌های باریک در گوشی ۳۲۰)، ولی آخرین کلمه و آیکون راهنما با هم می‌مونن (statLabel، UX10-05) */
+.stat > span { display: block; text-align: start; }
+.stat > span .nobr { white-space: nowrap; }
+.stat b, .stat small { text-align: start; }
 .stat b { font-size: var(--fs-base); }
 .ratio-bar { height: 6px; background: var(--zone-5); border-radius: 3px; overflow: hidden; margin-top: 6px; }
 .ratio-bar i { display: block; height: 100%; background: var(--success); }
@@ -396,7 +402,7 @@ textarea { resize: vertical; }
 .toast {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
   background: var(--surface-elevated); color: var(--text); border: 1px solid var(--border); padding: 10px 20px; border-radius: 999px; z-index: 200;
-  box-shadow: var(--shadow); transition: opacity 0.4s; max-width: calc(100vw - 32px); text-align: center;
+  box-shadow: var(--shadow); transition: opacity 0.4s; width: max-content; max-width: calc(100vw - 32px); text-align: center;
 }
 .toast.out { opacity: 0; }
 
@@ -1851,7 +1857,7 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--focus-ri
 .nf-tools button:focus-visible, .nf-act:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 .nf-flash {
   position: fixed; top: calc(70px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 210;
-  display: flex; align-items: center; gap: 8px; max-width: calc(100% - 32px); padding: 6px 14px 6px 10px; border-radius: 999px;
+  display: flex; align-items: center; gap: 8px; width: max-content; max-width: calc(100% - 32px); padding: 6px 14px 6px 10px; border-radius: 999px;
   background: var(--surface-elevated); border: 1px solid var(--border); color: var(--text); font-size: var(--fs-md); font-weight: 600;
   animation: nfDown .22s ease-out; transition: opacity .4s;
 }
@@ -2156,3 +2162,12 @@ button.help-link { padding: 0; cursor: pointer; font-family: inherit; }
 .rec-map-center { position: absolute; bottom: 10px; inset-inline-start: 10px; z-index: 500; background: var(--surface); border: 1px solid var(--border); }
 .rec-map-note { text-align: center; margin: 4px 0 0; }
 .rec-map .leaflet-control-attribution { font-size: 10px; }
+
+/* ---------- بازبینی ۱۰ ---------- */
+/* UX10-01: کنترل‌های نقشه‌ی ثبت (Leaflet): دکمه‌ی بزرگ‌نمایی ۴۴px و رنگ‌های اپ؛ اعتبار OpenStreetMap خوانا (۱۲px) با لینک دست‌کم ۲۴px */
+#rec-map .leaflet-bar { border-color: var(--border); }
+#rec-map .leaflet-bar a { width: 44px; height: 44px; line-height: 44px; font-size: 22px; background: var(--surface-elevated); color: var(--text); border-bottom-color: var(--border); }
+#rec-map .leaflet-control-attribution { font-size: var(--fs-xs); line-height: 1.2; padding: 2px 8px; background: var(--surface-elevated); color: var(--text-secondary); border-start-start-radius: 8px; }
+#rec-map .leaflet-control-attribution a { display: inline-flex; align-items: center; min-height: 24px; color: var(--text); text-decoration: underline; }
+/* UX10-02: دکمه‌های متنی صفحه‌ی برنامه با ناحیه‌ی لمس ۴۴px */
+.days-line .linklike, #day-panel > .linklike.small { display: inline-flex; align-items: center; min-height: 44px; padding-inline: 4px; }

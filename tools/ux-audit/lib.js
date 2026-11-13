@@ -136,6 +136,15 @@ const SCREENS = [
   ['walk-progress', '#progress', async (p) => asWalker(p)],
   ['walk-profile', '#profile', async (p) => asWalker(p)],
   ['walk-settings', '#settings', async (p) => { await asWalker(p); const b = p.locator('[data-set-open="remind"]'); if (await b.count()) { await b.first().click(); await p.waitForTimeout(300); } }],
+  // بازبینی ۱۰: صفحه‌های تازه‌تر
+  // فرم پیاده‌روی (حالت ویرایش): مرحله‌ی ۳ با تایمر و مرحله‌ی ۵ با هدف «سلامتی»
+  ['walk-onb-3', '#onboarding', async (p) => { await asWalker(p, { kind: 'health' }); await p.evaluate(() => { location.hash = '#onboarding'; }); await p.waitForTimeout(600); await gotoStep(p, 3); }],
+  ['walk-onb-5', '#onboarding', async (p) => { await asWalker(p, { kind: 'health' }); await p.evaluate(() => { location.hash = '#onboarding'; }); await p.waitForTimeout(600); await gotoStep(p, 5); }],
+  // آموزش پیاده‌روی
+  ['walk-learn', '#learn', async (p) => { await asWalker(p); await p.evaluate(() => { location.hash = '#learn'; }); await p.waitForTimeout(500); }],
+  ['walk-article', '#learn', async (p) => { await asWalker(p); await p.evaluate(() => { location.hash = '#learn/walkSafe'; }); await p.waitForTimeout(500); }],
+  // صفحه‌ی «شروع» (دکمه‌ی وسط: ثبت آزاد، قبل از شروع). آخر فهرست، چون حالت ثبت در مرورگر می‌مونه
+  ['record', '#home', async (p) => { await p.click('#tabbar a[data-tab="record"]'); await p.waitForTimeout(700); }],
 ];
 
 async function launch() {

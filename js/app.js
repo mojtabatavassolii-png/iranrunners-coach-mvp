@@ -2553,6 +2553,11 @@
     box.dataset.touched = '1';
     box.dispatchEvent(new Event('days-change', { bubbles: true }));
   });
+  // برچسب کاشی آمار هفته با آیکون راهنما: آخرین کلمه و آیکون با هم (برچسب می‌تونه بشکنه، ولی «؟» تنها به خط بعد نمی‌ره)
+  function statLabel(text, help) {
+    var k = text.lastIndexOf(' ');
+    return esc(text.slice(0, k + 1)) + '<span class="nobr">' + esc(text.slice(k + 1)) + ' ' + help + '</span>';
+  }
   // خط «تمرین N روز در هفته · تغییر» و توضیح حجم کم‌شده، زیر آمار هفته
   function daysLine(p, week) {
     var a = C.assessLevel(p), dc = C.dayCount(p, a.level, (p.days || []).length, !!a.walk);
@@ -2684,7 +2689,7 @@
     if (emptyStart) html += '<p class="week-empty">' + (firstS ? tt('week.emptyStart', { day: firstS.dayName, date: faDate(firstS.date, true) }) : esc(T('week.emptyStartNone'))) + '</p>';
     else html += '<div class="week-stats' + (zero ? ' week-stats-zero' : '') + '">' +
       (zero ? '<div class="stat"><span>' + esc(T('zero.stageLabel')) + '</span><b>' + tt('zero.stage', { n: (week.zeroStage || 0) + 1, total: week.zeroFinal + 1 }) + '</b></div>'
-        : '<div class="stat"><span>' + esc(T('week.phase')) + ' ' + helpLink('week', T('week.phaseHelp')) + '</span><b>' + t(week.phase.label) + '</b>' +
+        : '<div class="stat"><span>' + statLabel(T('week.phase'), helpLink('week', T('week.phaseHelp'))) + '</span><b>' + t(week.phase.label) + '</b>' +
       (week.periodLabel ? '<small class="period-tag">' + esc(week.periodLabel) + '</small>' : '') + '</div>') +
       '<div class="stat"><span>' + esc(T('week.sessions')) + '</span><b>' + tt('week.nSessions', { n: runDays }) + '</b>' +
         (runDays ? '<small class="done-tag">' + tt('week.doneSessions', { n: ws.d, total: runDays }) + '</small>' : '') + '</div>' +
@@ -2695,7 +2700,7 @@
           (ws.d ? '<small class="done-tag">' + tt('week.doneKm', { n: ws.dkm }) + '</small>' : '') +
           (kmChanged ? '<small class="period-tag">' + tt('week.plannedKm', { n: week.totalKm }) + '</small>' : '') +
           (week.goal && week.goal.category === 'ultra' && week.vert ? '<small class="period-tag">' + tt('week.vert', { n: week.vert }) + '</small>' : '') + '</div>') +
-      (zero || week.walk ? '' : '<div class="stat stat-ratio"><span>' + esc(T('week.ratio')) + ' ' + helpLink('week', T('week.ratioHelp')) + '</span><b dir="ltr">' + fa(100 - week.hardPct) + ' / ' + fa(week.hardPct) + '</b>' +
+      (zero || week.walk ? '' : '<div class="stat stat-ratio"><span>' + statLabel(T('week.ratio'), helpLink('week', T('week.ratioHelp'))) + '</span><b dir="ltr">' + fa(100 - week.hardPct) + ' / ' + fa(week.hardPct) + '</b>' +
       '<div class="ratio-bar" aria-hidden="true"><i style="width:' + (100 - week.hardPct) + '%"></i></div></div>') +
       '</div>' + learnMore(zero || week.walk ? ['tenpct'] : ['eighty', 'tenpct']);
     html += daysLine(p, week) + (daysOpen ? daysPanel(p) : '');
