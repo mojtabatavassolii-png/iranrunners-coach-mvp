@@ -2260,4 +2260,87 @@ test('تست ضعیف‌تر: توضیح با دلیل‌های احتمالی �
   assert.strictEqual(C.weakTestContext(p, st, C.parseDate('2026-11-12')), null, 'بهتر یا برابر');
 });
 
+test('مسابقه‌ی نزدیک بعد از وقفه: هشدار با توصیه بر اساس مسافت، تا «متوجه شدم»', function () {
+  var p = profileFor(5, { startDate: '2026-09-26', goal: { type: '21', date: '2026-12-05' } });
+  var today = C.parseDate('2026-11-16');
+  assert.strictEqual(C.raceAfterGap(p, today), null, 'بدون وقفه');
+  p.gapCap = { last: '2026-10-25', start: '2026-11-14', base: 25, days: 22 };
+  var r = C.raceAfterGap(p, today);
+  assert.ok(r && r.main && r.long && r.daysTo === 19 && !r.seen, JSON.stringify(r));
+  C.seenRaceAfterGap(p, today);
+  assert.ok(C.raceAfterGap(p, today).seen);
+  // مسابقه‌ی فرعی کوتاه و نزدیک‌تر
+  p.races = [{ id: 'x', date: '2026-11-28', km: 5, name: 'پارک‌ران' }];
+  r = C.raceAfterGap(p, today);
+  assert.ok(r && !r.main && !r.long && r.km === 5 && !r.seen, JSON.stringify(r));
+  // بیش از ۳۵ روز دورتر: نه
+  p.races = []; p.goal.date = '2027-02-01';
+  assert.strictEqual(C.raceAfterGap(p, today), null);
+});
+
+test('مسیر هدف: «آماده» با هفته‌های جاافتاده یا وسط برگشت از وقفه «عقب‌تر» می‌شه', function () {
+  var p = profileFor(6, { startDate: '2026-06-06', goal: { type: '10', date: '2026-12-19' } });
+  var today = C.parseDate('2026-11-28');
+  var st = { profile: p, done: {}, doneLog: {} };
+  // همه‌ی جلسه‌ها انجام شده
+  for (var w = -8; w < 0; w++) C.buildWeek(p, C.addDays(C.weekStart(today), 7 * w)).days.forEach(function (s) { if (s.km) st.done[s.date] = true; });
+  var gp = C.goalPath(p, today, st);
+  assert.strictEqual(gp.status, 'ready', JSON.stringify({ s: gp.status, w: gp.weeks }));
+  // ۴ هفته‌ی اخیر هیچی
+  var st2 = { profile: p, done: {}, doneLog: {} };
+  assert.strictEqual(C.goalPath(p, today, st2).status, 'behind');
+  // برگشت از وقفه
+  p.gapCap = { last: '2026-10-30', start: C.dateKey(C.weekStart(today)), base: 30, days: 28 };
+  gp = C.goalPath(p, today, st);
+  assert.ok(gp.status === 'behind' && gp.gap && gp.gap.days === 28, JSON.stringify(gp.status));
+});
+
+test('دو «فعلاً نه» پشت‌سرهم: یادآوری تست کوتاه ۲ کیلومتری؛ با تست تازه از صفر', function () {
+  var p = profileFor(4), d = C.parseDate('2026-11-14');
+  C.snoozeFitnessReminder(p, d);
+  assert.ok(!C.fitnessReminder(p, C.addDays(d, 7)).short);
+  C.snoozeFitnessReminder(p, C.addDays(d, 7));
+  var r = C.fitnessReminder(p, C.addDays(d, 14));
+  assert.ok(r && r.short && /۲ کیلومتری|2 km/.test(r.message), JSON.stringify(r));
+  p.fitnessTests = [{ date: '2026-11-29', distanceKm: 2, timeSec: 540, kind: 'test' }];
+  C.snoozeFitnessReminder(p, C.addDays(d, 16));
+  assert.ok(!C.fitnessReminder(p, C.parseDate('2027-02-01')).short, 'شمارش با تست تازه از اول');
+});
+
+test('بعد از پایین آمدن سطح، تا ۶۰ روز با تستی نزدیک مرز دوباره بالا نمی‌ره؛ با تست خیلی بهتر چرا', function () {
+  var at = function (v) { return Math.round(C.raceTimeFromVdot(v, 5)); };
+  var p = profileFor(6, { pb: { distanceKm: 5, timeSec: at(46), date: '2026-09-20' } });
+  var lvl = C.assessLevel(p).level, low = 0;
+  for (var v = 60; v > 20; v -= 0.05) if (C.levelFromVdot(v) < lvl) { low = v + 0.05; break; }
+  // دو تست زیر مرز → پایین
+  p.fitnessTests = [{ date: '2026-10-10', distanceKm: 5, timeSec: at(low - 0.6), kind: 'test' }, { date: '2026-11-07', distanceKm: 5, timeSec: at(low - 0.7), kind: 'test' }];
+  var sg = C.fitnessLevelSuggestion(p);
+  assert.ok(sg && !sg.up, 'پیشنهاد پایین');
+  C.applyFitnessLevel(p, C.parseDate('2026-11-08'));
+  assert.ok(C.assessLevel(p).level < lvl && p.levelChange.dir === 'down');
+  // ۳۰ روز بعد، تستی کمی بالای مرز: بالا نمی‌ره
+  p.fitnessTests.push({ date: '2026-12-08', distanceKm: 5, timeSec: at(low + 0.4), kind: 'test' });
+  assert.strictEqual(C.fitnessLevelSuggestion(p), null, 'نزدیک مرز');
+  // تست خیلی بهتر: بالا می‌ره
+  p.fitnessTests.push({ date: '2026-12-20', distanceKm: 5, timeSec: at(low + 2.5), kind: 'test' });
+  var up = C.fitnessLevelSuggestion(p);
+  assert.ok(up && up.up, 'با فاصله‌ی زیاد از مرز');
+  // بعد از ۶۰ روز: قاعده‌ی عادی
+  p.fitnessTests.pop();
+  p.fitnessTests.push({ date: '2027-01-20', distanceKm: 5, timeSec: at(low + 0.4), kind: 'test' });
+  assert.ok(C.fitnessLevelSuggestion(p) && C.fitnessLevelSuggestion(p).up);
+});
+
+test('چرخه‌ی کوتاه با یک ثبت جاافتاده (فاصله‌ی ۴۳ روز): «ثبت جاافتاده»، نه نامنظم', function () {
+  var st = ['2026-01-01'], d = C.parseDate('2026-01-01');
+  [22, 21, 22, 21, 43, 22].forEach(function (g) { d = C.addDays(d, g); st.push(C.dateKey(d)); });
+  var p = { cycle: { starts: st, cycleLen: 22 } };
+  var cs = C.cycleStats(p, C.addDays(d, 5));
+  assert.ok(cs.flags.indexOf('missed') >= 0 && cs.flags.indexOf('variable') < 0 && cs.flags.indexOf('outOfRange') < 0, JSON.stringify(cs.flags) + ' ' + cs.gaps);
+  // چرخه‌ی واقعاً نامنظم (۲۵ و ۳۸ روز، بدون دو برابری) هنوز «variable»
+  var st2 = ['2026-01-01'], d2 = C.parseDate('2026-01-01');
+  [25, 38, 26, 37, 24].forEach(function (g) { d2 = C.addDays(d2, g); st2.push(C.dateKey(d2)); });
+  assert.ok(C.cycleStats({ cycle: { starts: st2 } }, C.addDays(d2, 5)).flags.indexOf('variable') >= 0);
+});
+
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

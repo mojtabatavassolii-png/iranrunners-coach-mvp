@@ -938,6 +938,21 @@
     return '<p>' + head + '</p>' + (lines ? '<ul class="advice-list">' + lines + '</ul>' : '');
   }
   function dayNameOf(k) { var d = C.parseDate(k); return T('days')[(d.getDay() + 1) % 7]; }
+  // مسابقه‌ی نزدیک بعد از وقفه (C.raceAfterGap): یک کارت تا وقتی کاربر «متوجه شدم» بزنه
+  function gapRaceCard() {
+    var r = state.profile && C.raceAfterGap(state.profile, today());
+    if (!r || r.seen) return '';
+    var u = T('units.word.' + I.getUnits()), km = Math.round(dKm(r.km) * 10) / 10;
+    return '<section class="card advice-card gap-race" role="status"><div class="hcard-top"><span class="hcard-label">' + esc(T('gapRace.title')) + '</span></div>' +
+      '<p>' + tt('gapRace.head', { d: r.gapDays, n: r.daysTo, km: km, u: u, name: r.name || T('gapRace.race') }) + '</p>' +
+      '<ul><li>' + tt(r.long ? 'gapRace.long' : 'gapRace.short') + '</li><li>' + tt('gapRace.pace') + '</li><li>' + tt('gapRace.stop') + '</li></ul>' +
+      '<div class="actions"><button type="button" class="btn btn-outline" data-gap-race="ok">' + esc(T('gapRace.ok')) + '</button>' +
+      ' <a class="btn btn-ghost" href="#race">' + esc(T('gapRace.goal')) + '</a></div></section>';
+  }
+  document.addEventListener('click', function (e) {
+    if (!(e.target.closest && e.target.closest('[data-gap-race]'))) return;
+    C.seenRaceAfterGap(state.profile, today()); save(); route();
+  });
   function adviceCards() {
     var open = (state.advice || []).filter(function (x) { return x.status === 'open' && adviceLive(x); }).slice(-2);
     return open.map(function (x) {
@@ -4757,7 +4772,7 @@
     // آمادگی، پیشرفت هفته و نکته‌های فیتنس/قدم‌ها → پیشرفت؛ چرخه → برنامه؛ نصب → پروفایل؛ اهداف و مسیر → مسابقه و اهداف
     void p;
     var html = '<header class="home-head"><p class="eyebrow">' + esc(T('home.date', { day: base.dayName, date: faDate(key) })) + '</p>' +
-      '<h1>' + esc(p && p.name ? T('home.greetName', { g: T(greetKey()), name: p.name }) : T(greetKey())) + '</h1></header>' + nameCard() + recBanner() + adviceCards() + homeToday(base, r.session, ci, key, r) + weekBar() + freeButton() + homeChecklist(now);
+      '<h1>' + esc(p && p.name ? T('home.greetName', { g: T(greetKey()), name: p.name }) : T(greetKey())) + '</h1></header>' + nameCard() + recBanner() + gapRaceCard() + adviceCards() + homeToday(base, r.session, ci, key, r) + weekBar() + freeButton() + homeChecklist(now);
     app.innerHTML = '<div class="home">' + html + '</div>';
     collapseChecklist();
   }
@@ -4931,6 +4946,7 @@
   }
   function pathEta(gp) {
     if (gp.status === 'ready') return T('path.ready');
+    if (gp.status === 'behind' && (gp.gap || gp.weeks === 0)) return gp.gap ? T('path.backGap', { d: gp.gap.days }) : T('path.backMissed');
     return gp.goal.date ? T('path.eta', { a: gp.weeks, b: gp.weeksHi }) : T('path.etaMonth', { m: I.monthTitle(C.parseDate(gp.readyDate)) });
   }
   // مسیر تو (در صفحه‌ی مسابقه و اهداف): وقتی زمان کمه به برنامه‌های پیشنهادی لینک می‌شه

@@ -138,6 +138,7 @@
     reminder: {
       return: 'You\'ve been running regularly again for a few weeks; time for a 5 km (or 2 km) time trial so your paces come from today\'s fitness.',
       none: 'For accurate paces, log a 2 or 5 km time trial.',
+      short: 'No time for a full time trial? A 2 km test is enough: after a 10-minute warm-up, run 2 km at the fastest pace you can hold evenly. About 8–14 minutes; it can replace one of this week\'s easy runs.',
       stale: { one: 'Your last time trial or best time was {weeks} week ago. Fitness changes over time; log a new time trial to update your paces (every 4–6 weeks is ideal).',
         other: 'Your last time trial or best time was {weeks} weeks ago. Fitness changes over time; log a new time trial to update your paces (every 4–6 weeks is ideal).' }
     },
@@ -1353,6 +1354,8 @@
       week: 'Week {a} of about {b} weeks of preparation', notStarted: 'Your plan starts on {d}',
       race: 'Race in {n} days ({d})', eta: 'Estimated readiness: {a} to {b} weeks', etaMonth: 'Estimated arrival: around {m}', ready: 'In mileage and preparation, you are ready',
       st: { ok: 'You have enough time', tight: 'Tight; check an intermediate goal', ready: 'Ready', injury: 'Injury: this race is unlikely', behind: 'Behind the plan' },
+      backGap: 'After a {d}-day break, it takes a few weeks to get back to your previous fitness',
+      backMissed: 'By week count you\'re ready, but less than half the plan was done in recent weeks',
       more: 'Details →', seePlans: 'Suggested plans →',
       none: 'Your path: no goal yet', noneSub: 'See the suggested plans for your level and pick one'
     },
@@ -1407,6 +1410,17 @@
       trim: '{day}: {km} {u} (instead of {from})',
       yes: 'Accept', no: 'No', ok: 'OK',
       done: 'The plan for these days was updated.'
+    },
+    gapRace: {
+      title: 'Race after a break',
+      race: 'Your race',
+      head: 'After a {d}-day break, {name} ({km} {u}) is in {n} days. The plan has lowered weekly volume, but the race distance can\'t shrink.',
+      long: 'This distance is long for you right now. If you can, switch to a shorter distance, or run it with walk breaks (e.g. 8 min run, 1 min walk).',
+      short: 'You can take part, but as a good run, not for a best time.',
+      pace: 'Drop the time goal; start at easy pace and only speed up over the last kilometres if you feel good.',
+      stop: 'Sharp pain or limping means stop right there; there will be another race.',
+      ok: 'Got it',
+      goal: 'Goal and races'
     },
     wbar: {
       title: 'This week',

@@ -628,6 +628,12 @@
   function fitnessReminder(profile, today, opts) {
     if (profile.experience === 'never' || isWalk(profile)) return null;
     if (!(opts && opts.all) && profile.fitRemSnooze && dateKey(today) < profile.fitRemSnooze) return null;
+    var r = fitnessReminderBase(profile, today);
+    // بعد از دو «فعلاً نه» پشت‌سرهم: تست کوتاه ۲ کیلومتری به‌جای تایم‌تست کامل
+    if (r && snoozeCount(profile) >= 2) { r.short = true; r.message = T('reminder.short'); }
+    return r;
+  }
+  function fitnessReminderBase(profile, today) {
     var fit = currentFitness(profile);
     // برگشتی بعد از وقفه‌ی طولانی: تایم‌تست اول بعد از چند هفته دویدن آسون (سطح ۱ بعد از ۸ هفته، بقیه بعد از ۴)
     var ri = returnInfo(profile);
@@ -643,11 +649,18 @@
 
   // آیا فیتنس فعلی به سطح دیگه‌ای رسیده؟ (برنامه خودکار سطح عوض نمی‌کنه تا حجم پرش نکنه؛ به کاربر پیشنهاد می‌ده)
   // اختلاف عادی دو تایم‌تست ۲ تا ۳٪ (حدود ۱ تا ۱٫۵ VDOT) است؛ پایین آوردن سطح حاشیه می‌خواد. بالا رفتن با رکورد تازه بدون حاشیه و خودکاره
-  var LEVEL_DOWN_MARGIN = 2, LEVEL_UP_MARGIN = 0;
+  var LEVEL_DOWN_MARGIN = 2, LEVEL_UP_MARGIN = 0, LEVEL_FLIP_DAYS = 60, LEVEL_FLIP_MARGIN = 2;
   // «فعلاً نه»: پیشنهاد سطح تا تایم‌تست یا مسابقه‌ی بعدی پنهان می‌شه (کلید = همون نتیجه‌ای که پیشنهاد رو ساخته)
   function fitnessKey(e) { return e ? [e.date, e.distanceKm, e.timeSec].join('|') : null; }
   // «فعلاً نه» روی یادآوری تایم‌تست: یک هفته دیده نمی‌شه
+  // تعداد «فعلاً نه»های پشت‌سرهم برای همون آمادگی فعلی (با ثبت تست تازه از صفر)
+  function snoozeCount(profile) {
+    var fit = currentFitness(profile), fk = fit ? fitnessKey(fit.entry) : 'none';
+    return profile.fitRemSnoozeN && profile.fitRemSnoozeN.k === fk ? profile.fitRemSnoozeN.n : 0;
+  }
   function snoozeFitnessReminder(profile, today) {
+    var fit = currentFitness(profile), fk = fit ? fitnessKey(fit.entry) : 'none';
+    profile.fitRemSnoozeN = { k: fk, n: snoozeCount(profile) + 1 };
     profile.fitRemSnooze = dateKey(addDays(today, REMINDER_SNOOZE_DAYS));
     return true;
   }
@@ -686,6 +699,15 @@
         var recentU = prevU && daysBetween(parseDate(prevU.date), parseDate(fit.entry.date)) <= 16 * 7;
         if (!recentU || levelFromVdot(vdotFromRace(prevU.distanceKm, prevU.timeSec)) <= planLevel) return null;
       }
+    }
+    // تا ۶۰ روز بعد از تغییر سطح، جهت مخالف فقط با تستی که دست‌کم ۲ VDOT از مرز رد شده
+    // (وگرنه سطح در نزدیکی مرز دو ماهه یک بار پایین و یک بار بالا می‌رفت و برنامه دو بار از اول شروع می‌شد)
+    var lc = profile.levelChange;
+    if (lc && lc.date && daysBetween(parseDate(lc.date), parseDate(fit.entry.date)) < LEVEL_FLIP_DAYS && (fitLevel > planLevel ? lc.dir === 'down' : lc.dir === 'up')) {
+      var edge = fitLevel > planLevel
+        ? vdotFromRace(42.195, LEVELS[planLevel + 1].marathon[1] === Infinity ? hms(5, 30) : LEVELS[planLevel + 1].marathon[1])
+        : vdotFromRace(42.195, LEVELS[planLevel].marathon[1] === Infinity ? hms(5, 30) : LEVELS[planLevel].marathon[1]);
+      if (Math.abs(fit.vdot - edge) < LEVEL_FLIP_MARGIN) return null;
     }
     return { from: planLevel, to: fitLevel, up: fitLevel > planLevel };
   }
@@ -879,8 +901,10 @@
     if (!g || !g.start || !(g.base > 0)) return null;
     var k = Math.floor(daysBetween(parseDate(g.start), ws) / 7);
     if (k < 0 || k >= GAP_CAP_WEEKS) return null;
-    var r = gapRamp(g.days);
-    return Math.max(5, floor05(g.base * r.frac * Math.pow(r.rate, k)));
+    var r = gapRamp(g.days), steps = 0, st = parseDate(g.start);
+    // هفته‌ی سبک (deload) پله‌ی رشد حساب نمی‌شه، وگرنه هفته‌ی بعدش نسبت به خود هفته‌ی سبک خیلی می‌پرید
+    for (var i = 0; i < k; i++) { var wi = weekIndexFor(profile, addDays(st, 7 * i)); if (!(wi >= 0 && progression(wi).deload)) steps++; }
+    return Math.max(5, floor05(g.base * r.frac * Math.pow(r.rate, steps)));
   }
   function lastRunKey(state, uptoKey) {
     var off = ['rest', 'none', 'cancelled'], best = null;
@@ -917,6 +941,28 @@
     if (!n || !(sum > 0)) return false;
     p.gapCap = { last: last, start: ws, base: round05(sum / n), days: gap };
     return true;
+  }
+
+  // مسابقه‌ی نزدیک بعد از وقفه: مسافت مسابقه کم نمی‌شه (gapCap روی هفته‌ی مسابقه اعمال نمی‌شه)، پس به کاربر گفته می‌شه.
+  // تا ۳۵ روز جلوتر، فقط وقتی برگشت از وقفه هنوز در جریانه. «long»: مسابقه بلندتر از حجم هفتگی قبل از وقفه یا نیمه‌ماراتن به بالا
+  function raceAfterGap(profile, today) {
+    var g = profile && profile.gapCap;
+    if (!g || !g.start || isWalk(profile) || gapCapKm(profile, weekStart(today)) == null) return null;
+    var tk = dateKey(today), list = [];
+    var main = raceInfo(profile);
+    if (main) list.push({ key: dateKey(main.date), km: main.km, name: null, main: true });
+    otherRaces(profile).forEach(function (r) { if (r.kind === 'race' && r.mode === 'race') list.push({ key: r.key, km: r.km, name: r.name, main: false }); });
+    var next = list.filter(function (r) { return r.key >= tk && daysBetween(today, parseDate(r.key)) <= 35; })
+      .sort(function (a, b) { return a.key < b.key ? -1 : 1; })[0];
+    if (!next) return null;
+    var long = next.km >= 21 || next.km > g.base * 0.8;
+    return { key: next.key, km: next.km, name: next.name, main: next.main, daysTo: Math.round(daysBetween(today, parseDate(next.key))),
+      gapDays: g.days, base: g.base, long: long, seen: profile.gapRaceSeen === next.key + '|' + g.last };
+  }
+  function seenRaceAfterGap(profile, today) {
+    var r = raceAfterGap(profile, today);
+    if (r) profile.gapRaceSeen = r.key + '|' + profile.gapCap.last;
+    return !!r;
   }
 
   // کم شدن عمدی حجم این هفته نسبت به هفته‌ی قبل (برای توضیح زیر نوار حجم هفته، تا کاهش حس عقب‌گرد نده)
@@ -992,6 +1038,7 @@
     if (returnInfo(profile)) { profile.gap = 'now'; profile.gapDays = 0; profile.xtrain = null; profile.walkMinNow = null; }
     profile.startDate = dateKey(today);
     var after = assessLevel(profile).level, rAfter = sessionRange(after);
+    if (after !== before) profile.levelChange = { date: dateKey(today), dir: after > before ? 'up' : 'down' };
     profile.daysSuggest = after > before && Number(profile.runDays) < rAfter.def ? { level: after } : null;
     return { from: before, to: after, km: km, days: daysSuggestion(profile) };
   }
@@ -2985,7 +3032,7 @@
   // طول چرخه‌ی واقعی از شروع‌های ثبت‌شده (میانه‌ی حداکثر ۶ فاصله‌ی اخیر بین ۲۱ و ۴۵ روز؛ حداقل ۲ فاصله)، وگرنه عدد واردشده.
   // بی‌نظمی (برای پیام ملایم مشورت با پزشک، نه تشخیص): اختلاف کوتاه‌ترین و بلندترین فاصله‌ی اخیر بیشتر از ۹ روز،
   // فاصله‌ی خارج از ۲۱ تا ۴۵ روز، یا بیش از ۹۰ روز بدون شروع تازه (حدودهای رایج بالینی؛ ACOG 2015).
-  // ثبت جاافتاده: فاصله‌ای نزدیک به ۲ یا ۳ برابر طول معمول (±۲۰٪، حداقل ۵ روز؛ اختلاف عادی ماه‌به‌ماه تا ۷ روزه) احتمالاً یعنی شروع یک دوره ثبت نشده، نه چرخه‌ی نامنظم.
+  // ثبت جاافتاده: فاصله‌ای (بالای ۴۵ روز، یا با تکه‌های دست‌کم ۲۱ روزه) نزدیک به ۲ یا ۳ برابر طول معمول (±۲۰٪، حداقل ۵ روز؛ اختلاف عادی ماه‌به‌ماه تا ۷ روزه) احتمالاً یعنی شروع یک دوره ثبت نشده، نه چرخه‌ی نامنظم.
   // اون فاصله به چند فاصله‌ی برابر تقسیم می‌شه و به‌جای هشدار نامنظمی، از کاربر خواسته می‌شه تاریخ رو ثبت کنه.
   function cycleStats(profile, now) {
     var c = (profile && profile.cycle) || {}, st = cycleStarts(profile), raw = [];
@@ -2996,7 +3043,9 @@
     var L0 = okRaw.length >= 2 ? median(okRaw) : manual, tol = Math.max(5, L0 * 0.2), gaps = [], missed = [];
     raw.forEach(function (g, j) {
       var n = Math.round(g / L0);
-      if (g > 45 && n >= 2 && n <= 3 && Math.abs(g / n - L0) <= tol) {
+      // نه فقط بالای ۴۵ روز: با چرخه‌ی کوتاه (مثلاً ۲۱ تا ۲۳ روز) یک ثبت جاافتاده فاصله‌ی ۴۲ تا ۴۵ روز می‌سازه؛
+      // شرط: هر تکه دست‌کم ۲۱ روز (کوتاه‌ترین چرخه‌ی عادی)
+      if ((g > 45 || g / n >= 21) && n >= 2 && n <= 3 && Math.abs(g / n - L0) <= tol) {
         for (var k = 0; k < n; k++) gaps.push(Math.round(g / n));
         missed.push({ from: st[j], to: st[j + 1], days: g, n: n - 1 });
       } else gaps.push(g);
@@ -3868,7 +3917,13 @@
     var ad = !imp && data ? adherence(profile, data, today, 4) : null;
     if (ad && ad.share < BEHIND_SHARE) {
       out.behind = { share: ad.share };
-      if (out.status === 'ok' || out.status === 'tight') out.status = 'behind';
+      // «آماده» هم: شماره‌ی هفته جلو رفته ولی تمرین‌ها انجام نشده
+      if (out.status === 'ok' || out.status === 'tight' || out.status === 'ready') out.status = 'behind';
+    }
+    // برگشت از وقفه‌ی ۱۴ روز یا بیشتر هنوز در جریانه (gapCap): آمادگی قبل از وقفه حساب نمی‌شه
+    if (!imp && profile.gapCap && gapCapKm(profile, weekStart(today)) != null) {
+      out.gap = { days: profile.gapCap.days };
+      if (out.status === 'ok' || out.status === 'ready') out.status = 'behind';
     }
     return out;
   }
@@ -4028,7 +4083,7 @@
     easyRpeTrend: easyRpeTrend, easyDayHint: easyDayHint, easyPaceTrend: easyPaceTrend, weakTestContext: weakTestContext, fitnessReminder: fitnessReminder, snoozeFitnessReminder: snoozeFitnessReminder,
     makeActivity: makeActivity, addActivity: addActivity, freeInWeek: freeInWeek, weekActual: weekActual, adviceAfterRun: adviceAfterRun,
     overTrend: overTrend, applyPlanAdjust: applyPlanAdjust, longestRun: longestRun, isHardActivity: isHardActivity,
-    updateGapCap: updateGapCap, gapCapKm: gapCapKm, weekDrop: weekDrop,
+    updateGapCap: updateGapCap, gapCapKm: gapCapKm, weekDrop: weekDrop, raceAfterGap: raceAfterGap, seenRaceAfterGap: seenRaceAfterGap,
     sessionRange: sessionRange, SESSION_RANGE: SESSION_RANGE, dayCount: dayCount, daysSuggestion: daysSuggestion, acceptDaysSuggestion: acceptDaysSuggestion, recordCheck: recordCheck,
     fitnessLevelSuggestion: fitnessLevelSuggestion, skipLevelSuggestion: skipLevelSuggestion, applyFitnessLevel: applyFitnessLevel, autoLevelUp: autoLevelUp,
     adherence: adherence, rebaseSuggestion: rebaseSuggestion, applyRebase: applyRebase, logWeek: logWeek, planLogLimit: planLogLimit,

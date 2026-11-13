@@ -204,6 +204,8 @@ function simulate(persona, opts) {
         var due = rem && rem.kind !== 'none' || (rem && rem.kind === 'none' && day > 14);
         if (persona.traits.temperament === 'obsessive' && lastTestDay != null && day - lastTestDay >= 42) due = true;
         if (due && rnd.chance(T.test) && !unmot && !sick) H.testPlanned = true;
+        // پیشنهاد تست کوتاه ۲ کیلومتری بعد از دو «فعلاً نه»: کم‌زحمت‌تره، پس بیشتر قبول می‌شه (دنباله‌ی تصادفی جدا)
+        if (rem && rem.short && !H.testPlanned && !unmot && !sick && rnd2.chance(0.35)) { H.testPlanned = true; H.testShort = true; }
         var vs = C.vdotStepSuggestion(p, state.postRuns, d);
         if (vs && (persona.traits.temperament === 'competitive' || persona.traits.temperament === 'obsessive') && rnd.chance(0.7)) {
           p.fitnessTests = (p.fitnessTests || []).concat([vs.entry]);    // app.js data-vdot-step
@@ -342,7 +344,8 @@ function simulate(persona, opts) {
         }
       }
       if (isTest) {
-        var tkm = C.assessLevel(p).level <= 1 ? 2 : 5;
+        var tkm = C.assessLevel(p).level <= 1 || H.testShort ? 2 : 5;
+        H.testShort = false;
         var tsec = Math.round(racePred(tkm) * (1 + rnd.normal(0.01, 0.015)) * (fatigue >= 4 ? 1.03 : 1));
         p.fitnessTests = (p.fitnessTests || []).concat([{ date: k, distanceKm: tkm, timeSec: tsec, kind: 'test' }]);   // app.js fitness
         H.testPlanned = false; lastTestDay = day; H.vAtTest = H.vdot;
@@ -477,7 +480,9 @@ function simulate(persona, opts) {
         if (cst.since > 90 && cst.flags.indexOf('absent') < 0) F('major', 'cycle-absent-flag', day, 'بیش از ۹۰ روز بدون پریود ثبت‌شده، ولی هشدار نیومده', { since: cst.since });
         if (lg.length >= 3 && Math.max.apply(null, lg) - Math.min.apply(null, lg) > 9 && cst.flags.indexOf('variable') < 0) F('major', 'cycle-variable-flag', day, 'فاصله‌ها نامنظم ولی هشدار نامنظمی نیومده', { gaps: lg });
         // هشدار نامنظمی برای چرخه‌ای که در واقع منظمه (فقط چون کاربر یک شروع رو ثبت نکرده)
-        var rs = H.realStarts.filter(function (x) { return x <= k; }).slice(-7), rg = [];
+        // همون بازه‌ی زمانی فاصله‌های ثبت‌شده‌ی موتور (با یک ثبت جاافتاده، ۶ فاصله‌ی ثبت‌شده بازه‌ی طولانی‌تری از ۶ فاصله‌ی واقعی رو می‌پوشونن)
+        var lst = (cst.starts || []).filter(function (x) { return x <= k; }), from0 = lst.length > 6 ? lst[lst.length - 7] : (lst[0] || k);
+        var rs = H.realStarts.filter(function (x) { return x <= k && x >= from0; }), rg = [];
         for (var gi2 = 1; gi2 < rs.length; gi2++) rg.push(C.daysBetween(C.parseDate(rs[gi2 - 1]), C.parseDate(rs[gi2])));
         var realOk = !lg.some(function (g) { return g > 90; }) && rg.length >= 2 && rg.every(function (g) { return g >= 21 && g <= 45; }) && Math.max.apply(null, rg) - Math.min.apply(null, rg) <= 9 && !(cyc.absent || []).some(function (w) { return day >= w[0] && day < w[1] + 60; });
         // «absent» (بیش از ۹۰ روز بدون ثبت) عمداً هشدار می‌ده: موتور ثبت‌نکردن رو از بی‌پریودی واقعی تشخیص نمی‌ده
@@ -616,7 +621,10 @@ function simulate(persona, opts) {
     var doneBefore = before.length ? before.reduce(function (a, w) { return a + w.doneKm; }, 0) / before.length : 0;
     var plannedNow = curWeek ? curWeek.plannedKm : 0;
     events.push({ day: day, kind: 'return', text: 'برگشت بعد از ' + gapDays + ' روز؛ برنامه‌ی این هفته ' + plannedNow + ' کیلومتر، میانگین قبل از وقفه ' + r1(doneBefore) });
-    if (!walk && plannedNow > 8 && plannedNow > Math.max(doneBefore, 1) * 1.1)
+    // هفته‌ی مسابقه: مسافت مسابقه کم نمی‌شه ولی کارت «مسابقه بعد از وقفه» روی خانه دیده شده (app.js gapRaceCard)
+    var raceWarned = !walk && !!C.raceAfterGap(p, d);
+    if (raceWarned) events.push({ day: day, kind: 'return', text: 'هشدار «مسابقه بعد از وقفه» نشون داده شد' });
+    if (!walk && !raceWarned && plannedNow > 8 && plannedNow > Math.max(doneBefore, 1) * 1.1)
       F(gapDays >= 28 && plannedNow >= 15 && !(H.rebaseShown != null && day - H.rebaseShown <= 42) ? 'major' : 'minor', 'gap-return-' + (gapDays >= 28 ? 'long' : 'short'), day,
         'بعد از ' + gapDays + ' روز وقفه، حجم هفته‌ی برگشت بیشتر از قبل از وقفه‌ست', { gapDays: gapDays, plannedKm: plannedNow, doneBefore: r1(doneBefore), vdotHidden: r1(H.vdot) });
     if (gapDays >= 28) addChurn(day, persona.traits.temperament === 'sensitive' ? 3 : 1, 'hardReturn');
