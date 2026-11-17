@@ -131,6 +131,21 @@ var QUESTIONS6 = [
   ['انقباض عضله ساق دارم', 'dontknow|pain-general|ood|strength']
 ];
 
+// مجموعه‌ی ۷: کوفتگی، گرفتگی و درد پهلو (تأییدشده در نسخه‌ی ۱۵۱)
+var QUESTIONS7 = [
+  ['دو روز بعد تمرین پاهام کوفته ست چرا', 'doms'],
+  ['کوفتگی عضلات بخاطر اسید لاکتیکه؟', 'doms'],
+  ['از کجا بفهمم کوفتگیه یا آسیب دیدم', 'soreness-vs-injury'],
+  ['این درد عضله طبیعیه یا آسیبه', 'soreness-vs-injury|pain-general'],
+  ['با کوفتگی میتونم بدوم', 'run-while-sore'],
+  ['ساق پام حین دویدن گرفت', 'cramp|pain-general'],
+  ['گرفتگی عضله بخاطر کم آبیه؟', 'cramp|pain-general'],
+  ['موقع دویدن پهلوم درد میگیره', 'side-stitch|pain-general'],
+  ['سیخونک پهلو چیه', 'side-stitch'],
+  ['ساعتم صدا داد', 'dontknow|ood'],
+  ['کوفتگی دارم و یه نقطه روی استخوان پام خیلی درد داره', 'urgent']
+];
+
 function judge(exp, r) {
   // «الف|ب» با گزینه‌ی منتظر تأیید: هر کدوم درست باشه کافیه
   if (/\|/.test(exp) && /pending:/.test(exp) && !/^pending:[^|]*$/.test(exp)) {
@@ -155,7 +170,7 @@ function judge(exp, r) {
 }
 
 function run(set) {
-  var list = set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
+  var list = set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
   list.forEach(function (q) {
     var r = E.ask(idx, q[0], CTX), v = judge(q[1], r);
@@ -165,7 +180,7 @@ function run(set) {
   return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) [1, 2, 3, 4, 5, 6].forEach(function (set) {
+if (require.main === module) [1, 2, 3, 4, 5, 6, 7].forEach(function (set) {
   var res = run(set);
   console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
@@ -177,4 +192,4 @@ if (require.main === module) [1, 2, 3, 4, 5, 6].forEach(function (set) {
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
 });
-module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6 };
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7 };
