@@ -5,7 +5,7 @@
  * - بقیه (آیکون‌ها، فونت وزیرمتن روی خود سایت): کش و به‌روزرسانی در پس‌زمینه.
  * با هر انتشار، VERSION و نسخه‌ی فایل‌ها در index.html با هم بالا می‌رن (تست این هماهنگی رو بررسی می‌کنه).
  */
-var VERSION = '143';
+var VERSION = '144';
 var CACHE = 'coach-v' + VERSION;
 // صبر حداکثر برای شبکه موقع باز کردن صفحه، قبل از نشون دادن نسخه‌ی کش‌شده
 var NAV_WAIT = 1500;
@@ -37,6 +37,11 @@ var SHELL = [
   'js/pose.js?v=' + VERSION,
   'js/track.js?v=' + VERSION,
   'js/hr.js?v=' + VERSION,
+  'js/assistant/config.js?v=' + VERSION,
+  'js/assistant/engine.js?v=' + VERSION,
+  'js/assistant/kb-fa.js?v=' + VERSION,
+  'js/assistant/ui.js?v=' + VERSION,
+  'css/assistant.css?v=' + VERSION,
   'js/app.js?v=' + VERSION,
   'css/theme.css?v=' + VERSION,
   'public/assets/gaam-logo-transparent.svg?v=' + VERSION,

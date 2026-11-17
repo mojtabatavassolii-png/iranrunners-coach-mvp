@@ -1,0 +1,60 @@
+/* دستیار گام (آزمایشی): همه‌ی ظاهر دستیار؛ با برداشتن این فایل چیزی از بقیه‌ی اپ عوض نمی‌شه. */
+
+/* نوار بالا: «؟» کنار زنگ، ستون‌ها قرینه تا لوگو وسط بمونه */
+body.ga-on .site-header .header-inner { grid-template-columns: 92px 1fr 92px; }
+.site-header .ga-btn { grid-column: 3; grid-row: 1; justify-self: start; }
+
+/* خط «سؤال داری؟» بالای آموزش */
+.ga-learn-chip {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; margin: 0 0 14px; padding: 10px 14px;
+  font: inherit; font-weight: 600; color: var(--text); text-align: start; cursor: pointer; border: 1px solid var(--border);
+}
+.ga-learn-chip svg { flex: none; color: var(--primary); }
+.ga-learn-chip:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+
+/* برگه‌ی گفت‌وگو از پایین */
+.ga-backdrop { position: fixed; inset: 0; z-index: 160; background: var(--scrim); display: flex; justify-content: center; align-items: flex-end; }
+.ga-panel {
+  width: 100%; max-width: 560px; max-height: min(78vh, 640px); display: flex; flex-direction: column;
+  background: var(--surface-elevated); border: 1px solid var(--border); border-bottom: 0; border-radius: 22px 22px 0 0;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px)); animation: gaUp .2s ease-out;
+}
+@keyframes gaUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ga-panel { animation: none; } }
+.ga-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ga-head h2 { margin: 0; font-size: var(--fs-lg); }
+.ga-beta { font-size: var(--fs-xs); font-weight: 700; color: var(--primary); border: 1px solid var(--primary); border-radius: 999px; padding: 1px 8px; vertical-align: 2px; }
+.ga-x { width: 44px; height: 44px; border-radius: 50%; border: 0; background: none; color: var(--text); font-size: 26px; line-height: 1; cursor: pointer; }
+.ga-x:focus-visible { outline: 3px solid var(--primary); }
+.ga-log { flex: 1 1 auto; min-height: 120px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+.ga-msg { max-width: 88%; padding: 8px 12px; border-radius: 16px; line-height: 1.75; }
+.ga-msg p { margin: 0; }
+.ga-me { align-self: flex-start; background: var(--primary); color: var(--on-primary); border-end-start-radius: 4px; }
+.ga-bot { align-self: flex-end; background: var(--surface); border: 1px solid var(--border); border-end-end-radius: 4px; }
+.ga-caution { border-color: var(--warning); background: var(--warning-soft); }
+.ga-urgent { border-color: var(--error); background: var(--error-soft); font-weight: 600; }
+.ga-links, .ga-sug { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ga-link, .ga-chip {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 4px 12px; border-radius: 999px; font: inherit; font-size: var(--fs-sm);
+  color: var(--primary); background: none; border: 1px solid var(--primary); text-decoration: none; cursor: pointer;
+}
+.ga-chip { color: var(--text); border-color: var(--border); text-align: start; }
+.ga-fb { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: var(--fs-sm); color: var(--text-secondary, var(--text)); }
+.ga-fbb { min-width: 44px; min-height: 36px; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--text); font: inherit; cursor: pointer; }
+.ga-small { margin: 6px 0 0; font-size: var(--fs-sm); opacity: .85; }
+.ga-team { margin-top: 6px; font-size: var(--fs-sm); min-height: 36px; }
+.ga-consent .actions, .ga-report .actions { margin-top: 4px; }
+.ga-form { display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.ga-in { flex: 1 1 auto; min-width: 0; min-height: 44px; }
+.ga-send { flex: none; min-height: 44px; }
+.ga-foot { margin: 6px 0 0; text-align: center; font-size: var(--fs-sm); }
+.ga-foot .linklike { min-height: 36px; }
+.ga-report textarea { width: 100%; margin-top: 6px; }
+
+/* صفحه‌ی مدیریت */
+.ga-admin-panel { max-height: 88vh; }
+.ga-admin-body { overflow-y: auto; padding: 6px 0; }
+.ga-asec h3 { font-size: var(--fs-base); margin: 14px 0 6px; }
+.ga-asec ul { margin: 0; padding-inline-start: 18px; }
+.ga-asec li { margin: 4px 0; overflow-wrap: anywhere; }
+.ga-panel .btn-sm { min-height: 40px; padding: 6px 14px; }

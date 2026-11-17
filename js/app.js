@@ -285,6 +285,7 @@
     badge.hidden = !n;
     b.setAttribute('aria-label', n ? T('inbox.ariaN', { n: fa(n) }) : T('inbox.aria'));
     b.setAttribute('aria-expanded', String(!!document.getElementById('inbox')));
+    if (window.GaamAssistant) window.GaamAssistant.header(show); // دستیار گام (آزمایشی)
   }
   // پیام کوچیک لحظه‌ای بالای صفحه
   function flashMessage(k, text) {
@@ -6045,6 +6046,7 @@
     var html;
     if (!id) {
       html = '<header class="page-head"><h1>' + esc(T('learn.title')) + '</h1></header>' +
+        (window.GaamAssistant ? window.GaamAssistant.learnChip() : '') + // دستیار گام (آزمایشی)
         LEARN_GROUPS.map(function (g) { return [g[0], g[1].filter(learnVisible)]; }).filter(function (g) { return g[1].length; }).map(function (g) {
           return '<section class="learn-group"><h2 class="learn-gh">' + esc(T('learn.groups.' + g[0])) + '</h2><ul class="learn-list">' + g[1].map(function (k) {
             if (k.indexOf('g:') === 0) {
@@ -6551,7 +6553,7 @@
   var openSettings = {};
   function setSection(id, icon, title, sub, body) {
     return '<details class="card set-sec" id="set-' + id + '"' + (openSettings[id] ? ' open' : '') + '><summary>' +
-      '<span class="set-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + SET_ICONS[icon] + '</svg></span>' +
+      '<span class="set-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + (SET_ICONS[icon] || icon) + '</svg></span>' +
       '<span class="set-head"><b>' + esc(title) + '</b><small>' + sub + '</small></span><span class="set-chev" aria-hidden="true"></span></summary>' +
       '<div class="set-body">' + body + '</div></details>';
   }
@@ -6642,6 +6644,8 @@
         '</dl>' + '<div class="level-strip">' + levelCard(lv, true) + '</div>' + warningsCard(C.profileWarnings(p, today()))) +
       // ۵. سلامت (فقط اپ نیتیو)
       (P.health.supported() ? healthSection() : '') +
+      // دستیار گام (آزمایشی): بخش «آزمایشی»
+      (window.GaamAssistant ? window.GaamAssistant.settingsSection(setSection) : '') +
       // ۶. داده‌ها
       setSection('data', 'data', T('settingsPage.data'), tt('profile.statsVal', { c: nCheck, d: nDone }),
         '<div class="actions">' +
@@ -6820,6 +6824,40 @@
         document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') reg.update().catch(function () { /* */ }); });
       }).catch(function () { /* بدون کش آفلاین ادامه می‌ده */ });
     });
+  }
+
+  // دستیار گام (آزمایشی): فقط خوندنی؛ برنامه یا داده‌ی تمرین رو عوض نمی‌کنه
+  if (window.GaamAssistant) window.GaamAssistant.attach({
+    store: P.store, version: ASSET_V, num: fa,
+    lang: function () { return I.getLang(); },
+    ctx: assistantCtx,
+    learnTitle: function (k) { return learnTitle(k); },
+    guideTitle: function (k) { return T('guide.sections.' + k + '.title'); },
+    learnVisible: function (k) { return learnVisible(k); },
+    showToast: showToast,
+    rerender: function () { route(); },
+    saveFile: function (name, blob) { return P.files.save(name, blob, { share: true }); }
+  });
+  function assistantCtx() {
+    var p = state.profile;
+    if (!p || needsMigration()) return {};
+    var walk = C.isWalk(p), now = today(), o = { walk: walk, cycle: C.cycleAllowed(p) };
+    try {
+      var lv = C.assessLevel(p);
+      if (lv && lv.level != null && lv.info) o.level = T('level.title', { n: fa(lv.level), name: lv.info.name });
+    } catch (e) { /* */ }
+    try {
+      var z = walk ? null : C.paceZones(p);
+      if (z && z.easy) o.easyPace = T('pace.range', { a: fa(paceFmt(z.easy[0])), b: fa(paceFmt(z.easy[1])) });
+    } catch (e) { /* */ }
+    try {
+      var s = effectiveSession(C.sessionFor(p, now)).session;
+      if (s && s.type !== 'none') {
+        var amt = s.type === 'rest' || s.type === 'cancelled' ? '' : s.minutes ? T('dur.m', { n: fa(s.minutes) }) : s.km ? fa(Math.round(I.dist(s.km) * 10) / 10) + ' ' + T('units.word.' + I.getUnits()) : '';
+        o.today = (s.label || T('types.' + s.type)) + (amt ? ' (' + amt + ')' : '');
+      }
+    } catch (e) { /* */ }
+    return o;
   }
 
   applyStatic();

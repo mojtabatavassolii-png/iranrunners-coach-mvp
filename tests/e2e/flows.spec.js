@@ -477,3 +477,61 @@ test('سنسور ضربان: اتصال، عدد زنده، ذخیره‌ی می
   await page.locator('[data-postrun-cancel]').first().click();
   await expect(page.locator('.actual-line').first()).toContainText('ضربان میانگین');
 });
+
+// ---------- ۱۴. دستیار گام (آزمایشی): پیش‌فرض خاموش، روشن از تنظیمات، پاسخ شخصی، هشدار ایمنی، ارسال با رضایت ----------
+test('دستیار گام: کلید آزمایشی، پاسخ، هشدار ایمنی و ذخیره‌ی سؤال فقط با رضایت', async ({ page }) => {
+  await onboard(page);
+  // پیش‌فرض خاموش: دکمه دیده نمی‌شه
+  await expect(page.locator('#bell')).toBeVisible();
+  await expect(page.locator('#ga-btn')).toBeHidden();
+  await page.evaluate(() => { location.hash = '#settings'; });
+  await page.locator('#set-lab').evaluate((d) => { d.open = true; });
+  await page.locator('label:has(#ga-toggle)').click();
+  await expect(page.locator('#ga-btn')).toBeVisible();
+  // خط «سؤال داری؟» بالای آموزش، باز شدن گفت‌وگو
+  await page.evaluate(() => { location.hash = '#learn'; });
+  await page.locator('.ga-learn-chip').click();
+  const sheet = page.locator('#ga-sheet');
+  await expect(sheet).toBeVisible();
+  // پاسخ شخصی: پیس ایزی خود کاربر (عدد از برنامه، نه جای‌نگهدار)
+  await sheet.locator('.ga-in').fill('پیس ایزیم چنده؟');
+  await sheet.locator('.ga-send').click();
+  const ans = sheet.locator('.ga-bot').last();
+  await expect(ans).toContainText('ایزی');
+  await expect(ans).not.toContainText('{');
+  // بازخورد منفی → ارسال برای تیم فقط بعد از تیک رضایت
+  await ans.locator('[data-ga-fb="n"]').click();
+  await ans.locator('[data-ga-team]').click();
+  await expect(ans.locator('[data-ga-save]')).toBeDisabled();
+  await ans.locator('label:has([data-ga-ack])').click();
+  await ans.locator('[data-ga-save]').click();
+  const st = await page.evaluate(() => JSON.parse(localStorage.getItem('gaam-assistant')));
+  expect(st.queue.length).toBe(1);
+  expect(st.queue[0].q).toBe('پیس ایزیم چنده؟');
+  // فقط سؤال، پاسخ، شناسه‌ی مدخل و تاریخ؛ بدون اسم یا داده‌ی تمرین
+  expect(Object.keys(st.queue[0]).sort()).toEqual(['a', 'fb', 'id', 'kind', 'q', 't']);
+  expect(JSON.stringify(st)).not.toContain('آزمایشی');
+  // نشونه‌ی جدی: هشدار ثابت و پیوند ثبت درد
+  await sheet.locator('.ga-in').fill('زانوم ورم کرده و تو استراحت هم درد داره');
+  await sheet.locator('.ga-send').click();
+  await expect(sheet.locator('.ga-urgent').last()).toContainText('متوقف کن');
+  await expect(sheet.locator('.ga-urgent').last().locator('a[href="#health"]')).toBeVisible();
+  // خارج از حوزه
+  await sheet.locator('.ga-in').fill('بهترین گوشی برای عکاسی چیه');
+  await sheet.locator('.ga-send').click();
+  await expect(sheet.locator('.ga-bot').last()).toContainText('خارج از تخصص');
+  // پیوند مطلب، گفت‌وگو رو می‌بنده و صفحه رو باز می‌کنه
+  await sheet.locator('.ga-in').fill('تیپر یعنی چی');
+  await sheet.locator('.ga-send').click();
+  await sheet.locator('.ga-bot').last().locator('.ga-link').first().click();
+  await expect(page.locator('#ga-sheet')).toHaveCount(0);
+  await expect(page).toHaveURL(/#guide|#race|#learn/);
+  // دستیار فقط کلید خودش رو می‌نویسه
+  const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.indexOf('assistant') >= 0));
+  expect(keys).toEqual(['gaam-assistant']);
+  // خاموش کردن: دکمه پنهان
+  await page.evaluate(() => { location.hash = '#settings'; });
+  await page.locator('#set-lab').evaluate((d) => { d.open = true; });
+  await page.locator('label:has(#ga-toggle)').click();
+  await expect(page.locator('#ga-btn')).toBeHidden();
+});
