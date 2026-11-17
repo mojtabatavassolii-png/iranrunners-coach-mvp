@@ -1803,6 +1803,7 @@
       editOnb: 'Edit your details (setup form)',
       photoPick: 'Choose photo', photoChange: 'Change photo', photoRemove: 'Remove photo', photoSaved: 'Profile photo saved.',
       photoBad: 'This image can\'t be read; please choose another photo.', photoFull: 'Browser storage is full; the photo wasn\'t saved.',
+      rowLearn: 'Running science articles and the plan guide', rowLearnWalk: 'Walking articles and the plan guide',
       rowProgress: 'Charts for mileage, training load, pace and check-ins', rowProgressWalk: 'Charts for weekly minutes, daily steps and check-ins', rowGait: 'Running form analysis from a short video', rowGaitLast: 'Latest analysis: {d} · {s}% within the usual range',
       joined: 'Joined {d}', edit: 'Edit profile', levelLink: 'Suggested plans for your level', levelLinkWalk: 'This week\'s walking plan', goalSetShort: 'No goal set yet',
       groups: { mine: 'My stuff', prefs: 'My preferences' },

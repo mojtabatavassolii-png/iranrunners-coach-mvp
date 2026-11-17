@@ -1,8 +1,7 @@
 /* دستیار گام (آزمایشی): همه‌ی ظاهر دستیار؛ با برداشتن این فایل چیزی از بقیه‌ی اپ عوض نمی‌شه. */
 
-/* نوار بالا: «؟» کنار زنگ، ستون‌ها قرینه تا لوگو وسط بمونه */
-body.ga-on .site-header .header-inner { grid-template-columns: 92px 1fr 92px; }
-.site-header .ga-btn { grid-column: 3; grid-row: 1; justify-self: start; }
+/* تب «دستیار» در نوار پایین: همون ظاهر بقیه‌ی تب‌ها (استایل .tabbar a) */
+.tabbar a.ga-tab { cursor: pointer; }
 
 /* خط «سؤال داری؟» بالای آموزش */
 .ga-learn-chip {

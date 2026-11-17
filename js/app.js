@@ -1352,7 +1352,7 @@
   // تب مادر هر صفحه
   var TABS = ['home', 'plan', 'record', 'learn', 'profile'];
   var TAB_OF = { home: 'home', checkin: 'home', health: 'profile', race: 'profile', plans: 'profile', walkgoals: 'profile', progress: 'profile', gait: 'profile', plan: 'plan', fitness: 'profile',
-    learn: 'learn', guide: 'learn', profile: 'profile', settings: 'profile', record: 'record' };
+    learn: 'profile', guide: 'profile', profile: 'profile', settings: 'profile', record: 'record' };
   // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
   var lastView = null, lastTab = null;
   function animateView(v, tab) {
@@ -6425,6 +6425,7 @@
       periodCard(p, now, race) +
       listGroup(T('profile.groups.mine'), walker() ? [weekBar(true) ? ['#plan', 'plans', T('wbar.title'), weekBar(true)] : null, ['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgressWalk')],
         ['#walkgoals', 'flag', T('wgoal.pageTitle'), C.walkGoalInfo(p).kind !== 'none' ? T('wgoal.' + C.walkGoalInfo(p).kind + '.t') : T('profile.goalSetShort')],
+        ['#learn', 'book', T('tabs.learn'), T('profile.rowLearnWalk')],
         ['#settings', 'bell', T('remind.title'), remindSub(), 'remind']] : [
         weekBar(true) ? ['#plan', 'plans', T('wbar.title'), weekBar(true)] : null,
         ['#progress', 'chart', T('profile.tabs.progress'), T('profile.rowProgress')],
@@ -6432,6 +6433,7 @@
         ['#race', 'flag', T('race.pageTitle'), g.type !== 'none' ? C.goalLabel(g) + (race && race.date >= now ? T('progress.sep') + T('profile.goalIn', { n: Math.round(C.daysBetween(now, race.date)) }) : '') : T('profile.goalSetShort')],
         ['#plans', 'plans', T('plans.title'), T('plans.linkSub')],
         ['#fitness', 'watch', T('profile.linkFitness'), fit ? 'VDOT ' + fit.vdot.toFixed(1) + (fitAdj ? T('progress.sep') + T('profile.fitnessAdjusted') : '') : T('profile.registerTest')],
+        ['#learn', 'book', T('tabs.learn'), T('profile.rowLearn')],
         ['#gait', 'gait', T('profile.tabs.gait'), lastGait && lastGait.v >= 2 && lastGait.score != null ? T('profile.rowGaitLast', { d: faDate(lastGait.date), s: lastGait.score }) : T('profile.rowGait')]
       ]) +
       listGroup(T('profile.groups.prefs'), [
@@ -6537,6 +6539,7 @@
     health: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
     person: '<circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5"/>',
     install: '<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v8M8.8 11.8 12 15l3.2-3.2"/>',
+    book: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M8.5 7.5h7M8.5 11h5"/>',
     data: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
     flag: '<path d="M5.5 21V4"/><path d="M5.5 4.5h12l-2.5 4 2.5 4h-12"/>',
     plans: '<rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8 8.5h8M8 12h8M8 15.5h5"/>',

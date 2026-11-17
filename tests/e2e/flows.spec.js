@@ -479,17 +479,20 @@ test('سنسور ضربان: اتصال، عدد زنده، ذخیره‌ی می
 });
 
 // ---------- ۱۴. دستیار گام (آزمایشی): پیش‌فرض خاموش، روشن از تنظیمات، پاسخ شخصی، هشدار ایمنی، ارسال با رضایت ----------
-test('دستیار گام: کلید آزمایشی، پاسخ، هشدار ایمنی و ذخیره‌ی سؤال فقط با رضایت', async ({ page }) => {
+test('دستیار گام: تب نوار پایین، پاسخ، هشدار ایمنی و ذخیره‌ی سؤال فقط با رضایت', async ({ page }) => {
   await onboard(page);
-  // پیش‌فرض خاموش: دکمه دیده نمی‌شه
-  await expect(page.locator('#bell')).toBeVisible();
-  await expect(page.locator('#ga-btn')).toBeHidden();
-  await page.evaluate(() => { location.hash = '#settings'; });
-  await page.locator('#set-lab').evaluate((d) => { d.open = true; });
-  await page.locator('label:has(#ga-toggle)').click();
-  await expect(page.locator('#ga-btn')).toBeVisible();
+  // پیش‌فرض روشن: «دستیار» جای «آموزش» در نوار پایین؛ آموزش در پروفایل
+  await expect(page.locator('#tabbar a[data-tab="learn"]')).toHaveCount(0);
+  await expect(page.locator('#tabbar #ga-btn')).toBeVisible();
+  await page.locator('#ga-btn').click();
+  await expect(page.locator('#ga-sheet')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#ga-sheet')).toHaveCount(0);
+  await page.locator('#tabbar a[data-tab="profile"]').click();
+  await page.locator('#app a.list-row[href="#learn"]').click();
+  await expect(page).toHaveURL(/#learn/);
+  await expect(page.locator('#tabbar a[data-tab="profile"]')).toHaveClass(/is-active/);
   // خط «سؤال داری؟» بالای آموزش، باز شدن گفت‌وگو
-  await page.evaluate(() => { location.hash = '#learn'; });
   await page.locator('.ga-learn-chip').click();
   const sheet = page.locator('#ga-sheet');
   await expect(sheet).toBeVisible();
@@ -534,9 +537,13 @@ test('دستیار گام: کلید آزمایشی، پاسخ، هشدار ای�
   // دستیار فقط کلید خودش رو می‌نویسه
   const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.indexOf('assistant') >= 0));
   expect(keys).toEqual(['gaam-assistant']);
-  // خاموش کردن: دکمه پنهان
+  // خاموش کردن از تنظیمات › آزمایشی: تب پنهان و نوار پایین ۴تایی؛ روشن کردن دوباره
   await page.evaluate(() => { location.hash = '#settings'; });
   await page.locator('#set-lab').evaluate((d) => { d.open = true; });
   await page.locator('label:has(#ga-toggle)').click();
   await expect(page.locator('#ga-btn')).toBeHidden();
+  await expect(page.locator('#tabbar a:visible')).toHaveCount(4);
+  await page.locator('#set-lab').evaluate((d) => { d.open = true; });
+  await page.locator('label:has(#ga-toggle)').click();
+  await expect(page.locator('#ga-btn')).toBeVisible();
 });

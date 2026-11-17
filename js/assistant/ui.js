@@ -14,7 +14,7 @@
 
   // متن‌های رابط (فقط فارسی؛ در دوره‌ی آزمایش برای زبان انگلیسی پنهانه)
   var S = {
-    title: 'دستیار گام', beta: 'آزمایشی', btn: 'دستیار گام', close: 'بستن',
+    title: 'دستیار گام', beta: 'آزمایشی', btn: 'دستیار گام', tab: 'دستیار', close: 'بستن',
     hello: 'سلام! درباره‌ی دویدن، پیاده‌روی و برنامه‌ات بپرس. پاسخ‌ها کوتاه و عمومی‌ان و جای پزشک یا مربی نیستن.',
     placeholder: 'سؤالت رو بنویس…', send: 'بپرس',
     helpful: 'مفید بود؟', yes: 'بله', no: 'نه', thanks: 'ممنون از بازخوردت.',
@@ -50,28 +50,35 @@
     ['fb', 'queue', 'reports'].forEach(function (k) { if (d[k].length > MAX_ITEMS) d[k] = d[k].slice(-MAX_ITEMS); });
     try { api.store.set(STORE_KEY, JSON.stringify(d)); } catch (e) { /* */ }
   }
-  function isOn() { return !!(api && load().on); }
+  // پیش‌فرض روشن؛ فقط وقتی کاربر در تنظیمات خاموشش کرده باشه خاموشه
+  function isOn() { return !!(api && load().on !== false); }
   function langOk() { return api && api.lang() === 'fa'; }
   function active() { return isOn() && langOk(); }
 
-  // ---------- دکمه‌ی نوار بالا ----------
+  // ---------- تب «دستیار» در نوار پایین (جای «آموزش» که حالا در پروفایله) ----------
   var Q_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.2"/><path d="M14.6 9.6a2.6 2.6 0 1 0-3.6 2.4c.6.3 1 .8 1 1.5v.6"/><path d="M12 17.3h.01"/></svg>';
-  function header(show) {
-    var bell = document.getElementById('bell');
+  var TAB_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5a7.5 7.5 0 0 1-11.2 6.5L4 19.5l1.4-4.3A7.5 7.5 0 1 1 20 11.5z"/><path d="M9 10.5h6M9 13.5h4"/></svg>';
+  function header() {
+    var bar = document.querySelector('#tabbar .tabbar-inner');
+    if (!bar) return;
     var b = document.getElementById('ga-btn');
-    if (!bell) return;
     if (!b) {
-      b = document.createElement('button');
-      b.type = 'button'; b.id = 'ga-btn'; b.className = 'bell ga-btn';
-      b.setAttribute('aria-haspopup', 'dialog'); b.setAttribute('aria-expanded', 'false');
-      b.setAttribute('aria-label', S.btn); b.title = S.btn;
-      b.innerHTML = Q_ICON;
-      bell.parentNode.insertBefore(b, bell);
+      b = document.createElement('a');
+      b.href = '#'; b.id = 'ga-btn'; b.className = 'ga-tab'; b.dataset.tab = 'assistant';
+      b.setAttribute('role', 'button'); b.setAttribute('aria-haspopup', 'dialog'); b.setAttribute('aria-expanded', 'false');
+      b.innerHTML = '<span class="tab-ico" aria-hidden="true">' + TAB_ICON + '</span><span class="tab-lbl">' + esc(S.tab) + '</span>';
+      var prof = bar.querySelector('[data-tab="profile"]');
+      bar.insertBefore(b, prof || null);
     }
-    var vis = !!show && active();
+    var vis = active();
     b.hidden = !vis;
-    document.body.classList.toggle('ga-on', vis);
     if (!vis) close(true);
+  }
+  function tabState(open) {
+    var b = document.getElementById('ga-btn');
+    if (!b) return;
+    b.setAttribute('aria-expanded', String(open));
+    b.classList.toggle('is-active', open);
   }
 
   // ---------- پنجره‌ی گفت‌وگو ----------
@@ -90,8 +97,7 @@
       '<div class="ga-report" hidden></div></div>';
     document.body.appendChild(el);
     document.body.classList.add('modal-open');
-    var b = document.getElementById('ga-btn');
-    if (b) b.setAttribute('aria-expanded', 'true');
+    tabState(true);
     if (!msgs.length) msgs.push({ who: 'bot', id: ++seq, r: { kind: 'hello', answer: S.hello } });
     renderLog();
     var input = el.querySelector('.ga-in');
@@ -103,8 +109,9 @@
     if (!el) return;
     el.remove();
     document.body.classList.remove('modal-open');
+    tabState(false);
     var b = document.getElementById('ga-btn');
-    if (b) { b.setAttribute('aria-expanded', 'false'); if (!silent && !b.hidden) b.focus(); }
+    if (b && !silent && !b.hidden) b.focus();
   }
 
   // «Thomas, Erdman & Burke (2016), …» → «Thomas et al. (2016)»
@@ -273,7 +280,7 @@
   var LAB_ICON = '<path d="M9 3h6M10 3v6.2L4.8 18a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3L14 9.2V3"/><path d="M7.2 14h9.6"/>';
   function settingsSection(setSection) {
     if (!langOk()) return '';
-    var d = load(), on = !!d.on;
+    var d = load(), on = d.on !== false;
     var body = '<label class="check-row ga-toggle"><input type="checkbox" id="ga-toggle"' + (on ? ' checked' : '') + '> <span>' + esc(S.toggle) + '</span></label>' +
       '<small class="muted">' + esc(S.toggleHint) + '</small>';
     if (on) {
