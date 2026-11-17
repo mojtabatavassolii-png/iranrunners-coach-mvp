@@ -100,6 +100,23 @@ var QUESTIONS4 = [
   ['آشیلم یهو تق صدا داد و نمیتونم رو پنجه وایسم', 'urgent']
 ];
 
+// مجموعه‌ی ۵: خواب، ریکاوری و گرما (تأییدشده در نسخه‌ی ۱۴۸)
+var QUESTIONS5 = [
+  ['شبی چند ساعت بخوابم', 'sleep'],
+  ['دیشب ۵ ساعت خوابیدم امروز بدوم؟', 'sleep'],
+  ['چرا باید روز استراحت داشته باشم', 'rest-days'],
+  ['میتونم هر روز بدوم؟', 'rest-days|week-rules'],
+  ['همیشه خسته ام و رکوردم بدتر شده', 'overtraining'],
+  ['بیش تمرینی چیه', 'overtraining'],
+  ['بعد لانگ ران ماساژ برم؟', 'recovery-methods'],
+  ['حمام یخ بعد تمرین خوبه', 'recovery-methods'],
+  ['تابستون تو گرما چطور بدوم', 'heat'],
+  ['هوا خیلی گرمه پیسم کند شده', 'heat|rpe'],
+  ['علائم گرمازدگی چیه', 'urgent|heat-illness'],
+  ['تو گرما دویدم الان گیجم و سرم درد میکنه', 'urgent|pain-general'],
+  ['قرص خواب بخورم؟', 'dontknow|ood']
+];
+
 function judge(exp, r) {
   // «الف|ب» با گزینه‌ی منتظر تأیید: هر کدوم درست باشه کافیه
   if (/\|/.test(exp) && /pending:/.test(exp) && !/^pending:[^|]*$/.test(exp)) {
@@ -110,6 +127,9 @@ function judge(exp, r) {
   }
   if (exp.indexOf('small:') === 0) return r.kind === 'small' && r.small === exp.slice(6) ? 'correct' : (r.kind === 'none' || r.kind === 'suggest' ? 'dontknow' : 'wrong');
   var dk = r.kind === 'none' || r.kind === 'suggest';
+  if (/\|/.test(exp) && /^(urgent|dontknow|ood)\|/.test(exp)) {
+    return exp.split('|').some(function (o) { return judge(o, r) === 'correct'; }) ? 'correct' : ((r.kind === 'none' || r.kind === 'suggest') ? 'dontknow' : 'wrong');
+  }
   if (exp === 'urgent') return r.kind === 'urgent' ? 'correct' : 'wrong';
   if (exp === 'ood') return r.kind === 'ood' ? 'correct' : (dk ? 'dontknow' : 'wrong');
   if (exp === 'dontknow') return dk || r.kind === 'ood' ? 'correct' : 'wrong';
@@ -121,7 +141,7 @@ function judge(exp, r) {
 }
 
 function run(set) {
-  var list = set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
+  var list = set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
   list.forEach(function (q) {
     var r = E.ask(idx, q[0], CTX), v = judge(q[1], r);
@@ -131,7 +151,7 @@ function run(set) {
   return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) [1, 2, 3, 4].forEach(function (set) {
+if (require.main === module) [1, 2, 3, 4, 5].forEach(function (set) {
   var res = run(set);
   console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
@@ -143,4 +163,4 @@ if (require.main === module) [1, 2, 3, 4].forEach(function (set) {
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
 });
-module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4 };
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5 };
