@@ -30,14 +30,14 @@ test('بُن‌سازی سبک', function () {
   assert.strictEqual(E.stem('کفش'), 'کفش');
 });
 
-test('ساختار پایگاه دانش: ۵۰ مدخل، ۲ منتظر تأیید، تغذیه‌ی تأییدشده با منبع، پیوندها معتبر', function () {
-  assert.strictEqual(KB.entries.length, 50);
+test('ساختار پایگاه دانش: ۵۵ مدخل، هیچ مدخل منتظر تأیید، مدخل‌های منبع‌دار تأییدشده، پیوندها معتبر', function () {
+  assert.strictEqual(KB.entries.length, 55);
   var ids = {};
   KB.entries.forEach(function (e) {
     assert.ok(!ids[e.id], 'شناسه‌ی تکراری ' + e.id); ids[e.id] = 1;
     assert.ok(e.q && e.topic && Array.isArray(e.phrases) && Array.isArray(e.keywords), e.id);
     assert.ok(['none', 'caution', 'urgent'].indexOf(e.safety) >= 0, e.id);
-    if (e.sources) assert.ok(e.approved && e.sources.length && e.sources.every(function (x) { return x.ref && ['secondary', 'abstract', 'memory'].indexOf(x.verified) >= 0; }), 'منبع ' + e.id);
+    if (e.sources) assert.ok((e.status === 'pending' ? e.draft : e.approved) && e.sources.length && e.sources.every(function (x) { return x.ref && ['secondary', 'abstract', 'memory'].indexOf(x.verified) >= 0; }), 'منبع ' + e.id);
     if (e.status === 'pending') { assert.strictEqual(e.answer, '', e.id); return; }
     assert.strictEqual(e.status, 'ok', e.id);
     assert.ok(e.answer && e.source, 'پاسخ و منبع ' + e.id);
@@ -47,7 +47,7 @@ test('ساختار پایگاه دانش: ۵۰ مدخل، ۲ منتظر تأیی
       if (l.page) assert.ok(/^#[a-z]+$/.test(l.page) && l.label, 'صفحه ' + l.page);
     });
   });
-  assert.strictEqual(KB.entries.filter(function (e) { return e.status === 'pending'; }).length, 2);
+  assert.strictEqual(KB.entries.filter(function (e) { return e.status === 'pending'; }).length, 0);
   assert.strictEqual(KB.entries.filter(function (e) { return e.topic === 'تغذیه‌ی ورزشی' && e.status === 'ok' && e.sources; }).length, 9);
 });
 
@@ -85,6 +85,11 @@ test('شخصی‌سازی فقط خواندنی: پیس ایزی و جایگزی
   assert.ok(g.answer.indexOf('{') < 0 && /تست حرف زدن/.test(g.answer));
 });
 
+test('«به درد می‌خوره» درد نیست', function () {
+  assert.notStrictEqual(E.ask(idx, 'دویدن در آب به درد می‌خوره؟', {}).id, 'pain-general');
+  assert.strictEqual(E.ask(idx, 'زانوم درد میکنه', {}).id, 'pain-general');
+});
+
 test('پیاده‌روی: متن و پیوند مخصوص پیاده‌روی', function () {
   var r = E.ask(idx, 'روزانه باید چیکار کنم', { walk: true });
   assert.strictEqual(r.id, 'daily-start');
@@ -98,7 +103,10 @@ test('چرخه‌ی قاعدگی فقط وقتی این بخش برای کارب
 });
 
 test('مدخل منتظر تأیید جواب نمی‌ده', function () {
-  var r = E.ask(idx, 'میتونم بجای دو دوچرخه برم؟', CTX);
+  // همه‌ی مدخل‌ها تأیید شدن؛ رفتار «منتظر تأیید» با یک مدخل ساختگی بررسی می‌شه
+  var kb2 = JSON.parse(JSON.stringify(KB));
+  kb2.entries.push({ id: 'tmp-pending', topic: 'آزمایشی', q: 'سؤال آزمایشی زومبا', phrases: ['زومبا'], keywords: ['زومبا'], answer: '', pendingText: KB.texts.pending, links: [], safety: 'none', status: 'pending' });
+  var r = E.ask(E.createIndex(kb2), 'زومبا خوبه؟', CTX);
   assert.strictEqual(r.kind, 'pending');
   assert.strictEqual(r.answer, KB.texts.pending);
 });

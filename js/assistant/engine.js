@@ -300,7 +300,8 @@
     if (u) return { kind: 'urgent', answer: kb.texts.urgent, links: kb.urgentLinks, safety: 'urgent', matched: u };
     if (!qt.length) return { kind: 'none', answer: kb.texts.none, suggestions: popular(kb, ctx, []) };
     // ۲. خارج از حوزه
-    var pain = hasAny(n, PAIN);
+    // «به درد می‌خوره» یعنی «مفیده»، نه درد
+    var pain = hasAny(n.replace(/(^| )ب(ه )?درد(م|ت|ش)? ?(ن?می)?(خوره|خورن|بخوره)/g, ' '), PAIN);
     if (!pain && !inDomain(idx, qt) && !nearPhrase(idx, text)) return { kind: 'ood', answer: kb.texts.ood, suggestions: popular(kb, ctx, []) };
     // ۳. جست‌وجو
     var qreal = [], qg = trigrams(text), qw = qt.map(function (t, i) {

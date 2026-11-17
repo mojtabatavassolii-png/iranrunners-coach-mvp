@@ -35,7 +35,7 @@ var QUESTIONS = [
   ['چه کفشی واسه دویدن خوبه', 'shoes'],
   ['کی میتونم از پیاده روی برم سراغ دویدن', 'walk-to-run'],
   ['قبل مسابقه چی بخورم', 'race-food'],
-  ['میتونم بجای دو دوچرخه برم؟', 'pending:xtrain'],
+  ['میتونم بجای دو دوچرخه برم؟', 'xtrain'],
   ['تو ماراتن ژل بخورم یا نه', 'gels'],
   ['بهترین گوشی برای عکاسی چیه', 'ood'],
   ['دستور پخت قورمه سبزی', 'ood'],
@@ -63,7 +63,23 @@ var QUESTIONS2 = [
   ['خوبی؟ امروز بعد دویدن سرگیجه داشتم', 'urgent'],
   ['قیمت بلیت هواپیما به استانبول', 'ood'],
   ['بهترین آهنگ برای دویدن چیه', 'dontknow'],
-  ['شنا کنم یا بدوم', 'pending:xtrain']
+  ['شنا کنم یا بدوم', 'xtrain']
+];
+
+// مجموعه‌ی ۳: کراس‌تریننگ و تمرین قدرتی (تأییدشده در نسخه‌ی ۱۴۶)
+var QUESTIONS3 = [
+  ['میتونم یه روز به جای دویدن دوچرخه برم؟', 'xtrain'],
+  ['الپتیکال خوبه برای دونده', 'xtrain'],
+  ['دویدن تو استخر فایده داره', 'pool-running'],
+  ['دونده باید باشگاه بره؟', 'strength'],
+  ['وزنه زدن سرعتمو بیشتر میکنه؟', 'strength'],
+  ['چه حرکاتی برای پا بزنم که دویدنم بهتر شه', 'strength-how'],
+  ['چند ست اسکوات بزنم', 'strength-how'],
+  ['قبل لانگ ران پا بزنم یا نه', 'strength-timing|long-run'],
+  ['طناب زدن برای دونده خوبه؟', 'plyometrics'],
+  ['آسیب دیدم نمیتونم بدوم چه ورزشی کنم', 'xtrain-injury'],
+  ['یوگا برای دونده خوبه؟', 'dontknow'],
+  ['زانوم درد میکنه، دوچرخه برم؟', 'pain-general|xtrain-injury']
 ];
 
 function judge(exp, r) {
@@ -76,11 +92,11 @@ function judge(exp, r) {
     var ids = exp.slice(8).split('|');
     return r.kind === 'pending' && ids.indexOf(r.id) >= 0 ? 'correct' : (dk ? 'dontknow' : 'wrong');
   }
-  return r.kind === 'answer' && r.id === exp ? 'correct' : (dk ? 'dontknow' : 'wrong');
+  return r.kind === 'answer' && exp.split('|').indexOf(r.id) >= 0 ? 'correct' : (dk ? 'dontknow' : 'wrong');
 }
 
 function run(set) {
-  var list = set === 2 ? QUESTIONS2 : QUESTIONS;
+  var list = set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
   list.forEach(function (q) {
     var r = E.ask(idx, q[0], CTX), v = judge(q[1], r);
@@ -90,7 +106,7 @@ function run(set) {
   return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) [1, 2].forEach(function (set) {
+if (require.main === module) [1, 2, 3].forEach(function (set) {
   var res = run(set);
   console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
@@ -102,4 +118,4 @@ if (require.main === module) [1, 2].forEach(function (set) {
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
 });
-module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2 };
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3 };
