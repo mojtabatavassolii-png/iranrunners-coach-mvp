@@ -23,7 +23,7 @@
     consentOk: 'موافقم', save: 'ذخیره', cancel: 'انصراف', saved: 'ذخیره شد. از «تنظیمات › آزمایشی» بفرستش.',
     report: 'گزارش مشکل', reportPh: 'مشکل رو کوتاه بنویس (بدون اطلاعات شخصی)',
     reportConsent: 'متن گزارش، نسخه‌ی اپ و صفحه‌ای که روش بودی ذخیره می‌شه.',
-    learn: 'مطلب: ', chip: 'سؤال داری؟ از دستیار بپرس',
+    learn: 'مطلب: ', src: 'منبع: ', chip: 'سؤال داری؟ از دستیار بپرس',
     // تنظیمات
     labTitle: 'آزمایشی', labSub: 'دستیار گام', toggle: 'دستیار گام (آزمایشی)',
     toggleHint: 'یک دستیار ساده که از روی مطالب آموزش جواب می‌ده؛ بدون اینترنت و بدون هوش مصنوعی.',
@@ -107,6 +107,12 @@
     if (b) { b.setAttribute('aria-expanded', 'false'); if (!silent && !b.hidden) b.focus(); }
   }
 
+  // «Thomas, Erdman & Burke (2016), …» → «Thomas et al. (2016)»
+  function cite(ref) {
+    var m = /^([^,(]+?)(,[^(]*)?\s*(\(\d{4}\))/.exec(ref);
+    if (!m) return ref;
+    return m[1].trim() + (m[2] && !/et al/.test(m[1]) ? ' et al. ' : ' ') + m[3];
+  }
   function linkHtml(l) {
     if (l.learn) {
       if (api.learnVisible && !api.learnVisible(l.learn)) return '';
@@ -118,12 +124,19 @@
   }
   function botHtml(m) {
     var r = m.r, h = '<div class="ga-msg ga-bot' + (r.safety === 'urgent' || r.kind === 'urgent' ? ' ga-urgent' : r.safety === 'caution' ? ' ga-caution' : '') + '" data-mid="' + m.id + '">';
-    h += '<p>' + esc(r.answer) + '</p>';
-    if (r.kind === 'suggest') {
+    h += '<p>' + (r.greet ? esc(r.greet) + ' ' : '') + esc(r.answer) + '</p>';
+    if (r.suggestions && r.suggestions.length) {
       h += '<div class="ga-sug">' + r.suggestions.map(function (s) { return '<button type="button" class="ga-chip" data-ga-pick="' + esc(s.id) + '">' + esc(s.q) + '</button>'; }).join('') + '</div>';
     }
     var links = (r.links || []).map(linkHtml).filter(Boolean);
     if (links.length) h += '<div class="ga-links">' + links.join('') + '</div>';
+    // منبع مدخل‌های منبع‌دار (تغذیه): «نویسنده (سال)»
+    if (r.entry && r.entry.sources) h += '<p class="ga-src">' + esc(S.src + r.entry.sources.map(function (x) { return cite(x.ref); }).join('؛ ')) + '</p>';
+    // قدم بعدی در خود اپ (فقط قابلیت‌های واقعی)
+    if (r.next) {
+      var nl = linkHtml(r.next.learn ? { learn: r.next.learn } : r.next.guide ? { guide: r.next.guide } : { page: r.next.page, label: r.next.label });
+      h += '<p class="ga-next">' + esc(r.next.text) + (nl ? ' ' + nl : '') + '</p>';
+    }
     var canTeam = r.kind === 'none' || r.kind === 'pending' || r.kind === 'suggest' || m.fb === 'n';
     if ((r.kind === 'answer' || r.kind === 'urgent') && !m.fb) {
       h += '<div class="ga-fb"><span>' + esc(S.helpful) + '</span><button type="button" class="ga-fbb" data-ga-fb="y">' + esc(S.yes) + '</button><button type="button" class="ga-fbb" data-ga-fb="n">' + esc(S.no) + '</button></div>';

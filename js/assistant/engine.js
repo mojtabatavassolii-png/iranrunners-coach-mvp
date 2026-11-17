@@ -38,7 +38,7 @@
    'است هست هستش نیست بود بوده باشه باشد باید بشه میشه میشم می شه کنم کنیم کنه کنی میکنم میکنه بکنم ' +
    'دارم داره داری داریم ندارم میخوام میخواستم خواستم بدم بگو بگید بگین لطفا سلام ممنون مرسی ' +
    'چقدر چقد چند خوبه خوب بهتر بهترین درسته درست الان یعنی مثلا ' +
-   'میتونم میتونه نمیتونم تونم کردم کرد کرده شد شده شدم میشد دیگه خیلی کمی ای ولی اما فقط انجام').split(' ').forEach(function (w) { if (w) STOP[normalize(w)] = 1; });
+   'میتونم میتونه نمیتونم تونم کردم کرد کرده شد شده شدم میشد دیگه خیلی کمی ای ولی اما فقط انجام اصلا اصن').split(' ').forEach(function (w) { if (w) STOP[normalize(w)] = 1; });
 
   var SUFFIXES = ['هایی', 'های', 'ها', 'ترین', 'مون', 'تون', 'شون', 'مان', 'تان', 'شان', 'ام', 'ات', 'اش'];
   function stem(t) {
@@ -54,7 +54,8 @@
       if (t.length - s.length >= 3 && t.slice(-s.length) === s) return t.slice(0, -s.length);
     }
     var last = t[t.length - 1];
-    if ((last === 'م' || last === 'ت') && t.length >= 4) return t.slice(0, -1);
+    if (last === 'م' && t.length >= 4) return t.slice(0, -1);
+    if (last === 'ت' && t.length >= 5) return t.slice(0, -1); // «گوشت» و «پوست» بُن نیستن
     if ((last === 'ش' || last === 'ی') && t.length >= 5) return t.slice(0, -1);
     return t;
   }
@@ -81,10 +82,15 @@
     }
     return prev[b.length];
   }
+  var SHORT_SUFFIX = {};
+  ['م', 'ت', 'ش', 'ی', 'و', 'ها', 'های', 'رو', 'مو', 'تو', 'شو', 'ام', 'ات', 'اش', 'یم', 'ید', 'ن', 'ه', 'تر', 'ترین'].forEach(function (x) { SHORT_SUFFIX[x] = 1; });
   function wordSim(a, b) {
     if (a === b) return 1;
     var la = a.length, lb = b.length, m = Math.min(la, lb);
-    if (m >= 3 && Math.abs(la - lb) <= 3 && (a.indexOf(b) === 0 || b.indexOf(a) === 0)) return 0.85;
+    if (m >= 3 && Math.abs(la - lb) <= 3 && (a.indexOf(b) === 0 || b.indexOf(a) === 0)) {
+      // کلمه‌ی سه‌حرفی فقط با پسوند واقعی: «ساقم» = «ساق»، ولی «آهنگ» ≠ «آهن»
+      if (m > 3 || SHORT_SUFFIX[(la > lb ? a : b).slice(3)]) return 0.85;
+    }
     if (m >= 4 && lev(a, b, 1) <= 1) return 0.75;
     if (m >= 7 && lev(a, b, 2) <= 2) return 0.6;
     return 0;
@@ -161,7 +167,11 @@
   }
   function inDomain(idx, qt) {
     for (var i = 0; i < qt.length; i++) {
-      for (var j = 0; j < idx.domain.length; j++) if (wordSim(qt[i], idx.domain[j]) >= 0.75) return true;
+      for (var j = 0; j < idx.domain.length; j++) {
+        var sm = wordSim(qt[i], idx.domain[j]);
+        // غلط املایی فقط در کلمه‌های بلند؛ «گوشی» نباید «گوشت» حساب بشه
+        if (sm >= 0.85 || (sm >= 0.6 && qt[i].length >= 6 && idx.domain[j].length >= 6)) return true;
+      }
     }
     return false;
   }
@@ -173,7 +183,7 @@
 
   // امتیاز هر مدخل برای سؤال (۰ تا ۱)
   function scoreEntry(idx, x, qt, qg, qn, qw, qreal) {
-    var num = 0, den = 0, anchor = false;
+    var num = 0, den = 0, anchor = false, word = false;
     for (var i = 0; i < qt.length; i++) {
       var t = qt[i], best = 0, bw = 0, floor = qreal[i] ? 0.85 : 0;
       for (var term in x.terms) {
@@ -181,6 +191,7 @@
         if (s > floor || (s && s === floor)) {
           var v = s * (x.terms[term] >= 2 ? 1 : 0.8) * (idx.idf[term] || 0);
           if (v > best) { best = v; bw = idx.idf[term]; }
+          if (s >= 0.85 && x.terms[term] >= 2) word = true; // کلیدواژه‌ی مدخل، نه کلمه‌ی عمومی مثل «دویدن»
           // لنگر: کلیدواژه‌ی مدخل، دقیق یا با بُن؛ غلط املایی فقط در کلمه‌های بلند (۶ حرف به بالا)
           if (x.terms[term] >= 2 && (s >= 0.85 || (t.length >= 6 && term.length >= 6))) anchor = true;
         }
@@ -203,7 +214,7 @@
       if (d === 1) anchor = true;
       if (d > ph) ph = d;
     }
-    return { s: 0.65 * tok + 0.35 * ph, anchor: anchor };
+    return { s: 0.65 * tok + 0.35 * ph, anchor: anchor, word: word };
   }
 
   var T_ANSWER = 0.5, T_MARGIN = 0.07, T_SUGGEST = 0.3;
@@ -228,19 +239,69 @@
     return (ctx && ctx.walk && e.linksWalk) || e.links || [];
   }
 
+  // ---------- سلام و احوال‌پرسی ----------
+  // ترتیب مهمه: اولین نوعی که پیدا بشه جواب داده می‌شه
+  var SMALL = [
+    ['who', ['تو کی هستی', 'کی هستی', 'اسمت چیه', 'تو چی هستی', 'رباتی', 'ربات هستی', 'هوش مصنوعی هستی', 'ادمی', 'آدمی']],
+    ['how', ['خوبی', 'خوبین', 'خوب هستی', 'چطوری', 'چطورین', 'حالت چطوره', 'حالت خوبه', 'احوالت', 'چه خبر', 'چخبر', 'خسته نباشی', 'خسته نباشید']],
+    ['thanks', ['مرسی', 'ممنون', 'ممنونم', 'سپاس', 'سپاسگزارم', 'تشکر', 'دمت گرم', 'دستت درد نکنه', 'مچکرم', 'متشکرم', 'عالی بود', 'مرسی ازت']],
+    ['bye', ['خداحافظ', 'خدافظ', 'خدانگهدار', 'بای', 'بدرود', 'شب خوش', 'شب بخیر', 'فعلا']],
+    ['hello', ['سلام', 'سلام علیکم', 'سلامم', 'درود', 'هلو', 'صبح بخیر', 'ظهر بخیر', 'عصر بخیر', 'وقت بخیر', 'روز بخیر', 'صبحت بخیر']]
+  ].map(function (g) { return [g[0], g[1].map(normalize).sort(function (a, b) { return b.length - a.length; })]; });
+  function smallTalk(n) {
+    var found = [], rest = ' ' + n + ' ';
+    SMALL.forEach(function (g) {
+      g[1].forEach(function (w) {
+        var re = new RegExp('(^| )' + w + '(?= |$)', 'g');
+        if (re.test(rest)) { if (found.indexOf(g[0]) < 0) found.push(g[0]); rest = rest.replace(re, ' '); }
+      });
+    });
+    return { kinds: found, rest: rest.replace(/\s+/g, ' ').trim() };
+  }
+  function smallReply(kb, kind, ctx) {
+    var t = kb.smallTalk[kind], name = ctx && ctx.name ? ' ' + ctx.name : '';
+    var a = t.text.replace('{name}', name);
+    if (kind === 'hello' && ctx && ctx.today && t.today) a += ' ' + t.today.replace('{today}', ctx.today);
+    return { kind: 'small', small: kind, answer: a, links: t.links || [], suggestions: kind === 'hello' || kind === 'how' ? popular(kb, ctx, []) : [] };
+  }
+  // پیشنهادهای پرکاربرد وقتی جواب نداریم (پیاده‌روی جدا)
+  function popular(kb, ctx, skip) {
+    var ids = (ctx && ctx.walk ? kb.popularWalk : kb.popular) || [];
+    return ids.filter(function (id) { return skip.indexOf(id) < 0; }).map(function (id) {
+      var e = kb.entries.filter(function (x) { return x.id === id; })[0];
+      return e ? { id: e.id, q: e.q } : null;
+    }).filter(Boolean);
+  }
+
   // پرسش: نتیجه‌ی ساختاریافته برای رابط کاربری و آزمون
-  // kind: answer | pending | suggest | none | ood | urgent | empty
+  // kind: answer | pending | suggest | none | ood | urgent | small | empty
   function ask(idx, text, ctx) {
+    var n0 = normalize(text);
+    if (!n0) return { kind: 'empty' };
+    // ایمنی همیشه اول، حتی وسط سلام و احوال‌پرسی
+    var u = hasAny(n0, URGENT);
+    if (u) return { kind: 'urgent', answer: idx.kb.texts.urgent, links: idx.kb.urgentLinks, safety: 'urgent', matched: u };
+    var st = smallTalk(n0);
+    if (st.kinds.length) {
+      if (!tokens(st.rest).length) return smallReply(idx.kb, st.kinds[0], ctx);
+      var r = askCore(idx, st.rest, ctx);
+      // سلام جدا از متن پاسخ، تا اسم کاربر هیچ‌وقت در سؤال ذخیره‌شده برای تیم نره
+      if (st.kinds.indexOf('hello') >= 0 && r.kind !== 'urgent') r.greet = idx.kb.smallTalk.prefix.replace('{name}', ctx && ctx.name ? ' ' + ctx.name : '');
+      return r;
+    }
+    return askCore(idx, text, ctx);
+  }
+  function askCore(idx, text, ctx) {
     var kb = idx.kb, n = normalize(text);
     var qtAll = tokens(text, true), qt = tokens(text);
     if (!qtAll.length) return { kind: 'empty' };
     // ۱. ایمنی، قبل از هر چیز
     var u = hasAny(n, URGENT);
     if (u) return { kind: 'urgent', answer: kb.texts.urgent, links: kb.urgentLinks, safety: 'urgent', matched: u };
-    if (!qt.length) return { kind: 'none', answer: kb.texts.none, suggestions: [] };
+    if (!qt.length) return { kind: 'none', answer: kb.texts.none, suggestions: popular(kb, ctx, []) };
     // ۲. خارج از حوزه
     var pain = hasAny(n, PAIN);
-    if (!pain && !inDomain(idx, qt) && !nearPhrase(idx, text)) return { kind: 'ood', answer: kb.texts.ood };
+    if (!pain && !inDomain(idx, qt) && !nearPhrase(idx, text)) return { kind: 'ood', answer: kb.texts.ood, suggestions: popular(kb, ctx, []) };
     // ۳. جست‌وجو
     var qreal = [], qg = trigrams(text), qw = qt.map(function (t, i) {
       var b = bestVocab(idx, t);
@@ -249,7 +310,7 @@
     });
     var ranked = idx.entries.filter(function (x) { return visibleEntry(x.e, ctx); }).map(function (x) {
       var sc = scoreEntry(idx, x, qt, qg, n, qw, qreal);
-      return { x: x, s: sc.s, anchor: sc.anchor };
+      return { x: x, s: sc.s, anchor: sc.anchor, word: sc.word };
     }).sort(function (a, b) { return b.s - a.s; });
     // درد: فقط مدخل‌های ایمنی‌دار؛ اگه هیچ‌کدوم روشن نبود، پاسخ محتاطانه‌ی عمومی درد
     if (pain) {
@@ -259,14 +320,20 @@
     }
     var r1 = ranked[0], r2 = ranked[1];
     if (r1 && r1.anchor && r1.s >= T_ANSWER && (!r2 || r1.s - r2.s >= T_MARGIN || r1.x.e.topic === r2.x.e.topic && r1.s - r2.s >= T_MARGIN / 2)) return result(r1.x.e, r1.s, ctx);
-    var sug = ranked.filter(function (r) { return r.s >= T_SUGGEST; }).slice(0, 3).map(function (r) { return { id: r.x.e.id, q: r.x.e.q, score: round(r.s) }; });
+    // پیشنهاد فقط مدخل‌هایی که جواب دارن
+    // و دست‌کم یک کلمه‌ی واقعاً مشترک («آهنگ» به «آهن» پیشنهاد نمی‌ده)
+    var sug = ranked.filter(function (r) { return r.s >= T_SUGGEST && r.word && r.x.e.status !== 'pending'; }).slice(0, 3).map(function (r) { return { id: r.x.e.id, q: r.x.e.q, score: round(r.s) }; });
     if (sug.length) return { kind: 'suggest', answer: kb.texts.suggest, suggestions: sug, score: round(r1.s) };
-    return { kind: 'none', answer: kb.texts.none, suggestions: [], score: r1 ? round(r1.s) : 0 };
+    // بی‌جواب: نزدیک‌ترین‌ها (حتی ضعیف) و بعد پرکاربردها، تا کاربر دست‌خالی نمونه
+    var near = ranked.filter(function (r) { return r.s >= T_SUGGEST * 0.6 && r.word && r.x.e.status !== 'pending'; }).slice(0, 2).map(function (r) { return { id: r.x.e.id, q: r.x.e.q }; });
+    var more = popular(kb, ctx, near.map(function (x) { return x.id; }));
+    return { kind: 'none', answer: kb.texts.none, suggestions: near.concat(more).slice(0, 3), score: r1 ? round(r1.s) : 0 };
   }
   function round(x) { return Math.round(x * 1000) / 1000; }
   function result(e, s, ctx) {
     if (e.status === 'pending') return { kind: 'pending', id: e.id, entry: e, answer: e.pendingText || '', topic: e.topic, score: s == null ? null : round(s) };
-    return { kind: 'answer', id: e.id, entry: e, answer: fill(e, ctx), links: linksFor(e, ctx), safety: e.safety || 'none', score: s == null ? null : round(s) };
+    var nx = (ctx && ctx.walk && e.nextWalk) || e.next || null;
+    return { kind: 'answer', id: e.id, entry: e, answer: fill(e, ctx), links: linksFor(e, ctx), next: nx, safety: e.safety || 'none', score: s == null ? null : round(s) };
   }
   // نمایش مستقیم یک مدخل (وقتی کاربر یکی از پیشنهادها رو می‌زنه)
   function byId(idx, id, ctx) {

@@ -34,15 +34,40 @@ var QUESTIONS = [
   ['پیاده روی تند یعنی چقدر سریع', 'walk-intensity'],
   ['چه کفشی واسه دویدن خوبه', 'shoes'],
   ['کی میتونم از پیاده روی برم سراغ دویدن', 'walk-to-run'],
-  ['قبل مسابقه چی بخورم', 'pending:race-food|food-before'],
+  ['قبل مسابقه چی بخورم', 'race-food'],
   ['میتونم بجای دو دوچرخه برم؟', 'pending:xtrain'],
-  ['تو ماراتن ژل بخورم یا نه', 'pending:gels'],
+  ['تو ماراتن ژل بخورم یا نه', 'gels'],
   ['بهترین گوشی برای عکاسی چیه', 'ood'],
   ['دستور پخت قورمه سبزی', 'ood'],
   ['بهترین ساعت روز برای دویدن صبحه یا عصر؟', 'dontknow']
 ];
 
+// مجموعه‌ی ۲ (نسخه‌ی ۱۴۵): سلام و احوال‌پرسی، معرفی گام، مدخل‌های تغذیه (منتظر تأیید)، سلام همراه سؤال، بی‌جواب
+var QUESTIONS2 = [
+  ['سلام', 'small:hello'],
+  ['سلام خوبی؟', 'small:how'],
+  ['درود صبح بخیر', 'small:hello'],
+  ['مرسی دمت گرم', 'small:thanks'],
+  ['خدافظ', 'small:bye'],
+  ['تو کی هستی؟ رباتی؟', 'small:who'],
+  ['سلام پیس ایزیم چنده', 'easy-pace'],
+  ['گام چیه اصلا؟', 'about-gaam'],
+  ['چرا باید از این اپ استفاده کنم', 'why-gaam'],
+  ['اطلاعاتم کجا ذخیره میشه', 'privacy'],
+  ['روزی چقد پروتئین بخورم', 'protein'],
+  ['قهوه قبل مسابقه بخورم خوبه؟', 'caffeine'],
+  ['بعد لانگ ران چی بخورم', 'recovery-food'],
+  ['آزمایش فریتین بدم؟', 'iron'],
+  ['ناشتا بدوم یا صبحانه بخورم', 'food-before'],
+  ['سلام زانوم خیلی درد داره و ورم کرده', 'urgent'],
+  ['خوبی؟ امروز بعد دویدن سرگیجه داشتم', 'urgent'],
+  ['قیمت بلیت هواپیما به استانبول', 'ood'],
+  ['بهترین آهنگ برای دویدن چیه', 'dontknow'],
+  ['شنا کنم یا بدوم', 'pending:xtrain']
+];
+
 function judge(exp, r) {
+  if (exp.indexOf('small:') === 0) return r.kind === 'small' && r.small === exp.slice(6) ? 'correct' : (r.kind === 'none' || r.kind === 'suggest' ? 'dontknow' : 'wrong');
   var dk = r.kind === 'none' || r.kind === 'suggest';
   if (exp === 'urgent') return r.kind === 'urgent' ? 'correct' : 'wrong';
   if (exp === 'ood') return r.kind === 'ood' ? 'correct' : (dk ? 'dontknow' : 'wrong');
@@ -54,18 +79,20 @@ function judge(exp, r) {
   return r.kind === 'answer' && r.id === exp ? 'correct' : (dk ? 'dontknow' : 'wrong');
 }
 
-function run(verbose) {
+function run(set) {
+  var list = set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
-  QUESTIONS.forEach(function (q) {
+  list.forEach(function (q) {
     var r = E.ask(idx, q[0], CTX), v = judge(q[1], r);
     c[v]++;
     rows.push({ q: q[0], exp: q[1], kind: r.kind, id: r.id || (r.suggestions || []).map(function (s) { return s.id; }).join(',') || '', score: r.score, verdict: v });
   });
-  return { counts: c, rows: rows, n: QUESTIONS.length };
+  return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) {
-  var res = run();
+if (require.main === module) [1, 2].forEach(function (set) {
+  var res = run(set);
+  console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
   res.rows.forEach(function (r) {
     if (process.argv.indexOf('--verbose') >= 0 || r.verdict !== 'correct')
@@ -74,5 +101,5 @@ if (require.main === module) {
   console.log('درست: ' + res.counts.correct + ' (' + pct('correct') + ')  نمی‌دونم: ' + res.counts.dontknow + ' (' + pct('dontknow') + ')  نادرست: ' + res.counts.wrong + ' (' + pct('wrong') + ')');
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
-}
-module.exports = { run: run, QUESTIONS: QUESTIONS };
+});
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2 };

@@ -6841,7 +6841,7 @@
   function assistantCtx() {
     var p = state.profile;
     if (!p || needsMigration()) return {};
-    var walk = C.isWalk(p), now = today(), o = { walk: walk, cycle: C.cycleAllowed(p) };
+    var walk = C.isWalk(p), now = today(), o = { walk: walk, cycle: C.cycleAllowed(p), name: (p.name || '').trim().split(/\s+/)[0] || '' };
     try {
       var lv = C.assessLevel(p);
       if (lv && lv.level != null && lv.info) o.level = T('level.title', { n: fa(lv.level), name: lv.info.name });

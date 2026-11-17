@@ -30,13 +30,14 @@ test('بُن‌سازی سبک', function () {
   assert.strictEqual(E.stem('کفش'), 'کفش');
 });
 
-test('ساختار پایگاه دانش: ۴۲ مدخل، ۶ منتظر تأیید، پیوندها معتبر', function () {
-  assert.strictEqual(KB.entries.length, 42);
+test('ساختار پایگاه دانش: ۵۰ مدخل، ۲ منتظر تأیید، تغذیه‌ی تأییدشده با منبع، پیوندها معتبر', function () {
+  assert.strictEqual(KB.entries.length, 50);
   var ids = {};
   KB.entries.forEach(function (e) {
     assert.ok(!ids[e.id], 'شناسه‌ی تکراری ' + e.id); ids[e.id] = 1;
     assert.ok(e.q && e.topic && Array.isArray(e.phrases) && Array.isArray(e.keywords), e.id);
     assert.ok(['none', 'caution', 'urgent'].indexOf(e.safety) >= 0, e.id);
+    if (e.sources) assert.ok(e.approved && e.sources.length && e.sources.every(function (x) { return x.ref && ['secondary', 'abstract', 'memory'].indexOf(x.verified) >= 0; }), 'منبع ' + e.id);
     if (e.status === 'pending') { assert.strictEqual(e.answer, '', e.id); return; }
     assert.strictEqual(e.status, 'ok', e.id);
     assert.ok(e.answer && e.source, 'پاسخ و منبع ' + e.id);
@@ -46,7 +47,8 @@ test('ساختار پایگاه دانش: ۴۲ مدخل، ۶ منتظر تأیی
       if (l.page) assert.ok(/^#[a-z]+$/.test(l.page) && l.label, 'صفحه ' + l.page);
     });
   });
-  assert.strictEqual(KB.entries.filter(function (e) { return e.status === 'pending'; }).length, 6);
+  assert.strictEqual(KB.entries.filter(function (e) { return e.status === 'pending'; }).length, 2);
+  assert.strictEqual(KB.entries.filter(function (e) { return e.topic === 'تغذیه‌ی ورزشی' && e.status === 'ok' && e.sources; }).length, 9);
 });
 
 test('هر مدخل با عنوان خودش پیدا می‌شه (بدون جواب نادرست)', function () {
@@ -96,7 +98,7 @@ test('چرخه‌ی قاعدگی فقط وقتی این بخش برای کارب
 });
 
 test('مدخل منتظر تأیید جواب نمی‌ده', function () {
-  var r = E.ask(idx, 'قبل مسابقه چی بخورم', CTX);
+  var r = E.ask(idx, 'میتونم بجای دو دوچرخه برم؟', CTX);
   assert.strictEqual(r.kind, 'pending');
   assert.strictEqual(r.answer, KB.texts.pending);
 });
@@ -122,6 +124,58 @@ test('آزمون ۳۰ سؤالی: صفر نادرست، همه‌ی نشونه�
   assert.strictEqual(res.n, 30);
   assert.strictEqual(res.counts.wrong, 0, JSON.stringify(res.rows.filter(function (r) { return r.verdict === 'wrong'; })));
   res.rows.filter(function (r) { return r.exp === 'urgent'; }).forEach(function (r) { assert.strictEqual(r.verdict, 'correct', r.q); });
+  assert.ok(res.counts.correct / res.n >= 0.8);
+});
+
+test('سلام و احوال‌پرسی: با اسم کوچک و جلسه‌ی امروز؛ ایمنی مقدم‌تر', function () {
+  var r = E.ask(idx, 'سلام', { name: 'سارا', today: 'ایزی ران (۶ کیلومتر)' });
+  assert.strictEqual(r.kind, 'small');
+  assert.ok(/سارا/.test(r.answer) && /ایزی ران/.test(r.answer));
+  assert.ok(r.suggestions.length >= 1);
+  assert.strictEqual(E.ask(idx, 'مرسی', {}).small, 'thanks');
+  assert.strictEqual(E.ask(idx, 'سلام خوبی', {}).small, 'how');
+  assert.strictEqual(E.ask(idx, 'سلام، زانوم ورم کرده', {}).kind, 'urgent');
+  // «فعلا» وسط سؤال، سؤال رو خراب نمی‌کنه
+  assert.strictEqual(E.ask(idx, 'فعلا تیپر یعنی چی', {}).id, 'taper');
+});
+
+test('سلام همراه سؤال: سلام جدا از متن پاسخ (اسم در سؤال ذخیره‌شده نمی‌ره)', function () {
+  var r = E.ask(idx, 'سلام پیس ایزیم چنده', { name: 'سارا', easyPace: CTX.easyPace });
+  assert.strictEqual(r.id, 'easy-pace');
+  assert.ok(/سارا/.test(r.greet));
+  assert.ok(r.answer.indexOf('سارا') < 0);
+});
+
+test('بی‌جواب و خارج از حوزه: پیشنهاد به‌جای دست خالی', function () {
+  var n = E.ask(idx, 'بهترین آهنگ برای دویدن چیه', {});
+  assert.ok(n.kind === 'none' || n.kind === 'suggest');
+  assert.ok(n.suggestions.length >= 1);
+  var o = E.ask(idx, 'قیمت بلیت هواپیما', {});
+  assert.strictEqual(o.kind, 'ood');
+  assert.ok(o.suggestions.length >= 1);
+  assert.strictEqual(E.ask(idx, 'سلام', { walk: true }).suggestions[0].id, 'daily-start');
+});
+
+test('قدم بعدی فقط به صفحه‌های واقعی اپ', function () {
+  KB.entries.forEach(function (e) {
+    [e.next, e.nextWalk].filter(Boolean).forEach(function (x) {
+      assert.ok(x.text && (x.page ? /^#[a-z]+$/.test(x.page) && x.label : x.learn || x.guide), e.id);
+    });
+  });
+  assert.ok(E.ask(idx, 'پیس ایزیم چنده', CTX).next);
+});
+
+test('مدخل‌های منتظر تأیید جواب نمی‌دن؛ تغذیه‌ی تأییدشده جواب می‌ده', function () {
+  KB.entries.filter(function (e) { return e.status === 'pending'; }).forEach(function (e) { assert.strictEqual(E.byId(idx, e.id, {}).kind, 'pending', e.id); });
+  var r = E.ask(idx, 'قبل مسابقه چی بخورم', {});
+  assert.strictEqual(r.kind, 'answer');
+  assert.strictEqual(r.id, 'race-food');
+  assert.strictEqual(E.ask(idx, 'کمبود آهن دارم؟', {}).safety, 'caution');
+});
+
+test('آزمون مجموعه‌ی ۲: صفر نادرست، حداقل ۸۰٪ درست', function () {
+  var res = EVAL.run(2);
+  assert.strictEqual(res.counts.wrong, 0, JSON.stringify(res.rows.filter(function (r) { return r.verdict === 'wrong'; })));
   assert.ok(res.counts.correct / res.n >= 0.8);
 });
 

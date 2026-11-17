@@ -493,6 +493,11 @@ test('دستیار گام: کلید آزمایشی، پاسخ، هشدار ای�
   await page.locator('.ga-learn-chip').click();
   const sheet = page.locator('#ga-sheet');
   await expect(sheet).toBeVisible();
+  // سلام با اسم کوچک کاربر و پیشنهاد موضوع
+  await sheet.locator('.ga-in').fill('سلام');
+  await sheet.locator('.ga-send').click();
+  await expect(sheet.locator('.ga-bot').last()).toContainText(RUNNER.first);
+  await expect(sheet.locator('.ga-bot').last().locator('.ga-chip').first()).toBeVisible();
   // پاسخ شخصی: پیس ایزی خود کاربر (عدد از برنامه، نه جای‌نگهدار)
   await sheet.locator('.ga-in').fill('پیس ایزیم چنده؟');
   await sheet.locator('.ga-send').click();

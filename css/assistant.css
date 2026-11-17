@@ -58,3 +58,6 @@ body.ga-on .site-header .header-inner { grid-template-columns: 92px 1fr 92px; }
 .ga-asec ul { margin: 0; padding-inline-start: 18px; }
 .ga-asec li { margin: 4px 0; overflow-wrap: anywhere; }
 .ga-panel .btn-sm { min-height: 40px; padding: 6px 14px; }
+.ga-next { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--text-secondary, var(--text)); }
+.ga-next .ga-link { margin-top: 4px; }
+.ga-src { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--text-secondary, var(--text)); direction: rtl; }
