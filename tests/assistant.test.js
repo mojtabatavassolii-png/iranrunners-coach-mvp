@@ -30,8 +30,8 @@ test('بُن‌سازی سبک', function () {
   assert.strictEqual(E.stem('کفش'), 'کفش');
 });
 
-test('ساختار پایگاه دانش: ۵۵ مدخل، هیچ مدخل منتظر تأیید، مدخل‌های منبع‌دار تأییدشده، پیوندها معتبر', function () {
-  assert.strictEqual(KB.entries.length, 55);
+test('ساختار پایگاه دانش: ۶۲ مدخل، هیچ مدخل منتظر تأیید، مدخل‌های منبع‌دار تأییدشده، پیوندها معتبر', function () {
+  assert.strictEqual(KB.entries.length, 62);
   var ids = {};
   KB.entries.forEach(function (e) {
     assert.ok(!ids[e.id], 'شناسه‌ی تکراری ' + e.id); ids[e.id] = 1;
@@ -61,12 +61,27 @@ test('هر مدخل با عنوان خودش پیدا می‌شه (بدون جو
 });
 
 test('نشونه‌ی جدی همیشه قبل از جست‌وجو: هشدار ثابت و پیوند ثبت درد', function () {
-  ['ساقم درد میکنه و ورم کرده', 'زانوم تو استراحت هم درد داره', 'حین دویدن درد قفسه سینه داشتم', 'دیگه نمیتونم راه برم', 'درد شدید پاشنه'].forEach(function (q) {
+  ['ساقم درد میکنه و ورم کرده', 'زانوم تو استراحت هم درد داره', 'حین دویدن درد قفسه سینه داشتم', 'دیگه نمیتونم راه برم', 'درد شدید پاشنه', 'آشیلم تق صدا داد', 'نمیتونم رو پنجه وایسم'].forEach(function (q) {
     var r = E.ask(idx, q, CTX);
     assert.strictEqual(r.kind, 'urgent', q);
     assert.ok(/متوقف کن/.test(r.answer) && /پزشک/.test(r.answer), q);
     assert.strictEqual(r.links[0].page, '#health');
   });
+});
+
+test('سؤال درد هیچ‌وقت به «پاسخ تأییدشده ندارم» نمی‌رسه', function () {
+  var kb2 = JSON.parse(JSON.stringify(KB));
+  kb2.entries.forEach(function (e) { if (e.safety !== 'none' && e.id !== KB.painEntry && e.id !== 'red-flags') e.status = 'pending'; });
+  var i2 = E.createIndex(kb2);
+  ['ساقم درد میکنه', 'آشیلم درد داره', 'کف پام صبحا درد میکنه', 'جلوی زانوم موقع پله درد میکنه'].forEach(function (q) {
+    var r = E.ask(i2, q, {});
+    assert.ok(r.kind === 'answer' || r.kind === 'urgent', q + ' → ' + r.kind);
+  });
+});
+
+test('هشدار ایمنی بی‌دلیل نیست: «کفشم پاره شد» و «ساعتم صدا داد»', function () {
+  assert.notStrictEqual(E.ask(idx, 'کفشم پاره شد', {}).kind, 'urgent');
+  assert.notStrictEqual(E.ask(idx, 'ساعتم صدا داد', {}).kind, 'urgent');
 });
 
 test('درد معمولی: فقط پاسخ محتاطانه، بدون تشخیص', function () {

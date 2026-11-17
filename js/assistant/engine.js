@@ -118,7 +118,10 @@
     'قفسه سین', 'قفسه ی سین', 'درد سینه', 'سینه درد', 'سینم درد', 'تنگی نفس', 'نفسم بالا نمیاد', 'نفس کم میارم شدید',
     'غش', 'بیهوش', 'از هوش', 'سرگیجه',
     'درد نقطه ای', 'روی استخوان', 'شکستگی',
-    /ن(می)?(تونست?م|تونه|تونست) (راه|وزن|بایست|پا)/
+    'صدای تق', 'تق صدا', 'پارگی', 'یهو تیر کشید',
+    /ن(می)?(تونست?م|تونه|تونست) (راه|وزن|بایست|پا)/,
+    /ن(می)?تون(ست)?م (رو |روی )?(پا|پنجه)/,
+    /ن(می)?تون(ست)?م (وایس|بایست|بایس)/
   ].map(function (w) { return typeof w === 'string' ? normalize(w) : w; });
   var PAIN = ['درد', 'دردمیکنه', 'دردناک', 'مصدوم', 'تیر میکشه', 'تیرمیکشه', 'کشیدگی', 'گرفتگی', 'شین اسپلینت', 'اسپلینت'].map(normalize);
   function hasAny(n, list) {
@@ -139,10 +142,12 @@
       function add(list, w) {
         list.forEach(function (t) { if (t && (!terms[t] || terms[t] < w)) terms[t] = w; });
       }
-      (e.keywords || []).forEach(function (k) { add(tokens(k), 2); });
+      // کلیدواژه‌ی چندکلمه‌ای («زانوی دونده») مثل عبارت حساب می‌شه، نه چند کلیدواژه‌ی جدا («دونده» تنها لنگر نیست)
+      var multi = [];
+      (e.keywords || []).forEach(function (k) { var t = tokens(k); if (t.length > 1) { add(t, 1); multi.push(k); } else add(t, 2); });
       add(tokens(e.q), 1);
       (e.phrases || []).forEach(function (p) { add(tokens(p), 1); });
-      var phr = [e.q].concat(e.phrases || []).map(function (p) { return { n: normalize(p), g: trigrams(p), t: tokens(p) }; });
+      var phr = [e.q].concat(e.phrases || [], multi).map(function (p) { return { n: normalize(p), g: trigrams(p), t: tokens(p) }; });
       return { e: e, terms: terms, phrases: phr };
     });
     // IDF: کلمه‌ی کمیاب مهم‌تر
@@ -315,7 +320,8 @@
     }).sort(function (a, b) { return b.s - a.s; });
     // درد: فقط مدخل‌های ایمنی‌دار؛ اگه هیچ‌کدوم روشن نبود، پاسخ محتاطانه‌ی عمومی درد
     if (pain) {
-      var safe = ranked.filter(function (r) { return r.x.e.safety && r.x.e.safety !== 'none'; });
+      // مدخل منتظر تأیید هیچ‌وقت جای پاسخ محتاطانه‌ی درد رو نمی‌گیره
+      var safe = ranked.filter(function (r) { return r.x.e.safety && r.x.e.safety !== 'none' && r.x.e.status !== 'pending'; });
       var top = safe[0] && safe[0].anchor && safe[0].s >= T_ANSWER && (!safe[1] || safe[0].s - safe[1].s >= T_MARGIN) ? safe[0].x.e : kb.entries.filter(function (e) { return e.id === kb.painEntry; })[0];
       return result(top, safe[0] && safe[0].x.e === top ? safe[0].s : null, ctx);
     }

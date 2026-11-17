@@ -82,7 +82,32 @@ var QUESTIONS3 = [
   ['زانوم درد میکنه، دوچرخه برم؟', 'pain-general|xtrain-injury']
 ];
 
+// مجموعه‌ی ۴: آسیب‌های رایج (تأییدشده در نسخه‌ی ۱۴۷). درد مبهم باید پاسخ عمومی درد بگیره؛ نشونه‌ی جدی، هشدار
+var QUESTIONS4 = [
+  ['شین اسپلینت چیه', 'shin-pain|pain-general'],
+  ['جلوی ساق پام بعد دویدن درد میکنه', 'shin-pain|pain-general'],
+  ['دور کشکک زانوم موقع پایین اومدن از پله درد میکنه', 'knee-front|pain-general'],
+  ['زانوی دونده چیه', 'knee-front'],
+  ['بیرون زانوم تو سرازیری درد میگیره', 'knee-outer|pain-general'],
+  ['آشیلم صبحا خشکه و درد داره', 'achilles|pain-general'],
+  ['خار پاشنه دارم میتونم بدوم؟', 'heel-pain'],
+  ['صبح که از خواب پا میشم کف پام درد میکنه', 'heel-pain|pain-general'],
+  ['استرس فرکچر چیه', 'bone-stress'],
+  ['یه نقطه روی استخوان ساقم خیلی درد داره', 'urgent'],
+  ['چرا دونده ها زیاد آسیب میبینن', 'injury-risk|ten-percent'],
+  ['زانوم درد میکنه', 'pain-general|knee-front'],
+  ['یوگا برای دونده خوبه؟', 'dontknow'],
+  ['آشیلم یهو تق صدا داد و نمیتونم رو پنجه وایسم', 'urgent']
+];
+
 function judge(exp, r) {
+  // «الف|ب» با گزینه‌ی منتظر تأیید: هر کدوم درست باشه کافیه
+  if (/\|/.test(exp) && /pending:/.test(exp) && !/^pending:[^|]*$/.test(exp)) {
+    var opts = exp.split('|').map(function (o, k, all) { return o.indexOf('pending:') === 0 || k === 0 || all[k - 1].indexOf('pending:') !== 0 ? o : o; });
+    if (opts.some(function (o) { return judge(o, r) === 'correct'; })) return 'correct';
+    var dk0 = r.kind === 'none' || r.kind === 'suggest';
+    return dk0 ? 'dontknow' : 'wrong';
+  }
   if (exp.indexOf('small:') === 0) return r.kind === 'small' && r.small === exp.slice(6) ? 'correct' : (r.kind === 'none' || r.kind === 'suggest' ? 'dontknow' : 'wrong');
   var dk = r.kind === 'none' || r.kind === 'suggest';
   if (exp === 'urgent') return r.kind === 'urgent' ? 'correct' : 'wrong';
@@ -96,7 +121,7 @@ function judge(exp, r) {
 }
 
 function run(set) {
-  var list = set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
+  var list = set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
   list.forEach(function (q) {
     var r = E.ask(idx, q[0], CTX), v = judge(q[1], r);
@@ -106,7 +131,7 @@ function run(set) {
   return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) [1, 2, 3].forEach(function (set) {
+if (require.main === module) [1, 2, 3, 4].forEach(function (set) {
   var res = run(set);
   console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
@@ -118,4 +143,4 @@ if (require.main === module) [1, 2, 3].forEach(function (set) {
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
 });
-module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3 };
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4 };
