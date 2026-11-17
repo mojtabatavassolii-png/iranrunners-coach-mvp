@@ -30,8 +30,8 @@ test('بُن‌سازی سبک', function () {
   assert.strictEqual(E.stem('کفش'), 'کفش');
 });
 
-test('ساختار پایگاه دانش: ۶۸ مدخل، هیچ مدخل منتظر تأیید، مدخل‌های منبع‌دار تأییدشده، پیوندها معتبر', function () {
-  assert.strictEqual(KB.entries.length, 68);
+test('ساختار پایگاه دانش: ۷۱ مدخل، هیچ مدخل منتظر تأیید، مدخل‌های منبع‌دار تأییدشده، پیوندها معتبر', function () {
+  assert.strictEqual(KB.entries.length, 71);
   var ids = {};
   KB.entries.forEach(function (e) {
     assert.ok(!ids[e.id], 'شناسه‌ی تکراری ' + e.id); ids[e.id] = 1;
@@ -61,7 +61,7 @@ test('هر مدخل با عنوان خودش پیدا می‌شه (بدون جو
 });
 
 test('نشونه‌ی جدی همیشه قبل از جست‌وجو: هشدار ثابت و پیوند ثبت درد', function () {
-  ['ساقم درد میکنه و ورم کرده', 'زانوم تو استراحت هم درد داره', 'حین دویدن درد قفسه سینه داشتم', 'دیگه نمیتونم راه برم', 'درد شدید پاشنه', 'آشیلم تق صدا داد', 'نمیتونم رو پنجه وایسم', 'فکر کنم گرمازدگی گرفتم', 'تو گرما دویدم الان گیجم'].forEach(function (q) {
+  ['ساقم درد میکنه و ورم کرده', 'زانوم تو استراحت هم درد داره', 'حین دویدن درد قفسه سینه داشتم', 'دیگه نمیتونم راه برم', 'درد شدید پاشنه', 'آشیلم تق صدا داد', 'نمیتونم رو پنجه وایسم', 'فکر کنم گرمازدگی گرفتم', 'تو گرما دویدم الان گیجم', 'باردارم بعد دویدن خونریزی کردم', 'بچه تکون نمیخوره'].forEach(function (q) {
     var r = E.ask(idx, q, CTX);
     assert.strictEqual(r.kind, 'urgent', q);
     assert.ok(/متوقف کن/.test(r.answer) && /پزشک/.test(r.answer), q);
@@ -83,6 +83,8 @@ test('هشدار ایمنی بی‌دلیل نیست: «کفشم پاره شد»
   assert.notStrictEqual(E.ask(idx, 'کفشم پاره شد', {}).kind, 'urgent');
   assert.notStrictEqual(E.ask(idx, 'ساعتم صدا داد', {}).kind, 'urgent');
   assert.notStrictEqual(E.ask(idx, 'تو گرما چطور بدوم', {}).kind, 'urgent');
+  assert.notStrictEqual(E.ask(idx, 'انقباض عضله ساق دارم', {}).kind, 'urgent');
+  assert.notStrictEqual(E.ask(idx, 'تو بارداری میتونم بدوم', {}).kind, 'urgent');
 });
 
 test('درد معمولی: فقط پاسخ محتاطانه، بدون تشخیص', function () {

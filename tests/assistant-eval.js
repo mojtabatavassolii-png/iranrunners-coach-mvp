@@ -117,6 +117,20 @@ var QUESTIONS5 = [
   ['قرص خواب بخورم؟', 'dontknow|ood']
 ];
 
+// مجموعه‌ی ۶: بارداری و بعد از زایمان (تأییدشده در نسخه‌ی ۱۴۹)
+var QUESTIONS6 = [
+  ['حامله ام میتونم بدوم؟', 'pregnancy-running'],
+  ['ورزش در بارداری خطر داره؟', 'pregnancy-running|pregnancy-warning'],
+  ['ماه پنجم بارداریم چقدر بدوم', 'pregnancy-running'],
+  ['تو بارداری کی باید ورزش رو قطع کنم', 'pregnancy-warning|pregnancy-running'],
+  ['دویدم و الان لکه بینی دارم، باردارم', 'urgent'],
+  ['حامله ام بعد دویدن درد زیر شکم دارم', 'urgent'],
+  ['دو ماهه زایمان کردم کی بدوم', 'postpartum-running'],
+  ['بعد سزارین دویدن رو شروع کنم؟', 'postpartum-running'],
+  ['موقع دویدن نشت ادرار دارم', 'postpartum-running'],
+  ['انقباض عضله ساق دارم', 'dontknow|pain-general|ood|strength']
+];
+
 function judge(exp, r) {
   // «الف|ب» با گزینه‌ی منتظر تأیید: هر کدوم درست باشه کافیه
   if (/\|/.test(exp) && /pending:/.test(exp) && !/^pending:[^|]*$/.test(exp)) {
@@ -141,7 +155,7 @@ function judge(exp, r) {
 }
 
 function run(set) {
-  var list = set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
+  var list = set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
   list.forEach(function (q) {
     var r = E.ask(idx, q[0], CTX), v = judge(q[1], r);
@@ -151,7 +165,7 @@ function run(set) {
   return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) [1, 2, 3, 4, 5].forEach(function (set) {
+if (require.main === module) [1, 2, 3, 4, 5, 6].forEach(function (set) {
   var res = run(set);
   console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
@@ -163,4 +177,4 @@ if (require.main === module) [1, 2, 3, 4, 5].forEach(function (set) {
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
 });
-module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5 };
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6 };
