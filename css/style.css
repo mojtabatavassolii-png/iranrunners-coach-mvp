@@ -2177,3 +2177,15 @@ button.help-link { padding: 0; cursor: pointer; font-family: inherit; }
 .days-line .linklike, #day-panel > .linklike.small { display: inline-flex; align-items: center; min-height: 44px; padding-inline: 4px; }
 /* «تغییر» کنار روزهای تمرین: عرض لمس هم حداقل ۴۴ پیکسل (UX11-04) */
 .days-line .linklike { min-width: 44px; justify-content: center; }
+
+/* ---------- تراز دوطرفه برای متن‌های چندخطی‌ای که تا حالا استثنا بودن (تصمیم مالک محصول، بازبینی ۱۱) ----------
+   خط‌های لینک «بیشتر بدان»، عنوان‌ها و فهرست‌های آموزش، کارت اثر روی هدف، راهنمای زیر فیلدها، خط‌های کارت‌ها و هشدارها.
+   این بلوک آخر فایله تا روی قانون‌های استثنای قبلی بنشینه. همچنان استثنا: متن‌های وسط‌چین (ورود، انتظار GPS، عنوان ماه)،
+   سؤال‌های فرم اولیه (UX10-03)، یادداشت «حجم با این تعداد روز جا نمی‌شه» (UX11-02) و بیومکانیک؛ و دو مورد که دوطرفه
+   فاصله‌ی خیلی بزرگ می‌ساخت (دیده‌شده در اسکرین‌شات): خط منابع مقاله‌ها (اسم و عنوان انگلیسی، تا ۲۹ برابر فاصله‌ی عادی)
+   و خط تاریخ چک‌این که بعدش برچسب نوع جلسه میاد (خط اول تا ۱۹ برابر پهن می‌شد). */
+.learn-more, #day-panel > p.sess-how, #signout > p.small.muted, .ht-checkin > p.small.muted,
+.learn-body li, .medical-banner > p,
+.learn-item .learn-text > b, .path-meta > span, .race-item-body > p.small, .race-warn li,
+.ob-txt > small, .field small.muted, .field-tpick > small.muted,
+.impact-card > p, .plan-me > p, .inj-cur > p.small { text-align: justify; }
