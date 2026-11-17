@@ -146,6 +146,24 @@ var QUESTIONS7 = [
   ['کوفتگی دارم و یه نقطه روی استخوان پام خیلی درد داره', 'urgent']
 ];
 
+// مجموعه‌ی ۸: ارتفاع و سرما (پیش از تنظیم نوشته شد)
+var QUESTIONS8 = [
+  ['رفتم شمشک دویدم نفسم کم میومد', 'altitude'],
+  ['تو ارتفاع پیسم باید چقدر کند بشه', 'altitude'],
+  ['تمرین در ارتفاع چه فایده ای داره', 'altitude'],
+  ['میخوام برم دماوند چیکار کنم مریض نشم', 'altitude-sickness'],
+  ['علائم ارتفاع زدگی', 'altitude-sickness'],
+  ['تو کوه سرم درد گرفت و حالت تهوع دارم', 'urgent|altitude-sickness'],
+  ['بالای کوه تعادلم بهم خورده و گیجم', 'urgent'],
+  ['زمستون بیرون بدوم یا نه', 'cold'],
+  ['تو سرما دویدم سرفه میکنم', 'cold'],
+  ['رو برف و یخ چطور بدوم', 'cold'],
+  ['دستام تو سرما بی حس و سفید شده', 'urgent'],
+  ['بعد دویدن لرزم بند نمیاد', 'urgent'],
+  ['سرد تر شدن پیس رو کند میکنه؟', 'cold|dontknow'],
+  ['ارتفاع قدم چقدر باشه', 'dontknow|stride|cadence']
+];
+
 function judge(exp, r) {
   // «الف|ب» با گزینه‌ی منتظر تأیید: هر کدوم درست باشه کافیه
   if (/\|/.test(exp) && /pending:/.test(exp) && !/^pending:[^|]*$/.test(exp)) {
@@ -170,7 +188,7 @@ function judge(exp, r) {
 }
 
 function run(set) {
-  var list = set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
+  var list = set === 8 ? QUESTIONS8 : set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
   list.forEach(function (q) {
     var r = E.ask(idx, q[0], CTX), v = judge(q[1], r);
@@ -180,7 +198,7 @@ function run(set) {
   return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) [1, 2, 3, 4, 5, 6, 7].forEach(function (set) {
+if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8].forEach(function (set) {
   var res = run(set);
   console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
@@ -192,4 +210,4 @@ if (require.main === module) [1, 2, 3, 4, 5, 6, 7].forEach(function (set) {
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
 });
-module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7 };
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7, QUESTIONS8: QUESTIONS8 };
