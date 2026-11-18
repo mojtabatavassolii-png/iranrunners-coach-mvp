@@ -208,7 +208,13 @@ var QUESTIONS10 = [
   ['تمرین قدرتی رو کدوم روز بزنم', 'strength-timing'],
   ['سالمندم برای تعادل چه ورزشی کنم', 'strength|walk-safe'],
   ['زمین نخورم چه تمرینی کنم', 'strength'],
-  ['وزنه بزنم یا فقط پیاده روی', 'strength']
+  ['وزنه بزنم یا فقط پیاده روی', 'strength'],
+  ['به جای پیاده روی دوچرخه برم حساب میشه', 'xtrain'],
+  ['شنا جای پیاده روی حساب میشه', 'xtrain'],
+  ['الپتیکال باشگاه خوبه؟', 'xtrain'],
+  ['پیاده روی در آب خوبه', 'pool-running'],
+  ['زانوم آسیب دیده چه ورزشی کنم', 'xtrain-injury|intake'],
+  ['مصدومم ورزش جایگزین چی کنم', 'xtrain-injury']
 ];
 
 var INTAKE_OK = ['intake', 'pain-general', 'shin-pain', 'knee-front', 'knee-outer', 'achilles', 'heel-pain'];
