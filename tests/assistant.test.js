@@ -114,6 +114,26 @@ test('«به درد می‌خوره» درد نیست', function () {
   assert.strictEqual(E.ask(idx, 'زانوم درد میکنه', {}).kind, 'intake');
 });
 
+test('پیاده‌رو: نسخه‌ی پیاده‌روی پاسخ، «پیاده‌روی» به‌جای «دویدن»، سؤال هشدار مخصوص راه رفتن', function () {
+  var W = { walk: true };
+  var r = E.ask(idx, 'با پیاده روی لاغر میشم', W);
+  assert.strictEqual(r.id, 'weight-loss'); assert.ok(/پیاده‌روی/.test(r.answer) && !/دویدن کمک/.test(r.answer));
+  r = E.ask(idx, 'تو گرما پیاده روی کنم', W);
+  assert.strictEqual(r.id, 'heat'); assert.ok(r.answer.indexOf('ثانیه در کیلومتر') < 0);
+  // دونده همون متن دویدن رو می‌بینه
+  assert.ok(/^دویدن کمک/.test(E.ask(idx, 'با دویدن لاغر میشم', {}).answer));
+  // مدخل‌های خود پیاده‌روی سر جاشون
+  assert.strictEqual(E.ask(idx, 'پیاده روی تند یعنی چی', W).id, 'walk-intensity');
+  // گفت‌وگوی درد برای پیاده‌رو
+  r = E.ask(idx, 'بعد پیاده روی ساقم درد میکنه', W);
+  r = E.intake(idx, E.intake(idx, r.state, 'gradual', W).state, 'lt3', W);
+  assert.ok(/شکل راه رفتنت/.test(r.answer), r.answer);
+  r = E.intake(idx, r.state, 'no', W);
+  assert.ok(/پیاده‌روی ورزشی رو متوقف کن/.test(r.answer));
+  // هر نسخه‌ی پیاده‌روی، جمله‌ی «دویدن رو متوقف کن» نداره
+  KB.entries.forEach(function (e) { if (e.answerWalk) assert.ok(!/(دویدن|بدو) رو (متوقف|قطع)/.test(e.answerWalk), e.id); });
+});
+
 test('گفت‌وگوی درد: اول کجا، چطور و چند وقته؛ بعد نشونه‌های هشدار؛ بعد پاسخ', function () {
   // پرسش اطلاعاتی گفت‌وگو نمی‌خواد
   assert.strictEqual(E.ask(idx, 'شین اسپلینت چیه', {}).id, 'shin-pain');

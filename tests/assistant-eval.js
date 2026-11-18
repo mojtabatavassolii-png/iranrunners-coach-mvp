@@ -181,6 +181,28 @@ var QUESTIONS9 = [
   ['قرص لاغری بخورم', 'dontknow|ood|weight-loss']
 ];
 
+// مجموعه‌ی ۱۰: کاربر پیاده‌رو (پاسخ نسخه‌ی پیاده‌روی)
+var CTX_WALK = { level: '۳', today: 'پیاده‌روی ۳۰ دقیقه', walk: true, cycle: false };
+var QUESTIONS10 = [
+  ['با پیاده روی لاغر میشم', 'weight-loss'],
+  ['روزی چقدر پیاده روی کنم وزن کم کنم', 'weight-loss|walk150'],
+  ['پیاده روی چقدر کالری میسوزونه', 'run-calories'],
+  ['هر روز پیاده روی میکنم ولی وزنم کم نشده', 'weight-stuck'],
+  ['ناشتا پیاده روی کنم بهتره', 'fasted-run|food-before'],
+  ['تو گرما پیاده روی کنم', 'heat'],
+  ['زمستون تو سرما پیاده روی کنم', 'cold'],
+  ['پیاده روی تو کوه سخت تره چرا', 'altitude'],
+  ['بعد پیاده روی ساقم درد میکنه', 'intake'],
+  ['بعد پیاده روی پاهام کوفته ست', 'doms|run-while-sore'],
+  ['با کوفتگی پیاده روی برم؟', 'run-while-sore'],
+  ['حین پیاده روی ساق پام گرفت', 'cramp|intake'],
+  ['تو بارداری پیاده روی کنم', 'pregnancy-running'],
+  ['بعد زایمان کی پیاده روی رو شروع کنم', 'postpartum-running'],
+  ['قبل پیاده روی چی بخورم', 'food-before'],
+  ['قبل پیاده روی کشش انجام بدم', 'stretching|warmup'],
+  ['موقع پیاده روی زانوم ورم کرد', 'urgent']
+];
+
 var INTAKE_OK = ['intake', 'pain-general', 'shin-pain', 'knee-front', 'knee-outer', 'achilles', 'heel-pain'];
 function judge(exp, r) {
   // «الف|ب» با گزینه‌ی منتظر تأیید: هر کدوم درست باشه کافیه
@@ -208,17 +230,18 @@ function judge(exp, r) {
 }
 
 function run(set) {
-  var list = set === 9 ? QUESTIONS9 : set === 8 ? QUESTIONS8 : set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
+  var list = set === 10 ? QUESTIONS10 : set === 9 ? QUESTIONS9 : set === 8 ? QUESTIONS8 : set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
   list.forEach(function (q) {
-    var r = E.ask(idx, q[0], CTX), v = judge(q[1], r);
+    var r = E.ask(idx, q[0], set === 10 ? CTX_WALK : CTX), v = judge(q[1], r);
+    if (set === 10 && r.kind === 'answer' && r.entry && r.entry.answerWalk && r.answer.indexOf(r.entry.answerWalk.slice(0, 20)) < 0) v = 'wrong'; // نسخه‌ی پیاده‌روی نشون داده نشد
     c[v]++;
     rows.push({ q: q[0], exp: q[1], kind: r.kind, id: r.id || (r.suggestions || []).map(function (s) { return s.id; }).join(',') || '', score: r.score, verdict: v });
   });
   return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(function (set) {
+if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].forEach(function (set) {
   var res = run(set);
   console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
@@ -230,4 +253,4 @@ if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(function (set) 
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
 });
-module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7, QUESTIONS8: QUESTIONS8, QUESTIONS9: QUESTIONS9 };
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7, QUESTIONS8: QUESTIONS8, QUESTIONS9: QUESTIONS9, QUESTIONS10: QUESTIONS10 };

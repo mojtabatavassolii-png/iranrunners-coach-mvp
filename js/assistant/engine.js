@@ -298,12 +298,23 @@
     var st = smallTalk(n0);
     if (st.kinds.length) {
       if (!tokens(st.rest).length) return smallReply(idx.kb, st.kinds[0], ctx);
-      var r = askCore(idx, st.rest, ctx);
+      var r = askWalk(idx, st.rest, ctx);
       // سلام جدا از متن پاسخ، تا اسم کاربر هیچ‌وقت در سؤال ذخیره‌شده برای تیم نره
       if (st.kinds.indexOf('hello') >= 0 && r.kind !== 'urgent') r.greet = idx.kb.smallTalk.prefix.replace('{name}', ctx && ctx.name ? ' ' + ctx.name : '');
       return r;
     }
-    return askCore(idx, text, ctx);
+    return askWalk(idx, text, ctx);
+  }
+  // «پیاده‌روی» جای «دویدن»: اگه جواب روشنی پیدا نشد، با «دویدن» هم می‌گردیم
+  // (مدخل‌ها با کلمه‌ی دویدن نوشته شدن؛ نسخه‌ی پیاده‌روی پاسخ با ctx.walk انتخاب می‌شه)
+  var WALK_RE = /پیاده[\u200c ]?(روی|روی‌ها)|راه رفتن|راه برم|راه میرم/g;
+  function askWalk(idx, text, ctx) {
+    var r = askCore(idx, text, ctx);
+    if ((r.kind !== 'suggest' && r.kind !== 'none') || !WALK_RE.test(text)) return r;
+    WALK_RE.lastIndex = 0;
+    var r2 = askCore(idx, text.replace(WALK_RE, 'دویدن'), ctx);
+    WALK_RE.lastIndex = 0;
+    return r2.kind === 'answer' || r2.kind === 'intake' || r2.kind === 'urgent' ? r2 : r;
   }
   function askCore(idx, text, ctx) {
     var kb = idx.kb, n = normalize(text);
@@ -382,8 +393,8 @@
     if (step === 'knee') return I.knee.options.map(function (o) { return typeof o === 'string' ? opt(kb, null, o) : o; });
     return I[step].options;
   }
-  function question(idx, st, lead) {
-    var I = idx.kb.intake, q = I[st.step].q;
+  function question(idx, st, lead, ctx) {
+    var I = idx.kb.intake, q = (ctx && ctx.walk && I[st.step].qWalk) || I[st.step].q;
     return { kind: 'intake', answer: (lead ? lead + ' ' : '') + q, options: stepOptions(idx.kb, st.step).map(function (o) { return { v: o.v, label: o.label }; }),
       state: st, safety: st.step === 'flags' ? 'caution' : 'none' };
   }
@@ -402,7 +413,7 @@
     var st = { region: detectRegion(n) || undefined, onset: parseOnset(n) || undefined, duration: parseDuration(n) || undefined };
     if (st.onset === 'sudden') return urgentResult(idx.kb, 'intake:onset');
     st.step = nextStep(st);
-    return question(idx, st, idx.kb.intake.start);
+    return question(idx, st, idx.kb.intake.start, ctx);
   }
   // «رد شدن»: با همون چیزی که تا حالا گفته جواب می‌ده
   function intakeSkip(idx, state, ctx) { return intakeFinal(idx, JSON.parse(JSON.stringify(state || {})), ctx); }
@@ -414,7 +425,7 @@
     if (st.step === 'region' || st.step === 'knee') st.region = v;
     else st[st.step] = v;
     st.step = nextStep(st);
-    return st.step ? question(idx, st) : intakeFinal(idx, st, ctx);
+    return st.step ? question(idx, st, null, ctx) : intakeFinal(idx, st, ctx);
   }
   var NUMW = { 'یک': 1, 'یه': 1, 'دو': 2, 'سه': 3, 'چهار': 4, 'پنج': 5, 'شش': 6, 'هفت': 7, 'هشت': 8, 'ده': 10, 'چند': 3 };
   function parseDuration(n) {
@@ -431,7 +442,7 @@
     var u = hasAny(n, URGENT);
     if (u) return urgentResult(kb, u);
     var st = JSON.parse(JSON.stringify(state || {})), v = null;
-    if (st.step === 'region') { v = detectRegion(n); if (v === 'knee') return question(idx, { step: 'knee', region: 'knee' }); }
+    if (st.step === 'region') { v = detectRegion(n); if (v === 'knee') return question(idx, { step: 'knee', region: 'knee' }, null, ctx); }
     else if (st.step === 'knee') v = /بیرون|کنار/.test(n) ? 'knee-outer' : /جلو|کشکک/.test(n) ? 'knee-front' : /نمیدونم|جای دیگه|پشت|داخل|پشتش|توش/.test(n) ? 'knee-other' : null;
     else if (st.step === 'onset') v = parseOnset(n) || (/نمیدونم|یادم نیست|مطمئن نیستم/.test(n) ? 'unknown' : null);
     else if (st.step === 'duration') v = parseDuration(n);
@@ -449,7 +460,7 @@
     var extra = [];
     if (st.onset === 'load') extra.push(I.load);
     if (st.duration === 'gt14') extra.push(I.long);
-    if (!st.flags) extra.push(I.flagsNote);
+    if (!st.flags) extra.push((ctx && ctx.walk && I.flagsNoteWalk) || I.flagsNote);
     r.answer = (parts.length > 1 || reg.say ? I.summary.replace('{parts}', parts.join('، ')) + ' ' : '') + r.answer + (extra.length ? ' ' + extra.join(' ') : '');
     if (!(r.links || []).some(function (l) { return l.page === I.checkin.page; })) r.links = [I.checkin].concat(r.links || []);
     r.intake = { region: st.region, onset: st.onset, duration: st.duration };
