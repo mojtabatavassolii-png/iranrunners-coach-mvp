@@ -2204,5 +2204,5 @@ button.help-link { padding: 0; cursor: pointer; font-family: inherit; }
 @media (max-width: 600px) {
   .learn-more, .learn-body p, .learn-body li, .race-item-body > p.small, .race-warn li,
   .impact-card > p, .inj-cur > p.small, .advice-card > p, .advice-card li, .sess-phase li,
-  #gait-view-back .card > p.small { text-align: start; }
+  #gait-view-back .card > p.small, #day-panel > p.sess-how { text-align: start; }
 }
