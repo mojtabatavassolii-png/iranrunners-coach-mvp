@@ -363,7 +363,9 @@
   function result(e, s, ctx) {
     if (e.status === 'pending') return { kind: 'pending', id: e.id, entry: e, answer: e.pendingText || '', topic: e.topic, score: s == null ? null : round(s) };
     var nx = (ctx && ctx.walk && e.nextWalk) || e.next || null;
-    return { kind: 'answer', id: e.id, entry: e, answer: fill(e, ctx), links: linksFor(e, ctx), next: nx, safety: e.safety || 'none', score: s == null ? null : round(s) };
+    // منبع نسخه‌ی پیاده‌روی، اگه منبع جدا داره
+    var src = (ctx && ctx.walk && e.answerWalk && e.sourcesWalk) || e.sources || null;
+    return { kind: 'answer', id: e.id, entry: e, answer: fill(e, ctx), links: linksFor(e, ctx), next: nx, sources: src, safety: e.safety || 'none', score: s == null ? null : round(s) };
   }
   // ---------- گفت‌وگوی درد ----------
   var INTAKE_ENTRIES = ['pain-general', 'shin-pain', 'knee-front', 'knee-outer', 'achilles', 'heel-pain'];

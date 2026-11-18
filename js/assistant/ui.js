@@ -143,7 +143,8 @@
     var links = (r.links || []).map(linkHtml).filter(Boolean);
     if (links.length) h += '<div class="ga-links">' + links.join('') + '</div>';
     // منبع مدخل‌های منبع‌دار (تغذیه): «نویسنده (سال)»
-    if (r.entry && r.entry.sources) h += '<p class="ga-src">' + esc(S.src + r.entry.sources.map(function (x) { return cite(x.ref); }).join('؛ ')) + '</p>';
+    var srcs = r.sources || (r.entry && r.entry.sources);
+    if (srcs && srcs.length) h += '<p class="ga-src">' + esc(S.src + srcs.map(function (x) { return cite(x.ref); }).join('؛ ')) + '</p>';
     // قدم بعدی در خود اپ (فقط قابلیت‌های واقعی)
     if (r.next) {
       var nl = linkHtml(r.next.learn ? { learn: r.next.learn } : r.next.guide ? { guide: r.next.guide } : { page: r.next.page, label: r.next.label });

@@ -200,7 +200,15 @@ var QUESTIONS10 = [
   ['بعد زایمان کی پیاده روی رو شروع کنم', 'postpartum-running'],
   ['قبل پیاده روی چی بخورم', 'food-before'],
   ['قبل پیاده روی کشش انجام بدم', 'stretching|warmup'],
-  ['موقع پیاده روی زانوم ورم کرد', 'urgent']
+  ['موقع پیاده روی زانوم ورم کرد', 'urgent'],
+  ['حین پیاده روی آب بخورم؟', 'hydration'],
+  ['یک ساعت پیاده روی میکنم چقدر آب بخورم', 'hydration'],
+  ['تمرین قدرتی برای پیاده رو لازمه', 'strength'],
+  ['برای پیاده روی چه حرکات قدرتی انجام بدم', 'strength-how|strength'],
+  ['تمرین قدرتی رو کدوم روز بزنم', 'strength-timing'],
+  ['سالمندم برای تعادل چه ورزشی کنم', 'strength|walk-safe'],
+  ['زمین نخورم چه تمرینی کنم', 'strength'],
+  ['وزنه بزنم یا فقط پیاده روی', 'strength']
 ];
 
 var INTAKE_OK = ['intake', 'pain-general', 'shin-pain', 'knee-front', 'knee-outer', 'achilles', 'heel-pain'];
