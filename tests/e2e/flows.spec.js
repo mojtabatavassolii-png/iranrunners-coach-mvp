@@ -573,6 +573,12 @@ test('دستیار گام: تب نوار پایین، پاسخ، هشدار ای
   // خاموش کردن از تنظیمات › آزمایشی: تب پنهان و نوار پایین ۴تایی؛ روشن کردن دوباره
   await page.evaluate(() => { location.hash = '#settings'; });
   await page.locator('#set-lab').evaluate((d) => { d.open = true; });
+  // صفحه‌ی مدیریت پنهانه؛ ۵ بار زدن روی عنوان «آزمایشی» نشونش می‌ده (بازبینی ۱۲، UX-07)
+  await expect(page.locator('[data-ga-admin]')).toHaveCount(0);
+  await expect(page.locator('#set-lab > summary')).toContainText('روشن');
+  for (let i = 0; i < 5; i++) await page.locator('#set-lab > summary').click();
+  await page.locator('#set-lab').evaluate((d) => { d.open = true; });
+  await expect(page.locator('[data-ga-admin]')).toBeVisible();
   await page.locator('label:has(#ga-toggle)').click();
   await expect(page.locator('#ga-btn')).toBeHidden();
   await expect(page.locator('#tabbar a:visible')).toHaveCount(4);

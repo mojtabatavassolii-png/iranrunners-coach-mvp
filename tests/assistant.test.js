@@ -130,6 +130,9 @@ test('پیاده‌رو: نسخه‌ی پیاده‌روی پاسخ، «پیاد
   assert.ok(/شکل راه رفتنت/.test(r.answer), r.answer);
   r = E.intake(idx, r.state, 'no', W);
   assert.ok(/پیاده‌روی ورزشی رو متوقف کن/.test(r.answer));
+  // هشدار فوری برای پیاده‌رو از «فعالیت» می‌گه، برای دونده همون متن قبلی (بازبینی ۱۲، UX-02)
+  assert.strictEqual(E.ask(idx, 'زانوم ورم کرده و درد داره', W).answer, KB.texts.urgentWalk);
+  assert.strictEqual(E.ask(idx, 'زانوم ورم کرده و درد داره', {}).answer, KB.texts.urgent);
   // هر نسخه‌ی پیاده‌روی، جمله‌ی «دویدن رو متوقف کن» نداره
   KB.entries.forEach(function (e) { if (e.answerWalk) assert.ok(!/(دویدن|بدو) رو (متوقف|قطع)/.test(e.answerWalk), e.id); });
 });

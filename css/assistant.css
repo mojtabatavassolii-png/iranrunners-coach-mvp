@@ -14,7 +14,7 @@
 /* برگه‌ی گفت‌وگو از پایین */
 .ga-backdrop { position: fixed; inset: 0; z-index: 160; background: var(--scrim); display: flex; justify-content: center; align-items: flex-end; }
 .ga-panel {
-  width: 100%; max-width: 560px; max-height: min(78vh, 640px); display: flex; flex-direction: column;
+  width: 100%; max-width: 560px; max-height: min(92vh, 760px); display: flex; flex-direction: column;
   background: var(--surface-elevated); border: 1px solid var(--border); border-bottom: 0; border-radius: 22px 22px 0 0;
   padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px)); animation: gaUp .2s ease-out;
 }
@@ -26,7 +26,7 @@
 .ga-x { width: 44px; height: 44px; border-radius: 50%; border: 0; background: none; color: var(--text); font-size: 26px; line-height: 1; cursor: pointer; }
 .ga-x:focus-visible { outline: 3px solid var(--primary); }
 .ga-log { flex: 1 1 auto; min-height: 120px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
-.ga-msg { max-width: 88%; padding: 8px 12px; border-radius: 16px; line-height: 1.75; }
+.ga-msg { max-width: 94%; padding: 8px 12px; border-radius: 16px; line-height: 1.75; }
 .ga-msg p { margin: 0; }
 .ga-me { align-self: flex-start; background: var(--primary); color: var(--on-primary); border-end-start-radius: 4px; }
 .ga-bot { align-self: flex-end; background: var(--surface); border: 1px solid var(--border); border-end-end-radius: 4px; }
@@ -39,7 +39,7 @@
 }
 .ga-chip { color: var(--text); border-color: var(--border); text-align: start; }
 .ga-fb { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: var(--fs-sm); color: var(--text-secondary, var(--text)); }
-.ga-fbb { min-width: 44px; min-height: 36px; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--text); font: inherit; cursor: pointer; }
+.ga-fbb { min-width: 44px; min-height: 44px; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--text); font: inherit; cursor: pointer; }
 .ga-small { margin: 6px 0 0; font-size: var(--fs-sm); opacity: .85; }
 .ga-team { margin-top: 6px; font-size: var(--fs-sm); min-height: 36px; }
 .ga-consent .actions, .ga-report .actions { margin-top: 4px; }
@@ -47,7 +47,7 @@
 .ga-in { flex: 1 1 auto; min-width: 0; min-height: 44px; }
 .ga-send { flex: none; min-height: 44px; }
 .ga-foot { margin: 6px 0 0; text-align: center; font-size: var(--fs-sm); }
-.ga-foot .linklike { min-height: 36px; }
+.ga-foot .linklike { min-height: 44px; }
 .ga-report textarea { width: 100%; margin-top: 6px; }
 
 /* صفحه‌ی مدیریت */
@@ -60,5 +60,12 @@
 .ga-next { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--text-secondary, var(--text)); }
 .ga-next .ga-link { margin-top: 4px; }
 .ga-src { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--text-secondary, var(--text)); direction: rtl; }
-.ga-opts .ga-chip { border-color: var(--primary); }
 .ga-skip { min-height: 36px; font-size: var(--fs-sm); }
+
+/* بازبینی ۱۲ */
+/* UX-05: گزینه‌های سؤال‌های درد، ردیف‌های تمام‌عرض به‌جای قرص‌های دوخطی */
+.ga-opts { flex-direction: column; align-items: stretch; }
+.ga-opts .ga-chip { border-color: var(--primary); border-radius: 14px; justify-content: flex-start; min-height: 44px; padding: 8px 14px; }
+.ga-opts .ga-skip { align-self: flex-start; }
+/* UX-06: دکمه‌های «بله/نه» روی پیام‌های رنگی دیده بشن */
+.ga-urgent .ga-fbb, .ga-caution .ga-fbb { border-color: var(--text-secondary); }

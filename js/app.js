@@ -6,6 +6,8 @@
   'use strict';
   var C = window.CoachLogic;
   var I = window.CoachI18n;
+  // جداکننده‌ی فهرست‌های کوتاه: «·» در فونت فارسی شبیه صفر «۰» دیده می‌شه (بازبینی ۱۲، UX-03)
+  function dot() { return I.getLang() === 'fa' ? '، ' : ' · '; }
   var P = window.CoachPlatform;
   var T = I.t;
   var STORE_KEY = 'iranrunners-coach-mvp-v1';
@@ -791,7 +793,7 @@
     } else if (rec.status === 'done') {
       var sm = K.summary(st, now);
       html += '<div class="rec-done"><p><b>' + esc(T('rec.doneQ')) + '</b></p>' + (rec.free && sm.km >= 0.05 ? freeAskHtml() : '') +
-        (sm.splits.length ? '<p class="small">' + esc(T('rec.splits')) + ' ' + sm.splits.map(function (x) { return '<span dir="ltr">' + fa(C.formatDuration(x)) + '</span>'; }).join(' · ') + '</p>' : '') +
+        (sm.splits.length ? '<p class="small">' + esc(T('rec.splits')) + ' ' + sm.splits.map(function (x) { return '<span dir="ltr">' + fa(C.formatDuration(x)) + '</span>'; }).join(dot()) + '</p>' : '') +
         (sm.km < 0.05 ? '<p class="form-errors" role="alert">' + esc(T('rec.tooShort')) + '</p>' : '') +
         '<div class="rec-actions">' + (sm.km >= 0.05 ? '<button type="button" class="btn btn-primary rec-big" data-rec="save">' + esc(T('rec.save')) + '</button>' : '') +
         '<button type="button" class="btn btn-outline rec-big" data-rec="back">' + esc(T('rec.back')) + '</button></div>' +
@@ -1135,7 +1137,7 @@
       var end = function (ok) {
         if (fin) return; fin = true;
         res[i] = T(ok ? 'map.testOk' : 'map.testFail', { name: 'OpenStreetMap', ms: Date.now() - t0 });
-        if (++done === TILE_SOURCES.length) out.textContent = fa(res.join(' · '));
+        if (++done === TILE_SOURCES.length) out.textContent = fa(res.join(dot()));
       };
       img.onload = function () { end(true); }; img.onerror = function () { end(false); };
       setTimeout(function () { end(false); }, MAP_WAIT);
@@ -2400,7 +2402,7 @@
     if (log.src === 'health') parts.push('<span class="muted">' + esc(T('sync.from', { name: healthName() })) + '</span>');
     if (log.src === 'gps') parts.push('<span class="muted">' + esc(T('rec.src')) + '</span>');
     if (log.hr) parts.push(tt('rec.hr.line', { a: log.hr.avg, m: log.hr.max }) + (log.hr.easyMax && log.hr.above >= 60 ? ' <span class="muted">' + tt('rec.hr.lineAbove', { n: Math.round(log.hr.above / 60) }) + '</span>' : ''));
-    if (log.splits && log.splits.length) parts.push('<span class="muted">' + esc(T('rec.splits')) + ' ' + log.splits.map(function (x) { return '<span dir="ltr">' + fa(C.formatDuration(x)) + '</span>'; }).join(' · ') + '</span>');
+    if (log.splits && log.splits.length) parts.push('<span class="muted">' + esc(T('rec.splits')) + ' ' + log.splits.map(function (x) { return '<span dir="ltr">' + fa(C.formatDuration(x)) + '</span>'; }).join(dot()) + '</span>');
     return '<p class="actual-line"><b>' + esc(T('post.actRecorded')) + '</b> ' + parts.join(T('progress.sep')) + '</p>';
   }
   function postRunBlock(key, s, prefix) {
@@ -2714,7 +2716,7 @@
       '<button type="button" class="btn btn-icon" data-week="-1" aria-label="' + esc(T('week.prev')) + '"' + (week.start <= p.startDate ? ' disabled' : '') + '>' + prevGlyph + '</button>' +
       '<div class="week-title"><h2>' + (week.weekIndex >= 0 ? tt('week.n', { n: wkNum }) : esc(T(week.phase.key === 'intro' ? 'week.intro' : 'week.before'))) + '</h2>' +
       '<p class="muted">' + esc(T('week.range', { a: faDate(week.start, true), b: faDate(week.days[6].date, true) })) +
-      (viewWeekOffset !== 0 ? ' · <button type="button" class="linklike" data-week="0">' + esc(T('week.back')) + '</button>' : '') + '</p></div>' +
+      (viewWeekOffset !== 0 ? dot() + '<button type="button" class="linklike" data-week="0">' + esc(T('week.back')) + '</button>' : '') + '</p></div>' +
       '<button type="button" class="btn btn-icon" data-week="1" aria-label="' + esc(T('week.next')) + '">' + nextGlyph + '</button></div>';
 
     // آمار هفته از جلسه‌های واقعی (بعد از تطبیق با چک‌این و روزهای پریود)؛ اگه با برنامه‌ی اصلی فرق داشت، اون هم نشون داده می‌شه
@@ -2828,7 +2830,7 @@
       '<button type="button" class="btn btn-icon" data-month="-1" aria-label="' + esc(T('month.prev')) + '">' + prevGlyph + '</button>' +
       '<div class="week-title"><h2>' + t(I.monthTitle(C.addDays(mb.first, 14))) + '</h2>' +
       '<p class="muted">' + tt(timeBased ? 'month.statsMin' : 'month.stats', { n: ms.n, km: ms.km, min: ms.min, d: ms.d, dkm: ms.dkm, dmin: ms.dmin }) +
-      (monthOffset !== 0 ? ' · <button type="button" class="linklike" data-month="0">' + esc(T('month.back')) + '</button>' : '') + '</p></div>' +
+      (monthOffset !== 0 ? dot() + '<button type="button" class="linklike" data-month="0">' + esc(T('month.back')) + '</button>' : '') + '</p></div>' +
       '<button type="button" class="btn btn-icon" data-month="1" aria-label="' + esc(T('month.next')) + '">' + nextGlyph + '</button></div>';
 
     html += '<div class="month-grid" role="grid" aria-label="' + esc(T('month.gridAria')) + '">' +
@@ -3036,7 +3038,7 @@
         '<button type="button" class="btn btn-primary" data-zero-graduate="1">' + tt('zero.readyBtn') + '</button></section>';
     }
     var html = '<section class="card zero-card"><h3>' + esc(T('zero.cardTitle')) + '</h3>' +
-      '<p class="zero-stage"><b>' + tt('zero.stage', { n: stage + 1, total: fin + 1 }) + '</b> · ' + tt('zero.weeksLeft', { n: fin - stage }) + '</p>' +
+      '<p class="zero-stage"><b>' + tt('zero.stage', { n: stage + 1, total: fin + 1 }) + '</b>' + dot() + tt('zero.weeksLeft', { n: fin - stage }) + '</p>' +
       '<div class="zero-bar" aria-hidden="true"><i style="width:' + Math.round((stage + 1) / (fin + 1) * 100) + '%"></i></div>';
     if (wk.weekIndex >= 0) {
       var f = (p.zeroWeeks || {})[wk.start];
@@ -3264,7 +3266,7 @@
     var cur = (p.injuries || []).filter(function (j) { return C.injuryPhase(p, now) && C.injuryPhase(p, now).inj === j; })[0];
     var html = '<section class="card"><h2>' + esc(T('health.inj.title')) + '</h2><p class="small muted">' + esc(T('health.inj.hint')) + '</p>';
     if (cur) {
-      html += '<div class="inj-cur"><p><b>' + esc(cur.label || T('health.area.' + (cur.area || 'other'))) + '</b> · ' + esc(T('health.area.' + (cur.area || 'other'))) + '</p>' +
+      html += '<div class="inj-cur"><p><b>' + esc(cur.label || T('health.area.' + (cur.area || 'other'))) + '</b>' + dot() + esc(T('health.area.' + (cur.area || 'other'))) + '</p>' +
         '<p class="small">' + esc(fa(T('health.inj.dates', { a: faDate(cur.start), b: faDate(cur.stopUntil) }))) + (cur.returnDate ? T('progress.sep') + esc(fa(T('health.inj.ret', { d: faDate(cur.returnDate) }))) : '') + '</p>' +
         ((cur.setbacks || []).length ? '<p class="small muted">' + esc(fa(T('health.inj.setbacks', { n: cur.setbacks.length }))) + '</p>' : '') +
         '<div class="actions">' + (C.injuryPhase(p, now).phase === 'off' ? '<button type="button" class="btn btn-outline" data-inj-clear="' + esc(cur.id) + '">' + esc(T('health.inj.cleared')) + '</button>' : '') +
@@ -3559,7 +3561,7 @@
       html += '<p class="race-date">' + esc(faDate(g.date)) + '</p><div class="countdown">' + (daysLeft > 0 ? '<b>' + fa(daysLeft) + '</b><span>' + esc(T('race.daysLeft', { n: daysLeft })) + '</span>'
         : daysLeft === 0 ? '<b>' + esc(T('race.todayBang')) + '</b><span>' + esc(T('race.goodLuck')) + '</span>' : '<b>✓</b><span>' + esc(T('race.done')) + '</span>') + '</div>';
     } else {
-      html += '<p class="race-date">' + esc(T('race.noDate')) + ' · <a href="#onboarding">' + esc(T('race.addDate')) + '</a></p>';
+      html += '<p class="race-date">' + esc(T('race.noDate')) + dot() + '<a href="#onboarding">' + esc(T('race.addDate')) + '</a></p>';
     }
     if (race && race.date > now) {
       var taperStart = C.addDays(race.date, -C.taperWeeks(race.key) * 7);
@@ -3829,7 +3831,7 @@
       else {
         html += '<dl class="plan-rows">' +
           '<div><dt>' + esc(T('plans.targetPace')) + '</dt><dd dir="ltr">' + paceU(s.targetPace) + ' ' + esc(T('units.pace.' + I.getUnits())) + '</dd></div>' +
-          '<div><dt>VDOT</dt><dd><span dir="ltr">' + fa(s.vdot.toFixed(1)) + ' → ' + fa(s.targetVdot.toFixed(1)) + '</span> · ' + tt('plans.steps', { n: s.steps, w: s.stepWeeks }) + '</dd></div></dl>' +
+          '<div><dt>VDOT</dt><dd><span dir="ltr">' + fa(s.vdot.toFixed(1)) + ' → ' + fa(s.targetVdot.toFixed(1)) + '</span>' + dot() + tt('plans.steps', { n: s.steps, w: s.stepWeeks }) + '</dd></div></dl>' +
           '<p class="small muted">' + tt('plans.howPace', { e: paceU(s.paces.E), t: paceU(s.paces.T), w: s.stepWeeks }) + '</p>';
         if (s.ambitious) html += '<div class="alert alert-adapt small"><p>' + tt('plans.ambitious', { n: s.paceWeeks }) + '</p>' +
           '<button type="button" class="linklike small" data-plan-preset="' + k + '" data-sec="' + s.mid.sec + '">' + tt('plans.midUse', { t: C.formatDuration(s.mid.sec), n: s.mid.weeks }) + '</button></div>';
@@ -4266,7 +4268,7 @@
       return fa(lab + main + ' (' + (m.conf === 'unsure' ? T(F0x + 'unsure') : T('gait.conf.' + m.conf)) + (m.n != null ? T('progress.sep') + T(E + 'nSd', { n: m.n, sd: m.sd == null ? '—' : m.sd }) : '') + ')');
     };
     var rows = FX.map(function (f) {
-      var P0 = X + f.id + '.', vals = f.marks.map(function (m) { return cell(f, m); }).join(' · ');
+      var P0 = X + f.id + '.', vals = f.marks.map(function (m) { return cell(f, m); }).join(dot());
       if (f.id === 'head' && f.gaze != null) vals += T('progress.sep') + fa(T(X + 'sub.gaze', { n: f.gaze, l: T('gait.look.' + f.look) }));
       if (f.id === 'arms' && f.swing != null) vals += T('progress.sep') + fa(T(X + 'sub.swing', { n: f.swing }));
       if (f.id === 'cadence' && f.status === 'ok') vals += T('progress.sep') + T(X + 'from', { v: T(X + 'views.' + f.from) });
@@ -4292,9 +4294,9 @@
         var x = B[k] || {}, lab = T(X + (k === 'l' ? 'left' : 'right'));
         if (x.conf === 'low' || x.v == null) return lab + ': ' + T('gait.conf.low') + ' (' + T('gait.naShort.' + (x.why || 'fewSteps')) + ')';
         return fa(lab + ': ' + x.v + (u ? ' ' + u : '') + ' (' + T('gait.conf.' + x.conf) + T('progress.sep') + T(X + 'nSd', { n: x.n, sd: x.sd == null ? '—' : x.sd }) + ')');
-      }).join(' · ');
+      }).join(dot());
     };
-    var biConf = function (m, id) { var B = m.bi[id]; return ['l', 'r'].map(function (k) { return T(X + (k === 'l' ? 'left' : 'right')) + ' ' + T('gait.conf.' + ((B[k] || {}).conf || 'low')); }).join(' · '); };
+    var biConf = function (m, id) { var B = m.bi[id]; return ['l', 'r'].map(function (k) { return T(X + (k === 'l' ? 'left' : 'right')) + ' ' + T('gait.conf.' + ((B[k] || {}).conf || 'low')); }).join(dot()); };
     if (s && s.bi) {
       var ub = function (id) { return T(X + 'p.' + id + '.u'); };
       row('cadence', 'side', gaitCadCell(s, ub('cadence')), cf(s, 'cadence'));
@@ -4303,7 +4305,7 @@
         var x = s.bi.strike[k] || {}, lab = T(X + (k === 'l' ? 'left' : 'right'));
         if (x.conf === 'low' || x.v == null) return lab + ': ' + T('gait.conf.low') + ' (' + T('gait.naShort.' + (x.why || 'fewSteps')) + ')';
         return fa(lab + ': ' + x.v + ub('strike') + ' ' + gaitStrikePct({ pct: x.pct }) + ' (' + T('gait.conf.' + x.conf) + T('progress.sep') + T(X + 'nSd', { n: x.n, sd: x.sd == null ? '—' : x.sd }) + ')');
-      }).join(' · ') + (s.strikes ? T('progress.sep') + fa(T(X + 'footPx', { px: s.strikes.footPx == null ? '—' : s.strikes.footPx })) : ''), biConf(s, 'strike'));
+      }).join(dot()) + (s.strikes ? T('progress.sep') + fa(T(X + 'footPx', { px: s.strikes.footPx == null ? '—' : s.strikes.footPx })) : ''), biConf(s, 'strike'));
       row('trunk', 'side', s.trunk == null || cf(s, 'trunk') === T('gait.conf.low') ? T('gait.conf.low') + (s.why && s.why.trunk ? ' (' + T('gait.naShort.' + s.why.trunk) + ')' : '') : fa(s.trunk + ' ' + ub('trunk')), cf(s, 'trunk'));
       row('head', 'side', s.neck == null || (s.conf && s.conf.head === 'low') ? T('gait.conf.low') + (s.why && s.why.head ? ' (' + T('gait.naShort.' + s.why.head) + ')' : '') : fa(s.neck + '° / ' + s.gaze + '°'), cf(s, 'head'));
       row('vo', 'side', num(s.vo, ub('vo')), cf(s, 'vo'));
@@ -4332,9 +4334,9 @@
       if (b.trunkLat != null) row('trunkLat', 'back', num(b.trunkLat, '°'), cf(b, 'trunkLat'));
       if (b.armSym != null) row('armSym', 'back', num(b.armSym, '%'), cf(b, 'armSym'));
       row('armCross', 'back', b.armCross == null ? T(X + 'noData') : fa(Math.round(b.armCross * 100)) + ' %', cf(b, 'armCross'));
-      row('sides', 'back', fa((b.gctSym == null ? '—' : b.gctSym) + '% · ' + (b.pelvicSym == null ? '—' : b.pelvicSym) + '° · ' + (b.valgusSym == null ? '—' : b.valgusSym) + '°'), cf(b, 'sides'));
+      row('sides', 'back', fa((b.gctSym == null ? '—' : b.gctSym) + '%' + dot() + (b.pelvicSym == null ? '—' : b.pelvicSym) + '°' + dot() + (b.valgusSym == null ? '—' : b.valgusSym) + '°'), cf(b, 'sides'));
     } else if (b) {
-      var lr = function (l, rr) { return fa(T(X + 'left') + ' ' + (l == null ? '—' : l) + '° · ' + T(X + 'right') + ' ' + (rr == null ? '—' : rr) + '°'); };
+      var lr = function (l, rr) { return fa(T(X + 'left') + ' ' + (l == null ? '—' : l) + '°' + dot() + T(X + 'right') + ' ' + (rr == null ? '—' : rr) + '°'); };
       row('pelvic', 'back', lr(b.pelvicL, b.pelvicR), cf(b, 'pelvic'));
       row('valgus', 'back', lr(b.valgusL, b.valgusR), cf(b, 'valgus'));
       row('crossover', 'back', num(b.crossover, '%'), cf(b, 'crossover'));
@@ -4342,7 +4344,7 @@
       if (b.trunkLat != null) row('trunkLat', 'back', num(b.trunkLat, '°'), cf(b, 'trunkLat'));
       if (b.armSym != null) row('armSym', 'back', num(b.armSym, '%'), cf(b, 'armSym'));
       row('armCross', 'back', b.armCross == null ? T(X + 'noData') : fa(Math.round(b.armCross * 100)) + ' %', cf(b, 'armCross'));
-      row('sides', 'back', fa((b.gctSym == null ? '—' : b.gctSym) + '% · ' + (b.pelvicSym == null ? '—' : b.pelvicSym) + '° · ' + (b.valgusSym == null ? '—' : b.valgusSym) + '°'), cf(b, 'sides'));
+      row('sides', 'back', fa((b.gctSym == null ? '—' : b.gctSym) + '%' + dot() + (b.pelvicSym == null ? '—' : b.pelvicSym) + '°' + dot() + (b.valgusSym == null ? '—' : b.valgusSym) + '°'), cf(b, 'sides'));
     }
     var cd = gaitConditions(r), FX = gaitFactors(r), RR = r.risks || [];
     // الگوهای مرتبط با آسیب (ترکیبی از چند یافته) فقط در نسخه‌ی تخصصی
@@ -4357,7 +4359,7 @@
         fa(T(X + 'perfV', { s: p.totalS, n: p.frames, m: p.modelMs == null ? '—' : p.modelMs, o: p.otherMs == null ? '—' : p.otherMs })) + T('progress.sep') + T(X + 'read.' + (p.read === 'play' ? 'play' : 'seek')) +
         (p.fallback ? ' (' + p.fallback + ')' : '') + (p.night ? T('progress.sep') + T(X + 'night') : '') + (p.batch ? T('progress.sep') + fa(T(X + 'batch', { b: p.batch.batched, r: p.batch.redo })) : '') + (r.appV ? T('progress.sep') + 'v' + r.appV : '')]);
     });
-    if (r.engine) meta.push([T(X + 'engine'), (r.engine === 'rtmpose-m' ? 'RTMPose-m (Halpe26)' : r.engine === 'mediapipe-full' ? 'MediaPipe Pose (full)' : r.engine) + (r.backend ? ' · ' + (r.backend === 'webgpu' ? 'GPU' : 'CPU') : '')]);
+    if (r.engine) meta.push([T(X + 'engine'), (r.engine === 'rtmpose-m' ? 'RTMPose-m (Halpe26)' : r.engine === 'mediapipe-full' ? 'MediaPipe Pose (full)' : r.engine) + (r.backend ? dot() + (r.backend === 'webgpu' ? 'GPU' : 'CPU') : '')]);
     [['side', r.qSide], ['side2', r.qSide2], ['back', r.qBack]].forEach(function (q) {
       if (!q[1]) return;
       var v = q[1];
@@ -6018,7 +6020,7 @@
     if (!ids || !ids.length) return '';
     return '<p class="learn-more"><span>' + esc(T('learn.more')) + '</span> ' + ids.map(function (id) {
       return '<a href="#learn/' + id + '">' + esc(learnTitle(id)) + '</a>';
-    }).join('<span class="sep" aria-hidden="true"> · </span>') + '</p>';
+    }).join('<span class="sep" aria-hidden="true">' + dot() + '</span>') + '</p>';
   }
   // زمان مطالعه از تعداد کلمه‌ها (حدود ۲۰۰ کلمه در دقیقه)
   function readMinutes(html) {
@@ -6631,7 +6633,7 @@
       (p.gap && p.experience !== 'never' ? row('gap', esc(fa(C.gapDaysOf(p) ? C.gapText(C.gapDaysOf(p)) : T('gapOpt.now'))) + (p.pbOld ? ' <span class="muted small">' + tt('profile.oldPb', { d: distName(p.pbOld.distanceKm), t: C.formatDuration(p.pbOld.timeSec) }) + '</span>' : '')) : '') +
       row('structured', esc(T(p.structured ? 'profile.structYes' : 'profile.structNo'))) +
       row('hr', hrz ? tt('profile.hrVal', { a: hrz.easy[0], b: hrz.easy[1] }) : muted('profile.notEntered')) +
-      row('fitness', fit ? 'VDOT ' + t(fit.vdot.toFixed(1)) + ' · <a href="#fitness">' + esc(T('profile.details')) + '</a>' : '<a href="#fitness">' + esc(T('profile.registerTest')) + '</a>') +
+      row('fitness', fit ? 'VDOT ' + t(fit.vdot.toFixed(1)) + dot() + '<a href="#fitness">' + esc(T('profile.details')) + '</a>' : '<a href="#fitness">' + esc(T('profile.registerTest')) + '</a>') +
       row('km', p.monthAvgKm != null && p.experience !== 'never' ? tt('profile.kmVal2', { last: p.lastWeekKm, avg: p.monthAvgKm, start: lv.volume ? lv.volume.start : p.currentWeeklyKm })
         : tt('profile.kmVal', { n: p.currentWeeklyKm })) +
       row('body', tt('profile.bodyVal', { age: p.age, w: p.weightKg, h: p.heightCm }) + ' <span class="muted small">(BMI ' + t(bmi.toFixed(1)) + ')</span>') +

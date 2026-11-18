@@ -10,7 +10,7 @@
   if (!CFG.enabled || !E || !KB) { window.GaamAssistant = null; return; }
 
   var STORE_KEY = 'gaam-assistant', MAX_ITEMS = 200;
-  var api = null, idx = null, msgs = [], seq = 0;
+  var api = null, idx = null, msgs = [], seq = 0, labTaps = 0, labT0 = 0;
 
   // متن‌های رابط (فقط فارسی؛ در دوره‌ی آزمایش برای زبان انگلیسی پنهانه)
   var S = {
@@ -25,11 +25,11 @@
     reportConsent: 'متن گزارش، نسخه‌ی اپ و صفحه‌ای که روش بودی ذخیره می‌شه.',
     learn: 'مطلب: ', src: 'منبع: ', chip: 'سؤال داری؟ از دستیار بپرس',
     // تنظیمات
-    labTitle: 'آزمایشی', labSub: 'دستیار گام', toggle: 'دستیار گام (آزمایشی)',
+    labTitle: 'آزمایشی', labSub: 'دستیار گام', on: 'روشن', off: 'خاموش', toggle: 'دستیار گام (آزمایشی)',
     toggleHint: 'یک دستیار ساده که از روی مطالب آموزش جواب می‌ده؛ بدون اینترنت و بدون هوش مصنوعی.',
-    queued: 'سؤال‌های ذخیره‌شده برای تیم: {n} · گزارش‌ها: {r}',
+    queued: 'سؤال‌های ذخیره‌شده برای تیم: {n}، گزارش‌ها: {r}',
     share: 'فرستادن برای تیم گام', clear: 'پاک کردن سؤال‌های ذخیره‌شده', cleared: 'پاک شد.',
-    admin: 'صفحه‌ی مدیریت',
+    admin: 'صفحه‌ی مدیریت', adminOn: 'صفحه‌ی مدیریت دستیار فعال شد.',
     // مدیریت
     adminTitle: 'مدیریت دستیار', adminLoad: 'خوندن فایل‌های رسیده', adminLocal: 'داده‌ی همین دستگاه',
     adminFiles: '{n} فایل خونده شد.', adminBad: 'فایل معتبر نبود: {f}',
@@ -280,6 +280,11 @@
     if (t.closest('[data-ga-share]')) { shareQueue(); return; }
     if (t.closest('[data-ga-clear]')) { var d = load(); d.queue = []; d.reports = []; d.fb = []; save(d); api.showToast(S.cleared); api.rerender(); return; }
     if (t.closest('[data-ga-admin]')) { openAdmin(); return; }
+    if (t.closest('#set-lab > summary')) {
+      var now = Date.now();
+      labTaps = now - labT0 < 4000 ? labTaps + 1 : 1; if (labTaps === 1) labT0 = now;
+      if (labTaps >= 5) { labTaps = 0; var dd = load(); if (!dd.admin) { dd.admin = true; save(dd); api.showToast(S.adminOn); setTimeout(function () { api.rerender(); }, 0); } }
+    }
   });
   document.addEventListener('change', function (e) {
     var t = e.target;
@@ -319,11 +324,12 @@
       body += '<p class="small">' + esc(f(S.queued, { n: api.num(d.queue.length), r: api.num(d.reports.length) })) + '</p>' +
         '<div class="actions">' +
         (d.queue.length || d.reports.length || d.fb.length ? '<button type="button" class="btn btn-primary" data-ga-share="1">' + esc(S.share) + '</button>' : '') +
-        '<button type="button" class="btn btn-outline" data-ga-admin="1">' + esc(S.admin) + '</button>' +
+        // صفحه‌ی مدیریت فقط برای صاحب پروژه: ۵ بار زدن پشت‌سرهم روی عنوان «آزمایشی» (بازبینی ۱۲، UX-07)
+        (d.admin ? '<button type="button" class="btn btn-outline" data-ga-admin="1">' + esc(S.admin) + '</button>' : '') +
         (d.queue.length || d.reports.length || d.fb.length ? '<button type="button" class="btn btn-ghost" data-ga-clear="1">' + esc(S.clear) + '</button>' : '') +
         '</div>';
     }
-    return setSection('lab', LAB_ICON, S.labTitle, esc(S.labSub + (on ? ' · ✓' : '')), body);
+    return setSection('lab', LAB_ICON, S.labTitle, esc(S.labSub + ': ' + (on ? S.on : S.off)), body);
   }
 
   // فایل فرستادنی: فقط سؤال‌هایی که کاربر با رضایت ذخیره کرده، گزارش‌ها و شمار بازخورد هر مدخل
@@ -403,11 +409,11 @@
     var s = adminStats();
     var title = function (id) { var e = KB.entries.filter(function (x) { return x.id === id; })[0]; return e ? e.q : id; };
     box.innerHTML =
-      list(S.unanswered, s.unanswered, function (q) { return esc(q.q) + ' <span class="muted">· ' + esc(q.kind) + (q.id ? ' · ' + esc(q.id) : '') + '</span>'; }) +
+      list(S.unanswered, s.unanswered, function (q) { return esc(q.q) + ' <span class="muted">، ' + esc(q.kind) + (q.id ? '، ' + esc(q.id) : '') + '</span>'; }) +
       list(S.frequent, s.frequent, function (g) { return esc(g.q) + ' <b>×' + api.num(g.n) + '</b>'; }) +
       list(S.negative, s.negative, function (q) { return esc(q.q) + ' <span class="muted">→ ' + esc(title(q.id)) + '</span>'; }) +
-      list(S.perEntry, Object.keys(s.fb).map(function (k) { return [k, s.fb[k]]; }), function (x) { return esc(title(x[0])) + ' <span class="muted">· ' + esc(S.yes) + ' ' + api.num(x[1].y) + ' · ' + esc(S.no) + ' ' + api.num(x[1].n) + '</span>'; }) +
-      list(S.reports, s.reps, function (r) { return esc(r.text) + ' <span class="muted">· ' + esc(r.page || '') + ' · v' + esc(r.ver || '') + '</span>'; });
+      list(S.perEntry, Object.keys(s.fb).map(function (k) { return [k, s.fb[k]]; }), function (x) { return esc(title(x[0])) + ' <span class="muted">، ' + esc(S.yes) + ' ' + api.num(x[1].y) + '، ' + esc(S.no) + ' ' + api.num(x[1].n) + '</span>'; }) +
+      list(S.reports, s.reps, function (r) { return esc(r.text) + ' <span class="muted">، ' + esc(r.page || '') + '، v' + esc(r.ver || '') + '</span>'; });
   }
 
   // ---------- اتصال به اپ ----------

@@ -296,7 +296,7 @@
     if (!n0) return { kind: 'empty' };
     // ایمنی همیشه اول، حتی وسط سلام و احوال‌پرسی
     var u = hasAny(n0, URGENT);
-    if (u) return { kind: 'urgent', answer: idx.kb.texts.urgent, links: idx.kb.urgentLinks, safety: 'urgent', matched: u };
+    if (u) return urgentResult(idx.kb, u, ctx);
     var st = smallTalk(n0);
     if (st.kinds.length) {
       if (!tokens(st.rest).length) return smallReply(idx.kb, st.kinds[0], ctx);
@@ -324,7 +324,7 @@
     if (!qtAll.length) return { kind: 'empty' };
     // ۱. ایمنی، قبل از هر چیز
     var u = hasAny(n, URGENT);
-    if (u) return { kind: 'urgent', answer: kb.texts.urgent, links: kb.urgentLinks, safety: 'urgent', matched: u };
+    if (u) return urgentResult(kb, u, ctx);
     if (!qt.length) return { kind: 'none', answer: kb.texts.none, suggestions: popular(kb, ctx, []) };
     // ۲. خارج از حوزه
     // «به درد می‌خوره» یعنی «مفیده»، نه درد
@@ -402,7 +402,7 @@
     return { kind: 'intake', answer: (lead ? lead + ' ' : '') + q, options: stepOptions(idx.kb, st.step).map(function (o) { return { v: o.v, label: o.label }; }),
       state: st, safety: st.step === 'flags' ? 'caution' : 'none' };
   }
-  function urgentResult(kb, why) { return { kind: 'urgent', answer: kb.texts.urgent, links: kb.urgentLinks, safety: 'urgent', matched: why }; }
+  function urgentResult(kb, why, ctx) { return { kind: 'urgent', answer: (ctx && ctx.walk && kb.texts.urgentWalk) || kb.texts.urgent, links: kb.urgentLinks, safety: 'urgent', matched: why }; }
   // قدم بعدی؛ چیزی که کاربر از قبل گفته دوباره پرسیده نمی‌شه
   function nextStep(st) {
     if (!st.region) return 'region';
@@ -415,7 +415,7 @@
   }
   function intakeStart(idx, n, ctx) {
     var st = { region: detectRegion(n) || undefined, onset: parseOnset(n) || undefined, duration: parseDuration(n) || undefined };
-    if (st.onset === 'sudden') return urgentResult(idx.kb, 'intake:onset');
+    if (st.onset === 'sudden') return urgentResult(idx.kb, 'intake:onset', ctx);
     st.step = nextStep(st);
     return question(idx, st, idx.kb.intake.start, ctx);
   }
@@ -425,7 +425,7 @@
   function intake(idx, state, v, ctx) {
     var kb = idx.kb, st = JSON.parse(JSON.stringify(state || {})), o = opt(kb, null, v);
     if (!o || stepOptions(kb, st.step).indexOf(o) < 0) return null;
-    if (o.urgent) return urgentResult(kb, 'intake:' + st.step);
+    if (o.urgent) return urgentResult(kb, 'intake:' + st.step, ctx);
     if (st.step === 'region' || st.step === 'knee') st.region = v;
     else st[st.step] = v;
     st.step = nextStep(st);
@@ -444,7 +444,7 @@
     var kb = idx.kb, n = normalize(text);
     if (!n) return null;
     var u = hasAny(n, URGENT);
-    if (u) return urgentResult(kb, u);
+    if (u) return urgentResult(kb, u, ctx);
     var st = JSON.parse(JSON.stringify(state || {})), v = null;
     if (st.step === 'region') { v = detectRegion(n); if (v === 'knee') return question(idx, { step: 'knee', region: 'knee' }, null, ctx); }
     else if (st.step === 'knee') v = /بیرون|کنار/.test(n) ? 'knee-outer' : /جلو|کشکک/.test(n) ? 'knee-front' : /نمیدونم|جای دیگه|پشت|داخل|پشتش|توش/.test(n) ? 'knee-other' : null;

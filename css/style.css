@@ -48,6 +48,12 @@ body { text-align: justify; text-justify: inter-word; }
 .onb-step .sub-legend, .onb-step legend, .onb-step .field > label { text-align: start; }
 /* متن‌های راهنمای چندخطی که بعداً اضافه شدن، مثل بقیه‌ی متن‌های بلند دوطرفه (UX10-06) */
 #walkmin-field small.muted, #ci-pain .pain-consent-box p.small { text-align: justify; }
+/* بازبینی ۱۲: ستون‌های باریکی که دوطرفه فاصله‌ی ۵ تا ۹ برابری می‌ساختن (UX-08) */
+.days-capped, #g-walkWeek .guide-body li { text-align: start; }
+/* UX-01: ردیف تحلیل‌های قبلی در گوشی باریک بشکنه، دکمه‌ی حذف بیرون نزنه */
+.gait-hist li { flex-wrap: wrap; row-gap: 0; }
+.gait-hist li > * { min-width: 0; }
+.gait-hist li > span, .gait-hist li > b { flex: 1 1 140px; overflow-wrap: anywhere; }
 /* یادداشت «حجم با این تعداد روز جا نمی‌شه» در کادر باریک با عدد و پرانتز: دوطرفه فاصله‌ی ۳۵ پیکسلی می‌انداخت (بازبینی ۱۱، UX11-02) */
 .days-capped { text-align: start; }
 :lang(en) p, :lang(en) li, :lang(en) dd, :lang(en) small { hyphens: auto; -webkit-hyphens: auto; }
