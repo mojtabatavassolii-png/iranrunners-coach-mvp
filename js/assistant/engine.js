@@ -332,6 +332,8 @@
       // مدخل منتظر تأیید هیچ‌وقت جای پاسخ محتاطانه‌ی درد رو نمی‌گیره
       var safe = ranked.filter(function (r) { return r.x.e.safety && r.x.e.safety !== 'none' && r.x.e.status !== 'pending'; });
       var top = safe[0] && safe[0].anchor && safe[0].s >= T_ANSWER && (!safe[1] || safe[0].s - safe[1].s >= T_MARGIN) ? safe[0].x.e : kb.entries.filter(function (e) { return e.id === kb.painEntry; })[0];
+      // کاربر از درد خودش می‌گه: اول سؤال‌های معاینه (کجا، چطور، چند وقته، نشونه‌های هشدار)
+      if (kb.intake && !(ctx && ctx.noIntake) && INTAKE_ENTRIES.indexOf(top.id) >= 0 && personalPain(n)) return intakeStart(idx, n, ctx);
       return result(top, safe[0] && safe[0].x.e === top ? safe[0].s : null, ctx);
     }
     if (ctx && ctx.debug) ctx.debug.ranked = ranked.slice(0, 5).map(function (r) { return [r.x.e.id, round(r.s), r.anchor]; }); // فقط برای آزمون
@@ -352,6 +354,109 @@
     var nx = (ctx && ctx.walk && e.nextWalk) || e.next || null;
     return { kind: 'answer', id: e.id, entry: e, answer: fill(e, ctx), links: linksFor(e, ctx), next: nx, safety: e.safety || 'none', score: s == null ? null : round(s) };
   }
+  // ---------- گفت‌وگوی درد ----------
+  var INTAKE_ENTRIES = ['pain-general', 'shin-pain', 'knee-front', 'knee-outer', 'achilles', 'heel-pain'];
+  var STEPS = ['region', 'onset', 'duration', 'flags'];
+  function personalPain(n) {
+    // «ساقم درد میکنه»، «پاشنه‌ام صبح‌ها درد میکنه»، «درد دارم»: گزارش درد خود کاربر، حتی اگه آخرش «چیه؟» داشته باشه
+    if (/دردم|درد دارم|درد داشتم|مصدوم شدم|اسیب دیدم|[^ ]م( [^ ]+){0,3} (درد|تیر)/.test(n)) return true;
+    if (/چیه|یعنی چی|پیشگیری|جلوگیری|چطوری? (درمان|خوب)/.test(n)) return false;
+    return /دارم|داره|داشتم|داشت|میکنه|میکرد|کرده|گرفته|گرفت|میگیره|میکشه|دردم|م درد|مصدوم شدم|اسیب دیدم/.test(n);
+  }
+  function detectRegion(n) {
+    if (/(بیرون|کنار)(ی)? ?زانو|itb|ایلیوتیبیال|(ا|ای) ?تی ?بی/.test(n)) return 'knee-outer';
+    if (/کشکک|جلو(ی)? ?زانو/.test(n)) return 'knee-front';
+    if (/زانو/.test(n)) return 'knee';
+    if (/اشیل|پشت (ی )?پاشن/.test(n)) return 'achilles';
+    if (/کف (ی )?پا|پاشن|پلانتار/.test(n)) return 'heel';
+    if (/ساق|شین|اسپلینت/.test(n)) return 'shin';
+    if (/(^| )(ران|همسترینگ|باسن|کمر|لگن|کشاله|مچ|پهلو|شونه|شانه|گردن|انگشت)/.test(n)) return 'other';
+    return null;
+  }
+  function opt(kb, list, v) {
+    var all = kb.intake.region.options.concat(kb.intake.knee.options.filter(function (o) { return typeof o === 'object'; }), kb.intake.onset.options, kb.intake.duration.options, kb.intake.flags.options);
+    return all.filter(function (o) { return o.v === v; })[0] || null;
+  }
+  function stepOptions(kb, step) {
+    var I = kb.intake;
+    if (step === 'knee') return I.knee.options.map(function (o) { return typeof o === 'string' ? opt(kb, null, o) : o; });
+    return I[step].options;
+  }
+  function question(idx, st, lead) {
+    var I = idx.kb.intake, q = I[st.step].q;
+    return { kind: 'intake', answer: (lead ? lead + ' ' : '') + q, options: stepOptions(idx.kb, st.step).map(function (o) { return { v: o.v, label: o.label }; }),
+      state: st, safety: st.step === 'flags' ? 'caution' : 'none' };
+  }
+  function urgentResult(kb, why) { return { kind: 'urgent', answer: kb.texts.urgent, links: kb.urgentLinks, safety: 'urgent', matched: why }; }
+  // قدم بعدی؛ چیزی که کاربر از قبل گفته دوباره پرسیده نمی‌شه
+  function nextStep(st) {
+    if (!st.region) return 'region';
+    if (st.region === 'knee') return 'knee';
+    for (var i = 1; i < STEPS.length; i++) if (!st[STEPS[i]]) return STEPS[i];
+    return null;
+  }
+  function parseOnset(n) {
+    return /یهو|ناگهان|ضربه|پیچ|تق|زمین خوردم|افتادم/.test(n) ? 'sudden' : /حجم|سرعت|بیشتر کردم|زیاد کردم|اضافه کردم/.test(n) ? 'load' : /کم ?کم|تدریجی|ا?روم ا?روم/.test(n) ? 'gradual' : null;
+  }
+  function intakeStart(idx, n, ctx) {
+    var st = { region: detectRegion(n) || undefined, onset: parseOnset(n) || undefined, duration: parseDuration(n) || undefined };
+    if (st.onset === 'sudden') return urgentResult(idx.kb, 'intake:onset');
+    st.step = nextStep(st);
+    return question(idx, st, idx.kb.intake.start);
+  }
+  // «رد شدن»: با همون چیزی که تا حالا گفته جواب می‌ده
+  function intakeSkip(idx, state, ctx) { return intakeFinal(idx, JSON.parse(JSON.stringify(state || {})), ctx); }
+  // جواب یکی از گزینه‌ها
+  function intake(idx, state, v, ctx) {
+    var kb = idx.kb, st = JSON.parse(JSON.stringify(state || {})), o = opt(kb, null, v);
+    if (!o || stepOptions(kb, st.step).indexOf(o) < 0) return null;
+    if (o.urgent) return urgentResult(kb, 'intake:' + st.step);
+    if (st.step === 'region' || st.step === 'knee') st.region = v;
+    else st[st.step] = v;
+    st.step = nextStep(st);
+    return st.step ? question(idx, st) : intakeFinal(idx, st, ctx);
+  }
+  var NUMW = { 'یک': 1, 'یه': 1, 'دو': 2, 'سه': 3, 'چهار': 4, 'پنج': 5, 'شش': 6, 'هفت': 7, 'هشت': 8, 'ده': 10, 'چند': 3 };
+  function parseDuration(n) {
+    if (/امروز|دیروز|دیشب|همین الان|تازه/.test(n)) return 'lt3';
+    var m = /(?:^| )(?:(\d+|یک|یه|دو|سه|چهار|پنج|شش|هفت|هشت|ده|چند) ?)?(روز|هفته|ماه|سال)(?:ه|هست|ست|ی|ه که)?(?= |$)/.exec(n);
+    if (!m) return null;
+    var k = m[1] ? (/\d/.test(m[1]) ? +m[1] : NUMW[m[1]]) : 1, days = k * { 'روز': 1, 'هفته': 7, 'ماه': 30, 'سال': 365 }[m[2]];
+    return days < 3 ? 'lt3' : days <= 14 ? 'lt14' : 'gt14';
+  }
+  // جواب نوشتاری وسط گفت‌وگو؛ اگه فهمیده نشد null (رابط اون رو سؤال تازه حساب می‌کنه)
+  function intakeText(idx, state, text, ctx) {
+    var kb = idx.kb, n = normalize(text);
+    if (!n) return null;
+    var u = hasAny(n, URGENT);
+    if (u) return urgentResult(kb, u);
+    var st = JSON.parse(JSON.stringify(state || {})), v = null;
+    if (st.step === 'region') { v = detectRegion(n); if (v === 'knee') return question(idx, { step: 'knee', region: 'knee' }); }
+    else if (st.step === 'knee') v = /بیرون|کنار/.test(n) ? 'knee-outer' : /جلو|کشکک/.test(n) ? 'knee-front' : /نمیدونم|جای دیگه|پشت|داخل|پشتش|توش/.test(n) ? 'knee-other' : null;
+    else if (st.step === 'onset') v = parseOnset(n) || (/نمیدونم|یادم نیست|مطمئن نیستم/.test(n) ? 'unknown' : null);
+    else if (st.step === 'duration') v = parseDuration(n);
+    else if (st.step === 'flags') v = /^(نه|نخیر|هیچ ?کدوم|ندارم|نه ندارم)( |$)/.test(n) ? 'no' : /^(اره|بله|اوهوم|دارم|یکیش|اره دارم)( |$)/.test(n) ? 'yes' : null;
+    return v ? intake(idx, st, v, ctx) : null;
+  }
+  function intakeFinal(idx, st, ctx) {
+    var kb = idx.kb, I = kb.intake, reg = opt(kb, null, st.region) || opt(kb, null, 'other');
+    var e = kb.entries.filter(function (x) { return x.id === reg.entry; })[0];
+    // مدخل منتظر تأیید هیچ‌وقت جای پاسخ محتاطانه‌ی درد رو نمی‌گیره
+    if (!e || e.status === 'pending') { e = kb.entries.filter(function (x) { return x.id === kb.painEntry; })[0]; reg = { say: reg.say }; }
+    var r = result(e, null, ctx);
+    var parts = [I.painWord + (reg.say ? ' ' + reg.say : '')];
+    ['onset', 'duration'].forEach(function (k) { var o = opt(kb, null, st[k]); if (o && o.say) parts.push(o.say); });
+    var extra = [];
+    if (st.onset === 'load') extra.push(I.load);
+    if (st.duration === 'gt14') extra.push(I.long);
+    if (!st.flags) extra.push(I.flagsNote);
+    r.answer = (parts.length > 1 || reg.say ? I.summary.replace('{parts}', parts.join('، ')) + ' ' : '') + r.answer + (extra.length ? ' ' + extra.join(' ') : '');
+    if (!(r.links || []).some(function (l) { return l.page === I.checkin.page; })) r.links = [I.checkin].concat(r.links || []);
+    r.intake = { region: st.region, onset: st.onset, duration: st.duration };
+    if (st.duration === 'gt14' && r.safety === 'none') r.safety = 'caution';
+    return r;
+  }
+
   // نمایش مستقیم یک مدخل (وقتی کاربر یکی از پیشنهادها رو می‌زنه)
   function byId(idx, id, ctx) {
     var x = idx.entries.filter(function (y) { return y.e.id === id; })[0];
@@ -360,7 +465,7 @@
 
   return {
     normalize: normalize, tokens: tokens, stem: stem, wordSim: wordSim,
-    createIndex: createIndex, ask: ask, byId: byId,
+    createIndex: createIndex, ask: ask, byId: byId, intake: intake, intakeText: intakeText, intakeSkip: intakeSkip,
     THRESHOLDS: { answer: T_ANSWER, margin: T_MARGIN, suggest: T_SUGGEST }
   };
 });

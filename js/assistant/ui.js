@@ -132,6 +132,11 @@
   function botHtml(m) {
     var r = m.r, h = '<div class="ga-msg ga-bot' + (r.safety === 'urgent' || r.kind === 'urgent' ? ' ga-urgent' : r.safety === 'caution' ? ' ga-caution' : '') + '" data-mid="' + m.id + '">';
     h += '<p>' + (r.greet ? esc(r.greet) + ' ' : '') + esc(r.answer) + '</p>';
+    // گفت‌وگوی درد: گزینه‌ها فقط روی سؤال فعلی فعال‌ان
+    if (r.kind === 'intake' && !m.done) {
+      h += '<div class="ga-sug ga-opts">' + r.options.map(function (o) { return '<button type="button" class="ga-chip" data-ga-opt="' + esc(o.v) + '">' + esc(o.label) + '</button>'; }).join('') +
+        '<button type="button" class="linklike ga-skip" data-ga-skip="1">' + esc(KB.intake.skip) + '</button></div>';
+    }
     if (r.suggestions && r.suggestions.length) {
       h += '<div class="ga-sug">' + r.suggestions.map(function (s) { return '<button type="button" class="ga-chip" data-ga-pick="' + esc(s.id) + '">' + esc(s.q) + '</button>'; }).join('') + '</div>';
     }
@@ -166,13 +171,37 @@
       return m.who === 'me' ? '<div class="ga-msg ga-me"><p>' + esc(m.text) + '</p></div>' : botHtml(m);
     }).join('');
     log.scrollTop = log.scrollHeight;
+    // پاسخ بلند: از اول پاسخ نشون بده، نه از تهش
+    var last = log.lastElementChild;
+    if (last && last.classList.contains('ga-bot') && last.offsetHeight > log.clientHeight) log.scrollTop = last.offsetTop - log.offsetTop - 8;
   }
   function msgById(id) { return msgs.filter(function (m) { return String(m.id) === String(id); })[0]; }
 
+  // سؤال فعلی گفت‌وگوی درد (اگه هست)
+  function flowMsg() { var m = msgs[msgs.length - 1]; return m && m.who === 'bot' && m.r.kind === 'intake' && !m.done ? m : null; }
+  function flowStep(fm, r) {
+    fm.done = true;
+    if (!r) return;
+    msgs.push({ who: 'bot', id: ++seq, r: r });
+    renderLog();
+  }
+  function pickOpt(fm, v) {
+    var o = fm.r.options.filter(function (x) { return x.v === v; })[0];
+    if (!o) return;
+    msgs.push({ who: 'me', text: o.label });
+    flowStep(fm, E.intake(idx, fm.r.state, v, ctx()));
+  }
   function askText(text) {
     text = String(text || '').trim().slice(0, 200);
     if (!text) return;
     msgs.push({ who: 'me', text: text });
+    var fm = msgs.length > 1 ? (function (m) { return m && m.who === 'bot' && m.r.kind === 'intake' && !m.done ? m : null; })(msgs[msgs.length - 2]) : null;
+    if (fm) {
+      var fr = E.intakeText(idx, fm.r.state, text, ctx());
+      fm.done = true;
+      // جواب سؤال فهمیده نشد: سؤال تازه حسابش کن
+      if (fr) { msgs.push({ who: 'bot', id: ++seq, r: fr }); renderLog(); return; }
+    }
     var r = E.ask(idx, text, ctx());
     if (r.kind === 'empty') return;
     msgs.push({ who: 'bot', id: ++seq, r: r, q: text });
@@ -235,6 +264,8 @@
       var mEl = t.closest('[data-mid]'), m = mEl ? msgById(mEl.dataset.mid) : null;
       var b;
       if ((b = t.closest('[data-ga-pick]'))) { pick(b.dataset.gaPick); return; }
+      if ((b = t.closest('[data-ga-opt]')) && m && m === flowMsg()) { pickOpt(m, b.dataset.gaOpt); return; }
+      if (t.closest('[data-ga-skip]') && m && m === flowMsg()) { msgs.push({ who: 'me', text: KB.intake.skip }); flowStep(m, E.intakeSkip(idx, m.r.state, ctx())); return; }
       if ((b = t.closest('[data-ga-fb]')) && m) { feedback(m, b.dataset.gaFb); return; }
       if (t.closest('[data-ga-team]') && m) { m.consent = true; renderLog(); return; }
       if (t.closest('[data-ga-nocons]') && m) { m.consent = false; renderLog(); return; }

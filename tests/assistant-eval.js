@@ -164,6 +164,7 @@ var QUESTIONS8 = [
   ['ارتفاع قدم چقدر باشه', 'dontknow|stride|cadence']
 ];
 
+var INTAKE_OK = ['intake', 'pain-general', 'shin-pain', 'knee-front', 'knee-outer', 'achilles', 'heel-pain'];
 function judge(exp, r) {
   // «الف|ب» با گزینه‌ی منتظر تأیید: هر کدوم درست باشه کافیه
   if (/\|/.test(exp) && /pending:/.test(exp) && !/^pending:[^|]*$/.test(exp)) {
@@ -184,6 +185,8 @@ function judge(exp, r) {
     var ids = exp.slice(8).split('|');
     return r.kind === 'pending' && ids.indexOf(r.id) >= 0 ? 'correct' : (dk ? 'dontknow' : 'wrong');
   }
+  // گفت‌وگوی درد شروع شد: درسته وقتی پاسخ مورد انتظار یکی از مدخل‌های درد باشه
+  if (r.kind === 'intake') return exp.split('|').some(function (x) { return INTAKE_OK.indexOf(x) >= 0; }) ? 'correct' : 'wrong';
   return r.kind === 'answer' && exp.split('|').indexOf(r.id) >= 0 ? 'correct' : (dk ? 'dontknow' : 'wrong');
 }
 

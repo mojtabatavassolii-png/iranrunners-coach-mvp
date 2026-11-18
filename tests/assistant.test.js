@@ -55,6 +55,8 @@ test('هر مدخل با عنوان خودش پیدا می‌شه (بدون جو
   KB.entries.forEach(function (e) {
     var r = E.ask(idx, e.q, { cycle: true });
     if (r.kind === 'urgent') return; // عنوان‌هایی که خودشون نشونه‌ی جدی دارن
+    // گزارش درد: اول گفت‌وگوی معاینه
+    if (r.kind === 'intake') { assert.ok(['pain-general', 'shin-pain', 'knee-front', 'knee-outer', 'achilles', 'heel-pain'].indexOf(e.id) >= 0, e.id + ' → intake'); return; }
     var hit = r.id === e.id || (r.suggestions || []).some(function (s) { return s.id === e.id; }) || (e.safety !== 'none' && r.id === KB.painEntry);
     assert.ok(hit, e.id + ' → ' + r.kind + ' ' + (r.id || ''));
   });
@@ -75,7 +77,9 @@ test('سؤال درد هیچ‌وقت به «پاسخ تأییدشده ندار�
   var i2 = E.createIndex(kb2);
   ['ساقم درد میکنه', 'آشیلم درد داره', 'کف پام صبحا درد میکنه', 'جلوی زانوم موقع پله درد میکنه'].forEach(function (q) {
     var r = E.ask(i2, q, {});
-    assert.ok(r.kind === 'answer' || r.kind === 'urgent', q + ' → ' + r.kind);
+    assert.ok(r.kind === 'answer' || r.kind === 'urgent' || r.kind === 'intake', q + ' → ' + r.kind);
+    // پایان گفت‌وگوی درد هم هیچ‌وقت «منتظر تأیید» نیست
+    if (r.kind === 'intake') assert.strictEqual(E.intakeSkip(i2, r.state, {}).kind, 'answer', q);
   });
 });
 
@@ -89,6 +93,8 @@ test('هشدار ایمنی بی‌دلیل نیست: «کفشم پاره شد»
 
 test('درد معمولی: فقط پاسخ محتاطانه، بدون تشخیص', function () {
   var r = E.ask(idx, 'ساق پام بعد دویدن درد میکنه', CTX);
+  assert.strictEqual(r.kind, 'intake');
+  r = E.intakeSkip(idx, r.state, CTX);
   assert.strictEqual(r.kind, 'answer');
   assert.strictEqual(r.safety, 'caution');
   assert.ok(/تشخیص/.test(r.answer) && /پزشک/.test(r.answer));
@@ -105,7 +111,43 @@ test('شخصی‌سازی فقط خواندنی: پیس ایزی و جایگزی
 
 test('«به درد می‌خوره» درد نیست', function () {
   assert.notStrictEqual(E.ask(idx, 'دویدن در آب به درد می‌خوره؟', {}).id, 'pain-general');
-  assert.strictEqual(E.ask(idx, 'زانوم درد میکنه', {}).id, 'pain-general');
+  assert.strictEqual(E.ask(idx, 'زانوم درد میکنه', {}).kind, 'intake');
+});
+
+test('گفت‌وگوی درد: اول کجا، چطور و چند وقته؛ بعد نشونه‌های هشدار؛ بعد پاسخ', function () {
+  // پرسش اطلاعاتی گفت‌وگو نمی‌خواد
+  assert.strictEqual(E.ask(idx, 'شین اسپلینت چیه', {}).id, 'shin-pain');
+  assert.strictEqual(E.ask(idx, 'موقع دویدن پهلوم درد میگیره', {}).id, 'side-stitch');
+  var r = E.ask(idx, 'درد دارم', {});
+  assert.strictEqual(r.kind, 'intake'); assert.strictEqual(r.state.step, 'region');
+  assert.ok(r.options.length >= 5);
+  r = E.intake(idx, r.state, 'shin', {}); assert.strictEqual(r.state.step, 'onset');
+  r = E.intake(idx, r.state, 'gradual', {}); assert.strictEqual(r.state.step, 'duration');
+  r = E.intake(idx, r.state, 'gt14', {}); assert.strictEqual(r.state.step, 'flags');
+  r = E.intake(idx, r.state, 'no', {});
+  assert.strictEqual(r.kind, 'answer'); assert.strictEqual(r.id, 'shin-pain');
+  assert.ok(/^خلاصه/.test(r.answer) && r.answer.indexOf(KB.intake.long) >= 0);
+  assert.ok(r.links.some(function (l) { return l.page === '#checkin'; }));
+  // چیزی که کاربر گفته دوباره پرسیده نمی‌شه
+  r = E.ask(idx, 'آشیلم یه هفته ست درد داره', {});
+  assert.deepStrictEqual([r.state.region, r.state.duration, r.state.step], ['achilles', 'lt14', 'onset']);
+  r = E.ask(idx, 'زانوم درد میکنه', {}); assert.strictEqual(r.state.step, 'knee');
+  r = E.intakeText(idx, r.state, 'بیرونش', {}); assert.strictEqual(r.state.region, 'knee-outer');
+  r = E.intakeText(idx, r.state, 'از وقتی حجمو زیاد کردم', {}); assert.strictEqual(r.state.onset, 'load');
+  r = E.intakeText(idx, r.state, 'سه هفته', {}); assert.strictEqual(r.state.duration, 'gt14');
+  r = E.intakeText(idx, r.state, 'نه', {}); assert.strictEqual(r.id, 'knee-outer'); assert.ok(r.answer.indexOf(KB.intake.load) >= 0);
+  // نشونه‌ی جدی در هر قدم: هشدار
+  r = E.ask(idx, 'درد دارم', {});
+  assert.strictEqual(E.intake(idx, E.intake(idx, r.state, 'heel', {}).state, 'sudden', {}).kind, 'urgent');
+  var f = E.intake(idx, E.intake(idx, E.intake(idx, E.intake(idx, r.state, 'heel', {}).state, 'gradual', {}).state, 'lt3', {}).state, 'yes', {});
+  assert.strictEqual(f.kind, 'urgent');
+  assert.strictEqual(E.intakeText(idx, r.state, 'پام ورم کرده', {}).kind, 'urgent');
+  assert.strictEqual(E.ask(idx, 'پام پیچ خورد درد میکنه', {}).kind, 'urgent');
+  // جواب نامفهوم: null تا رابط سؤال تازه حسابش کنه
+  assert.strictEqual(E.intakeText(idx, E.intake(idx, r.state, 'heel', {}).state, 'پیس ایزیم چنده', {}), null);
+  // رد شدن: پاسخ با نشونه‌های هشدار
+  var sk = E.intakeSkip(idx, r.state, {});
+  assert.strictEqual(sk.id, 'pain-general'); assert.ok(sk.answer.indexOf(KB.intake.flagsNote) >= 0);
 });
 
 test('پیاده‌روی: متن و پیوند مخصوص پیاده‌روی', function () {

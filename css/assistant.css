@@ -60,3 +60,5 @@
 .ga-next { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--text-secondary, var(--text)); }
 .ga-next .ga-link { margin-top: 4px; }
 .ga-src { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--text-secondary, var(--text)); direction: rtl; }
+.ga-opts .ga-chip { border-color: var(--primary); }
+.ga-skip { min-height: 36px; font-size: var(--fs-sm); }

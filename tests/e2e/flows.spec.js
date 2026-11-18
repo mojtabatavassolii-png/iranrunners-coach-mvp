@@ -383,6 +383,15 @@ test('ثبت با GPS: شروع، بازگشت بعد از بستن صفحه، �
       await context.setGeolocation({ latitude: lat, longitude: 51.4, accuracy: 5 });
     }
   }
+  // روز ثابت (سه‌شنبه): بسته به روز هفته، امروزِ برنامه‌ی تازه ممکنه استراحت باشه و دکمه‌ی ثبت نداشته باشه
+  // ساعت با همون سرعت جلو می‌ره، فقط روزش جابه‌جا می‌شه (زمان و مسافت ثبت درست می‌مونه)
+  const shift = new Date('2026-11-17T09:00:00').getTime() - Date.now();
+  await page.addInitScript((off) => {
+    const R = Date;
+    function D(...a) { return a.length ? new R(...a) : new R(R.now() + off); }
+    D.prototype = R.prototype; D.now = () => R.now() + off; D.parse = R.parse; D.UTC = R.UTC;
+    window.Date = D;
+  }, shift);
   await onboard(page);
   await page.locator('.hcard-today .rec-entry').click();
   await expect(page).toHaveURL(/#record/);
@@ -524,6 +533,30 @@ test('دستیار گام: تب نوار پایین، پاسخ، هشدار ای
   await sheet.locator('.ga-send').click();
   await expect(sheet.locator('.ga-urgent').last()).toContainText('متوقف کن');
   await expect(sheet.locator('.ga-urgent').last().locator('a[href="#health"]')).toBeVisible();
+  // گزارش درد: اول سؤال‌های معاینه (کجا، چطور، چند وقته، نشونه‌های هشدار)، بعد پاسخ با خلاصه
+  await sheet.locator('.ga-in').fill('زانوم درد میکنه');
+  await sheet.locator('.ga-send').click();
+  await expect(sheet.locator('.ga-bot').last()).toContainText('کجای زانو');
+  await sheet.locator('.ga-bot').last().locator('[data-ga-opt="knee-front"]').click();
+  await expect(sheet.locator('.ga-bot').last()).toContainText('چطور شروع شد');
+  // گزینه‌های سؤال قبلی دیگه فعال نیستن
+  await expect(sheet.locator('[data-ga-opt="knee-front"]')).toHaveCount(0);
+  await sheet.locator('.ga-bot').last().locator('[data-ga-opt="gradual"]').click();
+  // جواب نوشتاری هم فهمیده می‌شه
+  await sheet.locator('.ga-in').fill('سه هفته‌ست');
+  await sheet.locator('.ga-send').click();
+  await expect(sheet.locator('.ga-bot').last()).toContainText('ورم');
+  await sheet.locator('.ga-bot').last().locator('[data-ga-opt="no"]').click();
+  const fin = sheet.locator('.ga-bot').last();
+  await expect(fin).toContainText('خلاصه‌ی چیزی که گفتی: درد جلوی زانو');
+  await expect(fin.locator('a[href="#checkin"]')).toBeVisible();
+  await expect(fin.locator('[data-ga-fb="y"]')).toBeVisible();
+  // نشونه‌ی هشدار وسط گفت‌وگو: هشدار
+  await sheet.locator('.ga-in').fill('درد دارم');
+  await sheet.locator('.ga-send').click();
+  await sheet.locator('.ga-bot').last().locator('[data-ga-opt="heel"]').click();
+  await sheet.locator('.ga-bot').last().locator('[data-ga-opt="sudden"]').click();
+  await expect(sheet.locator('.ga-bot').last()).toHaveClass(/ga-urgent/);
   // خارج از حوزه
   await sheet.locator('.ga-in').fill('بهترین گوشی برای عکاسی چیه');
   await sheet.locator('.ga-send').click();
