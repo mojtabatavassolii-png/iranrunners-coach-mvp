@@ -46,6 +46,8 @@ body { text-align: justify; text-justify: inter-word; }
 .learn-more, .card.checkin > p.muted, .learn-item .learn-text, .level-note, .learn-body .learn-src { text-align: start; }
 /* سؤال‌های فرم اولیه مثل عنوان‌ان (۱ تا ۲ خط، پررنگ): تراز دوطرفه بین کلمه‌هاشون فاصله‌ی زیاد می‌نداخت (بازبینی ۱۰، UX10-03) */
 .onb-step .sub-legend, .onb-step legend, .onb-step .field > label { text-align: start; }
+/* ولی توضیح‌ها و سؤال‌های چندخطی فرم (p.sub-legend) دوطرفه، به خواست صاحب پروژه (بازبینی ۱۲، UX-08) */
+.onb-step p.sub-legend { text-align: justify; }
 /* متن‌های راهنمای چندخطی که بعداً اضافه شدن، مثل بقیه‌ی متن‌های بلند دوطرفه (UX10-06) */
 #walkmin-field small.muted, #ci-pain .pain-consent-box p.small { text-align: justify; }
 /* بازبینی ۱۲: ستون‌های باریکی که دوطرفه فاصله‌ی ۵ تا ۹ برابری می‌ساختن (UX-08) */
