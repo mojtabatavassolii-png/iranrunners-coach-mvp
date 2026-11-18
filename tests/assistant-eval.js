@@ -164,6 +164,23 @@ var QUESTIONS8 = [
   ['ارتفاع قدم چقدر باشه', 'dontknow|stride|cadence']
 ];
 
+// مجموعه‌ی ۹: کاهش وزن
+var QUESTIONS9 = [
+  ['با دویدن لاغر میشم', 'weight-loss'],
+  ['برای لاغری بدوم یا پیاده روی', 'weight-loss'],
+  ['چقدر در هفته بدوم که وزن کم کنم', 'weight-loss'],
+  ['دویدن برای چربی سوزی خوبه؟', 'weight-loss|fasted-run'],
+  ['هر کیلومتر دویدن چند کالری میسوزونه', 'run-calories'],
+  ['تند بدوم کالری بیشتری میسوزونم', 'run-calories'],
+  ['دو ماهه میدوم ولی وزنم کم نشده', 'weight-stuck'],
+  ['بعد دویدن خیلی گرسنه میشم', 'weight-stuck'],
+  ['ناشتا بدوم بهتره', 'fasted-run|food-before'],
+  ['صبح قبل صبحانه بدوم چربی بیشتری میسوزه', 'fasted-run'],
+  ['رژیم گرفتم و زیاد تمرین میکنم پریودم قطع شده', 'red-s'],
+  ['وزن من چقدر باید باشه', 'dontknow|ood|weight-loss'],
+  ['قرص لاغری بخورم', 'dontknow|ood|weight-loss']
+];
+
 var INTAKE_OK = ['intake', 'pain-general', 'shin-pain', 'knee-front', 'knee-outer', 'achilles', 'heel-pain'];
 function judge(exp, r) {
   // «الف|ب» با گزینه‌ی منتظر تأیید: هر کدوم درست باشه کافیه
@@ -191,7 +208,7 @@ function judge(exp, r) {
 }
 
 function run(set) {
-  var list = set === 8 ? QUESTIONS8 : set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
+  var list = set === 9 ? QUESTIONS9 : set === 8 ? QUESTIONS8 : set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
   list.forEach(function (q) {
     var r = E.ask(idx, q[0], CTX), v = judge(q[1], r);
@@ -201,7 +218,7 @@ function run(set) {
   return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8].forEach(function (set) {
+if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(function (set) {
   var res = run(set);
   console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
@@ -213,4 +230,4 @@ if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8].forEach(function (set) {
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
 });
-module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7, QUESTIONS8: QUESTIONS8 };
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7, QUESTIONS8: QUESTIONS8, QUESTIONS9: QUESTIONS9 };
