@@ -2197,3 +2197,12 @@ button.help-link { padding: 0; cursor: pointer; font-family: inherit; }
 .learn-item .learn-text > b, .path-meta > span, .race-item-body > p.small, .race-warn li,
 .ob-txt > small, .field small.muted, .field-tpick > small.muted,
 .impact-card > p, .plan-me > p, .inj-cur > p.small { text-align: justify; }
+
+/* ---------- بازبینی ۱۲: ستون‌های باریک در گوشی (به خواست صاحب پروژه) ----------
+   این متن‌ها در بازبینی ۱۱ دوطرفه شدن، ولی در عرض گوشی بین کلمه‌ها ۵ تا ۱۳ برابر فاصله‌ی عادی می‌افتاد
+   (فارسی هجابندی نداره و واژه‌های لاتین مثل VDOT و RPE شکسته نمی‌شن). فقط تا عرض ۶۰۰ پیکسل راست‌چین؛ تبلت و دسکتاپ دوطرفه می‌مونن. */
+@media (max-width: 600px) {
+  .learn-more, .learn-body p, .learn-body li, .race-item-body > p.small, .race-warn li,
+  .impact-card > p, .inj-cur > p.small, .advice-card > p, .advice-card li, .sess-phase li,
+  #gait-view-back .card > p.small { text-align: start; }
+}
