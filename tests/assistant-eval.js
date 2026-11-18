@@ -181,6 +181,33 @@ var QUESTIONS9 = [
   ['قرص لاغری بخورم', 'dontknow|ood|weight-loss']
 ];
 
+// مجموعه‌ی ۱۱: روش‌های تمرینی و تکنیک دویدن (پیش از تنظیم نوشته شد)
+var QUESTIONS11 = [
+  ['تمرین قطبی چیه', 'polarized'],
+  ['پولاریزه تمرین کنم بهتره؟', 'polarized'],
+  ['متد نروژی چیه', 'norwegian'],
+  ['دوبل آستانه برای من خوبه', 'norwegian'],
+  ['تمرین مافتون', 'maffetone'],
+  ['۱۸۰ منهای سن یعنی چی', 'maffetone'],
+  ['روش لیدیارد', 'lydiard'],
+  ['برنامه هانسون برای ماراتن', 'hansons'],
+  ['روش گالووی دویدن و راه رفتن', 'run-walk'],
+  ['وسط ماراتن راه برم بده؟', 'run-walk'],
+  ['ریکاوری ران چیه', 'recovery-run'],
+  ['پیس ماراتن من چنده', 'marathon-pace'],
+  ['دویدن پاشنه یا پنجه', 'footstrike'],
+  ['روی پنجه بدوم بهتره؟', 'footstrike'],
+  ['کیدنس چند باشه', 'cadence'],
+  ['۱۸۰ قدم در دقیقه لازمه؟', 'cadence'],
+  ['دویدن با پای برهنه', 'minimal-shoes'],
+  ['کفش مینیمال بخرم', 'minimal-shoes|shoes'],
+  ['تکنیک دویدن درست', 'running-form'],
+  ['قانون ۸۰ ۲۰ چیه', 'eighty'],
+  ['۸۰/۲۰ چیه', 'eighty'],
+  ['تمرین تمپو چیه', 'tempo-interval'],
+  ['فارتلک چیه', 'fartlek']
+];
+
 // مجموعه‌ی ۱۰: کاربر پیاده‌رو (پاسخ نسخه‌ی پیاده‌روی)
 var CTX_WALK = { level: '۳', today: 'پیاده‌روی ۳۰ دقیقه', walk: true, cycle: false };
 var QUESTIONS10 = [
@@ -244,7 +271,7 @@ function judge(exp, r) {
 }
 
 function run(set) {
-  var list = set === 10 ? QUESTIONS10 : set === 9 ? QUESTIONS9 : set === 8 ? QUESTIONS8 : set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
+  var list = set === 11 ? QUESTIONS11 : set === 10 ? QUESTIONS10 : set === 9 ? QUESTIONS9 : set === 8 ? QUESTIONS8 : set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
   list.forEach(function (q) {
     var r = E.ask(idx, q[0], set === 10 ? CTX_WALK : CTX), v = judge(q[1], r);
@@ -255,7 +282,7 @@ function run(set) {
   return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].forEach(function (set) {
+if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].forEach(function (set) {
   var res = run(set);
   console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
@@ -267,4 +294,4 @@ if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].forEach(function (s
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
 });
-module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7, QUESTIONS8: QUESTIONS8, QUESTIONS9: QUESTIONS9, QUESTIONS10: QUESTIONS10 };
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7, QUESTIONS8: QUESTIONS8, QUESTIONS9: QUESTIONS9, QUESTIONS10: QUESTIONS10, QUESTIONS11: QUESTIONS11 };
