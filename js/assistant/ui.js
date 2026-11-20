@@ -193,7 +193,7 @@
     finishAnim();
     var m = { who: 'bot', id: ++seq, r: r };
     if (q) m.q = q;
-    if (r.kind !== 'urgent' && !reduceMotion() && fullText(r)) m.anim = 'typing';
+    if (r.kind !== 'urgent' && r.kind !== 'crisis' && !reduceMotion() && fullText(r)) m.anim = 'typing';
     msgs.push(m);
     if (msgs.length > 60) msgs = msgs.slice(-60);
     renderLog();

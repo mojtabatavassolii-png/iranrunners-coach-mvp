@@ -30,8 +30,8 @@ test('بُن‌سازی سبک', function () {
   assert.strictEqual(E.stem('کفش'), 'کفش');
 });
 
-test('ساختار پایگاه دانش: ۹۶ مدخل، هیچ مدخل منتظر تأیید، مدخل‌های منبع‌دار تأییدشده، پیوندها معتبر', function () {
-  assert.strictEqual(KB.entries.length, 96);
+test('ساختار پایگاه دانش: ۱۰۲ مدخل، هیچ مدخل منتظر تأیید، مدخل‌های منبع‌دار تأییدشده، پیوندها معتبر', function () {
+  assert.strictEqual(KB.entries.length, 102);
   var ids = {};
   KB.entries.forEach(function (e) {
     assert.ok(!ids[e.id], 'شناسه‌ی تکراری ' + e.id); ids[e.id] = 1;
@@ -135,6 +135,18 @@ test('پیاده‌رو: نسخه‌ی پیاده‌روی پاسخ، «پیاد
   assert.strictEqual(E.ask(idx, 'زانوم ورم کرده و درد داره', {}).answer, KB.texts.urgent);
   // هر نسخه‌ی پیاده‌روی، جمله‌ی «دویدن رو متوقف کن» نداره
   KB.entries.forEach(function (e) { if (e.answerWalk) assert.ok(!/(دویدن|بدو) رو (متوقف|قطع)/.test(e.answerWalk), e.id); });
+});
+
+test('حال کاربر: جواب همدلانه؛ فکر آسیب به خود همیشه با شماره‌های کمک', function () {
+  ['میخوام بمیرم', 'به خودم آسیب میزنم', 'زندگی ارزش نداره', 'سلام دیگه میخوام خودکشی کنم'].forEach(function (q) {
+    var r = E.ask(idx, q, {}); assert.strictEqual(r.kind, 'crisis', q); assert.ok(/۱۲۳/.test(r.answer) && /۱۴۸۰/.test(r.answer));
+  });
+  var M = { 'خوبم': 'mood-good', 'خوب نیستم': 'mood-low', 'خستم امروز': 'mood-tired', 'انگیزه ندارم': 'mood-unmotivated', 'استرس مسابقه دارم': 'mood-stress', 'تمرینم خوب نبود': 'mood-disappointed', 'مرسی خوبم تو خوبی': 'mood-good' };
+  Object.keys(M).forEach(function (q) { assert.strictEqual(E.ask(idx, q, {}).id, M[q], q); });
+  // سؤال روشن یا درد بر حال اولویت داره
+  assert.strictEqual(E.ask(idx, 'استرس فرکچر چیه', {}).id, 'bone-stress');
+  assert.strictEqual(E.ask(idx, 'خوب بدوم یا نه', {}).id === 'mood-good', false);
+  assert.strictEqual(E.ask(idx, 'خسته ام زانوم درد میکنه', {}).kind, 'intake');
 });
 
 test('گفت‌وگوی درد: اول کجا، چطور و چند وقته؛ بعد نشونه‌های هشدار؛ بعد پاسخ', function () {

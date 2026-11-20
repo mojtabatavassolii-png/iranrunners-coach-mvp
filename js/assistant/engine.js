@@ -289,6 +289,32 @@
     }).filter(Boolean);
   }
 
+  // ---------- حال کاربر ----------
+  // فکر آسیب به خود: قبل از هر چیز، با شماره‌های کمک (متن در kb.texts.crisis)
+  var CRISIS = /خودکشی|خودمو بکشم|خودم رو بکشم|خودمو میکشم|میخوام بمیرم|دلم میخواد بمیرم|کاش بمیرم|کاش مرده بودم|ارزش زندگی کردن ندارم|زندگی ارزش نداره|به خودم اسیب|رگمو بزنم|نمیخوام زنده باشم/;
+  // حال کاربر؛ ترتیب مهمه (منفی‌ها قبل از «خوبم»)
+  var MOODS = [
+    ['mood-low', /حالم (خوب نیست|بده|خرابه|گرفته)|خوب نیستم|ناراحتم|غمگینم|افسرده|دلم گرفته|حال روحیم|روحیم خوب نیست|دپرس/],
+    ['mood-disappointed', /افتضاح (بود|شد|دویدم)|(تمرین|دویدن|جلسه|مسابقه)\S* (\S+ )?(بد|خراب|افتضاح) (بود|شد)|ناامید|نا امید|تمرینم (خوب نبود|بد بود|افتضاح)|بد دویدم|نتونستم تمومش کنم|رکوردم (بد|خراب)|خراب کردم|عقب افتادم/],
+    ['mood-stress', /استرس(?!ی| ?(فرکچر|فراکچر|فکچر))|مضطرب|اضطراب|دلشوره|نگرانم|میترسم/],
+    ['mood-unmotivated', /انگیزه ندارم|بی انگیزه|بیانگیزه|انگیزه(م)? (کم|نیست)|حوصله ندارم|حوصله(م)? (نیست|سر رفته)|تنبلیم|حال ندارم (بدوم|تمرین|ورزش)|دلم نمیخواد (بدوم|تمرین|ورزش)/],
+    ['mood-tired', /خستم|خسته ام|خستهام|خسته هستم|خیلی خسته|بی ?حالم|انرژی ندارم|کم خوابیدم|بی خوابی دارم|کوفته ام/],
+    ['mood-good', /^(تمرین|دویدن|مسابقه|پیاده ?روی)\S* (خوب|عالی) بود$|^(من )?(خوبم|خیلی خوبم|عالیم|عالی ام|سرحالم|سرحال|توپم|ردیفم|خوب|عالی|حالم خوبه|حالم عالیه|انرژی دارم|خوبم مرسی|خوبم ممنون|مرسی خوبم|ممنون خوبم|شکر خوبم)( (مرسی|ممنون|شکر|خداروشکر|تو|هستم|ام))*$/]
+  ];
+  function detectMood(n) {
+    for (var i = 0; i < MOODS.length; i++) {
+      if (!MOODS[i][1].test(n)) continue;
+      // «خوبم» فقط وقتی پیام کوتاهه (نه «خوب بدوم یا نه»)
+      if (MOODS[i][0] === 'mood-good' && n.split(' ').length > 3) continue;
+      return MOODS[i][0];
+    }
+    return null;
+  }
+  function moodResult(idx, id, ctx) {
+    var e = idx.kb.entries.filter(function (x) { return x.id === id; })[0];
+    return e ? result(e, null, ctx) : null;
+  }
+
   // پرسش: نتیجه‌ی ساختاریافته برای رابط کاربری و آزمون
   // kind: answer | pending | suggest | none | ood | urgent | small | empty
   function ask(idx, text, ctx) {
@@ -297,7 +323,20 @@
     // ایمنی همیشه اول، حتی وسط سلام و احوال‌پرسی
     var u = hasAny(n0, URGENT);
     if (u) return urgentResult(idx.kb, u, ctx);
+    if (CRISIS.test(n0) && idx.kb.texts.crisis) return { kind: 'crisis', answer: idx.kb.texts.crisis, links: [], safety: 'urgent' };
     var st = smallTalk(n0);
+    // حال کاربر (بعد از سلام یا «تو چطوری؟»): جواب همدلانه، مگه اینکه پیام یه سؤال روشن یا گزارش درد باشه
+    var mood = detectMood(st.rest || '');
+    if (mood && st.rest) {
+      var core = tokens(st.rest, true).length > 3 ? askCore(idx, st.rest, ctx) : null; // پیام کوتاه («خستم امروز») یعنی حال، نه سؤال
+      // پیام بدون کلمه‌ی پرسشی («تمرین امروزم افتضاح بود») بیان حاله، مگه اینکه جواب خیلی روشنی داشته باشه
+      var asking = /(^| )(چی|چیه|چه|چطور|چطوری|چجوری|چرا|کی|کجا|کدوم|چقدر|چند|ایا|اگه|بکنم|کنم|بخورم|برم|بدوم)( |$)/.test(st.rest) || /\?|؟/.test(text);
+      if (core && core.kind === 'answer' && !asking && (core.score || 0) < 0.8) core = null;
+      if (!core || (core.kind !== 'answer' && core.kind !== 'intake' && core.kind !== 'urgent')) {
+        var mr = moodResult(idx, mood, ctx);
+        if (mr) { if (st.kinds.indexOf('hello') >= 0) mr.greet = idx.kb.smallTalk.prefix.replace('{name}', ctx && ctx.name ? ' ' + ctx.name : ''); return mr; }
+      }
+    }
     if (st.kinds.length) {
       if (!tokens(st.rest).length) return smallReply(idx.kb, st.kinds[0], ctx);
       var r = askWalk(idx, st.rest, ctx);

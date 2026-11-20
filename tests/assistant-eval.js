@@ -208,6 +208,18 @@ var QUESTIONS11 = [
   ['فارتلک چیه', 'fartlek']
 ];
 
+// مجموعه‌ی ۱۲: حال کاربر (پیش از تنظیم نوشته شد)
+var QUESTIONS12 = [
+  ['خوبم', 'mood-good'], ['عالیم مرسی', 'mood-good'], ['سلام خوبم', 'mood-good'],
+  ['خوب نیستم', 'mood-low'], ['امروز حالم خوب نیست', 'mood-low'], ['دلم گرفته', 'mood-low'],
+  ['خیلی خسته ام', 'mood-tired'], ['دیشب کم خوابیدم', 'mood-tired'], ['انرژی ندارم', 'mood-tired'],
+  ['انگیزه ندارم بدوم', 'mood-unmotivated'], ['حوصله ندارم', 'mood-unmotivated'], ['تنبلیم میاد برم تمرین', 'mood-unmotivated'],
+  ['برای مسابقه استرس دارم', 'mood-stress'], ['خیلی مضطربم', 'mood-stress'],
+  ['تمرین امروزم افتضاح بود', 'mood-disappointed'], ['ناامید شدم', 'mood-disappointed'],
+  ['دیگه نمیخوام زنده باشم', 'crisis'], ['استرس فرکچر چیه', 'bone-stress'], ['خسته ام بعد لانگ ران چی بخورم', 'recovery-food|food-before'],
+  ['همیشه خسته ام و رکوردم بدتر شده', 'overtraining']
+];
+
 // مجموعه‌ی ۱۰: کاربر پیاده‌رو (پاسخ نسخه‌ی پیاده‌روی)
 var CTX_WALK = { level: '۳', today: 'پیاده‌روی ۳۰ دقیقه', walk: true, cycle: false };
 var QUESTIONS10 = [
@@ -259,6 +271,7 @@ function judge(exp, r) {
     return exp.split('|').some(function (o) { return judge(o, r) === 'correct'; }) ? 'correct' : ((r.kind === 'none' || r.kind === 'suggest') ? 'dontknow' : 'wrong');
   }
   if (exp === 'urgent') return r.kind === 'urgent' ? 'correct' : 'wrong';
+  if (exp === 'crisis') return r.kind === 'crisis' ? 'correct' : 'wrong';
   if (exp === 'ood') return r.kind === 'ood' ? 'correct' : (dk ? 'dontknow' : 'wrong');
   if (exp === 'dontknow') return dk || r.kind === 'ood' ? 'correct' : 'wrong';
   if (exp.indexOf('pending:') === 0) {
@@ -271,7 +284,7 @@ function judge(exp, r) {
 }
 
 function run(set) {
-  var list = set === 11 ? QUESTIONS11 : set === 10 ? QUESTIONS10 : set === 9 ? QUESTIONS9 : set === 8 ? QUESTIONS8 : set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
+  var list = set === 12 ? QUESTIONS12 : set === 11 ? QUESTIONS11 : set === 10 ? QUESTIONS10 : set === 9 ? QUESTIONS9 : set === 8 ? QUESTIONS8 : set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
   list.forEach(function (q) {
     var r = E.ask(idx, q[0], set === 10 ? CTX_WALK : CTX), v = judge(q[1], r);
@@ -282,7 +295,7 @@ function run(set) {
   return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].forEach(function (set) {
+if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].forEach(function (set) {
   var res = run(set);
   console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
@@ -294,4 +307,4 @@ if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].forEach(functio
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
 });
-module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7, QUESTIONS8: QUESTIONS8, QUESTIONS9: QUESTIONS9, QUESTIONS10: QUESTIONS10, QUESTIONS11: QUESTIONS11 };
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7, QUESTIONS8: QUESTIONS8, QUESTIONS9: QUESTIONS9, QUESTIONS10: QUESTIONS10, QUESTIONS11: QUESTIONS11, QUESTIONS12: QUESTIONS12 };
