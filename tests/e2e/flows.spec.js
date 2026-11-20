@@ -513,6 +513,11 @@ test('دستیار گام: تب نوار پایین، پاسخ، هشدار ای
   // پاسخ شخصی: پیس ایزی خود کاربر (عدد از برنامه، نه جای‌نگهدار)
   await sheet.locator('.ga-in').fill('پیس ایزیم چنده؟');
   await sheet.locator('.ga-send').click();
+  // حس گفت‌وگو: اول «در حال نوشتن…»، بعد پاسخ کلمه‌به‌کلمه؛ با زدن روی پیام کامل می‌شه
+  await expect(sheet.locator('.ga-typing')).toBeVisible();
+  await expect(sheet.locator('.ga-caret')).toBeVisible();
+  await sheet.locator('[data-ga-skipanim]').click();
+  await expect(sheet.locator('.ga-caret')).toHaveCount(0);
   const ans = sheet.locator('.ga-bot').last();
   await expect(ans).toContainText('ایزی');
   await expect(ans).not.toContainText('{');
@@ -531,6 +536,8 @@ test('دستیار گام: تب نوار پایین، پاسخ، هشدار ای
   // نشونه‌ی جدی: هشدار ثابت و پیوند ثبت درد
   await sheet.locator('.ga-in').fill('زانوم ورم کرده و تو استراحت هم درد داره');
   await sheet.locator('.ga-send').click();
+  // هشدار فوری بدون مکث «در حال نوشتن» نشون داده می‌شه
+  await expect(sheet.locator('.ga-typing')).toHaveCount(0);
   await expect(sheet.locator('.ga-urgent').last()).toContainText('متوقف کن');
   await expect(sheet.locator('.ga-urgent').last().locator('a[href="#health"]')).toBeVisible();
   // گزارش درد: اول سؤال‌های معاینه (کجا، چطور، چند وقته، نشونه‌های هشدار)، بعد پاسخ با خلاصه
