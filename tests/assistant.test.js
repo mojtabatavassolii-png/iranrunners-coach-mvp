@@ -30,8 +30,8 @@ test('بُن‌سازی سبک', function () {
   assert.strictEqual(E.stem('کفش'), 'کفش');
 });
 
-test('ساختار پایگاه دانش: ۱۰۲ مدخل، هیچ مدخل منتظر تأیید، مدخل‌های منبع‌دار تأییدشده، پیوندها معتبر', function () {
-  assert.strictEqual(KB.entries.length, 102);
+test('ساختار پایگاه دانش: ۱۳۱ مدخل، هیچ مدخل منتظر تأیید، مدخل‌های منبع‌دار تأییدشده، پیوندها معتبر', function () {
+  assert.strictEqual(KB.entries.length, 131);
   var ids = {};
   KB.entries.forEach(function (e) {
     assert.ok(!ids[e.id], 'شناسه‌ی تکراری ' + e.id); ids[e.id] = 1;

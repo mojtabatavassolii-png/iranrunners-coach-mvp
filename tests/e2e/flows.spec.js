@@ -493,30 +493,53 @@ test('دستیار گام: تب نوار پایین، پاسخ، هشدار ای
   // پیش‌فرض روشن: «دستیار» جای «آموزش» در نوار پایین؛ آموزش در پروفایل
   await expect(page.locator('#tabbar a[data-tab="learn"]')).toHaveCount(0);
   await expect(page.locator('#tabbar #ga-btn')).toBeVisible();
+  // تمام‌صفحه مثل بقیه‌ی صفحه‌ها: آدرس خودش، تب فعال، از زیر سربرگ تا بالای نوار پایین
   await page.locator('#ga-btn').click();
-  await expect(page.locator('#ga-sheet')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.locator('#ga-sheet')).toHaveCount(0);
+  await expect(page).toHaveURL(/#assistant$/);
+  await expect(page.locator('#ga-chat')).toBeVisible();
+  await expect(page.locator('#ga-btn')).toHaveClass(/is-active/);
+  await expect(page.locator('#ga-btn')).toHaveAttribute('aria-current', 'page');
+  const fitBox = await page.evaluate(() => {
+    const pg = document.getElementById('ga-chat').getBoundingClientRect(), bar = document.getElementById('tabbar').getBoundingClientRect();
+    // روی گوشی نوار پایین؛ روی دسکتاپ ستون کناری و پایین صفحه حده
+    const limit = bar.width > bar.height ? bar.top : innerHeight;
+    return { gap: limit - pg.bottom, h: pg.height, vh: innerHeight };
+  });
+  expect(fitBox.gap).toBeGreaterThanOrEqual(0);
+  expect(fitBox.gap).toBeLessThan(40);
+  expect(fitBox.h).toBeGreaterThan(fitBox.vh * 0.5);
+  await page.locator('#tabbar a[data-tab="home"]').click();
+  await expect(page.locator('#ga-chat')).toHaveCount(0);
+  // دکمه‌ی برگشت مرورگر دوباره دستیار رو باز می‌کنه
+  await page.goBack();
+  await expect(page.locator('#ga-chat')).toBeVisible();
+  await page.locator('#tabbar a[data-tab="home"]').click();
   await page.locator('#tabbar a[data-tab="profile"]').click();
   await page.locator('#app a.list-row[href="#learn"]').click();
   await expect(page).toHaveURL(/#learn/);
   await expect(page.locator('#tabbar a[data-tab="profile"]')).toHaveClass(/is-active/);
   // خط «سؤال داری؟» بالای آموزش، باز شدن گفت‌وگو
   await page.locator('.ga-learn-chip').click();
-  const sheet = page.locator('#ga-sheet');
+  const sheet = page.locator('#ga-chat');
   await expect(sheet).toBeVisible();
   // سلام با اسم کوچک کاربر و پیشنهاد موضوع
   await sheet.locator('.ga-in').fill('سلام');
   await sheet.locator('.ga-send').click();
   await expect(sheet.locator('.ga-bot').last()).toContainText(RUNNER.first);
   await expect(sheet.locator('.ga-bot').last().locator('.ga-chip').first()).toBeVisible();
+  // حس گفت‌وگو: اول «در حال نوشتن…»، بعد پاسخ کلمه‌به‌کلمه؛ با زدن روی پیام کامل می‌شه.
+  // پاسخ بلند (حدود ۲ ثانیه نوشتن) و کلیک بی‌معطلی: پیام در حال نوشتن مدام بلندتر می‌شه و «ثابت» نیست
+  // (تست دوره‌ای ۳۰ آبان روی WebKit: کلیک منتظر ثابت شدن موند تا نوشتن تموم شد و پیام عوض شد)
+  await sheet.locator('.ga-in').fill('تمرین قطبی چیه');
+  await sheet.locator('.ga-send').click();
+  await expect(sheet.locator('.ga-typing')).toBeVisible();
+  await expect(sheet.locator('.ga-caret')).toBeVisible();
+  await sheet.locator('[data-ga-skipanim]').click({ force: true });
+  await expect(sheet.locator('.ga-caret')).toHaveCount(0);
+  await expect(sheet.locator('.ga-bot').last()).toContainText('۸۰');
   // پاسخ شخصی: پیس ایزی خود کاربر (عدد از برنامه، نه جای‌نگهدار)
   await sheet.locator('.ga-in').fill('پیس ایزیم چنده؟');
   await sheet.locator('.ga-send').click();
-  // حس گفت‌وگو: اول «در حال نوشتن…»، بعد پاسخ کلمه‌به‌کلمه؛ با زدن روی پیام کامل می‌شه
-  await expect(sheet.locator('.ga-typing')).toBeVisible();
-  await expect(sheet.locator('.ga-caret')).toBeVisible();
-  await sheet.locator('[data-ga-skipanim]').click();
   await expect(sheet.locator('.ga-caret')).toHaveCount(0);
   const ans = sheet.locator('.ga-bot').last();
   await expect(ans).toContainText('ایزی');
@@ -533,6 +556,21 @@ test('دستیار گام: تب نوار پایین، پاسخ، هشدار ای
   // فقط سؤال، پاسخ، شناسه‌ی مدخل و تاریخ؛ بدون اسم یا داده‌ی تمرین
   expect(Object.keys(st.queue[0]).sort()).toEqual(['a', 'fb', 'id', 'kind', 'q', 't']);
   expect(JSON.stringify(st)).not.toContain('آزمایشی');
+  // پاسخ‌های متناسب با خود کاربر: هدف، این هفته و نوع تمرین‌های سطحش (داده از برنامه، نه جای‌نگهدار)
+  await sheet.locator('.ga-in').fill('تا مسابقه ام چند روز مونده');
+  await sheet.locator('.ga-send').click();
+  await expect(sheet.locator('.ga-caret')).toHaveCount(0);
+  await expect(sheet.locator('.ga-bot').last()).toContainText('۱۰ کیلومتر');
+  await expect(sheet.locator('.ga-bot').last()).toContainText('روز مونده');
+  await sheet.locator('.ga-in').fill('این هفته چند کیلومتر باید بدوم');
+  await sheet.locator('.ga-send').click();
+  await expect(sheet.locator('.ga-caret')).toHaveCount(0);
+  await expect(sheet.locator('.ga-bot').last()).toContainText('جلسه');
+  await sheet.locator('.ga-in').fill('چرا تو برنامه ام اینتروال نیست');
+  await sheet.locator('.ga-send').click();
+  await expect(sheet.locator('.ga-caret')).toHaveCount(0);
+  await expect(sheet.locator('.ga-bot').last()).toContainText('برای سطح تو');
+  await expect(sheet.locator('.ga-bot').last()).not.toContainText('{');
   // نشونه‌ی جدی: هشدار ثابت و پیوند ثبت درد
   await sheet.locator('.ga-in').fill('زانوم ورم کرده و تو استراحت هم درد داره');
   await sheet.locator('.ga-send').click();
@@ -572,7 +610,7 @@ test('دستیار گام: تب نوار پایین، پاسخ، هشدار ای
   await sheet.locator('.ga-in').fill('تیپر یعنی چی');
   await sheet.locator('.ga-send').click();
   await sheet.locator('.ga-bot').last().locator('.ga-link').first().click();
-  await expect(page.locator('#ga-sheet')).toHaveCount(0);
+  await expect(page.locator('#ga-chat')).toHaveCount(0);
   await expect(page).toHaveURL(/#guide|#race|#learn/);
   // دستیار فقط کلید خودش رو می‌نویسه
   const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.indexOf('assistant') >= 0));

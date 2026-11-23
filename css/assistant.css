@@ -11,7 +11,21 @@
 .ga-learn-chip svg { flex: none; color: var(--primary); }
 .ga-learn-chip:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 
-/* برگه‌ی گفت‌وگو از پایین */
+/* صفحه‌ی گفت‌وگو (#assistant): تمام‌صفحه مثل بقیه‌ی صفحه‌ها؛ ارتفاع رو ui.js از زیر سربرگ تا بالای نوار پایین می‌ذاره */
+.ga-screen { display: flex; flex-direction: column; min-height: 320px; height: calc(100dvh - 170px); }
+.ga-screen .page-head { flex: none; margin-bottom: 4px; }
+.ga-screen .ga-head h1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ga-screen .ga-log { padding: 8px 2px; }
+.ga-screen .ga-form { flex: none; background: var(--bg); }
+.ga-screen .ga-foot { flex: none; }
+/* صفحه‌کلید گوشی باز: نوار پایین کنار می‌ره تا جای نوشتن بمونه */
+body.ga-kb .tabbar { display: none; }
+body.ga-kb { padding-bottom: 0; }
+@media (min-width: 720px) { .ga-screen .ga-msg { max-width: 82%; } }
+/* داخل #app پاراگراف‌ها دوطرفه‌ان؛ متن گفت‌وگو مثل هر پیام‌رسانی از سر خط */
+.ga-screen .ga-msg p, .ga-screen .ga-msg li, .ga-screen .ga-small { text-align: start; }
+
+/* صفحه‌ی مدیریت: برگه از پایین */
 .ga-backdrop { position: fixed; inset: 0; z-index: 160; background: var(--scrim); display: flex; justify-content: center; align-items: flex-end; }
 .ga-panel {
   width: 100%; max-width: 560px; max-height: min(92vh, 760px); display: flex; flex-direction: column;
@@ -56,7 +70,7 @@
 .ga-asec h3 { font-size: var(--fs-base); margin: 14px 0 6px; }
 .ga-asec ul { margin: 0; padding-inline-start: 18px; }
 .ga-asec li { margin: 4px 0; overflow-wrap: anywhere; }
-.ga-panel .btn-sm { min-height: 40px; padding: 6px 14px; }
+.ga-screen .btn-sm, .ga-panel .btn-sm { min-height: 40px; padding: 6px 14px; }
 .ga-next { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--text-secondary, var(--text)); }
 .ga-next .ga-link { margin-top: 4px; }
 .ga-src { margin: 6px 0 0; font-size: var(--fs-xs); color: var(--text-secondary, var(--text)); direction: rtl; }

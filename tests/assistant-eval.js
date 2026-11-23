@@ -257,6 +257,60 @@ var QUESTIONS10 = [
 ];
 
 var INTAKE_OK = ['intake', 'pain-general', 'shin-pain', 'knee-front', 'knee-outer', 'achilles', 'heel-pain'];
+// مجموعه‌ی ۱۳ (v165): راهنمای کامل اپ و پاسخ‌های متناسب با خود کاربر (دونده)
+var QUESTIONS13 = [
+  ['این اپ چه قسمت هایی داره', 'app-tour'],
+  ['هر بخش اپ به چه دردی میخوره', 'app-tour'],
+  ['چک این دقیقا چیکار میکنه', 'checkin-how'],
+  ['چرا تمرین امروزم خودش سبک تر شد', 'checkin-how|deload'],
+  ['چطوری دویدنمو با جی پی اس ضبط کنم', 'gps-record'],
+  ['مسافت دویدنم رو چطور ثبت کنم', 'gps-record|done-log'],
+  ['کمربند ضربانمو چجوری وصل کنم', 'hr-sensor'],
+  ['ساعت گارمینم به گام وصل میشه؟', 'health-sync'],
+  ['دویدن های اپل واچم خودکار ثبت میشه؟', 'health-sync'],
+  ['تحلیل ویدیویی دویدن چطوریه', 'gait-analysis'],
+  ['برای بیومکانیک گوشیو کجا بذارم فیلم بگیرم', 'gait-filming'],
+  ['نمودار پیشرفتم کجاست', 'progress-page'],
+  ['چند هفته طول میکشه برای نیمه ماراتن آماده بشم', 'suggested-plans|early-race'],
+  ['دکتر گفته سه هفته ندوم تو اپ چیکار کنم', 'injury-return'],
+  ['میخوام هفته ای ۵ روز تمرین کنم چطوری عوض کنم', 'training-days'],
+  ['کی میرم سطح بعدی', 'level-up'],
+  ['گوشیمو عوض کنم اطلاعاتم چی میشه', 'backup|privacy'],
+  ['چطوری بکاپ بگیرم', 'backup'],
+  ['اپو چطوری رو آیفون نصب کنم', 'install-app'],
+  ['بدون اینترنت هم کار میکنه؟', 'install-app'],
+  ['عدد قرمز روی زنگوله چیه', 'inbox'],
+  ['میخوام هر روز ساعت ۶ یادم بندازه', 'reminders'],
+  ['چطوری واحدو مایل کنم', 'settings-lang'],
+  ['تقویمو میلادی کنم', 'settings-lang'],
+  ['دارک مود داره؟', 'theme'],
+  ['حجم تمرینم عوض شده برنامه رو آپدیت کنم', 'edit-profile'],
+  ['میخوام همه اطلاعاتمو پاک کنم', 'wipe-data'],
+  ['تو با هوش مصنوعی جواب میدی؟', 'assistant-help|small'],
+  ['من تا حالا اصلا ندویدم برنامه ام چجوریه', 'zero-start'],
+  ['پیس ایزیم برام خیلی سخته', 'easy-adjust|easy-pace'],
+  ['پیس تمپوی من چنده', 'my-paces|tempo-interval'],
+  ['جدول پیس هامو بگو', 'my-paces'],
+  ['تا مسابقه ام چند روز مونده', 'my-goal'],
+  ['این هفته چند کیلومتر باید بدوم', 'my-week'],
+  ['چرا تو برنامه ام اینتروال نیست', 'my-training'],
+  ['درد زانومو کجا ثبت کنم', 'pain-log|intake'],
+  ['ثبت تمرین آزاد چطوریه', 'free-run']
+];
+// مجموعه‌ی ۱۴ (v165): همون موضوع‌ها برای پیاده‌رو
+var QUESTIONS14 = [
+  ['بخش های اپ رو توضیح بده', 'app-tour'],
+  ['چک این پیاده روی چیکار میکنه', 'checkin-how'],
+  ['پیاده رویمو چطوری ثبت کنم', 'gps-record|done-log'],
+  ['قدمامو کجا وارد کنم', 'steps'],
+  ['هدف پیاده رویمو عوض کنم', 'walk-goal'],
+  ['هدف من چیه', 'my-goal'],
+  ['این هفته چقدر باید پیاده روی کنم', 'my-week'],
+  ['کی میرم سطح بالاتر', 'level-up'],
+  ['نمودار دقیقه های هفتگیم کجاست', 'progress-page'],
+  ['روزای پیاده رویمو کم کنم', 'training-days']
+];
+
 function judge(exp, r) {
   // «الف|ب» با گزینه‌ی منتظر تأیید: هر کدوم درست باشه کافیه
   if (/\|/.test(exp) && /pending:/.test(exp) && !/^pending:[^|]*$/.test(exp)) {
@@ -284,18 +338,18 @@ function judge(exp, r) {
 }
 
 function run(set) {
-  var list = set === 12 ? QUESTIONS12 : set === 11 ? QUESTIONS11 : set === 10 ? QUESTIONS10 : set === 9 ? QUESTIONS9 : set === 8 ? QUESTIONS8 : set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
+  var list = set === 14 ? QUESTIONS14 : set === 13 ? QUESTIONS13 : set === 12 ? QUESTIONS12 : set === 11 ? QUESTIONS11 : set === 10 ? QUESTIONS10 : set === 9 ? QUESTIONS9 : set === 8 ? QUESTIONS8 : set === 7 ? QUESTIONS7 : set === 6 ? QUESTIONS6 : set === 5 ? QUESTIONS5 : set === 4 ? QUESTIONS4 : set === 3 ? QUESTIONS3 : set === 2 ? QUESTIONS2 : QUESTIONS;
   var c = { correct: 0, dontknow: 0, wrong: 0 }, rows = [];
   list.forEach(function (q) {
-    var r = E.ask(idx, q[0], set === 10 ? CTX_WALK : CTX), v = judge(q[1], r);
-    if (set === 10 && r.kind === 'answer' && r.entry && r.entry.answerWalk && r.answer.indexOf(r.entry.answerWalk.slice(0, 20)) < 0) v = 'wrong'; // نسخه‌ی پیاده‌روی نشون داده نشد
+    var r = E.ask(idx, q[0], set === 10 || set === 14 ? CTX_WALK : CTX), v = judge(q[1], r);
+    if ((set === 10 || set === 14) && r.kind === 'answer' && r.entry && r.entry.answerWalk && [r.entry.answerWalk, r.entry.fallbackWalk || ''].every(function (w) { var pre = w.split('{')[0].slice(0, 20); return !pre || r.answer.indexOf(pre) < 0; })) v = 'wrong'; // نسخه‌ی پیاده‌روی نشون داده نشد
     c[v]++;
     rows.push({ q: q[0], exp: q[1], kind: r.kind, id: r.id || (r.suggestions || []).map(function (s) { return s.id; }).join(',') || '', score: r.score, verdict: v });
   });
   return { counts: c, rows: rows, n: list.length };
 }
 
-if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].forEach(function (set) {
+if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].forEach(function (set) {
   var res = run(set);
   console.log('— مجموعه‌ی ' + set + ' (' + res.n + ' سؤال)');
   var pct = function (k) { return Math.round(100 * res.counts[k] / res.n) + '%'; };
@@ -307,4 +361,4 @@ if (require.main === module) [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].forEach(fun
   // آستانه‌ی محتاط: هیچ پاسخ نادرستی قبول نیست و همه‌ی نشونه‌های جدی باید هشدار بگیرن
   if (res.counts.wrong > 0) process.exitCode = 1;
 });
-module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7, QUESTIONS8: QUESTIONS8, QUESTIONS9: QUESTIONS9, QUESTIONS10: QUESTIONS10, QUESTIONS11: QUESTIONS11, QUESTIONS12: QUESTIONS12 };
+module.exports = { run: run, QUESTIONS: QUESTIONS, QUESTIONS2: QUESTIONS2, QUESTIONS3: QUESTIONS3, QUESTIONS4: QUESTIONS4, QUESTIONS5: QUESTIONS5, QUESTIONS6: QUESTIONS6, QUESTIONS7: QUESTIONS7, QUESTIONS8: QUESTIONS8, QUESTIONS9: QUESTIONS9, QUESTIONS10: QUESTIONS10, QUESTIONS11: QUESTIONS11, QUESTIONS12: QUESTIONS12, QUESTIONS13: QUESTIONS13, QUESTIONS14: QUESTIONS14 };

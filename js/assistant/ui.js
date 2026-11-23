@@ -1,5 +1,5 @@
 /* دستیار گام (آزمایشی): رابط کاربری.
- * دکمه‌ی «؟» کنار زنگ اعلان، خط «سؤال داری؟» بالای آموزش، پنجره‌ی گفت‌وگو، بازخورد، ارسال برای تیم با رضایت،
+ * تب «دستیار» در نوار پایین، خط «سؤال داری؟» بالای آموزش، صفحه‌ی گفت‌وگو (#assistant)، بازخورد، ارسال برای تیم با رضایت،
  * گزارش مشکل، بخش «آزمایشی» در تنظیمات و صفحه‌ی مدیریت (خوندن فایل‌های رسیده).
  * فقط خواندنی: برنامه، پروفایل یا داده‌ی تمرین رو تغییر نمی‌ده. هیچ درخواست شبکه‌ای نداره.
  * داده‌ی خودش فقط در کلید «gaam-assistant». */
@@ -64,54 +64,53 @@
     var b = document.getElementById('ga-btn');
     if (!b) {
       b = document.createElement('a');
-      b.href = '#'; b.id = 'ga-btn'; b.className = 'ga-tab'; b.dataset.tab = 'assistant';
-      b.setAttribute('role', 'button'); b.setAttribute('aria-haspopup', 'dialog'); b.setAttribute('aria-expanded', 'false');
+      b.href = '#assistant'; b.id = 'ga-btn'; b.className = 'ga-tab'; b.dataset.tab = 'assistant';
       b.innerHTML = '<span class="tab-ico" aria-hidden="true">' + TAB_ICON + '</span><span class="tab-lbl">' + esc(S.tab) + '</span>';
       var prof = bar.querySelector('[data-tab="profile"]');
       bar.insertBefore(b, prof || null);
     }
     var vis = active();
     b.hidden = !vis;
-    if (!vis) close(true);
-  }
-  function tabState(open) {
-    var b = document.getElementById('ga-btn');
-    if (!b) return;
-    b.setAttribute('aria-expanded', String(open));
-    b.classList.toggle('is-active', open);
   }
 
-  // ---------- پنجره‌ی گفت‌وگو ----------
+  // ---------- صفحه‌ی گفت‌وگو (#assistant): تمام‌صفحه مثل بقیه‌ی صفحه‌ها، با نوار پایین ----------
   function ctx() { try { return api.ctx() || {}; } catch (e) { return {}; } }
-  function open(prefill) {
-    if (document.getElementById('ga-sheet')) return;
-    var el = document.createElement('div');
-    el.id = 'ga-sheet'; el.className = 'ga-backdrop';
-    el.innerHTML = '<div class="ga-panel" role="dialog" aria-modal="true" aria-labelledby="ga-title">' +
-      '<div class="ga-head"><h2 id="ga-title">' + esc(S.title) + ' <span class="ga-beta">' + esc(S.beta) + '</span></h2>' +
-      '<button type="button" class="ga-x" data-ga-close="1" aria-label="' + esc(S.close) + '">×</button></div>' +
+  var prefillNext = '';
+  function renderPage(app) {
+    app.innerHTML = '<section id="ga-chat" class="ga-screen" aria-labelledby="ga-title">' +
+      '<header class="page-head ga-head"><h1 id="ga-title">' + esc(S.title) + ' <span class="ga-beta">' + esc(S.beta) + '</span></h1></header>' +
       '<div class="ga-log" aria-live="polite"></div>' +
       '<form class="ga-form" autocomplete="off"><input type="text" class="ga-in" maxlength="200" enterkeyhint="send" aria-label="' + esc(S.placeholder) + '" placeholder="' + esc(S.placeholder) + '">' +
       '<button type="submit" class="btn btn-primary ga-send">' + esc(S.send) + '</button></form>' +
       '<p class="ga-foot"><button type="button" class="linklike" data-ga-report="1">' + esc(S.report) + '</button></p>' +
-      '<div class="ga-report" hidden></div></div>';
-    document.body.appendChild(el);
-    document.body.classList.add('modal-open');
-    tabState(true);
+      '<div class="ga-report" hidden></div></section>';
+    fit();
     if (!msgs.length) pushBot({ kind: 'hello', answer: S.hello }); else renderLog();
-    var input = el.querySelector('.ga-in');
-    if (prefill) input.value = prefill;
-    input.focus();
+    var input = app.querySelector('.ga-in');
+    if (prefillNext) { input.value = prefillNext; prefillNext = ''; }
+    // روی گوشی صفحه‌کلید خودکار باز نشه؛ روی دسکتاپ مستقیم آماده‌ی نوشتن
+    if (!touch()) input.focus({ preventScroll: true });
   }
-  function close(silent) {
-    finishAnim();
-    var el = document.getElementById('ga-sheet');
-    if (!el) return;
-    el.remove();
-    document.body.classList.remove('modal-open');
-    tabState(false);
-    var b = document.getElementById('ga-btn');
-    if (b && !silent && !b.hidden) b.focus();
+  function touch() { try { return matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } }
+  // ارتفاع صفحه: از زیر سربرگ تا بالای نوار پایین؛ با باز شدن صفحه‌کلید گوشی کوتاه می‌شه و نوار پایین کنار می‌ره
+  function fit() {
+    var pg = document.getElementById('ga-chat');
+    if (!pg) { document.body.classList.remove('ga-kb'); return; }
+    var vv = window.visualViewport, vh = vv ? vv.height : window.innerHeight;
+    var kb = touch() && document.activeElement && document.activeElement.classList.contains('ga-in') && vh < window.innerHeight * 0.8;
+    document.body.classList.toggle('ga-kb', !!kb);
+    // نوار پایین روی گوشی افقیه و پایین صفحه؛ روی دسکتاپ ستون کناریه و جایی از ارتفاع نمی‌گیره
+    var bar = document.getElementById('tabbar'), br = !kb && bar && !bar.hidden ? bar.getBoundingClientRect() : null;
+    var barH = br && br.width > br.height ? Math.max(0, vh - br.top) : 0;
+    if (!kb) window.scrollTo(0, 0);
+    var top = kb ? 0 : pg.getBoundingClientRect().top;
+    pg.style.height = Math.max(kb ? 200 : 320, Math.round(vh - top - barH - 10)) + 'px';
+    if (kb) { var log = pg.querySelector('.ga-log'); if (log) log.scrollTop = log.scrollHeight; }
+  }
+  function onPage() { return !!document.getElementById('ga-chat'); }
+  function open(prefill) {
+    if (prefill) prefillNext = prefill;
+    if (location.hash === '#assistant') { if (api) api.rerender(); } else location.hash = '#assistant';
   }
 
   // «Thomas, Erdman & Burke (2016), …» → «Thomas et al. (2016)»
@@ -171,7 +170,7 @@
     return h + '</div>';
   }
   function renderLog() {
-    var log = document.querySelector('#ga-sheet .ga-log');
+    var log = document.querySelector('#ga-chat .ga-log');
     if (!log) return;
     log.innerHTML = msgs.map(function (m) {
       return m.who === 'me' ? '<div class="ga-msg ga-me' + (m.fresh ? ' ga-pop' : '') + '"><p>' + esc(m.text) + '</p></div>' : botHtml(m);
@@ -209,7 +208,7 @@
       m.anim = 'reveal'; renderLog();
       anim.timer = setInterval(function () {
         anim.shown = Math.min(words.length, anim.shown + per);
-        var el = document.querySelector('#ga-sheet [data-mid="' + m.id + '"] .ga-txt');
+        var el = document.querySelector('#ga-chat [data-mid="' + m.id + '"] .ga-txt');
         if (el) el.textContent = words.slice(0, anim.shown).join('');
         followLog();
         if (anim.shown >= words.length) finishAnim();
@@ -224,7 +223,7 @@
   }
   // تا وقتی پیام کوتاه‌تر از قابه، پایین گفت‌وگو بمونه؛ پیام بلند از اولش خونده بشه
   function followLog() {
-    var log = document.querySelector('#ga-sheet .ga-log'), last = log && log.lastElementChild;
+    var log = document.querySelector('#ga-chat .ga-log'), last = log && log.lastElementChild;
     if (!last) return;
     if (last.offsetHeight <= log.clientHeight) log.scrollTop = log.scrollHeight;
   }
@@ -283,7 +282,7 @@
 
   // گزارش مشکل
   function showReport() {
-    var box = document.querySelector('#ga-sheet .ga-report');
+    var box = document.querySelector('#ga-chat .ga-report');
     if (!box) return;
     box.hidden = false;
     box.innerHTML = '<label class="sr-only" for="ga-rep">' + esc(S.report) + '</label><textarea id="ga-rep" rows="3" maxlength="500" placeholder="' + esc(S.reportPh) + '"></textarea>' +
@@ -298,7 +297,7 @@
     var d = load();
     d.reports.push({ t: today(), text: text, ver: api.version || '', page: (api.lastPage || location.hash || '#home').split('/')[0] });
     save(d);
-    var box = document.querySelector('#ga-sheet .ga-report');
+    var box = document.querySelector('#ga-chat .ga-report');
     box.innerHTML = '<p class="ga-small">' + esc(S.saved) + '</p>';
   }
 
@@ -306,11 +305,10 @@
   document.addEventListener('click', function (e) {
     var t = e.target;
     if (!t.closest) return;
-    if (t.closest('#ga-btn') || t.closest('[data-ga-open]')) { e.preventDefault(); if (document.getElementById('ga-sheet')) close(); else open(); return; }
-    var sheet = document.getElementById('ga-sheet');
+    if (t.closest('[data-ga-open]')) { e.preventDefault(); open(); return; }
+    var sheet = document.getElementById('ga-chat');
     if (sheet && sheet.contains(t)) {
-      if (t === sheet || t.closest('[data-ga-close]')) { close(); return; }
-      if (t.closest('[data-ga-nav]')) { setTimeout(function () { close(true); }, 0); return; } // پیوند خودش صفحه رو عوض می‌کنه
+      if (t.closest('[data-ga-nav]')) { finishAnim(); return; } // پیوند خودش صفحه رو عوض می‌کنه
       var mEl = t.closest('[data-mid]'), m = mEl ? msgById(mEl.dataset.mid) : null;
       if (t.closest('[data-ga-skipanim]')) { finishAnim(); return; }
       var b;
@@ -349,7 +347,7 @@
     if (t.matches && t.matches('#ga-files')) readFiles(t.files);
   });
   document.addEventListener('submit', function (e) {
-    if (!e.target.closest || !e.target.closest('#ga-sheet')) return;
+    if (!e.target.closest || !e.target.closest('#ga-chat')) return;
     e.preventDefault();
     var input = e.target.querySelector('.ga-in');
     askText(input.value);
@@ -357,11 +355,16 @@
     input.focus();
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Escape') return;
-    if (document.getElementById('ga-admin')) closeAdmin();
-    else if (document.getElementById('ga-sheet')) close();
+    if (e.key === 'Escape' && document.getElementById('ga-admin')) closeAdmin();
   });
-  window.addEventListener('hashchange', function () { close(true); closeAdmin(); });
+  window.addEventListener('hashchange', function () { if (location.hash !== '#assistant') { finishAnim(); document.body.classList.remove('ga-kb'); } closeAdmin(); });
+  // اندازه‌ی صفحه با چرخش گوشی، تغییر اندازه‌ی پنجره و باز/بسته شدن صفحه‌کلید
+  var fitT = 0;
+  function fitSoon() { if (!onPage()) return; clearTimeout(fitT); fitT = setTimeout(fit, 30); }
+  window.addEventListener('resize', fitSoon);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', fitSoon);
+  document.addEventListener('focusin', function (e) { if (e.target.classList && e.target.classList.contains('ga-in')) fitSoon(); });
+  document.addEventListener('focusout', function (e) { if (e.target.classList && e.target.classList.contains('ga-in')) setTimeout(fitSoon, 120); });
 
   // ---------- تنظیمات › آزمایشی ----------
   var LAB_ICON = '<path d="M9 3h6M10 3v6.2L4.8 18a2 2 0 0 0 1.7 3h11a2 2 0 0 0 1.7-3L14 9.2V3"/><path d="M7.2 14h9.6"/>';
@@ -413,7 +416,7 @@
     var el = document.getElementById('ga-admin');
     if (!el) return;
     el.remove();
-    if (!document.getElementById('ga-sheet')) document.body.classList.remove('modal-open');
+    document.body.classList.remove('modal-open');
   }
   function readFiles(list) {
     var files = Array.prototype.slice.call(list || []), done = 0, bad = [];
@@ -470,6 +473,8 @@
   window.GaamAssistant = {
     attach: function (a) { api = a; idx = E.createIndex(KB); },
     header: header,
+    available: function () { return active(); },
+    renderPage: function (app) { renderPage(app); },
     learnChip: function () {
       if (!active()) return '';
       return '<button type="button" class="card ga-learn-chip" data-ga-open="1">' + Q_ICON + '<span>' + esc(S.chip) + '</span></button>';

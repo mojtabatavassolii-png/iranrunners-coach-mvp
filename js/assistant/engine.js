@@ -146,8 +146,10 @@
   }
 
   // ---------- ساخت نمایه ----------
+  var PLUS = null; // جمله‌های «plus» پایگاه دانش (فقط یک پایگاه دانش در اپ)
   function createIndex(kb, opts) {
     opts = opts || {};
+    PLUS = (kb.texts && kb.texts.plus) || null;
     var entries = kb.entries.map(function (e) {
       var terms = {};
       function add(list, w) {
@@ -241,15 +243,29 @@
   }
 
   // پر کردن جای داده‌ی کاربر؛ نبودش = متن عمومی
+  // personal: یک کلید یا فهرست کلیدها؛ همه باید باشن، وگرنه متن عمومی (fallback)
+  // plus: جمله‌ی اضافه از داده‌ی خود کاربر (مثلاً گروه تمرین‌های سطحش)؛ فقط وقتی داده هست
   function fill(e, ctx) {
     var walk = ctx && ctx.walk && e.answerWalk;
     var a = walk ? e.answerWalk : e.answer;
-    if (e.personal) {
-      var v = ctx && ctx[e.personal];
-      if (v) a = a.replace('{' + e.personal + '}', v);
+    if (e.personal || (walk && e.personalWalk != null)) {
+      var keys = [].concat(walk && e.personalWalk != null ? e.personalWalk : e.personal), ok = keys.every(function (k) { return ctx && ctx[k] != null && ctx[k] !== ''; });
+      if (ok) a = sub(a, ctx);
       else a = (walk && e.fallbackWalk) || e.fallback || a.replace(/[^.؛]*\{[a-zA-Z]+\}[^.؛]*[.؛]?/g, '').trim();
     }
+    var plus = PLUS;
+    if (e.plus && plus && !(ctx && ctx.walk)) {
+      [].concat(e.plus).forEach(function (k) {
+        var t = plus[k];
+        if (!t) return;
+        var need = (t.match(/\{([a-zA-Z]+)\}/g) || []).map(function (x) { return x.slice(1, -1); });
+        if (need.every(function (n) { return ctx && ctx[n] != null && ctx[n] !== ''; })) a += ' ' + sub(t, ctx);
+      });
+    }
     return a;
+  }
+  function sub(t, ctx) {
+    return t.replace(/\{([a-zA-Z]+)\}/g, function (m, k) { var v = ctx && ctx[k]; return v == null || v === '' ? m : String(v).replace(/\d/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'[d]; }); });
   }
   function linksFor(e, ctx) {
     return (ctx && ctx.walk && e.linksWalk) || e.links || [];
@@ -367,7 +383,7 @@
     if (!qt.length) return { kind: 'none', answer: kb.texts.none, suggestions: popular(kb, ctx, []) };
     // ۲. خارج از حوزه
     // «به درد می‌خوره» یعنی «مفیده»، نه درد
-    var pain = hasAny(n.replace(/(^| )ب(ه )?درد(م|ت|ش)? ?(ن?می)?(خوره|خورن|بخوره)/g, ' '), PAIN);
+    var pain = hasAny(n.replace(/(^| )ب(ه )?(چه )?درد(ی|م|ت|ش)? ?(ن?می)?(خوره|خورن|بخوره)/g, ' '), PAIN);
     if (!pain && !inDomain(idx, qt) && !nearPhrase(idx, text)) return { kind: 'ood', answer: kb.texts.ood, suggestions: popular(kb, ctx, []) };
     // ۳. جست‌وجو
     var qreal = [], qg = trigrams(text), qw = qt.map(function (t, i) {
@@ -380,6 +396,11 @@
       return { x: x, s: sc.s, anchor: sc.anchor, word: sc.word };
     }).sort(function (a, b) { return b.s - a.s; });
     // درد: فقط مدخل‌های ایمنی‌دار؛ اگه هیچ‌کدوم روشن نبود، پاسخ محتاطانه‌ی عمومی درد
+    // «دردم رو کجا ثبت کنم؟»: سؤال درباره‌ی اپه، نه گزارش درد
+    if (pain && /(^| )(ثبت|وارد)( |$)/.test(n) && /(^| )(کجا|چطور|چطوری|چجوری|چگونه)( |$)/.test(n) && kb.painLogEntry) {
+      var pl = kb.entries.filter(function (e) { return e.id === kb.painLogEntry; })[0];
+      if (pl) return result(pl, null, ctx);
+    }
     if (pain) {
       // مدخل منتظر تأیید هیچ‌وقت جای پاسخ محتاطانه‌ی درد رو نمی‌گیره
       var safe = ranked.filter(function (r) { return r.x.e.safety && r.x.e.safety !== 'none' && r.x.e.status !== 'pending'; });

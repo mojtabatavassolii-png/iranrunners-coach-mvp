@@ -164,23 +164,23 @@ const SCREENS = [
   // بازبینی ۱۲: دستیار گام (برگه‌ی گفت‌وگو)، تنظیمات › آزمایشی
   ['assistant', '#home', async (p) => {
     if (!(await p.locator('#ga-btn').isVisible())) return; await p.click('#ga-btn'); await p.waitForTimeout(300);
-    for (const q of ['سلام', 'تمرین قطبی چیه', 'ساقم درد میکنه']) { await p.fill('#ga-sheet .ga-in', q); await p.click('#ga-sheet .ga-send'); await p.waitForTimeout(250); }
+    for (const q of ['سلام', 'تمرین قطبی چیه', 'ساقم درد میکنه']) { await p.fill('#ga-chat .ga-in', q); await p.click('#ga-chat .ga-send'); await p.waitForTimeout(250); }
   }],
   ['assistant-answer', '#home', async (p) => {
     if (!(await p.locator('#ga-btn').isVisible())) return; await p.click('#ga-btn'); await p.waitForTimeout(300);
-    await p.fill('#ga-sheet .ga-in', 'با دویدن وزن کم میکنم'); await p.click('#ga-sheet .ga-send'); await p.waitForTimeout(300);
+    await p.fill('#ga-chat .ga-in', 'با دویدن وزن کم میکنم'); await p.click('#ga-chat .ga-send'); await p.waitForTimeout(300);
   }],
   ['assistant-urgent', '#home', async (p) => {
     if (!(await p.locator('#ga-btn').isVisible())) return; await p.click('#ga-btn'); await p.waitForTimeout(300);
-    for (const q of ['بهترین گوشی برای عکاسی', 'زانوم ورم کرده و درد داره']) { await p.fill('#ga-sheet .ga-in', q); await p.click('#ga-sheet .ga-send'); await p.waitForTimeout(250); }
+    for (const q of ['بهترین گوشی برای عکاسی', 'زانوم ورم کرده و درد داره']) { await p.fill('#ga-chat .ga-in', q); await p.click('#ga-chat .ga-send'); await p.waitForTimeout(250); }
   }],
   ['walk-assistant', '#home', async (p) => {
     await asWalker(p); if (!(await p.locator('#ga-btn').isVisible())) return; await p.click('#ga-btn'); await p.waitForTimeout(300);
-    await p.fill('#ga-sheet .ga-in', 'تو گرما پیاده روی کنم'); await p.click('#ga-sheet .ga-send'); await p.waitForTimeout(300);
+    await p.fill('#ga-chat .ga-in', 'تو گرما پیاده روی کنم'); await p.click('#ga-chat .ga-send'); await p.waitForTimeout(300);
   }],
   ['walk-assistant-urgent', '#home', async (p) => {
     await asWalker(p); if (!(await p.locator('#ga-btn').isVisible())) return; await p.click('#ga-btn'); await p.waitForTimeout(300);
-    await p.fill('#ga-sheet .ga-in', 'زانوم ورم کرده و درد داره'); await p.click('#ga-sheet .ga-send'); await p.waitForTimeout(300);
+    await p.fill('#ga-chat .ga-in', 'زانوم ورم کرده و درد داره'); await p.click('#ga-chat .ga-send'); await p.waitForTimeout(300);
   }],
   ['settings-lab', '#settings', async (p) => { if (!(await p.locator('#set-lab').count())) return; await p.locator('#set-lab').evaluate((d) => { d.open = true; }); await p.locator('#set-lab').scrollIntoViewIfNeeded(); }],
   // صفحه‌ی «شروع» (دکمه‌ی وسط: ثبت آزاد، قبل از شروع). آخر فهرست، چون حالت ثبت در مرورگر می‌مونه

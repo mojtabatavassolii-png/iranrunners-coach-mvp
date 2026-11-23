@@ -518,7 +518,9 @@
   function needsMigration() { return state.profile && state.profile.schemaVersion !== SCHEMA_VERSION; }
 
   // ---------- مسیریابی ----------
-  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, health: renderHealth, settings: renderSettings, plans: renderPlans, walkgoals: renderWalkGoals, progress: renderProgressPage, gait: renderGaitPage, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding, record: renderRecord };
+  var VIEWS = { home: renderHome, plan: renderPlan, checkin: renderCheckin, fitness: renderFitness, race: renderRace, health: renderHealth, settings: renderSettings, plans: renderPlans, walkgoals: renderWalkGoals, progress: renderProgressPage, gait: renderGaitPage, learn: renderLearn, guide: renderGuide, profile: renderProfile, onboarding: renderOnboarding, record: renderRecord,
+    // دستیار گام (آزمایشی): صفحه‌ی گفت‌وگو
+    assistant: function () { window.GaamAssistant.renderPage(app); } };
   // ---------- ثبت دویدن با GPS (#record) ----------
   // مسافت و زمان با CoachTrack از نقطه‌های CoachPlatform.gps (وب: فقط با صفحه‌ی باز؛ اپ نیتیو: در پس‌زمینه هم).
   // مختصات ذخیره نمی‌شن؛ فقط در حین ثبت، وضعیت (با آخرین نقطه) در REC_KEY نگه داشته می‌شه تا اگه اپ بسته شد ثبت از دست نره.
@@ -1288,6 +1290,7 @@
     var noProfile = !state.profile || needsMigration();
     if (noProfile && v !== 'guide' && v !== 'learn') v = 'onboarding';
     if (!VIEWS[v]) v = 'home';
+    if (v === 'assistant' && !(window.GaamAssistant && window.GaamAssistant.available())) v = 'home';
     // صفحه‌های فقط دویدن برای کاربر پیاده‌روی
     if (!noProfile && C.isWalk(state.profile) && ['plans', 'race', 'fitness', 'gait'].indexOf(v) >= 0) v = 'home';
     // نوار پایین: همه‌جا به‌جز ورود و فرم اولیه؛ صفحه‌های فرعی زیر تب مادرشون فعال می‌شن
@@ -1352,9 +1355,9 @@
       chevron(isRtl() ? 'right' : 'left') + esc(T('app.back')) + '</a></nav>';
   }
   // تب مادر هر صفحه
-  var TABS = ['home', 'plan', 'record', 'learn', 'profile'];
+  var TABS = ['home', 'plan', 'record', 'assistant', 'profile'];
   var TAB_OF = { home: 'home', checkin: 'home', health: 'profile', race: 'profile', plans: 'profile', walkgoals: 'profile', progress: 'profile', gait: 'profile', plan: 'plan', fitness: 'profile',
-    learn: 'profile', guide: 'profile', profile: 'profile', settings: 'profile', record: 'record' };
+    learn: 'profile', guide: 'profile', profile: 'profile', settings: 'profile', record: 'record', assistant: 'assistant' };
   // جابه‌جایی نرم بین صفحه‌ها: بین تب‌ها لغزش افقی هم‌جهت با ترتیب تب‌ها (در RTL برعکس)، بقیه محو شدن ملایم
   var lastView = null, lastTab = null;
   function animateView(v, tab) {
@@ -6854,6 +6857,42 @@
     try {
       var z = walk ? null : C.paceZones(p);
       if (z && z.easy) o.easyPace = T('pace.range', { a: fa(paceFmt(z.easy[0])), b: fa(paceFmt(z.easy[1])) });
+      // همه‌ی پیس‌های تمرینی (جدول پیس‌های صفحه‌ی فیتنس) و VDOT
+      if (z && z.vdot) {
+        var pr = function (r) { return T('pace.range', { a: fa(paceFmt(Math.min(r[0], r[1]))), b: fa(paceFmt(Math.max(r[0], r[1]))) }); };
+        o.vdot = fa(z.vdot.toFixed(1));
+        o.paces = ['ایزی (E): ' + pr(z.easy), 'ماراتن (M): ' + pr(z.marathon), 'آستانه/تمپو (T): ' + pr(z.tempo), 'اینتروال (I): ' + pr(z.interval), 'تکرار (R): ' + pr(z.reps)].join('؛ ');
+      }
+    } catch (e) { /* */ }
+    // سطح، گروه تمرین‌ها، هدف، روزهای تمرین و حجم این هفته: برای پاسخ‌های متناسب با خود کاربر
+    try {
+      var lv2 = C.assessLevel(p);
+      if (lv2 && lv2.level != null) {
+        o.levelNum = lv2.level;
+        if (!walk && lv2.info && lv2.info.tier) o.tier = T('tier.' + lv2.info.tier);
+      }
+    } catch (e) { /* */ }
+    try {
+      var g = C.goalInfo(p);
+      if (!walk) {
+        // تمرکز تمرین‌های شدید فقط وقتی برنامه تمرین شدید ساختاریافته داره (گروه C به بالا)؛ وگرنه با «بدون اینتروال» گروه A تناقض داره
+        var tierK = (C.assessLevel(p).info || {}).tier;
+        if (['C', 'D', 'E'].indexOf(tierK) >= 0) o.focus = T('guide.focus.' + g.category);
+        if (g.type !== 'none') {
+          var rc = C.raceInfo(p), dl = rc ? Math.round(C.daysBetween(today(), rc.date)) : null;
+          o.goal = C.goalLabel(g) + (rc && dl >= 0 ? '، ' + fa(dl) + ' روز مونده (' + faDate(g.date) + ')' : '');
+        }
+      } else {
+        var wg = C.walkGoalInfo(p);
+        if (wg && wg.kind && wg.kind !== 'none') o.goal = T('wgoal.' + wg.kind + '.t');
+      }
+    } catch (e) { /* */ }
+    try {
+      var wk = C.buildWeek(p, now);
+      var nSes = wk.days.filter(function (d) { return ['rest', 'none', 'cancelled'].indexOf(d.type) < 0; }).length;
+      if (nSes) o.days = fa(nSes) + ' جلسه';
+      var vol = walk ? (wk.totalMin ? T('dur.m', { n: fa(wk.totalMin) }) : '') : (wk.totalKm ? fa(Math.round(I.dist(wk.totalKm) * 10) / 10) + ' ' + T('units.word.' + I.getUnits()) : '');
+      if (vol || nSes) o.week = [wk.phase && wk.phase.label, vol, nSes ? fa(nSes) + ' جلسه' : ''].filter(Boolean).join('، ');
     } catch (e) { /* */ }
     try {
       var s = effectiveSession(C.sessionFor(p, now)).session;
