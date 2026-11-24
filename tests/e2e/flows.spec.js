@@ -487,6 +487,19 @@ test('سنسور ضربان: اتصال، عدد زنده، ذخیره‌ی می
   await expect(page.locator('.actual-line').first()).toContainText('ضربان میانگین');
 });
 
+// ---------- پیام‌ها: کل پیام قابل زدنه، بدون خط پیوند جدا ----------
+test('پیام‌ها: زدن روی خود پیام به مقصدش می‌بره', async ({ page }) => {
+  await onboard(page);
+  await page.locator('#bell').click();
+  const msg = page.locator('#inbox a.nf-go').first();
+  await expect(msg).toBeVisible();
+  await expect(page.locator('#inbox .nf-act')).toHaveCount(0);
+  const href = await msg.getAttribute('href');
+  await msg.locator('.nf-body').click();
+  await expect(page.locator('#inbox')).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(href + '$'));
+});
+
 // ---------- ۱۴. دستیار گام (آزمایشی): پیش‌فرض خاموش، روشن از تنظیمات، پاسخ شخصی، هشدار ایمنی، ارسال با رضایت ----------
 test('دستیار گام: تب نوار پایین، پاسخ، هشدار ایمنی و ذخیره‌ی سؤال فقط با رضایت', async ({ page }) => {
   await onboard(page);

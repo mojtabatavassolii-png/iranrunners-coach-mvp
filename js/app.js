@@ -314,11 +314,13 @@
     list.forEach(function (x, i) {
       var g = x.day === todayKey ? 'today' : 'earlier';
       if (g !== grp) { grp = g; html += '<p class="nf-grp">' + esc(T('inbox.' + g)) + '</p>'; }
-      var act = T('msg.' + x.m + '.a', x.p);
-      html += '<div class="nf-msg' + (x.read ? '' : ' unread') + '"><span class="nf-dot" aria-hidden="true"></span>' + statusIcon(x.k) +
-        '<div class="nf-txt"><b>' + tt('msg.' + x.m + '.t', x.p) + '</b><p>' + tt('msg.' + x.m + '.b', x.p) + '</p>' +
-        (x.href && act ? '<button type="button" class="nf-act" data-nf-go="' + i + '">' + esc(act) + ' ' + (isRtl() ? '←' : '→') + '</button>' : '') +
-        '</div><time>' + esc(msgTime(x)) + '</time>' + (x.read ? '' : '<span class="sr-only">' + esc(T('inbox.unread')) + '</span>') + '</div>';
+      // پیامی که مقصد داره، کلش قابل زدنه (بدون خط پیوند جدا زیرش)
+      var go = !!x.href, tag = go ? 'a' : 'div';
+      html += '<' + tag + ' class="nf-msg' + (x.read ? '' : ' unread') + (go ? ' nf-go' : '') + '"' + (go ? ' href="' + esc(x.href) + '" data-nf-go="' + i + '"' : '') + '>' +
+        '<span class="nf-dot" aria-hidden="true"></span>' + statusIcon(x.k) +
+        '<span class="nf-txt"><b>' + tt('msg.' + x.m + '.t', x.p) + '</b><span class="nf-body">' + tt('msg.' + x.m + '.b', x.p) + '</span></span>' +
+        '<time>' + esc(msgTime(x)) + '</time>' + (x.read ? '' : '<span class="sr-only">' + esc(T('inbox.unread')) + '</span>') +
+        (go ? chevron(isRtl() ? 'left' : 'right') : '') + '</' + tag + '>';
     });
     return '<div class="nf-top"><h2 id="inbox-title">' + esc(T('inbox.title')) + '</h2><div class="nf-tools">' +
       (unreadCount() ? '<button type="button" data-nf-readall="1">' + esc(T('inbox.readAll')) + '</button>' : '') +
@@ -357,6 +359,7 @@
     if (e.target === box) { closeInbox(); return; }
     var go = e.target.closest('[data-nf-go]');
     if (go) {
+      e.preventDefault();
       var x = inbox()[Number(go.dataset.nfGo)];
       if (!x) return;
       x.read = true; save();

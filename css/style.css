@@ -1860,7 +1860,14 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--focus-ri
 .nf-ico.s-info { --nf-c: var(--info); --nf-soft: var(--info-soft); }
 .nf-txt { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: start; }
 .nf-txt b { font-size: var(--fs-md); }
-.nf-txt p { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.7; }
+.nf-txt p, .nf-txt .nf-body { margin: 0; font-size: var(--fs-sm); color: var(--text-secondary); line-height: 1.7; }
+/* پیام با مقصد: کل ردیف قابل زدنه */
+a.nf-msg.nf-go { color: inherit; text-decoration: none; cursor: pointer; min-height: 44px; }
+a.nf-msg.nf-go:hover { background: var(--surface); }
+a.nf-msg.nf-go.unread:hover { background: var(--primary-soft); filter: brightness(.97); }
+a.nf-msg.nf-go:active { background: var(--surface-elevated); }
+a.nf-msg.nf-go:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.nf-msg.nf-go > svg:last-child { flex: none; align-self: center; width: 18px; height: 18px; color: var(--text-secondary); }
 .nf-act { justify-self: start; font: inherit; font-size: var(--fs-sm); font-weight: 800; color: var(--primary); background: none; border: 0; padding: 0; min-height: 36px; cursor: pointer; }
 .nf-msg time { flex: none; font-size: var(--fs-xs); color: var(--text-secondary); white-space: nowrap; margin-top: 2px; }
 .nf-empty { margin: 14px 8px; color: var(--text-secondary); font-size: var(--fs-md); }
