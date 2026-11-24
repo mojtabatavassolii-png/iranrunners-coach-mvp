@@ -1496,8 +1496,6 @@
     var afterLight = !!(e3[0] && (LIGHT.indexOf(e3[0].ph) >= 0 || e3[0].sr));
     var km = baseR * Math.pow(1.1, steps);
     if (afterLight) km = Math.max(km, mx(e12, 'km'));
-    // حجم‌های خیلی کم: حد از حجم شروع برنامه (تا ۱۰ کیلومتر) پایین‌تر نره، تا هفته‌به‌هفته کم نشه (F12)
-    km = Math.max(km, Math.min(startKm(profile), 10));
     return { km: km, v3: mx(e3, 'vert'), v12: mx(e12, 'vert'), s4: s4, s12: mx(e12, 'sv'), gap: g - 1,
       // حد لانگ‌ران: ۱۰٪ یا ۲ کیلومتر (هر کدوم بیشتر) بالای بلندترین دویدن ۴ هفته‌ی اخیر، برای هر هفته‌ی ثبت‌نشده یک پله (F3)
       lg: lg4 > 0 ? Math.max(lg4 * Math.pow(1.1, steps), lg4 + 2 * steps) : null };
