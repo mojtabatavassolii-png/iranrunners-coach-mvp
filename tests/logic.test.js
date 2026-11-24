@@ -1957,6 +1957,9 @@ test('تاریخچه‌ی هفتگی برنامه: ثبت، نگه‌داشتن 
   // بلافاصله بعد از هفته‌ی ریکاوری/سبک/مسابقه، برگشت به حجم عادی ۱۲ هفته‌ی اخیر آزاده
   q2.planLog[C.dateKey(C.addDays(ws2, -7))] = { km: 20, vert: 0, sv: 0, ph: 'recovery' };
   assert.strictEqual(C.buildWeek(q2, ws2).totalKm, free2, 'بعد از ریکاوری: برگشت به حجم عادی قبل');
+  // ولی بعد از هفته‌ی سبکِ عادی (deload) نه: حداکثر ۱۰٪ بالای سه هفته‌ی اخیر (شبیه‌ساز: پرش ۲ هفته‌ای بعد از برگشت از مسابقه)
+  q2.planLog[C.dateKey(C.addDays(ws2, -7))] = { km: 17, vert: 0, sv: 0, ph: 'deload' };
+  assert.ok(C.buildWeek(q2, ws2).totalKm <= 22.5, 'بعد از deload: ' + C.buildWeek(q2, ws2).totalKm);
   // هفته‌ی قبلی ثبت نشده (کاربر یک هفته اپ رو باز نکرده): حد از آخرین هفته‌ی ثبت‌شده، ۱۰٪ برای هر هفته‌ی بینش (۲۰ × ۱٫۲۱)
   delete q.planLog[C.dateKey(C.addDays(ws, -7 * 6))]; delete q.planLog[C.dateKey(C.addDays(ws, -7))];
   var lim2 = C.buildWeek(q, ws).totalKm;
