@@ -240,6 +240,18 @@
     return out;
   }
 
+  // سابقه‌ی امروز: سابقه‌ی فرم اولیه + ماه‌هایی که از شروع استفاده از اپ گذشته
+  function effectiveExperience(profile) {
+    var exp = profile.experience || 'gt3y';
+    if (exp === 'never') return exp;
+    var m = profile.runMonths != null && isFinite(profile.runMonths) ? Number(profile.runMonths) : MONTHS_FROM_EXP[exp];
+    var since = profile.createdAt || profile.startDate, d0 = since ? new Date(since) : null;
+    if (d0 && !isNaN(d0)) m += Math.max(0, Math.floor(daysBetween(d0, new Date()) / 30.4));
+    var e2 = experienceFromMonths(m);
+    // هیچ‌وقت کمتر از چیزی که کاربر گفته
+    var order = ['never', 'lt3m', '3to12m', '1to3y', 'gt3y'];
+    return order.indexOf(e2) > order.indexOf(exp) ? e2 : exp;
+  }
   function levelFromKm(km) {
     for (var n = 10; n >= 1; n--) if (km >= LEVELS[n].km[0]) return n;
     return 1;
@@ -358,9 +370,14 @@
       var pbLevel = levelFromVdot(vd);
       out.vdot = vd;
       out.pbLevel = pbLevel;
-      out.level = pbLevel;
       out.source = 'pb';
       out.notes = [];
+      // سطح (نوع و پیچیدگی جلسه‌ها) با رکورد سریع هم از سقف سابقه بالاتر نمی‌ره؛ پیس‌ها همچنان از خود رکورد میان (ممیزی موتور، F4).
+      // سابقه با گذشت زمان از شروع استفاده از اپ بیشتر حساب می‌شه، پس این سقف کم‌کم برداشته می‌شه
+      var pbCap = experienceCap(effectiveExperience(profile), km);
+      out.level = Math.min(pbLevel, pbCap);
+      if (out.level < pbLevel) out.notes.push(T('levelNote.expCap', { exp: EXPERIENCE[effectiveExperience(profile)].label, from: pbLevel, to: out.level }));
+      pbLevel = out.level;
       if (pbLevel >= volLevel + 2) {
         out.cautious = true;
         out.notes.push(T('levelNote.cautious'));
@@ -692,7 +709,8 @@
     var fit = currentFitness(profile);
     if (!fit || fit.entry.kind === 'baseline' || fit.entry.kind === 'step' || profile.experience === 'never') return null;
     var planLevel = assessLevel(profile).level;
-    var fitLevel = levelFromVdot(fit.vdot);
+    // همون سقف سابقه‌ای که سطح از رکورد داره (F4)؛ وگرنه پیشنهاد «بالا رفتن» هر بار تکرار می‌شد
+    var fitLevel = Math.min(levelFromVdot(fit.vdot), experienceCap(effectiveExperience(profile), volumeInfo(profile).level));
     if (fitLevel === planLevel) return null;
     // «فعلاً نه» فقط برای پایین آوردن سطحه؛ بالا رفتن با رکورد تازه خودکاره (autoLevelUp)
     if (fitLevel < planLevel && profile.levelSkip && profile.levelSkip === fitnessKey(fit.entry)) return null;
@@ -1418,9 +1436,14 @@
     var ws = weekStart(today), bw = buildWeek(profile, today);
     // پیاده‌روی: دقیقه‌ی هفته (حد رشد walkLogLimit)
     if (isWalk(profile) ? !(bw.totalMin > 0) : !(bw.totalKm > 0 || bw.vert > 0)) return false;
+    // حجم تمرین بدون خود مسابقه (اصلی و فرعی): کیلومتر مسابقه حد رشد هفته‌های بعد رو بالا نبره (ممیزی موتور، F2)
+    // lg: بلندترین دویدن هفته (برای حد رشد لانگ‌ران، F3)؛ sr: هفته‌ی مسابقه‌ی فرعی (هفته‌ی سبک حساب می‌شه)
+    var raceKm = bw.days.reduce(function (x, d) { return x + (d.type === 'race' ? (d.km || 0) : 0); }, 0);
     var e = isWalk(profile) ? { km: 0, min: bw.totalMin, vert: 0, sv: 0, ph: (bw.phase && bw.phase.key) || null }
-      : { km: bw.totalKm || 0, vert: bw.vert || 0, sv: bw.days.reduce(function (x, d) { return Math.max(x, d.type === 'race' ? 0 : (d.vert || 0)); }, 0),
+      : { km: round05(Math.max(0, (bw.totalKm || 0) - raceKm)), vert: bw.vert || 0, sv: bw.days.reduce(function (x, d) { return Math.max(x, d.type === 'race' ? 0 : (d.vert || 0)); }, 0),
+      lg: bw.days.reduce(function (x, d) { return Math.max(x, d.type === 'race' || d.type === 'cross' ? 0 : (d.km || 0)); }, 0),
       ph: (bw.phase && bw.phase.key) || null };
+    if (!isWalk(profile) && bw.days.some(function (d) { return d.type === 'race' && d.side; })) e.sr = 1;
     var log = profile.planLog = profile.planLog || {}, k = dateKey(ws), before = JSON.stringify(log[k] || null);
     log[k] = e;
     var oldest = dateKey(addDays(ws, -7 * PLAN_LOG_WEEKS));
@@ -1450,12 +1473,12 @@
     var g = 1, miss = 0, okR = function (e) { return e && (e.ph !== 'intro' || !anyFull); };
     while (g <= PLAN_LOG_GAP_WEEKS && !okR(log[dateKey(addDays(ws, -7 * g))])) { if (!log[dateKey(addDays(ws, -7 * g))]) miss++; g++; }
     if (g > PLAN_LOG_GAP_WEEKS) return null;
-    var e3 = [], e12 = [], s4 = 0;
+    var e3 = [], e12 = [], s4 = 0, lg4 = 0;
     for (var i = 1; i <= 12; i++) {
       var e = log[dateKey(addDays(ws, -7 * i))];
       if (!okR(e)) continue;
       if (i >= g && i < g + 3) e3.push(e);
-      if (i <= 4) s4 = Math.max(s4, e.sv || 0);
+      if (i <= 4) { s4 = Math.max(s4, e.sv || 0); lg4 = Math.max(lg4, e.lg || 0); }
       if (e.ph !== 'race' && e.ph !== 'taper') e12.push(e);
     }
     if (!e3.length) return null;
@@ -1464,7 +1487,20 @@
     var baseR = mx(e3, 'km');
     // (بعد از تغییر خودکار سطح، حجم فعلی پروفایل رو خود اپ نوشته، نه کاربر؛ اون موقع فقط همون هفته‌ی شروع مبناست)
     if (!anyFull && !profile.levelChange) baseR = Math.max(baseR, Number(profile.currentWeeklyKm) || 0);
-    return { km: Math.max(baseR * Math.pow(1.1, logGapSteps(ws, miss + 1)), mx(e12, 'km')), v3: mx(e3, 'vert'), v12: mx(e12, 'vert'), s4: s4, s12: mx(e12, 'sv'), gap: g - 1 };
+    var steps = logGapSteps(ws, miss + 1);
+    // برگشت به بیشترین هفته‌ی ۱۲ هفته‌ی اخیر فقط بعد از هفته‌ی سبک، تیپر، مسابقه، ریکاوری یا آسیب؛
+    // وگرنه حجم هر هفته حداکثر ۱۰٪ بالای بیشترین ۳ هفته‌ی قبل (قبلاً با روزهای کم حجم هفته تا ۵۰٪ بالا و پایین می‌پرید؛ ممیزی موتور، F1)
+    // برگشت بعد از آسیب و بعد از مسابقه (return) خودش تدریجیه و اینجا استثنا نیست؛ وگرنه آخرین پله تا ۳۰٪ می‌پرید
+    var LIGHT = ['deload', 'taper', 'race', 'recovery'];
+    // فقط هفته‌ی بلافاصله بعد از هفته‌ی سبک (نه هر سه هفته‌ای که یکی‌شون سبک بوده؛ با هفته‌ی سبکِ هر ۴ هفته این حد عملاً برداشته می‌شد)
+    var afterLight = !!(e3[0] && (LIGHT.indexOf(e3[0].ph) >= 0 || e3[0].sr));
+    var km = baseR * Math.pow(1.1, steps);
+    if (afterLight) km = Math.max(km, mx(e12, 'km'));
+    // حجم‌های خیلی کم: حد از حجم شروع برنامه (تا ۱۰ کیلومتر) پایین‌تر نره، تا هفته‌به‌هفته کم نشه (F12)
+    km = Math.max(km, Math.min(startKm(profile), 10));
+    return { km: km, v3: mx(e3, 'vert'), v12: mx(e12, 'vert'), s4: s4, s12: mx(e12, 'sv'), gap: g - 1,
+      // حد لانگ‌ران: ۱۰٪ یا ۲ کیلومتر (هر کدوم بیشتر) بالای بلندترین دویدن ۴ هفته‌ی اخیر، برای هر هفته‌ی ثبت‌نشده یک پله (F3)
+      lg: lg4 > 0 ? Math.max(lg4 * Math.pow(1.1, steps), lg4 + 2 * steps) : null };
   }
   // منوی کیفی اولترا با مرحله‌ی تپه هماهنگ می‌شه
   function adaptHillSpecs(specs, hp, goal, tier) {
@@ -2143,10 +2179,11 @@
   // اولترا: حداقل‌های ماراتن). خروجی null (آماده یا نامعلوم) یا { key, needKm, needLong, peakKm, peakLong }
   var EARLY_MIN_KM = 30;
   function raceReadiness(profile, km, date, today) {
-    if (!profile || isWalk(profile) || !(km > EARLY_MIN_KM)) return null;
+    if (!profile || isWalk(profile) || !(km >= 21)) return null;
     var d = typeof date === 'string' ? parseDate(date) : date;
     if (!d || d < today) return null;
-    var key = '42', need = PLAN_NEEDS[key];
+    // نیمه‌ماراتن هم (ممیزی موتور، F5): سطح‌های پایین تا روز مسابقه به لانگ‌ران ۱۸ کیلومتری نمی‌رسن
+    var key = km > EARLY_MIN_KM ? '42' : '21', need = PLAN_NEEDS[key];
     var base = Object.assign({}, profile, { races: (profile.races || []).filter(function (r) { return r && r.date !== dateKey(d); }) });
     var raceWs = weekStart(d), from = addDays(weekStart(today), -28), last = addDays(raceWs, -7);
     if (last > addDays(weekStart(today), 26 * 7)) return null;   // خیلی دور: برنامه هنوز فرصت داره
@@ -2169,7 +2206,8 @@
     // هدف اصلی (بیشتر از ۳۰ کیلومتر) هم، کنار مسابقه‌های فرعی
     var main = raceInfo(profile), all = otherRaces(profile).filter(function (r) { return r.kind === 'race'; });
     if (main) all.push({ id: 'main', km: main.km, key: dateKey(main.date), date: main.date, name: null, main: true });
-    var list = all.filter(function (r) { return r.key >= tk && daysBetween(today, r.date) <= 35; }).sort(function (a, b) { return a.key < b.key ? -1 : 1; });
+    // مسابقه‌ی اصلی از همون موقع انتخاب هدف (تا ۲۶ هفته‌ی جلوتر، حد raceReadiness)؛ فرعی‌ها ۳۵ روز آخر (ممیزی موتور، F5)
+    var list = all.filter(function (r) { return r.key >= tk && (r.main || daysBetween(today, r.date) <= 35); }).sort(function (a, b) { return a.key < b.key ? -1 : 1; });
     for (var i = 0; i < list.length; i++) {
       var r = list[i], rd = raceReadiness(profile, r.km, r.date, today);
       if (rd) return Object.assign(rd, { id: r.id, raceKey: r.key, name: r.name, main: !!r.main, daysTo: Math.round(daysBetween(today, r.date)),
@@ -2431,8 +2469,8 @@
     // ضریب برگشت بعد از مسابقه برای کل هفته (۰٫۷، ۰٫۷۷، ... تا ۱)
     var rfWeek = race && race.date < ws ? returnFactor(daysBetween(addDays(ws, 6), race.date)) : 1;
     var tier = L.tier;
-    // بدون تجربه‌ی تمرین ساختاریافته: ۴ هفته‌ی اول تمرین‌های کیفی در حد گروه B
-    if (profile.structured === false && W < 4 && 'CDE'.indexOf(tier) >= 0) tier = 'B';
+    // بدون تجربه‌ی تمرین ساختاریافته: ۸ هفته‌ی اول تمرین‌های کیفی در حد گروه B (قبلاً ۴؛ ممیزی موتور، F4)
+    if (profile.structured === false && W < 8 && 'CDE'.indexOf(tier) >= 0) tier = 'B';
 
     if (level === 0) {
       template._zero = zeroStage(profile, W);
@@ -2485,7 +2523,8 @@
           period !== 'base' && nSessions >= 4 && longDay > 0 && avail.indexOf(longDay - 1) >= 0) {
         b2bDay = longDay - 1;
         if (sessionDays.indexOf(b2bDay) < 0) {
-          if (sessionDays.length >= L.sessions) {
+          // روز B2B جای یکی از روزهای آسون رو می‌گیره، نه اینکه روز تمرین بیشتر از انتخاب کاربر بشه (ممیزی موتور، F6)
+          if (sessionDays.length >= nSessions) {
             var drop = sessionDays.filter(function (d) { return d !== longDay; })
               .sort(function (x, y) { return circDist(x, b2bDay) - circDist(y, b2bDay); })[0];
             sessionDays.splice(sessionDays.indexOf(drop), 1);
@@ -2567,6 +2606,14 @@
         if (weekVertUsed() > hp.vlim + 5) longVert = Math.max(0, round10((longVert || 0) - (weekVertUsed() - hp.vlim)));
       }
 
+      // جلسه‌ی کیفی تکراری در یک هفته (مثلاً دو «استدی» بعد از جایگزینی تپه‌ها در اولترا): دومی دویدن آسون می‌شه (ممیزی موتور، F10)
+      var seenQ = {};
+      qDays.slice().forEach(function (d) {
+        var q = qSessions[d];
+        if (!q) return;
+        var qk = q.spec ? q.spec.type + '/' + (q.spec.rep || q.spec.form || '') : q.type;
+        if (seenQ[qk]) { delete qSessions[d]; qDays.splice(qDays.indexOf(d), 1); } else seenQ[qk] = 1;
+      });
       // سقف ۸۰/۲۰: اگه به‌خاطر حداقل تکرارها رد شد، اول بخش تند لانگ‌ران، بعد جلسات آخر منو حذف می‌شن
       var hardBudget = weeklyKm * 0.2;
       var hardSum = function () {
@@ -2575,6 +2622,14 @@
       };
       if (hardSum() > hardBudget + 1e-9) longSegKm = 0;
       while (hardSum() > hardBudget + 1e-9 && qDays.length) delete qSessions[qDays.pop()];
+      // گروه B با یک جلسه‌ی کیفی: همیشه همون تمپوی ملایم نباشه؛ هفته‌به‌هفته با اینتروال کوتاه و تپه‌ی کوتاه بچرخه (ممیزی موتور، F11)
+      if (tier === 'B' && !ultra && !pr.deload && qDays.length === 1 && qSessions[qDays[0]] && qSessions[qDays[0]].spec && qSessions[qDays[0]].spec.type === 'tempoMild') {
+        var altB = [null, Q('shortint', 0.05, { rep: 200 }), Q('hillsB', 0.04)][W % 3];
+        if (altB) {
+          var nsB = makeQuality(altB, weeklyKm, ctx), oldB = qSessions[qDays[0]];
+          if (nsB.hardKm <= hardBudget + 1e-9 && nsB.km <= oldB.km + 1) qSessions[qDays[0]] = nsB;
+        }
+      }
       var qSum = function () { return Object.keys(qSessions).reduce(function (s, k) { return s + qSessions[k].km; }, 0); };
       while (longKm + b2bKm + qSum() > weeklyKm + 1e-9 && qDays.length) delete qSessions[qDays.pop()];
 
@@ -2607,6 +2662,13 @@
       // حجمی که با این تعداد روز جا نمی‌شه از هفته کم می‌شه (capped)، نه اینکه یک جلسه بیش از حد بلند بشه.
       // (Daniels: لانگ‌ران حداکثر ۲۵ تا ۳۰٪ حجم هفته؛ جهش ناگهانی طول یک جلسه خطر آسیب رو بالا می‌بره)
       longKm = Math.min(longKm, longCap);
+      // لانگ‌ران حداکثر ۱۰٪ یا ۲ کیلومتر (هر کدوم بیشتر) بالای بلندترین دویدن ۴ هفته‌ی اخیر؛ اضافه به دویدن‌های آسون می‌ره
+      // و اگه جا نشه از هفته کم می‌شه (ممیزی موتور، F3: با عوض شدن منو، پایان ران‌های پشت‌سرهم یا پایان ریکاوری بعد از مسابقه ۲۰ تا ۴۰٪ می‌پرید)
+      if (logLim && logLim.lg && !raceWeek && longKm > floor05(logLim.lg) + 0.25) {
+        var lgCap = Math.max(3, floor05(logLim.lg));
+        remaining += longKm - lgCap; longKm = lgCap;
+        if (!easyDays.length && remaining > 0) { cappedKm = round05(cappedKm + remaining); remaining = 0; }
+      }
       // سهم لانگ‌ران از هفته: در آماده‌سازی نیمه‌ماراتن، ماراتن و اولترا استاندارد خود مسابقه (سقف لانگ‌ران مسافت، RACE_LONG_CAP)؛
       // بقیه (بدون مسابقه، ۵ و ۱۰ کیلومتر، و بعد از مسابقه) قاعده‌ی دنیلز: حداکثر longShare (۲۵ تا ۳۰٪، با ۳ جلسه ۳۵٪).
       // با روزهای کم، لانگ‌ران فقط تا جایی بالاتر از این سهم می‌ره که هنوز ۱۵٪ از بلندترین جلسه‌ی دیگه بلندتر باشه (LONG_OVER_EASY)؛
@@ -2669,6 +2731,19 @@
         cappedKm = round05(cappedKm + remaining - sesCap * easyDays.length);
         remaining = sesCap * easyDays.length;
       }
+      // ۸۰/۲۰ دوباره با حجم نهایی (بعد از کم شدن دویدن‌های آسون و لانگ‌ران): اول بخش تند لانگ‌ران، بعد آخرین جلسه‌ی کیفی آسون می‌شه (ممیزی موتور، F8)
+      for (var g8 = 0; g8 < 4; g8++) {
+        var act8 = longKm + b2bKm + qKm + remaining, hq8 = Object.keys(qSessions).reduce(function (x, k) { return x + qSessions[k].hardKm; }, 0);
+        var seg8 = longSegKm ? Math.min(floor05(longSegKm), floor05(longKm * 0.4)) : 0;
+        if (hq8 + seg8 <= act8 * 0.2 + 1e-9) break;
+        if (seg8 > 0) { longSegKm = 0; continue; }
+        if (!qDays.length) break;
+        var qd8 = qDays.pop(); remaining += qSessions[qd8].km; delete qSessions[qd8]; easyDays.push(qd8); qKm = qSum();
+      }
+      if (easyDays.length && remaining > sesCap * easyDays.length + 0.25) {
+        cappedKm = round05(cappedKm + remaining - sesCap * easyDays.length);
+        remaining = sesCap * easyDays.length;
+      }
       easyAlloc = {};
       if (easyDays.length) {
         var units = Math.max(0, Math.round(remaining * 2));
@@ -2690,7 +2765,10 @@
       sessionDays.forEach(function (d) {
         if (qSessions[d]) template[d] = { session: qSessions[d] };
         else if (b2bDay !== null && d === b2bDay) template[d] = { session: makeLong(longKm, ctx, 0, 'ultra', { vert: longVert, b2b: 'day1' }) };
-        else if (d === longDay && nSessions >= 2) {
+        else if (d === longDay && nSessions >= 2 && weeklyKm < 10 && b2bDay === null) {
+          // هفته‌ی زیر ۱۰ کیلومتر: «لانگ‌ران» ۲ کیلومتری معنی نداره؛ همون دویدن آسون (ممیزی موتور، F12)
+          template[d] = { session: makeEasy(longKm, zones) };
+        } else if (d === longDay && nSessions >= 2) {
           template[d] = { session: b2bDay !== null
             ? makeLong(b2bKm, ctx, 0, 'ultra', { vert: b2bVert, b2b: 'day2' })
             : makeLong(longKm, ctx, longSegKm, workouts.long.kind, { vert: longVert }) };
@@ -2787,6 +2865,12 @@
         days[i] = ns;
       });
     }
+    // دویدن آسون هیچ‌وقت بلندتر از لانگ‌ران همون هفته نیست (مثلاً اولین روز تیپر مسابقه‌ی بلند که فقط لانگ‌ران جمعه رو کوتاه می‌کرد؛ ممیزی موتور، F9)
+    var longMaxW = days.reduce(function (x, s) { return s.type === 'long' ? Math.max(x, s.km || 0) : x; }, 0);
+    if (longMaxW > 0) days.forEach(function (s) {
+      if (s.type !== 'easy' || s.light || s.double || !(s.km > longMaxW)) return;
+      s.km = longMaxW; s.target = T('s.km', { n: longMaxW }); s.steps[0] = T('s.easy', { km: longMaxW });
+    });
     var totalKm = days.reduce(function (x, s) { return x + (s.km || 0); }, 0);
     var hardKm = days.reduce(function (x, s) { return x + (s.type === 'race' ? 0 : (s.hardKm || 0)); }, 0);
     var totalMin = days.reduce(function (x, s) { return x + (s.minutes || 0); }, 0);
@@ -4398,7 +4482,7 @@
     planSuggestion: planSuggestion, goalPath: goalPath,
     isWalk: isWalk, walkGoalInfo: walkGoalInfo, walkPath: walkPath, walkLevelSuggestion: walkLevelSuggestion, walkDoneShare: walkDoneShare, walkWeeksTo: walkWeeksTo, WALK_GOALS: WALK_GOALS, WALK_GOALS_ONB: WALK_GOALS_ONB, WALK_EVENT_KM: WALK_EVENT_KM, daySteps: daySteps, assessWalkLevel: assessWalkLevel, buildWalkWeek: buildWalkWeek, walkWeeklyMin: walkWeeklyMin, WALK_LEVELS: WALK_LEVELS, WALK_TYPES: WALK_TYPES, vdotStepSuggestion: vdotStepSuggestion, goalTarget: goalTarget, weeksToVolume: weeksToVolume, ageFactor: ageFactor,
     effectiveSession: effectiveSession, prevCheckin: prevCheckin, dressAlt: dressAlt, cycleMoveTarget: cycleMoveTarget,
-    returnInfo: returnInfo, GAP_STEPS: GAP_STEPS, gapDaysOf: gapDaysOf, gapText: gapText, detrainFactor: detrainFactor, experienceFromMonths: experienceFromMonths, HISTORY_STEPS: HISTORY_STEPS, MONTHS_FROM_EXP: MONTHS_FROM_EXP, GAP_KEYS: GAP_KEYS, XTRAIN_KEYS: XTRAIN_KEYS,
+    returnInfo: returnInfo, GAP_STEPS: GAP_STEPS, gapDaysOf: gapDaysOf, gapText: gapText, detrainFactor: detrainFactor, experienceFromMonths: experienceFromMonths, effectiveExperience: effectiveExperience, HISTORY_STEPS: HISTORY_STEPS, MONTHS_FROM_EXP: MONTHS_FROM_EXP, GAP_KEYS: GAP_KEYS, XTRAIN_KEYS: XTRAIN_KEYS,
     PACE_LEVEL: PACE_LEVEL, PLAN_NEEDS: PLAN_NEEDS, vdotStepWeeks: vdotStepWeeks,
     analytics: analytics, sessionLoad: sessionLoad, sessionSnapshot: sessionSnapshot, CTL_DAYS: CTL_DAYS, ATL_DAYS: ATL_DAYS,
     healthFits: healthFits, healthMatches: healthMatches, healthActual: healthActual, HEALTH_MIN_SEC: HEALTH_MIN_SEC

@@ -1952,7 +1952,11 @@ test('تاریخچه‌ی هفتگی برنامه: ثبت، نگه‌داشتن 
   var q2 = Object.assign({}, q, { planLog: {} });
   for (i = 1; i <= 3; i++) q2.planLog[C.dateKey(C.addDays(ws2, -7 * i))] = { km: 20, vert: 0, sv: 0, ph: 'return' };
   q2.planLog[C.dateKey(C.addDays(ws2, -7 * 6))] = { km: free2, vert: 0, sv: 0, ph: 'build' };
-  assert.strictEqual(C.buildWeek(q2, ws2).totalKm, free2, 'هفته‌ی عادی: برگشت به حجم عادی قبل');
+  // ممیزی موتور (F1): بعد از هفته‌های «برگشت» (خودشون تدریجی‌ان) حد ۱۰٪ برقراره، نه پرش به حجم عادی قبل
+  assert.ok(C.buildWeek(q2, ws2).totalKm <= 22.5, 'بعد از برگشت: ' + C.buildWeek(q2, ws2).totalKm);
+  // بلافاصله بعد از هفته‌ی ریکاوری/سبک/مسابقه، برگشت به حجم عادی ۱۲ هفته‌ی اخیر آزاده
+  q2.planLog[C.dateKey(C.addDays(ws2, -7))] = { km: 20, vert: 0, sv: 0, ph: 'recovery' };
+  assert.strictEqual(C.buildWeek(q2, ws2).totalKm, free2, 'بعد از ریکاوری: برگشت به حجم عادی قبل');
   // هفته‌ی قبلی ثبت نشده (کاربر یک هفته اپ رو باز نکرده): حد از آخرین هفته‌ی ثبت‌شده، ۱۰٪ برای هر هفته‌ی بینش (۲۰ × ۱٫۲۱)
   delete q.planLog[C.dateKey(C.addDays(ws, -7 * 6))]; delete q.planLog[C.dateKey(C.addDays(ws, -7))];
   var lim2 = C.buildWeek(q, ws).totalKm;
@@ -2023,7 +2027,8 @@ test('«ادامه از حجم فعلی» حجم رو کم می‌کنه ولی 
   assert.strictEqual(r.to, before);
   assert.strictEqual(C.assessLevel(p).level, before);
   assert.ok(C.buildWeek(p, C.addDays(now, 7)).days.every(function (d) { return d.type !== 'runwalk'; }), 'دویدن پیوسته، نه دو-پیاده');
-  // رکورد تازه سطح رو از نو تعیین می‌کنه
+  // رکورد تازه سطح رو از نو تعیین می‌کنه (دونده با سابقه‌ی کافی؛ سقف سابقه در تست جدا)
+  p.experience = '1to3y'; p.runMonths = 24;
   p.fitnessTests = [{ date: '2026-11-21', distanceKm: 5, timeSec: Math.round(C.raceTimeFromVdot(50, 5)), kind: 'test' }];
   C.autoLevelUp(p, C.parseDate('2026-11-21'));
   assert.strictEqual(p.levelHold, null);
@@ -2447,14 +2452,17 @@ test('یادآوری ماهانه‌ی پشتیبان: ۳۰ روز، حداقل 
   assert.strictEqual(C.backupDue({ profile: { startDate: '2026-12-10' }, checkins: data.checkins, done: data.done }, C.parseDate('2026-12-01')), null, 'برنامه هنوز شروع نشده');
 });
 
-test('آمادگی مسابقه‌ی فرعی: حجم کم برای بیشتر از ۳۰ کیلومتر «زوده»، برای مسافت‌های کوتاه‌تر هشدار نیست؛ کارت خانه و «متوجه شدم»', function () {
+test('آمادگی مسابقه: حجم کم برای نیمه‌ماراتن و بیشتر «زوده»، برای مسافت‌های کوتاه‌تر هشدار نیست؛ کارت خانه و «متوجه شدم»', function () {
   var p = profileFor(2, { days: [0, 2, 4] }), today = C.addDays(C.parseDate(p.startDate), 21);
   var mar = C.dateKey(C.addDays(today, 30)), fiveK = C.dateKey(C.addDays(today, 20));
   var rd = C.raceReadiness(p, 42.195, mar, today);
   assert.ok(rd && rd.key === '42' && rd.needKm === C.PLAN_NEEDS['42'].km && rd.peakKm < rd.needKm, JSON.stringify(rd));
   assert.strictEqual(C.raceReadiness(p, 5, fiveK, today), null, '۵ کیلومتر با حجم سطح ۲ آماده‌ست');
-  assert.strictEqual(C.raceReadiness(p, 21.0975, C.dateKey(C.addDays(today, 30)), today), null, 'نیمه‌ماراتن: هشدار نیست');
-  assert.strictEqual(C.raceReadiness(p, 30, C.dateKey(C.addDays(today, 30)), today), null, '۳۰ کیلومتر خودش: هشدار نیست');
+  // ممیزی موتور (F5): نیمه‌ماراتن هم با حداقل‌های خودش (۴۰ کیلومتر در هفته، لانگ‌ران ۱۸)
+  var hm = C.raceReadiness(p, 21.0975, C.dateKey(C.addDays(today, 30)), today);
+  assert.ok(hm && hm.key === '21' && hm.needLong === C.PLAN_NEEDS['21'].long, 'نیمه‌ماراتن: هشدار ' + JSON.stringify(hm));
+  assert.ok(C.raceReadiness(p, 30, C.dateKey(C.addDays(today, 30)), today).key === '21', '۳۰ کیلومتر: حداقل‌های نیمه‌ماراتن');
+  assert.strictEqual(C.raceReadiness(p, 10, C.dateKey(C.addDays(today, 30)), today), null, '۱۰ کیلومتر: هشدار نیست');
   assert.ok(C.raceReadiness(p, 32, C.dateKey(C.addDays(today, 30)), today), 'بیشتر از ۳۰ کیلومتر: هشدار');
   assert.ok(C.raceReadiness(p, 50, C.dateKey(C.addDays(today, 30)), today), 'اولترا: هشدار');
   var q = profileFor(8), mq = C.addDays(C.parseDate(q.startDate), 21);
@@ -2519,13 +2527,20 @@ test('روزهای کمتر از حداقل سطح: سهم لانگ‌ران ا�
   });
 });
 
-test('«زوده» برای هدف اصلی بیشتر از ۳۰ کیلومتر هم', function () {
+test('«زوده» برای هدف اصلی هم، از همون موقع انتخاب هدف', function () {
   var p = profileFor(2, { days: [0, 2, 4] }), today = C.addDays(C.parseDate(p.startDate), 21);
   p.goal = { type: '42', date: C.dateKey(C.addDays(today, 30)) };
   var er = C.earlyRace(p, today);
   assert.ok(er && er.main && er.daysTo === 30, JSON.stringify(er));
   p.goal = { type: '21', date: C.dateKey(C.addDays(today, 30)) };
-  assert.strictEqual(C.earlyRace(p, today), null, 'نیمه‌ماراتن اصلی: هشدار نیست');
+  assert.ok(C.earlyRace(p, today) && C.earlyRace(p, today).key === '21', 'نیمه‌ماراتن اصلی: هشدار');
+  // ممیزی موتور (F5): هدف اصلی دور (۲۰ هفته) هم هشدار داره، نه فقط ۳۵ روز آخر؛ مسابقه‌ی فرعی دور نه
+  p.goal = { type: '42', date: C.dateKey(C.addDays(today, 140)) };
+  var far = C.earlyRace(p, today);
+  assert.ok(far && far.main && far.daysTo === 140, JSON.stringify(far));
+  p.goal = { type: '5', date: C.dateKey(C.addDays(today, 140)) };
+  p.races = [{ id: 's', km: 42.195, date: C.dateKey(C.addDays(today, 100)), kind: 'race' }];
+  assert.strictEqual(C.earlyRace(p, today), null, 'فرعی دور: هنوز نه');
 });
 
 test('هفته‌ی مسابقه‌ی فرعی کوتاه: کل هفته با مسابقه از حجم برنامه بیشتر نمی‌شه', function () {
@@ -2581,6 +2596,108 @@ test('پیاده‌روی با تاریخچه: دقیقه‌ها با شروع �
   }
   var ref = C.buildWeek(free, C.addDays(d0, 15 * 7)).totalMin;
   assert.ok(last >= ref * 0.9, 'بعد از ۱۵ هفته ' + last + ' از ' + ref);
+});
+
+// ---------- ممیزی موتور (v167): هر هفته مثل اپ ساخته و در تاریخچه ثبت می‌شه ----------
+function live(p, weeks, cb) {
+  var d0 = C.parseDate(p.startDate), out = [];
+  for (var w = 0; w < weeks; w++) { var d = C.addDays(d0, w * 7 + 3), wk = C.buildWeek(p, d); C.logWeek(p, d); out.push(wk); if (cb) cb(wk, w); }
+  return out;
+}
+function trainKm(wk) { return wk.days.reduce(function (x, d) { return x + (d.type === 'race' ? 0 : (d.km || 0)); }, 0); }
+function longOf(wk) { return wk.days.reduce(function (x, d) { return d.type === 'long' ? Math.max(x, d.km) : x; }, 0); }
+test('ممیزی F1: با روزهای کمتر از حداقل سطح، حجم هفته بیشتر از ۱۰٪ بالای سه هفته‌ی قبل نمی‌پره', function () {
+  [[7, [2, 0, 4, 6]], [8, [0, 2, 4]], [9, [1, 3, 5, 6]], [10, [0, 2, 4, 6]]].forEach(function (c) {
+    var p = profileFor(c[0], { days: c[1], startDate: '2026-12-05' }), wks = live(p, 26), hist = [];
+    wks.forEach(function (wk, w) {
+      var t = trainKm(wk), ph = wk.phase.key;
+      if (hist.length && ['deload', 'first'].indexOf(ph) < 0 && ['deload'].indexOf(wks[w - 1].phase.key) < 0) {
+        var m3 = Math.max.apply(null, hist.slice(-3));
+        assert.ok(t <= m3 * 1.1 + 0.6, 'سطح ' + c[0] + ' هفته‌ی ' + w + ': ' + t + ' از ' + m3);
+      }
+      hist.push(t);
+    });
+  });
+});
+test('ممیزی F2: کیلومتر خود مسابقه در تاریخچه‌ی حجم حساب نمی‌شه', function () {
+  var p = profileFor(4, { days: [0, 2, 4, 6], startDate: '2026-12-05', goal: { type: '21', date: '2027-01-29' } });
+  var wks = live(p, 12), raceWk = wks.filter(function (w) { return w.days.some(function (d) { return d.type === 'race'; }); })[0];
+  var e = p.planLog[raceWk.start];
+  assert.ok(Math.abs(e.km - trainKm(raceWk)) < 0.6, e.km + ' vs ' + trainKm(raceWk));
+  // هیچ هفته‌ی بعد از مسابقه از بیشترین هفته‌ی تمرینی قبل از مسابقه بزرگ‌تر نیست
+  var ri = wks.indexOf(raceWk), pre = Math.max.apply(null, wks.slice(0, ri).map(trainKm));
+  wks.slice(ri + 1).forEach(function (w, k) { assert.ok(trainKm(w) <= pre * 1.1 + 0.6, 'هفته‌ی ' + (k + 1) + ' بعد: ' + trainKm(w) + ' از ' + pre); });
+});
+test('ممیزی F3: لانگ‌ران هر هفته حداکثر ۱۰٪ یا ۲ کیلومتر بالای بلندترین دویدن ۴ هفته‌ی قبل', function () {
+  var cases = [profileFor(3, { days: [0, 1, 2, 3, 4, 5], startDate: '2026-12-05', goal: { type: '42', date: '2027-06-11' } }),
+    profileFor(7, { startDate: '2026-12-05', goal: goalOf('ultra', null, { km: 50, gain: 3500 }) }),
+    profileFor(4, { days: [0, 2, 4, 6], startDate: '2026-12-05', goal: goalOf('ultra', '2027-03-05', { km: 100, gain: 2500 }) })];
+  cases.forEach(function (p, ci) {
+    var longs = [];
+    live(p, 30, function (wk, w) {
+      var lg = Math.max(longOf(wk), 0), prev = longs.slice(-4).filter(function (x) { return x > 0; });
+      if (lg && prev.length && !wk.days.some(function (d) { return d.type === 'race'; })) {
+        var m = Math.max.apply(null, prev);
+        assert.ok(lg <= Math.max(m * 1.1, m + 2) + 0.5, 'نمونه‌ی ' + ci + ' هفته‌ی ' + w + ': ' + m + ' → ' + lg);
+      }
+      longs.push(wk.days.reduce(function (x, d) { return d.type === 'race' || d.type === 'cross' ? x : Math.max(x, d.km || 0); }, 0));
+    });
+  });
+});
+test('ممیزی F4: رکورد سریع سطح رو از سقف سابقه بالاتر نمی‌بره؛ پیس‌ها از خود رکورد', function () {
+  var pb = { distanceKm: 10, timeSec: hms(0, 36) };
+  var p = profileFor(2, { experience: '3to12m', runMonths: 6, pb: pb, startDate: '2026-12-05', createdAt: new Date().toISOString() });
+  var a = C.assessLevel(p);
+  assert.strictEqual(a.level, 2, 'سطح ' + a.level);
+  assert.ok(Math.abs(C.paceSet(p, a.level).vdot - C.vdotFromRace(10, hms(0, 36))) < 0.1, 'پیس از رکورد');
+  assert.strictEqual(C.fitnessLevelSuggestion(p), null, 'پیشنهاد بالا رفتن تکراری نیست');
+  // با سابقه‌ی کافی همون رکورد سطح بالاتر می‌ده
+  assert.ok(C.assessLevel(Object.assign({}, p, { experience: 'gt3y', runMonths: 60 })).level > 4);
+  // بدون تجربه‌ی ساختاریافته: ۸ هفته‌ی اول گروه B
+  var q = profileFor(6, { structured: false, pb: { distanceKm: 10, timeSec: hms(0, 40) }, startDate: '2026-12-05' });
+  for (var w = 0; w < 10; w++) { var wk = weekAt(q, w); if (w < 8) assert.strictEqual(wk.tier, 'B', 'هفته‌ی ' + w); }
+});
+test('ممیزی F6: ران‌های پشت‌سرهم اولترا روز تمرین رو از انتخاب کاربر بیشتر نمی‌کنه', function () {
+  var p = profileFor(7, { runDays: 4, days: [0, 1, 2, 3, 4, 5], startDate: '2026-12-05', currentWeeklyKm: 85, goal: goalOf('ultra', '2027-08-06', { km: 80, gain: 3000 }) });
+  var any = false;
+  live(p, 26, function (wk, w) {
+    if (wk.b2b) any = true;
+    var n = wk.days.filter(function (d) { return ['rest', 'none'].indexOf(d.type) < 0 && !d.extra; }).length;
+    assert.ok(n <= 4, 'هفته‌ی ' + w + ': ' + n + ' جلسه');
+  });
+  assert.ok(any, 'B2B دیده شد');
+});
+test('ممیزی F8 و F10: بخش سخت حداکثر ۲۰٪ (جز هفته‌ی مسابقه و تیپر) و جلسه‌ی کیفی تکراری در هفته نیست', function () {
+  [profileFor(9, { days: [0, 1, 2, 3, 4, 6], startDate: '2026-12-05', goal: { type: '21', date: '2027-03-12' } }),
+    profileFor(6, { startDate: '2026-12-05', goal: goalOf('ultra', '2027-04-02', { km: 50, gain: 3500 }) }),
+    profileFor(8, { days: [0, 2, 3, 5, 6], startDate: '2026-12-05', goal: { type: '42', date: '2027-05-07' } })].forEach(function (p, ci) {
+    live(p, 22, function (wk, w) {
+      var t = trainKm(wk), h = wk.days.reduce(function (x, d) { return x + (d.type === 'race' ? 0 : (d.hardKm || 0)); }, 0);
+      if (['race', 'taper'].indexOf(wk.phase.key) < 0) assert.ok(h <= t * 0.2 + 0.6, 'نمونه‌ی ' + ci + ' هفته‌ی ' + w + ': ' + h + ' از ' + t);
+      var sp = wk.days.filter(function (d) { return d.spec; }).map(function (d) { return d.spec.type + '/' + (d.spec.rep || d.spec.form || ''); });
+      assert.strictEqual(new Set(sp).size, sp.length, 'نمونه‌ی ' + ci + ' هفته‌ی ' + w + ': ' + sp);
+    });
+  });
+});
+test('ممیزی F9: دویدن آسون هیچ‌وقت از لانگ‌ران همون هفته بلندتر نیست (شروع تیپر)', function () {
+  var p = profileFor(5, { days: [0, 2, 6, 5], startDate: '2026-12-05', goal: { type: '21', date: '2027-02-05' } });
+  live(p, 12, function (wk, w) {
+    var lg = longOf(wk);
+    if (lg) wk.days.forEach(function (d) { if (d.type === 'easy' && !d.light) assert.ok(d.km <= lg, 'هفته‌ی ' + w + ': آسون ' + d.km + ' > لانگ ' + lg); });
+  });
+});
+test('ممیزی F11: گروه B با یک جلسه‌ی کیفی، هر هفته همون تمپوی ملایم نیست', function () {
+  var p = profileFor(3, { currentWeeklyKm: 26, days: [0, 2, 4, 6], startDate: '2026-12-05' }), kinds = {};
+  live(p, 20, function (wk) { wk.days.forEach(function (d) { if (d.spec) kinds[d.spec.type] = 1; }); });
+  assert.ok(Object.keys(kinds).length >= 2, JSON.stringify(kinds));
+});
+test('ممیزی F12: هفته‌ی زیر ۱۰ کیلومتر «لانگ‌ران» نداره و حجم هفته‌به‌هفته پایین نمی‌ره', function () {
+  var p = profileFor(3, { currentWeeklyKm: 8, lastWeekKm: 8, monthAvgKm: 8, days: [0, 2, 4], startDate: '2026-12-05' });
+  var wks = live(p, 8), first = trainKm(wks[0]);
+  wks.forEach(function (wk, w) {
+    if (trainKm(wk) < 10) assert.strictEqual(longOf(wk), 0, 'هفته‌ی ' + w);
+    if (wk.phase.key !== 'deload') assert.ok(trainKm(wk) >= Math.min(first, 8) - 0.6, 'هفته‌ی ' + w + ': ' + trainKm(wk));
+  });
 });
 
 console.log(passed + ' تست موفق' + (process.exitCode ? ' — برخی ناموفق' : ''));

@@ -92,7 +92,7 @@
       structuredCap: 'You haven\'t done structured training (intervals/tempo) yet, so your level was capped from {from} to {to}.',
       expCap: 'Based on your running history ({exp}), your level was capped from {from} to {to}.',
       cautious: 'We\'ll increase your volume cautiously, because your current mileage doesn\'t match your speed yet.',
-      pbLower: 'Your level comes from your best time, which reflects your real fitness better. Your current mileage is kept, but the intensity matches your speed.',
+      pbLower: 'Your level comes from your best time, which reflects your real fitness better, and the intensity matches your speed. Your weekly mileage is kept as far as it fits within this level\'s session lengths; if you run more now, the plan lowers it and shows the amount in your weekly plan.',
       dropTemp: 'Your last week ({last:d} {u}) was much lower than your monthly average ({avg:d} {u}) because of {reason}. Since this drop is temporary and your fitness is intact, your level is based on the monthly average. The plan starts at {start:d} {u} and returns to {avg:d} {u} within a few weeks (10% rule).',
       dropHealth: 'Your last week ({last:d} {u}) was much lower than your monthly average ({avg:d} {u}) because of {reason}. Your level is set cautiously from the weighted average ({w:d} {u}). The plan starts at {start:d} {u} and builds back gradually (at most 10% a week) to {avg:d} {u}.',
       dropReal: 'Your last week ({last:d} {u}) was much lower than your monthly average ({avg:d} {u}) for no particular reason, so your volume has genuinely dropped. Your level is based on the weighted average ({w:d} {u}) and the plan starts at {start:d} {u}.',
