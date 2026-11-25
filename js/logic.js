@@ -1463,6 +1463,18 @@
     var cur = weekStart(parseDate(dateKey(new Date())));
     return ws > cur ? g : 1;
   }
+  // حجم «عادی» اخیر از تاریخچه: بیشترین ۳ هفته‌ی تمرینی آخر (بدون هفته‌ی سبک، تیپر، مسابقه، ریکاوری، برگشت و شروع ناقص) قبل از هفته‌ی ws
+  var NOT_NORMAL = ['deload', 'taper', 'race', 'recovery', 'return', 'intro', 'injury', 'injuryReturn'];
+  function recentNormalKm(log, ws) {
+    if (!log) return 0;
+    var got = [], m = 0;
+    for (var i = 1; i <= PLAN_LOG_GAP_WEEKS && got.length < 3; i++) {
+      var e = log[dateKey(addDays(ws, -7 * i))];
+      if (!e || NOT_NORMAL.indexOf(e.ph) >= 0 || e.sr) continue;
+      got.push(e); m = Math.max(m, e.km || 0);
+    }
+    return m;
+  }
   function planLogLimit(profile, ws) {
     var log = profile.planLog;
     if (!log) return null;
@@ -1488,7 +1500,8 @@
     // (بعد از تغییر خودکار سطح، حجم فعلی پروفایل رو خود اپ نوشته، نه کاربر؛ اون موقع فقط همون هفته‌ی شروع مبناست)
     if (!anyFull && !profile.levelChange) baseR = Math.max(baseR, Number(profile.currentWeeklyKm) || 0);
     var steps = logGapSteps(ws, miss + 1);
-    // برگشت به بیشترین هفته‌ی ۱۲ هفته‌ی اخیر فقط بعد از تیپر، مسابقه، ریکاوری یا هفته‌ی مسابقه‌ی جانبی؛
+    // برگشت به حجم عادیِ اخیر (بیشترین ۳ هفته‌ی تمرینی آخر، recentNormalKm) فقط بعد از تیپر، مسابقه، ریکاوری یا هفته‌ی مسابقه‌ی جانبی؛
+    // نه بیشترین ۱۲ هفته، که می‌تونه هفته‌ی قدیمی یا غیرمعمول باشه (ممیزی v170: ۱۳ → ۶۴٫۵ کیلومتر بعد از ریکاوری)؛
     // وگرنه حجم هر هفته حداکثر ۱۰٪ بالای بیشترین ۳ هفته‌ی قبل (قبلاً با روزهای کم حجم هفته تا ۵۰٪ بالا و پایین می‌پرید؛ ممیزی موتور، F1)
     // برگشت بعد از آسیب و بعد از مسابقه (return) خودش تدریجیه و اینجا استثنا نیست؛ وگرنه آخرین پله تا ۳۰٪ می‌پرید
     // بعد از هفته‌ی سبکِ عادی (deload) نه: سه هفته‌ی اخیر خودش دو هفته‌ی قبل از اون رو داره و برگشت به همون سطح کافیه؛
@@ -1497,7 +1510,7 @@
     // فقط هفته‌ی بلافاصله بعد از هفته‌ی سبک (نه هر سه هفته‌ای که یکی‌شون سبک بوده؛ با هفته‌ی سبکِ هر ۴ هفته این حد عملاً برداشته می‌شد)
     var afterLight = !!(e3[0] && (LIGHT.indexOf(e3[0].ph) >= 0 || e3[0].sr));
     var km = baseR * Math.pow(1.1, steps);
-    if (afterLight) km = Math.max(km, mx(e12, 'km'));
+    if (afterLight) km = Math.max(km, recentNormalKm(log, ws) || mx(e12, 'km'));
     return { km: km, v3: mx(e3, 'vert'), v12: mx(e12, 'vert'), s4: s4, s12: mx(e12, 'sv'), gap: g - 1,
       // حد لانگ‌ران: ۱۰٪ یا ۲ کیلومتر (هر کدوم بیشتر) بالای بلندترین دویدن ۴ هفته‌ی اخیر، برای هر هفته‌ی ثبت‌نشده یک پله (F3)
       lg: lg4 > 0 ? Math.max(lg4 * Math.pow(1.1, steps), lg4 + 2 * steps) : null };
@@ -2496,7 +2509,9 @@
       var postRace = inPostRaceRamp(profile, ws);
       if (postRace) pr = { deload: false, steps: pr.steps };
       vol = weeklyVolume(profile, W, postRace, a);
-      weeklyKm = rfWeek < 1 ? floor05(vol.km * rfWeek) : vol.km;
+      // رمپ برگشت بعد از مسابقه از حجم واقعیِ قبل از مسابقه (تاریخچه)، نه از حجم نظری برنامه که ممکنه هیچ‌وقت اجرا نشده باشه
+      var preRace = rfWeek < 1 ? recentNormalKm(profile.planLog, weekStart(race.date)) : 0;
+      weeklyKm = rfWeek < 1 ? floor05((preRace ? Math.min(vol.km, preRace) : vol.km) * rfWeek) : vol.km;
       period = 'DE'.indexOf(tier) >= 0 ? periodFor(W, ws, race) : null;
       workouts = weekWorkouts(tier, level, W, pr.deload, goal, period);
       // اولین هفته‌ی برگشت بعد از مسابقه: فقط دویدن آسون

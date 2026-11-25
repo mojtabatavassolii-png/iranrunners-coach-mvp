@@ -1948,6 +1948,28 @@ test('شبیه‌ساز ۹: ارتفاع اولترا؛ استراید سربا�
   var nd = v.filter(function (x, j) { return j >= 4 && x.phase.key !== 'deload'; }).map(function (x) { return x.vert; });
   assert.ok(nd[nd.length - 1] > nd[0], 'برنامه بزرگ‌تر می‌شه، نه کوچیک‌تر: ' + nd.join(' '));
 });
+test('برگشت بعد از مسابقه از حجم واقعیِ قبل از مسابقه، نه از بیشترین ۱۲ هفته یا حجم نظری (ممیزی، v170)', function () {
+  // دونده‌ی پرحجم روی کاغذ (۱۱۰ کیلومتر) که در عمل هفته‌ای ۴۰ کیلومتر دویده؛ یک هفته‌ی قدیمی ۷۰ کیلومتری هم در ۱۲ هفته‌ی اخیر هست
+  var p = profileFor(6, { currentWeeklyKm: 110, goal: goalOf('10', '2027-01-08') });
+  var R = C.weekStart(C.parseDate('2027-01-08')), k = function (n) { return C.dateKey(C.addDays(R, 7 * n)); };
+  p.planLog = {};
+  p.planLog[k(-9)] = { km: 70, vert: 0, sv: 0, ph: 'build' };
+  for (var i = -8; i <= -1; i++) p.planLog[k(i)] = { km: 40, vert: 0, sv: 0, ph: i % 4 === 0 ? 'deload' : 'build' };
+  p.planLog[k(0)] = { km: 30, vert: 0, sv: 0, ph: 'race' };
+  p.planLog[k(1)] = { km: 12, vert: 0, sv: 0, ph: 'recovery' };
+  var w1 = C.buildWeek(p, C.addDays(R, 14));
+  assert.strictEqual(w1.phase.key, 'return');
+  assert.ok(w1.totalKm <= 40 * 0.7 + 0.5, 'هفته‌ی اول برگشت: ' + w1.totalKm);
+  // هفته‌های بعدی پله‌پله بالا می‌رن و از حجم قبل از مسابقه جلو نمی‌زنن
+  var prev = w1.totalKm;
+  p.planLog[k(2)] = { km: w1.totalKm, vert: 0, sv: 0, ph: 'return' };
+  for (var w = 3; w <= 4; w++) {
+    var wk = C.buildWeek(p, C.addDays(R, 7 * w));
+    assert.ok(wk.totalKm >= prev - 0.5 && wk.totalKm <= 40 + 0.5, 'w' + w + ': ' + wk.totalKm + ' بعد از ' + prev);
+    p.planLog[k(w)] = { km: wk.totalKm, vert: 0, sv: 0, ph: wk.phase.key };
+    prev = wk.totalKm;
+  }
+});
 test('تاریخچه‌ی هفتگی برنامه: ثبت، نگه‌داشتن ۲۶ هفته، و حد رشد بعد از تغییر هدف', function () {
   var p = profileFor(5, { startDate: '2026-09-26', goal: { type: '10', date: '2027-03-01' } });
   var now = C.parseDate('2026-11-07');
