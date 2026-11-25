@@ -1317,11 +1317,11 @@
       { q: [Q('midInt', 0.08, { rep: 1000 }), Q('tempoRun', 0.08)] },
       { q: [Q('shortHills', 0.04), Q('longInt', 0.08, { rep: 1600 })], long: { kind: 'tempo', share: 0.04 } },
       { q: [Q('shortInt', 0.08, { rep: 800 }), Q('thresholdInt', 0.08)] },
-      { q: [Q('speedFartlek', 0.07, { form: 'mona' }), Q('tempoRun', 0.08)] }
+      { q: [Q('speedFartlek', 0.07, { form: 'mona' }), Q('progressive', 0.08)] }
     ],
     // ۵ و ۱۰ کیلومتر: VO2max و سرعت
     speed: [
-      { q: [Q('shortInt', 0.08, { rep: 400 }), Q('tempoRun', 0.07)] },
+      { q: [Q('shortInt', 0.08, { rep: 400 }), Q('progressive', 0.07)] },
       { q: [Q('midInt', 0.08, { rep: 1000 }), Q('speedFartlek', 0.07, { form: 'mona' })] },
       { q: [Q('shortInt', 0.08, { rep: 800 }), Q('shortHills', 0.04)], long: { kind: 'tempo', share: 0.04 } },
       { q: [Q('midInt', 0.08, { rep: 1600 }), Q('speedFartlek', 0.07, { form: 'pyramid' })] },
@@ -1330,13 +1330,13 @@
     // نیمه‌ماراتن: آستانه + VO2max
     half: [
       { q: [Q('thresholdInt', 0.08), Q('longInt', 0.08, { rep: 1600 })] },
-      { q: [Q('longInt', 0.08, { rep: 2000 }), Q('tempoRun', 0.09, { max: 40 })] },
+      { q: [Q('longInt', 0.08, { rep: 2000 }), Q('progressive', 0.09)] },
       { q: [Q('thresholdInt', 0.08), Q('speedFartlek', 0.05, { form: 'landmark' })], long: { kind: 'tempo', share: 0.05 } }
     ],
     // ماراتن: آستانه و استقامت ویژه
     marathon: [
       { q: [Q('longTempo', 0.1), Q('shortHills', 0.03)] },
-      { q: [Q('mpInt', 0.09), Q('tempoRun', 0.06)] },
+      { q: [Q('mpInt', 0.09), Q('progressive', 0.06)] },
       { q: [Q('longFartlek', 0.08)], long: { kind: 'mp', share: 0.09 } }
     ],
     // اولترا/تریل بر اساس شاخص فنی بودن مسیر
@@ -1550,7 +1550,7 @@
     if (tier === 'C') return pack(rot[w % rot.length], Math.min(1, 0.5 + w * 0.05));
     // D و E
     if (period === 'base') {
-      var bq = ultra ? [Q('longHills', 0.05), Q('steady', 0.07)] : [Q('reps', 0.05, { rep: w % 2 ? 400 : 200 }), Q('tempoRun', 0.08)];
+      var bq = ultra ? [Q('longHills', 0.05), Q('steady', 0.07)] : [Q('reps', 0.05, { rep: w % 2 ? 400 : 200 }), Q(w % 3 === 2 ? 'progressive' : 'tempoRun', 0.08)];
       return pack({ q: bq }, 0.5);
     }
     if (period === 'peak' && PEAK[key]) return pack(PEAK[key][w % PEAK[key].length], 1);
@@ -1619,7 +1619,7 @@
   var QUALITY_CAT = {
     shortInt: 'interval', midInt: 'interval', longInt: 'interval', shortint: 'interval', reps: 'interval', speedFartlek: 'interval',
     thresholdInt: 'tempo', tempoRun: 'tempo', longTempo: 'tempo', mpInt: 'tempo', tempoMild: 'tempo',
-    shortHills: 'hills', longHills: 'hills', hillsB: 'hills', downhill: 'hills', steady: 'light', longFartlek: 'light'
+    shortHills: 'hills', longHills: 'hills', hillsB: 'hills', downhill: 'hills', steady: 'light', longFartlek: 'light', progressive: 'light'
   };
 
   function makeRunWalk(rw, factor, extraNote) {
@@ -2011,6 +2011,16 @@
       T('s.steady.how'),
       { rpeOnly: true });
   }
+  // پراگرسیو (افزاینده): دویدن پیوسته که هر بخش تندتر از قبلیه: ۱۵ دقیقه آسون (گرم کردن)، بعد پیس ماراتن، بعد پیس آستانه، ۱۰ دقیقه آسون.
+  // بخش سخت (ماراتن + آستانه) مثل بقیه‌ی جلسه‌های کیفی سهمی از حجم هفته‌ست؛ هر بخش ۱۰ تا ۲۰ دقیقه
+  function makeProgressive(main, ctx) {
+    var seg = clamp(Math.round(main * (ctx.P.pM + ctx.P.pT) / 2 / 60 / 2), 10, 20);
+    var hard = seg * 60 / ctx.P.pM + seg * 60 / ctx.P.pT;
+    return sess('tempo', T('s.progressive.variant'), hard, hard + 25 * 60 / ctx.P.pE,
+      [T('s.progressive.easy15'), T('s.progressive.mp', { min: seg, g: repGuide(ctx, 0, band(ctx.P.pM)) }),
+        T('s.progressive.t', { min: seg, g: repGuide(ctx, 0, ctx.P.tRange) }), T('s.progressive.cool')],
+      T('s.progressive.how') + paceBasis(ctx), { progressive: true });
+  }
   // سطح ۳-۴ تریل/عمومی: تپه‌ی کوتاه کنترل‌شده
   function makeHillsB(main, ctx) {
     var reps = clamp(Math.round(main / 0.12), 6, 8), hard = reps * 0.12;
@@ -2029,6 +2039,7 @@
       case 'thresholdInt': s = makeThresholdInt(main, ctx); break;
       case 'longInt': s = makeLongInt(main, ctx, spec.rep); break;
       case 'tempoRun': s = makeTempoRun(main, ctx, spec.max); break;
+      case 'progressive': s = makeProgressive(main, ctx); break;
       case 'longTempo': s = makeLongTempo(main, ctx); break;
       case 'mpInt': s = makeMpInt(main, ctx); break;
       case 'longFartlek': s = makeLongFartlek(main, ctx, weeklyKm); break;

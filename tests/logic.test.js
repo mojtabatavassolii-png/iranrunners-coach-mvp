@@ -523,11 +523,32 @@ test('گرم کردن اختصاصی: بر اساس نوع جلسه و سطح، 
   assert(/^15 دقیقه/.test(int3.warmup.lines[0]) && !/باند/.test(int3.warmup.lines.join(' ')), int3.warmup.lines[0]);
   [int6, tempo].forEach(function (d) { d.steps.forEach(function (x) { assert(!/گرم کردن|سرد کردن|استراید/.test(x), x); }); });
 });
-test('هدف نیمه‌ماراتن: اینتروال آستانه، اینتروال بلند، تمپوی پیوسته', function () {
+test('هدف نیمه‌ماراتن: اینتروال آستانه، اینتروال بلند، پراگرسیو', function () {
   var v = variants(profileFor(6, { goal: goalOf('21') }), 9);
-  ['thresholdInt', 'longInt', 'tempoRun'].forEach(function (k) { assert(v[k], k); });
+  ['thresholdInt', 'longInt', 'progressive'].forEach(function (k) { assert(v[k], k); });
   var th = weekAt(profileFor(6, { goal: goalOf('21') }), 0).days.find(function (d) { return d.spec && d.spec.type === 'thresholdInt'; });
   assert(/^[34] × (8|9|10) دقیقه/.test(th.steps[0]), th.steps[0]);
+});
+test('پراگرسیو (افزاینده): از سطح ۵ گاهی، نه زیر سطح ۵ و نه اولترا؛ آسون ← پیس ماراتن ← آستانه ← آسون', function () {
+  ['none', '5', '21', '42'].forEach(function (g) {
+    [5, 6, 7, 9].forEach(function (n) {
+      var v = variants(profileFor(n, { goal: goalOf(g) }), 16);
+      assert(v.progressive, g + ' L' + n + ' بدون پراگرسیو');
+      assert(v.progressive <= 6, g + ' L' + n + ' بیش از حد: ' + v.progressive);
+    });
+  });
+  [2, 3, 4].forEach(function (n) { assert(!variants(profileFor(n), 16).progressive, 'L' + n); });
+  assert(!variants(profileFor(6, { goal: goalOf('ultra') }), 16).progressive, 'ultra');
+  var p = profileFor(6), s = null;
+  for (var w = 0; w < 16 && !s; w++) s = weekAt(p, w).days.find(function (d) { return d.spec && d.spec.type === 'progressive'; });
+  assert.strictEqual(s.type, 'tempo');
+  assert.strictEqual(s.variant, 'پراگرسیو (افزاینده)');
+  assert.strictEqual(s.steps.length, 4);
+  assert(/^۱۵ دقیقه آسون/.test(s.steps[0]) && /پیس ماراتن/.test(s.steps[1]) && /پیس آستانه/.test(s.steps[2]) && /آسون/.test(s.steps[3]), s.steps.join(' | '));
+  var seg = Number(s.steps[1].match(/^(\d+)/)[1]);
+  assert(seg >= 10 && seg <= 20, 'بخش ' + seg);
+  assert(s.hardKm > 0 && s.km > s.hardKm, s.km + ' ' + s.hardKm);
+  assert.ok(C.isHard(s.type));
 });
 test('هدف ماراتن: تمپوی بلند، اینتروال پیس ماراتن، فارتلک درازمدت، لانگ‌ران با پایان پیس ماراتن', function () {
   var v = variants(profileFor(6, { goal: goalOf('42') }), 9);

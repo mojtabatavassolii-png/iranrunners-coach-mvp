@@ -341,6 +341,14 @@
         back: 'Walk or jog very easily back up',
         how: 'Effort: controlled, not letting go (RPE 6 out of 10). Short, quick steps and soft landings.'
       },
+      progressive: {
+        variant: 'progressive',
+        easy15: '15 min easy',
+        mp: '{min} min at marathon pace{g}',
+        t: '{min} min at threshold pace{g}',
+        cool: '10 min easy',
+        how: 'All parts continuous, no stops; each part a little faster than the one before. Effort: starts easy (RPE 3–4) and the last part is hard but controlled (RPE 7 out of 10).'
+      },
       steady: {
         variant: 'steady',
         easy15: '15 min easy',
