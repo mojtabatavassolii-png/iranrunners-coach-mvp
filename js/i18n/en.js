@@ -378,6 +378,16 @@
         extra: 'Then: 4 × 200 m fast and relaxed at R pace{g}, 200 m jog between',
         how: 'Effort: "comfortably hard" (RPE 7 out of 10); a little faster than tempo but not interval effort. The last rep should still feel controlled.'
       },
+      alternation: {
+        variant: 'alternations with float (Canova)',
+        main: '{n} times back to back: 1 km a little faster than marathon pace{g} + 1 km "float"{f}, no stops',
+        how: 'Effort: fast parts RPE 7 out of 10, float RPE 5; the float is fairly quick running (between marathon and easy pace), not a slow jog or a stop. The whole session is continuous.'
+      },
+      fastProg: {
+        variant: 'fast progression (Canova)',
+        main: '{min} min continuous: start a little faster than marathon pace{a} and speed up gradually to a pace of{b} in the final minutes',
+        how: 'Effort: from RPE 6 to 8 out of 10; speed up smoothly, not in sudden steps. If you cannot speed up, finish at the same pace.'
+      },
       progressive: {
         variant: 'progressive',
         easy15: '15 min easy',
@@ -419,8 +429,12 @@
         tempoSplit: '{a:d} {u} tempo, {j:d} {u} easy, {b:d} {u} tempo',
         restEasy: 'The rest, up to {km:d} {u}, easy',
         lastTempo: 'Last {km:d} {u} at tempo rhythm',
+        progStart: 'First half ({km:d} {u}) easy and relaxed',
+        progMid: 'Then speed up a little, gradually and without jumps',
+        progEnd: 'Final {km:d} {u} about 10% slower than marathon pace{g}',
+        progHow: 'Effort: from easy (RPE 4) to steady (RPE 6) at the end; no part is all-out.',
         ffEnd: 'Final {km:d} {u} faster, between marathon and threshold pace{g}',
-        vFf: 'fast finish', vMp: 'marathon-pace finish', vTempo: 'with tempo sections'
+        vProg: 'gentle progression', vFf: 'fast finish', vMp: 'marathon-pace finish', vTempo: 'with tempo sections'
       },
       rest: 'Full rest, or a light walk / stretching',
       notStarted: 'Your plan starts on the start date you chose.',

@@ -578,6 +578,32 @@ test('مدل‌های تازه (v172): فارتلک کنیایی، Saltin، Wats
   for (var w = 0; w < 16; w++) { var wk = weekAt(p6, w); wk.days.forEach(function (d) { if (d.hills) { hillW++; assert.notStrictEqual(wk.phase.key, 'deload', 'اسپرینت سربالایی در هفته‌ی سبک'); } }); }
   assert.ok(hillW >= 2, 'اسپرینت سربالایی گروه C: ' + hillW);
 });
+test('مدل‌های تازه (v173): تناوب Canova با شناور، پروگرسیو تند Canova، لانگ‌ران پروگرسیو ملایم', function () {
+  var seen = {};
+  ['2027-03-13', '2027-05-08', '2027-06-12'].forEach(function (dt) {
+    [5, 7, 9].forEach(function (n) {
+      ['21', '42'].forEach(function (g) {
+        var p = profileFor(n, { goal: goalOf(g, dt) });
+        for (var w = 0; w < 45; w++) weekAt(p, w).days.forEach(function (d) {
+          if (d.spec && (d.spec.type === 'alternation' || d.spec.type === 'fastProg')) {
+            seen[d.spec.type] = 1;
+            assert.ok(n >= 7, d.spec.type + ' فقط گروه D و E، نه سطح ' + n);
+            assert.ok(d.hardKm > 0 && d.km > d.hardKm && !/undefined|NaN/.test(d.steps.join(' ') + d.how), d.spec.type + ': ' + d.steps.join(' | '));
+            if (d.spec.type === 'fastProg') { var m = Number(d.steps[0].match(/^(\d+)/)[1]); assert.ok(m >= 20 && m <= 40, 'پروگرسیو تند ' + m + ' دقیقه'); }
+          }
+          if (d.type === 'long' && d.kind === 'prog') {
+            seen.prog = 1;
+            assert.strictEqual(d.hardKm, 0, 'لانگ پروگرسیو ملایم بخش سخت نداره');
+            assert.strictEqual(d.steps.length, 3);
+          }
+        });
+      });
+    });
+  });
+  ['alternation', 'fastProg', 'prog'].forEach(function (k) { assert.ok(seen[k], 'مدل ساخته نشد: ' + k); });
+  // برای ۵/۱۰ و بدون هدف و اولترا نیست
+  ['none', '5', '10', 'ultra'].forEach(function (g) { var v = variants(profileFor(7, { goal: goalOf(g) }), 30); assert.ok(!v.alternation && !v.fastProg && !v['long:prog'], g); });
+});
 test('هدف ماراتن: تمپوی بلند، اینتروال پیس ماراتن، فارتلک درازمدت، لانگ‌ران با پایان پیس ماراتن', function () {
   var v = variants(profileFor(6, { goal: goalOf('42') }), 9);
   ['longTempo', 'mpInt', 'longFartlek', 'long:mp'].forEach(function (k) { assert(v[k], k); });

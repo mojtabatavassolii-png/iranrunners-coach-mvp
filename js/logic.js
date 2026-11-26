@@ -1340,7 +1340,8 @@
       { q: [Q('longInt', 0.08, { rep: 2000 }), Q('progressive', 0.09)] },
       { q: [Q('thresholdInt', 0.08), Q('speedFartlek', 0.05, { form: 'landmark' })], long: { kind: 'tempo', share: 0.05 } },
       { q: [Q('cv', 0.08), Q('kenyan', 0.07, { form: '3-1' })], long: { kind: 'ff', share: 0.04 } },
-      { q: [Q('watson', 0.08, { minTier: 'D', alt: Q('saltin', 0.08) }), Q('thresholdInt', 0.08)] }
+      { q: [Q('watson', 0.08, { minTier: 'D', alt: Q('saltin', 0.08) }), Q('thresholdInt', 0.08)] },
+      { q: [Q('alternation', 0.08, { minTier: 'D', alt: Q('thresholdInt', 0.08) }), Q('kenyan', 0.07, { form: '2-1' })], long: { kind: 'prog', share: 0 } }
     ],
     // ماراتن: آستانه و استقامت ویژه
     marathon: [
@@ -1348,7 +1349,9 @@
       { q: [Q('mpInt', 0.09), Q('progressive', 0.06)] },
       { q: [Q('longFartlek', 0.08)], long: { kind: 'mp', share: 0.09 } },
       { q: [Q('kenyan', 0.07, { form: '3-1' }), Q('tempoRun', 0.07)], long: { kind: 'ff', share: 0.05 } },
-      { q: [Q('cv', 0.07), Q('shortHills', 0.03)] }
+      { q: [Q('cv', 0.07), Q('shortHills', 0.03)] },
+      { q: [Q('alternation', 0.09, { minTier: 'D', alt: Q('mpInt', 0.09) }), Q('shortHills', 0.03)], long: { kind: 'prog', share: 0 } },
+      { q: [Q('fastProg', 0.08, { minTier: 'D', alt: Q('tempoRun', 0.07) })] }
     ],
     // اولترا/تریل بر اساس شاخص فنی بودن مسیر
     ultra_mountain: [
@@ -1385,7 +1388,9 @@
     ],
     marathon: [
       { q: [Q('mpInt', 0.09)], long: { kind: 'mp', share: 0.09 } },
-      { q: [Q('longTempo', 0.1)], long: { kind: 'mp', share: 0.07 } }
+      { q: [Q('fastProg', 0.08)], long: { kind: 'mp', share: 0.07 } },
+      { q: [Q('longTempo', 0.1)], long: { kind: 'mp', share: 0.07 } },
+      { q: [Q('alternation', 0.09)], long: { kind: 'prog', share: 0 } }
     ]
   };
 
@@ -1648,7 +1653,7 @@
     shortInt: 'interval', midInt: 'interval', longInt: 'interval', shortint: 'interval', reps: 'interval', speedFartlek: 'interval',
     thresholdInt: 'tempo', tempoRun: 'tempo', longTempo: 'tempo', mpInt: 'tempo', tempoMild: 'tempo',
     shortHills: 'hills', longHills: 'hills', hillsB: 'hills', downhill: 'hills', steady: 'light', longFartlek: 'light', progressive: 'light',
-    kenyan: 'interval', saltin: 'interval', watson: 'interval', gerschler: 'interval', billat: 'interval', i6030: 'interval', cv: 'tempo'
+    kenyan: 'interval', saltin: 'interval', watson: 'interval', gerschler: 'interval', billat: 'interval', i6030: 'interval', cv: 'tempo', alternation: 'tempo', fastProg: 'tempo'
   };
 
   function makeRunWalk(rw, factor, extraNote) {
@@ -2098,6 +2103,20 @@
     if (extra) { steps.push(T('s.cv.extra', { g: repGuide(ctx, 200, ctx.P.R) })); hard += 0.8; }
     return sess('interval', T('s.cv.variant'), hard, hard + reps * 0.2 + (extra ? 0.8 : 0) + ctx.wu, steps, T('s.cv.how') + paceBasis(ctx), { kind: 'cv' });
   }
+  // ---------- مدل‌های تازه (مرحله‌ی ۲): ماراتن و نیمه‌ماراتن ----------
+  // تناوب Canova: تکه‌های ۱ کیلومتری کمی تندتر از پیس ماراتن و ۱ کیلومتر «شناور» (بین پیس ماراتن و ایزی)، بدون توقف
+  function makeAlternation(main, ctx) {
+    var n = clamp(Math.round(main), 3, 8), pM = ctx.P.pM, pE = ctx.P.pE;
+    var on = [(pM + ctx.P.tRange[1]) / 2, pM], fl = [pM + (pE - pM) / 3, pM + (pE - pM) * 2 / 3];
+    return sess('tempo', T('s.alternation.variant'), n, n * 2 + ctx.wu,
+      [T('s.alternation.main', { n: n, g: repGuide(ctx, 1000, on), f: repGuide(ctx, 0, fl) })], T('s.alternation.how') + paceBasis(ctx), { kind: 'alternation' });
+  }
+  // پروگرسیو تند Canova: ۲۰ تا ۴۰ دقیقه پیوسته، از حدود ۱۰۲٪ سرعت پیس ماراتن تا حدود ۱۰۸٪ در پایان
+  function makeFastProgressive(main, ctx) {
+    var pM = ctx.P.pM, a = pM / 1.02, b = pM / 1.08, min = clamp(Math.round(main * (a + b) / 2 / 60), 20, 40), hard = min * 60 / ((a + b) / 2);
+    return sess('tempo', T('s.fastProg.variant'), hard, hard + ctx.wu,
+      [T('s.fastProg.main', { min: min, a: repGuide(ctx, 0, band(a)), b: repGuide(ctx, 0, band(b)) })], T('s.fastProg.how') + paceBasis(ctx), { kind: 'fastProg' });
+  }
   // سطح ۳-۴ تریل/عمومی: تپه‌ی کوتاه کنترل‌شده
   function makeHillsB(main, ctx) {
     var reps = clamp(Math.round(main / 0.12), 6, 8), hard = reps * 0.12;
@@ -2124,6 +2143,8 @@
       case 'billat': s = makeOnOffI(main, ctx, 30, 30); break;
       case 'i6030': s = makeOnOffI(main, ctx, 60, 30); break;
       case 'cv': s = makeCV(main, ctx); break;
+      case 'alternation': s = makeAlternation(main, ctx); break;
+      case 'fastProg': s = makeFastProgressive(main, ctx); break;
       case 'longTempo': s = makeLongTempo(main, ctx); break;
       case 'mpInt': s = makeMpInt(main, ctx); break;
       case 'longFartlek': s = makeLongFartlek(main, ctx, weeklyKm); break;
@@ -2147,6 +2168,13 @@
     opts = opts || {};
     var zones = ctx.zones;
     km = round05(km);
+    if (kind === 'prog') {
+      // لانگ‌ران پروگرسیو ملایم (Pfitzinger): کل مسیر کم‌کم تندتر، از ایزی تا حدود ۹۰٪ سرعت پیس ماراتن در ربع آخر؛ بخش سخت نداره
+      var endP = ctx.P.pM / 0.9, sp = { type: 'long', km: round05(km), hardKm: 0, target: T('s.km', { n: round05(km) }), segKm: 0, kind: 'prog',
+        steps: [T('s.long.progStart', { km: round05(km * 0.5) }), T('s.long.progMid'), T('s.long.progEnd', { km: round05(km * 0.25), g: repGuide(ctx, 0, band(endP)) })],
+        how: T('s.long.progHow') + easyGuide(zones), talk: talkTest(), variant: T('s.long.vProg') };
+      return attachWarmup(sp, 'long', ctx.level);
+    }
     if (kind === 'ultra') {
       var vert = opts.vert || 0, g = ctx.goal || {};
       var tof = km * ctx.P.pE * 1.08 / 60 + vert * 0.06;
