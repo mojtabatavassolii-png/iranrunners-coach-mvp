@@ -604,6 +604,31 @@ test('مدل‌های تازه (v173): تناوب Canova با شناور، پر�
   // برای ۵/۱۰ و بدون هدف و اولترا نیست
   ['none', '5', '10', 'ultra'].forEach(function (g) { var v = variants(profileFor(7, { goal: goalOf(g) }), 30); assert.ok(!v.alternation && !v.fastProg && !v['long:prog'], g); });
 });
+test('مدل‌های تازه (v174): مدار تپه‌ی Lydiard فقط چند هفته در دوره‌ی پایه، زیرآستانه‌ی نروژی تک‌جلسه‌ای فقط D و E', function () {
+  var sub = 0;
+  ['none', '5', '10', '21', '42'].forEach(function (g) {
+    [5, 7, 9].forEach(function (n) {
+      var p = profileFor(n, { goal: goalOf(g, g === 'none' ? null : '2027-06-12') }), hc = [];
+      for (var w = 0; w < 40; w++) { var wk = weekAt(p, w); wk.days.forEach(function (d) {
+        if (!d.spec) return;
+        if (d.spec.type === 'hillCircuit') {
+          hc.push(w);
+          assert.ok(n >= 7 && wk.period === 'base', 'مدار تپه فقط D و E در دوره‌ی پایه: سطح ' + n + '، ' + wk.period);
+          assert.strictEqual(d.type, 'hills');
+        }
+        if (d.spec.type === 'subT') {
+          sub++;
+          assert.ok(n >= 7, 'زیرآستانه فقط D و E، نه سطح ' + n);
+          assert.ok(d.hardKm > 0 && d.km > d.hardKm && !/undefined|NaN/.test(d.steps.join(' ') + d.how), d.steps.join(' | '));
+        }
+      }); }
+      if (n >= 7) assert.ok(hc.length >= 2 && hc.length <= (g === 'none' ? 8 : 4), g + ' L' + n + ' هفته‌های مدار تپه: ' + hc.join(','));
+      else assert.strictEqual(hc.length, 0);
+    });
+  });
+  assert.ok(sub > 0, 'زیرآستانه ساخته نشد');
+  assert.ok(!variants(profileFor(8, { goal: goalOf('ultra') }), 30).hillCircuit && !variants(profileFor(8, { goal: goalOf('ultra') }), 30).subT, 'اولترا');
+});
 test('هدف ماراتن: تمپوی بلند، اینتروال پیس ماراتن، فارتلک درازمدت، لانگ‌ران با پایان پیس ماراتن', function () {
   var v = variants(profileFor(6, { goal: goalOf('42') }), 9);
   ['longTempo', 'mpInt', 'longFartlek', 'long:mp'].forEach(function (k) { assert(v[k], k); });

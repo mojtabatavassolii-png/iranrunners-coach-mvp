@@ -1320,7 +1320,8 @@
       { q: [Q('speedFartlek', 0.07, { form: 'mona' }), Q('progressive', 0.08)] },
       { q: [Q('kenyan', 0.07, { form: '2-1' }), Q('cv', 0.07)] },
       { q: [Q('billat', 0.07), Q('thresholdInt', 0.08)] },
-      { q: [Q('saltin', 0.08), Q('tempoRun', 0.08)], long: { kind: 'ff', share: 0.04 } }
+      { q: [Q('saltin', 0.08), Q('tempoRun', 0.08)], long: { kind: 'ff', share: 0.04 } },
+      { q: [Q('shortInt', 0.08, { rep: 400 }), Q('subT', 0.09, { form: 'min', minTier: 'D', alt: Q('thresholdInt', 0.08) })] }
     ],
     // ۵ و ۱۰ کیلومتر: VO2max و سرعت
     speed: [
@@ -1332,7 +1333,8 @@
       { q: [Q('billat', 0.07), Q('cv', 0.07)] },
       { q: [Q('gerschler', 0.05), Q('kenyan', 0.07, { form: '3-1' })] },
       { q: [Q('i6030', 0.07), Q('cv', 0.07)] },
-      { q: [Q('watson', 0.08, { minTier: 'D', alt: Q('saltin', 0.08) }), Q('tempoRun', 0.07)] }
+      { q: [Q('watson', 0.08, { minTier: 'D', alt: Q('saltin', 0.08) }), Q('tempoRun', 0.07)] },
+      { q: [Q('midInt', 0.08, { rep: 1000 }), Q('subT', 0.08, { form: 'km', minTier: 'D', alt: Q('tempoRun', 0.07) })] }
     ],
     // نیمه‌ماراتن: آستانه + VO2max
     half: [
@@ -1341,7 +1343,8 @@
       { q: [Q('thresholdInt', 0.08), Q('speedFartlek', 0.05, { form: 'landmark' })], long: { kind: 'tempo', share: 0.05 } },
       { q: [Q('cv', 0.08), Q('kenyan', 0.07, { form: '3-1' })], long: { kind: 'ff', share: 0.04 } },
       { q: [Q('watson', 0.08, { minTier: 'D', alt: Q('saltin', 0.08) }), Q('thresholdInt', 0.08)] },
-      { q: [Q('alternation', 0.08, { minTier: 'D', alt: Q('thresholdInt', 0.08) }), Q('kenyan', 0.07, { form: '2-1' })], long: { kind: 'prog', share: 0 } }
+      { q: [Q('alternation', 0.08, { minTier: 'D', alt: Q('thresholdInt', 0.08) }), Q('kenyan', 0.07, { form: '2-1' })], long: { kind: 'prog', share: 0 } },
+      { q: [Q('subT', 0.09, { form: 'min', minTier: 'D', alt: Q('thresholdInt', 0.08) }), Q('shortHills', 0.03)] }
     ],
     // ماراتن: آستانه و استقامت ویژه
     marathon: [
@@ -1351,7 +1354,8 @@
       { q: [Q('kenyan', 0.07, { form: '3-1' }), Q('tempoRun', 0.07)], long: { kind: 'ff', share: 0.05 } },
       { q: [Q('cv', 0.07), Q('shortHills', 0.03)] },
       { q: [Q('alternation', 0.09, { minTier: 'D', alt: Q('mpInt', 0.09) }), Q('shortHills', 0.03)], long: { kind: 'prog', share: 0 } },
-      { q: [Q('fastProg', 0.08, { minTier: 'D', alt: Q('tempoRun', 0.07) })] }
+      { q: [Q('fastProg', 0.08, { minTier: 'D', alt: Q('tempoRun', 0.07) })] },
+      { q: [Q('subT', 0.09, { form: 'km', minTier: 'D', alt: Q('mpInt', 0.09) })], long: { kind: 'mp', share: 0.06 } }
     ],
     // اولترا/تریل بر اساس شاخص فنی بودن مسیر
     ultra_mountain: [
@@ -1583,7 +1587,10 @@
     if (tier === 'C') return pack(rot[w % rot.length], Math.min(1, 0.5 + w * 0.05));
     // D و E
     if (period === 'base') {
-      var bq = ultra ? [Q('longHills', 0.05), Q('steady', 0.07)] : [Q('reps', 0.05, { rep: w % 2 ? 400 : 200 }), Q(w % 3 === 2 ? 'progressive' : 'tempoRun', 0.08)];
+      // مدار تپه‌ی Lydiard: فقط دوره‌ی پایه و فقط چند هفته (در منابع ۳ تا ۶ هفته)، به‌جای تکرار R:
+      // با مسابقه‌ی تاریخ‌دار هفته‌های ۱، ۲، ۴ و ۵ برنامه؛ بدون تاریخ هفته‌های ۱ و ۲ هر چرخه‌ی ۱۲ هفته‌ای
+      var lyd = goal && goal.date ? [1, 2, 4, 5].indexOf(w) >= 0 : [1, 2].indexOf(((w % 12) + 12) % 12) >= 0;
+      var bq = ultra ? [Q('longHills', 0.05), Q('steady', 0.07)] : [lyd ? Q('hillCircuit', 0.05) : Q('reps', 0.05, { rep: w % 2 ? 400 : 200 }), Q(w % 3 === 2 ? 'progressive' : 'tempoRun', 0.08)];
       return pack({ q: bq }, 0.5);
     }
     if (period === 'peak' && PEAK[key]) return pack(PEAK[key][w % PEAK[key].length], 1);
@@ -1653,7 +1660,7 @@
     shortInt: 'interval', midInt: 'interval', longInt: 'interval', shortint: 'interval', reps: 'interval', speedFartlek: 'interval',
     thresholdInt: 'tempo', tempoRun: 'tempo', longTempo: 'tempo', mpInt: 'tempo', tempoMild: 'tempo',
     shortHills: 'hills', longHills: 'hills', hillsB: 'hills', downhill: 'hills', steady: 'light', longFartlek: 'light', progressive: 'light',
-    kenyan: 'interval', saltin: 'interval', watson: 'interval', gerschler: 'interval', billat: 'interval', i6030: 'interval', cv: 'tempo', alternation: 'tempo', fastProg: 'tempo'
+    kenyan: 'interval', saltin: 'interval', watson: 'interval', gerschler: 'interval', billat: 'interval', i6030: 'interval', cv: 'tempo', alternation: 'tempo', fastProg: 'tempo', hillCircuit: 'hills', subT: 'tempo'
   };
 
   function makeRunWalk(rw, factor, extraNote) {
@@ -2117,6 +2124,21 @@
     return sess('tempo', T('s.fastProg.variant'), hard, hard + ctx.wu,
       [T('s.fastProg.main', { min: min, a: repGuide(ctx, 0, band(a)), b: repGuide(ctx, 0, band(b)) })], T('s.fastProg.how') + paceBasis(ctx), { kind: 'fastProg' });
   }
+  // ---------- مدل‌های تازه (مرحله‌ی ۳) ----------
+  // مدار تپه‌ی Lydiard: هر دور حدود ۱۵ دقیقه؛ سربالایی با بانسینگ/فنری یا دویدن تند، پایین اومدن با جاگ، بعد چند دوی سرعت کوتاه روی زمین صاف
+  function makeHillCircuit(main, ctx) {
+    var laps = clamp(Math.round(main / 2), 1, 3), hard = laps * 1.5;
+    return sess('hills', T('s.hillCircuit.variant'), hard, ctx.wu + laps * 3,
+      [T('s.hillCircuit.lap', { laps: laps }), T('s.hillCircuit.up'), T('s.hillCircuit.flat')],
+      T('s.hillCircuit.how'), { vert: laps * 60, kind: 'hillCircuit' });
+  }
+  // زیرآستانه‌ی تک‌جلسه‌ای (برداشت ساده از روش نروژی، بدون اندازه‌گیری لاکتات): تکرارهای ۶ دقیقه‌ای یا ۱ کیلومتری کمی کندتر از آستانه، ۶۰ ثانیه جاگ
+  function makeSubThreshold(main, ctx, form) {
+    var lo = ctx.P.tRange[1], r = [lo, lo + 10], pace = lo + 5, n, hard, step;
+    if (form === 'km') { n = clamp(Math.round(main), 6, 10); hard = n; step = T('s.subT.km', { n: n, g: repGuide(ctx, 1000, r) }); }
+    else { n = clamp(Math.round(main * pace / 60 / 6), 4, 6); hard = n * 6 * 60 / pace; step = T('s.subT.min', { n: n, g: repGuide(ctx, 0, r) }); }
+    return sess('tempo', T('s.subT.variant'), hard, hard + n * 60 / ctx.P.pE + ctx.wu, [step], T('s.subT.how') + paceBasis(ctx), { kind: 'subT', form: form });
+  }
   // سطح ۳-۴ تریل/عمومی: تپه‌ی کوتاه کنترل‌شده
   function makeHillsB(main, ctx) {
     var reps = clamp(Math.round(main / 0.12), 6, 8), hard = reps * 0.12;
@@ -2145,6 +2167,8 @@
       case 'cv': s = makeCV(main, ctx); break;
       case 'alternation': s = makeAlternation(main, ctx); break;
       case 'fastProg': s = makeFastProgressive(main, ctx); break;
+      case 'hillCircuit': s = makeHillCircuit(main, ctx); break;
+      case 'subT': s = makeSubThreshold(main, ctx, spec.form); break;
       case 'longTempo': s = makeLongTempo(main, ctx); break;
       case 'mpInt': s = makeMpInt(main, ctx); break;
       case 'longFartlek': s = makeLongFartlek(main, ctx, weeklyKm); break;
@@ -2198,9 +2222,14 @@
       st = [T('s.long.plain', { km: km })];
       // آب همراه فقط وقتی مدت تخمینی از ۶۰ دقیقه بیشتره (نکته، نه قدم تمرین)
       if (km * ctx.P.pE / 60 > 60) extra = T('s.long.water');
+    } else if (kind === 'ff' && segKm < 2) {
+      // پایان تند کمتر از ۲ کیلومتر معنی نداره؛ و بالا بردنش بخش سخت رو از بودجه‌ی ۸۰/۲۰ موتور بیشتر می‌کرد (ممیزی v173): لانگ ساده
+      segKm = 0; kind = 'plain';
+      st = [T('s.long.plain', { km: km })];
+      if (km * ctx.P.pE / 60 > 60) extra = T('s.long.water');
     } else if (kind === 'ff') {
       // پایان تند: ۲ تا ۵ کیلومتر آخر بین پیس ماراتن و آستانه (Hansons و دیگران)
-      segKm = clamp(segKm, 2, 5);
+      segKm = Math.min(segKm, 5);
       st = [T('s.long.easyKm', { km: round05(km - segKm) }), T('s.long.ffEnd', { km: segKm, g: repGuide(ctx, 0, [ctx.P.tRange[0], ctx.P.pM]) })];
     } else if (kind === 'mp') {
       st = [T('s.long.easyKm', { km: round05(km - segKm) }), T('s.long.mpEnd', { km: segKm }), T('s.long.mpFuel')];

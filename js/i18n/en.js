@@ -388,6 +388,19 @@
         main: '{min} min continuous: start a little faster than marathon pace{a} and speed up gradually to a pace of{b} in the final minutes',
         how: 'Effort: from RPE 6 to 8 out of 10; speed up smoothly, not in sudden steps. If you cannot speed up, finish at the same pace.'
       },
+      hillCircuit: {
+        variant: 'hill circuit (Lydiard)',
+        lap: '{laps} laps of the hill circuit, about 15 min each, no stops between parts',
+        up: 'On a gentle to moderate hill: go up with bounding strides or springy steps on the toes, or a fast uphill run; jog slowly back down',
+        flat: 'Then on flat ground: a few short sprints (50 to 100 m) at a relaxed fast speed, jog between them',
+        how: 'Effort: powerful and controlled (RPE 7–8 out of 10); quality of movement matters more than speed. If your shins, Achilles or feet hurt, drop the bounding and springing and just run uphill.'
+      },
+      subT: {
+        variant: 'sub-threshold (Norwegian style)',
+        min: '{n} × 6 min a little slower than threshold pace{g}; 60 s easy jog between reps',
+        km: '{n} × 1 km a little slower than threshold pace{g}; 60 s easy jog between reps',
+        how: 'Effort: "controlled" (RPE 6–7 out of 10); deliberately slower than a full tempo so more time adds up at threshold. The last rep should feel more comfortable than hard.'
+      },
       progressive: {
         variant: 'progressive',
         easy15: '15 min easy',
