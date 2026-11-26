@@ -2088,6 +2088,26 @@ test('مسابقه وسط دوره‌ی آسیب (ممیزی v174): مسابقه
   }
   assert.ok(rampSeen >= 2, 'هفته‌های رمپ بعد از مسابقه: ' + rampSeen);
 });
+test('رمپ برگشت از آسیب: هر هفته حداکثر ۲۰٪ بالای هفته‌ی قبل، حتی وقتی جلسه‌ی کیفی برمی‌گرده (ممیزی v175)', function () {
+  // ۳ روز در هفته: در هفته‌های اول رمپ سقف هر جلسه حجم رو پایین نگه می‌داره؛ برگشت جلسه‌ی کیفی نباید یک‌باره پرش بده
+  [5, 6, 8].forEach(function (n) {
+    var p = profileFor(n, { days: [0, 2, 5], goal: goalOf('10') }), ws0 = C.weekStart(C.parseDate('2026-11-07'));
+    p.planLog = {};
+    for (var i = 1; i <= 4; i++) p.planLog[C.dateKey(C.addDays(ws0, -7 * i))] = { km: 30, vert: 0, sv: 0, ph: 'build' };
+    p.injuries = [{ id: 'i1', area: 'shin', label: 'شین', start: '2026-11-07', stopUntil: '2026-11-21', setbacks: [] }];
+    var prev = null, ramp = 0;
+    for (var w = 0; w < 14; w++) {
+      var day = C.addDays(ws0, 7 * w), ip = C.injuryPhase(p, day), wk = C.buildWeek(p, day);
+      if (ip && ip.phase === 'ramp') {
+        ramp++;
+        if (prev) assert.ok(wk.totalKm <= prev * 1.2 + 0.5, 'L' + n + ' هفته‌ی ' + w + ': ' + prev + ' → ' + wk.totalKm);
+        prev = wk.totalKm;
+      }
+      C.logWeek(p, day);
+    }
+    assert.ok(ramp >= 3, 'L' + n + ' هفته‌های رمپ: ' + ramp);
+  });
+});
 test('برگشت بعد از مسابقه از حجم واقعیِ قبل از مسابقه، نه از بیشترین ۱۲ هفته یا حجم نظری (ممیزی، v170)', function () {
   // دونده‌ی پرحجم روی کاغذ (۱۱۰ کیلومتر) که در عمل هفته‌ای ۴۰ کیلومتر دویده؛ یک هفته‌ی قدیمی ۷۰ کیلومتری هم در ۱۲ هفته‌ی اخیر هست
   var p = profileFor(6, { currentWeeklyKm: 110, goal: goalOf('10', '2027-01-08') });

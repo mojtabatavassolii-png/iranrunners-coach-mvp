@@ -2689,6 +2689,10 @@
         var preRamp = rfWeek < 1 ? preRaceKm(profile.planLog, weekStart(race.date)) : 0;
         var postRaceKm = rfWeek < 1 ? (preRamp ? floor05(preRamp * rfWeek) : weeklyKm) : Infinity;
         weeklyKm = Math.max(5, Math.min(weeklyVolume(profile, W, true, a).km, floor05(preKm * ipw.factor), postRaceKm));
+        // هر هفته‌ی رمپ حداکثر ۲۰٪ بالای حجم واقعی هفته‌ی قبلِ همین رمپ (ممیزی v175: وقتی جلسه‌ی کیفی در هفته‌ی سوم رمپ برمی‌گشت
+        // حجم واقعی تا ۵۰٪ بالا می‌پرید، چون در دو هفته‌ی اول سقف هر جلسه حجم رو پایین‌تر از هدف نگه داشته بود). بعد از مسابقه‌ی جانبی نه (حد خودش رو داره)
+        var lastRamp = (profile.planLog || {})[dateKey(addDays(ws, -7))];
+        if (lastRamp && lastRamp.ph === 'injuryReturn' && lastRamp.km > 0 && !lastRamp.sr && rfWeek >= 1) weeklyKm = Math.min(weeklyKm, Math.max(5, floor05(lastRamp.km * 1.2)));
         // رمپ برگشت از آسیب خودش حجم رو کم کرده؛ هفته‌ی سبکِ دوره‌ای روش اعمال نمی‌شه (مثل برگشت بعد از مسابقه)،
         // وگرنه بعد از هر هفته‌ی سبک حجم یک‌باره تا ۴۰٪ بالا می‌پرید
         if (pr.deload) { pr = { deload: false, steps: pr.steps }; workouts = weekWorkouts(tier, level, W, false, goal, period); }
