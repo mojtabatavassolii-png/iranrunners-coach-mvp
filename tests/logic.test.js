@@ -2059,6 +2059,35 @@ test('هفته‌ی خیلی کم‌حجم: جلسه‌ی کیفی جای دوی
   assert.ok(longest <= wk.totalKm * 0.5 + 0.25, 'بلندترین دویدن ' + longest + ' از ' + wk.totalKm);
   runs.forEach(function (d) { assert.ok(d.km >= 3, 'دویدن کمتر از ۳ کیلومتر: ' + d.km); });
 });
+test('مسابقه وسط دوره‌ی آسیب (ممیزی v174): مسابقه‌ی اجرانشده ریکاوری نداره؛ مسابقه وسط رمپ، برگشت تدریجی از سطح خود رمپ', function () {
+  var recTxt = /ریکاوری بعد از مسابقه/;
+  // ۱. روز مسابقه وسط دوره‌ی توقف: هفته‌های بعد هیچ روز «ریکاوری بعد از مسابقه» ندارن
+  var p = profileFor(6, { goal: goalOf('10', '2026-12-04') });
+  p.injuries = [{ id: 'i1', area: 'shin', label: 'شین', start: '2026-11-21', stopUntil: '2026-12-12', setbacks: [] }];
+  for (var w = 0; w < 4; w++) {
+    var wk = C.buildWeek(p, C.addDays(C.parseDate('2026-12-05'), 7 * w));
+    assert.notStrictEqual(wk.phase.key, 'recovery', 'هفته‌ی ' + w + ' ریکاوری مسابقه‌ی اجرانشده');
+    wk.days.forEach(function (d) { assert.ok(!recTxt.test((d.how || '') + (d.steps || []).join(' ')), 'روز ریکاوری بعد از مسابقه‌ی اجرانشده: ' + d.date); });
+  }
+  // ۲. ماراتن وسط رمپ: بعد از ریکاوری از سطح خود رمپ قبل از مسابقه (۴۰) برمی‌گرده، نه از حجم قبل از آسیب (۱۰۰)؛ بعد از رمپ هم پرش نداره
+  var q = profileFor(7, { currentWeeklyKm: 100, goal: goalOf('42', '2027-01-01') });
+  var ws0 = C.weekStart(C.parseDate('2026-11-07'));
+  q.planLog = {};
+  for (var i = 1; i <= 4; i++) q.planLog[C.dateKey(C.addDays(ws0, -7 * i))] = { km: 100, vert: 0, sv: 0, ph: 'build' };
+  q.injuries = [{ id: 'i1', area: 'shin', label: 'شین', start: '2026-11-07', stopUntil: '2026-11-21', setbacks: [] }];
+  var R = C.weekStart(C.parseDate('2027-01-01'));
+  for (i = 1; i <= 3; i++) q.planLog[C.dateKey(C.addDays(R, -7 * i))] = { km: 40, vert: 0, sv: 0, ph: 'injuryReturn' };
+  q.planLog[C.dateKey(R)] = { km: 55, vert: 0, sv: 0, ph: 'race' };
+  q.planLog[C.dateKey(C.addDays(R, 7))] = { km: 15, vert: 0, sv: 0, ph: 'recovery' };
+  var prev = 15, rampSeen = 0;
+  for (var k = 2; k <= 8; k++) {
+    var day = C.addDays(R, 7 * k), ip = C.injuryPhase(q, day), wr = C.buildWeek(q, day);
+    if (ip && ip.phase === 'ramp') { rampSeen++; assert.ok(wr.totalKm <= 40 + 0.5, 'هفته‌ی ' + k + ' بعد از ماراتن وسط رمپ: ' + wr.totalKm + ' > ۴۰'); }
+    if (k > 2) assert.ok(wr.totalKm <= prev * 1.25 + 2, 'پرش هفته‌ی ' + k + ': ' + prev + ' → ' + wr.totalKm);
+    C.logWeek(q, day); prev = wr.totalKm;
+  }
+  assert.ok(rampSeen >= 2, 'هفته‌های رمپ بعد از مسابقه: ' + rampSeen);
+});
 test('برگشت بعد از مسابقه از حجم واقعیِ قبل از مسابقه، نه از بیشترین ۱۲ هفته یا حجم نظری (ممیزی، v170)', function () {
   // دونده‌ی پرحجم روی کاغذ (۱۱۰ کیلومتر) که در عمل هفته‌ای ۴۰ کیلومتر دویده؛ یک هفته‌ی قدیمی ۷۰ کیلومتری هم در ۱۲ هفته‌ی اخیر هست
   var p = profileFor(6, { currentWeeklyKm: 110, goal: goalOf('10', '2027-01-08') });

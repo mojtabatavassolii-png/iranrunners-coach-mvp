@@ -486,8 +486,19 @@
     if (g.type === 'none' || !g.date || !(g.km > 0)) return null;
     return { key: g.type, date: parseDate(g.date), km: g.km, goal: g };
   }
-  function inPostRaceRamp(profile, ws) {
+  // مسابقه‌ای که روزش در دوره‌ی توقف یا مرحله‌های دو-پیاده‌ی آسیب افتاده اجرا نشده (موتور خودش روز مسابقه رو حذف می‌کنه)؛
+  // پس ریکاوری و برگشت بعد از مسابقه هم براش نیست (ممیزی v174: هفته‌ی ریکاوریِ مسابقه‌ی اجرانشده و بعد پرش تا ۲۷۰٪)
+  function raceSkippedByInjury(profile, race) {
+    if (!race || !profile.injuries || !profile.injuries.length) return false;
+    var ip = injuryPhase(profile, race.date);
+    return !!ip && (ip.phase === 'off' || ip.phase === 'return');
+  }
+  function doneRaceInfo(profile, ws) {
     var race = raceInfo(profile);
+    return race && race.date < ws && raceSkippedByInjury(profile, race) ? null : race;
+  }
+  function inPostRaceRamp(profile, ws) {
+    var race = doneRaceInfo(profile, ws);
     if (!race || race.date >= ws) return false;
     return returnFactor(daysBetween(addDays(ws, 6), race.date)) < 1 || daysBetween(race.date, ws) < 7;
   }
@@ -1495,6 +1506,20 @@
     }
     return m;
   }
+  // حجم قبل از مسابقه برای برگشت بعد از مسابقه: مثل recentNormalKm، ولی هفته‌های برگشت از آسیب هم حسابن
+  // (مسابقه وسط یا کمی بعد از رمپ آسیب: مبنا سطح واقعی رمپه، نه حجم قبل از آسیب؛ ممیزی v174)
+  function preRaceKm(log, ws) {
+    if (!log) return 0;
+    // اگه در ۳ هفته‌ی قبل هفته‌ی برگشت از آسیب هست، فقط همین ۳ هفته (هفته‌های توقف و دو-پیاده ثبت نمی‌شن و جست‌وجوی عقب‌تر به حجم قبل از آسیب می‌رسید)
+    var inj = false, m = 0;
+    for (var i = 1; i <= 3; i++) {
+      var e = log[dateKey(addDays(ws, -7 * i))];
+      if (!e) continue;
+      if (e.ph === 'injuryReturn') inj = true;
+      if (['deload', 'taper', 'race', 'recovery', 'return', 'intro', 'injury'].indexOf(e.ph) < 0 && !e.sr) m = Math.max(m, e.km || 0);
+    }
+    return inj ? m : recentNormalKm(log, ws);
+  }
   function planLogLimit(profile, ws) {
     var log = profile.planLog;
     if (!log) return null;
@@ -1530,7 +1555,7 @@
     // فقط هفته‌ی بلافاصله بعد از هفته‌ی سبک (نه هر سه هفته‌ای که یکی‌شون سبک بوده؛ با هفته‌ی سبکِ هر ۴ هفته این حد عملاً برداشته می‌شد)
     var afterLight = !!(e3[0] && (LIGHT.indexOf(e3[0].ph) >= 0 || e3[0].sr));
     var km = baseR * Math.pow(1.1, steps);
-    if (afterLight) km = Math.max(km, recentNormalKm(log, ws) || mx(e12, 'km'));
+    if (afterLight) km = Math.max(km, preRaceKm(log, ws) || mx(e12, 'km'));
     return { km: km, v3: mx(e3, 'vert'), v12: mx(e12, 'vert'), s4: s4, s12: mx(e12, 'sv'), gap: g - 1,
       // حد لانگ‌ران: ۱۰٪ یا ۲ کیلومتر (هر کدوم بیشتر) بالای بلندترین دویدن ۴ هفته‌ی اخیر، برای هر هفته‌ی ثبت‌نشده یک پله (F3)
       lg: lg4 > 0 ? Math.max(lg4 * Math.pow(1.1, steps), lg4 + 2 * steps) : null };
@@ -2613,7 +2638,7 @@
     // گرم و سرد کردن کامل (دویدن آروم + حرکات + استرایدز) برای جلسه‌های کیفی؛ فاصله از زمانش حساب می‌شه
     if (level >= 3) ctx.wu = Math.max(L.wuKm, wuKmFor(level, ctx.P.pE));
     var pr = progression(W);
-    var race = raceInfo(profile);
+    var race = doneRaceInfo(profile, ws);
     var avail = (profile.days || []).map(satToRel);
     // تعداد جلسه: انتخاب خود کاربر (runDays) یا پیشنهاد سطح؛ بیشتر از پیشنهاد = «روز سبک» (پایین‌تر)، بدون حجم بیشتر
     var dc = dayCount(profile, level, avail.length);
@@ -2642,7 +2667,7 @@
       if (postRace) pr = { deload: false, steps: pr.steps };
       vol = weeklyVolume(profile, W, postRace, a);
       // رمپ برگشت بعد از مسابقه از حجم واقعیِ قبل از مسابقه (تاریخچه)، نه از حجم نظری برنامه که ممکنه هیچ‌وقت اجرا نشده باشه
-      var preRace = rfWeek < 1 ? recentNormalKm(profile.planLog, weekStart(race.date)) : 0;
+      var preRace = rfWeek < 1 ? preRaceKm(profile.planLog, weekStart(race.date)) : 0;
       weeklyKm = rfWeek < 1 ? floor05((preRace ? Math.min(vol.km, preRace) : vol.km) * rfWeek) : vol.km;
       period = 'DE'.indexOf(tier) >= 0 ? periodFor(W, ws, race) : null;
       workouts = weekWorkouts(tier, level, W, pr.deload, goal, period);
@@ -2659,7 +2684,11 @@
         // (ممیزی v171: ۱۰۱ دونده در برگشت از آسیب بیشتر از قبل از آسیب می‌دویدن، مثلاً ۵۵ کیلومتر در برابر ۳۱٫۵)
         var preReal = recentNormalKm(profile.planLog, weekStart(parseDate(ipw.inj.start)));
         if (preReal) preKm = Math.min(preKm, preReal);
-        weeklyKm = Math.max(5, Math.min(weeklyVolume(profile, W, true, a).km, floor05(preKm * ipw.factor)));
+        // مسابقه وسط رمپ آسیب: هر کدوم سخت‌گیرانه‌تره، رمپ آسیب یا برگشت تدریجی بعد از مسابقه (قبلاً رمپ برگشت مسابقه رو نادیده می‌گرفت)
+        // مبنا: سطح واقعی خود رمپ درست قبل از مسابقه (هفته‌های رمپ آسیب هم حساب)، نه حجم قبل از آسیب
+        var preRamp = rfWeek < 1 ? preRaceKm(profile.planLog, weekStart(race.date)) : 0;
+        var postRaceKm = rfWeek < 1 ? (preRamp ? floor05(preRamp * rfWeek) : weeklyKm) : Infinity;
+        weeklyKm = Math.max(5, Math.min(weeklyVolume(profile, W, true, a).km, floor05(preKm * ipw.factor), postRaceKm));
         // رمپ برگشت از آسیب خودش حجم رو کم کرده؛ هفته‌ی سبکِ دوره‌ای روش اعمال نمی‌شه (مثل برگشت بعد از مسابقه)،
         // وگرنه بعد از هر هفته‌ی سبک حجم یک‌باره تا ۴۰٪ بالا می‌پرید
         if (pr.deload) { pr = { deload: false, steps: pr.steps }; workouts = weekWorkouts(tier, level, W, false, goal, period); }
@@ -3073,7 +3102,7 @@
     return { key: ip.phase === 'off' ? 'injury' : 'injuryReturn', label: T(ip.phase === 'off' ? 'phase.injury' : 'phase.injuryReturn') };
   }
   function weekPhase(profile, ws, pr, w, vol) {
-    var race = raceInfo(profile);
+    var race = doneRaceInfo(profile, ws);
     if (w === -1 && addDays(ws, 6) >= parseDate(profile.startDate)) return { key: 'intro', label: T('phase.intro') };
     if (w < 0) return { key: 'before', label: T('phase.before') };
     if (race) {
