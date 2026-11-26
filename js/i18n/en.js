@@ -341,6 +341,43 @@
         back: 'Walk or jog very easily back up',
         how: 'Effort: controlled, not letting go (RPE 6 out of 10). Short, quick steps and soft landings.'
       },
+      kenyan: {
+        variant2: 'Kenyan fartlek 2/1', variant3: 'Kenyan fartlek 3/1',
+        main: '{n} times: {on} min hard, about 10k pace{g}, + 1 min easy running, no stops',
+        how: 'Effort: hard but even (RPE 7–8 out of 10); the last rep should be as fast as the first. The easy part is running, not walking or stopping.'
+      },
+      saltin: {
+        variant: 'Saltin fartlek (3/1)',
+        main: '{n} times: 3 min hard at interval pace{g} + 1 min easy jog',
+        how: 'Effort: hard (RPE 8 out of 10), all reps the same.'
+      },
+      watson: {
+        variant: 'Watson fartlek (4/1)',
+        main: '{n} times: 4 min hard, about 10k pace{g}, + 1 min easy jog',
+        how: 'Effort: hard but steady (RPE 7–8 out of 10); choose a speed you can hold to the last rep.'
+      },
+      gerschler: {
+        variant: 'Gerschler intervals',
+        main: 'Set: 3 × 30 s hard at interval pace{g}',
+        sets: '{sets} sets back to back; jog recovery between reps in each set: {recs} seconds (shorter each time)',
+        how: 'Effort: hard (RPE 8 out of 10). Recoveries get shorter; if you cannot catch your breath in the recovery or cannot hold the speed, stop the session there.'
+      },
+      billat: {
+        variant: '30-30 intervals',
+        main: '{n} times: 30 s hard at interval pace{g} + 30 s very easy running',
+        how: 'Effort: hard (RPE 8 out of 10). The easy part is running, not stopping; if the fast parts slow down, end the session early.'
+      },
+      i6030: {
+        variant: '60-30 intervals',
+        main: '{n} times: 60 s hard at interval pace{g} + 30 s very easy running',
+        how: 'Effort: hard (RPE 8 out of 10), all reps the same. The easy part is running, not stopping.'
+      },
+      cv: {
+        variant: 'CV intervals',
+        main: '{reps} × 1 km between threshold and 10k pace{g}; 200 m easy jog between reps',
+        extra: 'Then: 4 × 200 m fast and relaxed at R pace{g}, 200 m jog between',
+        how: 'Effort: "comfortably hard" (RPE 7 out of 10); a little faster than tempo but not interval effort. The last rep should still feel controlled.'
+      },
       progressive: {
         variant: 'progressive',
         easy15: '15 min easy',
@@ -382,7 +419,8 @@
         tempoSplit: '{a:d} {u} tempo, {j:d} {u} easy, {b:d} {u} tempo',
         restEasy: 'The rest, up to {km:d} {u}, easy',
         lastTempo: 'Last {km:d} {u} at tempo rhythm',
-        vMp: 'marathon-pace finish', vTempo: 'with tempo sections'
+        ffEnd: 'Final {km:d} {u} faster, between marathon and threshold pace{g}',
+        vFf: 'fast finish', vMp: 'marathon-pace finish', vTempo: 'with tempo sections'
       },
       rest: 'Full rest, or a light walk / stretching',
       notStarted: 'Your plan starts on the start date you chose.',

@@ -1317,7 +1317,10 @@
       { q: [Q('midInt', 0.08, { rep: 1000 }), Q('tempoRun', 0.08)] },
       { q: [Q('shortHills', 0.04), Q('longInt', 0.08, { rep: 1600 })], long: { kind: 'tempo', share: 0.04 } },
       { q: [Q('shortInt', 0.08, { rep: 800 }), Q('thresholdInt', 0.08)] },
-      { q: [Q('speedFartlek', 0.07, { form: 'mona' }), Q('progressive', 0.08)] }
+      { q: [Q('speedFartlek', 0.07, { form: 'mona' }), Q('progressive', 0.08)] },
+      { q: [Q('kenyan', 0.07, { form: '2-1' }), Q('cv', 0.07)] },
+      { q: [Q('billat', 0.07), Q('thresholdInt', 0.08)] },
+      { q: [Q('saltin', 0.08), Q('tempoRun', 0.08)], long: { kind: 'ff', share: 0.04 } }
     ],
     // ۵ و ۱۰ کیلومتر: VO2max و سرعت
     speed: [
@@ -1325,19 +1328,27 @@
       { q: [Q('midInt', 0.08, { rep: 1000 }), Q('speedFartlek', 0.07, { form: 'mona' })] },
       { q: [Q('shortInt', 0.08, { rep: 800 }), Q('shortHills', 0.04)], long: { kind: 'tempo', share: 0.04 } },
       { q: [Q('midInt', 0.08, { rep: 1600 }), Q('speedFartlek', 0.07, { form: 'pyramid' })] },
-      { q: [Q('shortInt', 0.08, { rep: 600 }), Q('speedFartlek', 0.07, { form: 'landmark' })] }
+      { q: [Q('shortInt', 0.08, { rep: 600 }), Q('speedFartlek', 0.07, { form: 'landmark' })] },
+      { q: [Q('billat', 0.07), Q('cv', 0.07)] },
+      { q: [Q('gerschler', 0.05), Q('kenyan', 0.07, { form: '3-1' })] },
+      { q: [Q('i6030', 0.07), Q('cv', 0.07)] },
+      { q: [Q('watson', 0.08, { minTier: 'D', alt: Q('saltin', 0.08) }), Q('tempoRun', 0.07)] }
     ],
     // نیمه‌ماراتن: آستانه + VO2max
     half: [
       { q: [Q('thresholdInt', 0.08), Q('longInt', 0.08, { rep: 1600 })] },
       { q: [Q('longInt', 0.08, { rep: 2000 }), Q('progressive', 0.09)] },
-      { q: [Q('thresholdInt', 0.08), Q('speedFartlek', 0.05, { form: 'landmark' })], long: { kind: 'tempo', share: 0.05 } }
+      { q: [Q('thresholdInt', 0.08), Q('speedFartlek', 0.05, { form: 'landmark' })], long: { kind: 'tempo', share: 0.05 } },
+      { q: [Q('cv', 0.08), Q('kenyan', 0.07, { form: '3-1' })], long: { kind: 'ff', share: 0.04 } },
+      { q: [Q('watson', 0.08, { minTier: 'D', alt: Q('saltin', 0.08) }), Q('thresholdInt', 0.08)] }
     ],
     // ماراتن: آستانه و استقامت ویژه
     marathon: [
       { q: [Q('longTempo', 0.1), Q('shortHills', 0.03)] },
       { q: [Q('mpInt', 0.09), Q('progressive', 0.06)] },
-      { q: [Q('longFartlek', 0.08)], long: { kind: 'mp', share: 0.09 } }
+      { q: [Q('longFartlek', 0.08)], long: { kind: 'mp', share: 0.09 } },
+      { q: [Q('kenyan', 0.07, { form: '3-1' }), Q('tempoRun', 0.07)], long: { kind: 'ff', share: 0.05 } },
+      { q: [Q('cv', 0.07), Q('shortHills', 0.03)] }
     ],
     // اولترا/تریل بر اساس شاخص فنی بودن مسیر
     ultra_mountain: [
@@ -1548,10 +1559,14 @@
     }
     var key = rotationKey(goal);
     var rot = ROTATIONS[key];
-    var extra = tier === 'C' ? { strides: true } : { strides: true, hills: !ultra, strength: tier === 'E' ? 2 : (ultra ? 2 : 1), doubles: tier === 'E' };
+    // اسپرینت سربالایی کوتاه: D و E هر دو هفته یک بار، C هر سه هفته یک بار (به‌جای استراید همون روز)
+    var extra = tier === 'C' ? { strides: true, hills: !ultra } : { strides: true, hills: !ultra, strength: tier === 'E' ? 2 : (ultra ? 2 : 1), doubles: tier === 'E' };
     if (ultra && tier === 'C') extra.strength = 1;
+    var TIER_RANK = { 0: 0, A: 1, B: 2, C: 3, D: 4, E: 5 };
     function pack(row, vf) {
-      var o = { quality: row.q.slice(), long: row.long || plainLong, vertFactor: vf };
+      // مدلی که برای این گروه سنگینه (minTier) جایگزین خودش رو داره (مثلاً Watson فقط D و E؛ برای C همون Saltin)
+      var q = row.q.map(function (x) { return x.minTier && TIER_RANK[tier] < TIER_RANK[x.minTier] ? x.alt : x; });
+      var o = { quality: q, long: row.long || plainLong, vertFactor: vf };
       if (ultra) o.long = { kind: 'ultra', share: 0 };
       for (var k in extra) o[k] = extra[k];
       return o;
@@ -1632,7 +1647,8 @@
   var QUALITY_CAT = {
     shortInt: 'interval', midInt: 'interval', longInt: 'interval', shortint: 'interval', reps: 'interval', speedFartlek: 'interval',
     thresholdInt: 'tempo', tempoRun: 'tempo', longTempo: 'tempo', mpInt: 'tempo', tempoMild: 'tempo',
-    shortHills: 'hills', longHills: 'hills', hillsB: 'hills', downhill: 'hills', steady: 'light', longFartlek: 'light', progressive: 'light'
+    shortHills: 'hills', longHills: 'hills', hillsB: 'hills', downhill: 'hills', steady: 'light', longFartlek: 'light', progressive: 'light',
+    kenyan: 'interval', saltin: 'interval', watson: 'interval', gerschler: 'interval', billat: 'interval', i6030: 'interval', cv: 'tempo'
   };
 
   function makeRunWalk(rw, factor, extraNote) {
@@ -2034,6 +2050,54 @@
         T('s.progressive.t', { min: seg, g: repGuide(ctx, 0, ctx.P.tRange) }), T('s.progressive.cool')],
       T('s.progressive.how') + paceBasis(ctx), { progressive: true });
   }
+  // ---------- مدل‌های تازه (مرحله‌ی ۱): فارتلک کنیایی/Saltin/Watson، Gerschler، ۳۰-۳۰، ۶۰-۳۰، CV ----------
+  // بخش سخت هر جلسه سهمی از حجم هفته‌ست (مثل بقیه‌ی جلسه‌های کیفی)؛ تعداد تکرار از همون سهم، با کف و سقف هر مدل
+  function onOff(main, ctx, pace, on, off, lo, hi) {
+    var n = clamp(Math.round(main * pace / 60 / on), lo, hi);
+    var hard = n * on * 60 / pace;
+    return { n: n, hard: hard, total: hard + n * off * 60 / ctx.P.pE + ctx.wu };
+  }
+  // فارتلک کنیایی: تکه‌های ۲ یا ۳ دقیقه‌ای تند (حدود پیس ۱۰ کیلومتر) با ۱ دقیقه آروم، بدون توقف
+  function makeKenyanFartlek(main, ctx, form) {
+    var on = form === '2-1' ? 2 : 3, x = onOff(main, ctx, ctx.P.p10, on, 1, on === 2 ? 6 : 5, on === 2 ? 20 : 15);
+    return sess('fartlek', T('s.kenyan.variant' + on), x.hard, x.total,
+      [T('s.kenyan.main', { n: x.n, on: on, g: repGuide(ctx, 0, band(ctx.P.p10)) })], T('s.kenyan.how') + paceBasis(ctx), { form: form });
+  }
+  // Saltin: ۳ دقیقه تند (پیس I) + ۱ دقیقه جاگ، حداکثر ۶ بار
+  function makeSaltin(main, ctx) {
+    var pI = (ctx.P.I[0] + ctx.P.I[1]) / 2, x = onOff(main, ctx, pI, 3, 1, 3, 6);
+    return sess('fartlek', T('s.saltin.variant'), x.hard, x.total,
+      [T('s.saltin.main', { n: x.n, g: repGuide(ctx, 0, ctx.P.I) })], T('s.saltin.how') + paceBasis(ctx));
+  }
+  // Watson: ۴ دقیقه تند (حدود پیس ۱۰ کیلومتر) + ۱ دقیقه جاگ، حداکثر ۸ بار؛ فقط گروه D و E
+  function makeWatson(main, ctx) {
+    var x = onOff(main, ctx, ctx.P.p10, 4, 1, 4, 8);
+    return sess('fartlek', T('s.watson.variant'), x.hard, x.total,
+      [T('s.watson.main', { n: x.n, g: repGuide(ctx, 0, band(ctx.P.p10)) })], T('s.watson.how') + paceBasis(ctx));
+  }
+  // Gerschler: سه‌تایی‌های ۳۰ ثانیه تند (پیس I)؛ ریکاوری هر سه‌تایی ۱۵ ثانیه کمتر از قبلی، از ۹۰ تا حداقل ۱۵ ثانیه
+  function makeGerschler(main, ctx) {
+    var pI = (ctx.P.I[0] + ctx.P.I[1]) / 2, sets = clamp(Math.round(main * pI / 60 / 1.5), 2, 6), hard = sets * 1.5 * 60 / pI;
+    var recs = []; for (var i = 0; i < sets; i++) recs.push(90 - 15 * i);
+    var easyMin = recs.reduce(function (x, r) { return x + 3 * r; }, 0) / 60;
+    return sess('interval', T('s.gerschler.variant'), hard, hard + easyMin * 60 / ctx.P.pE + ctx.wu,
+      [T('s.gerschler.main', { g: repGuide(ctx, 0, ctx.P.I) }), T('s.gerschler.sets', { sets: sets, recs: recs.join(T('listSep')) })],
+      T('s.gerschler.how') + paceBasis(ctx), { kind: 'gerschler' });
+  }
+  // ۳۰-۳۰ (Billat) و ۶۰-۳۰: تکه‌های پیس I با بخش خیلی آروم
+  function makeOnOffI(main, ctx, on, off) {
+    var pI = (ctx.P.I[0] + ctx.P.I[1]) / 2, x = onOff(main, ctx, pI, on / 60, off / 60, on === 30 ? 10 : 8, on === 30 ? 30 : 20);
+    var k = on === 30 ? 'billat' : 'i6030';
+    return sess('interval', T('s.' + k + '.variant'), x.hard, x.total,
+      [T('s.' + k + '.main', { n: x.n, g: repGuide(ctx, 0, ctx.P.I) })], T('s.' + k + '.how') + paceBasis(ctx), { kind: k });
+  }
+  // CV: تکرارهای ۱ کیلومتری بین پیس آستانه و ۱۰ کیلومتر، ۲۰۰ متر جاگ؛ از سطح ۷ چند ۲۰۰ متری تند در آخر
+  function makeCV(main, ctx) {
+    var reps = clamp(Math.floor(main + 1e-9), 4, 7), hard = reps, extra = ctx.level >= 7;
+    var steps = [T('s.cv.main', { reps: reps, g: repGuide(ctx, 1000, [ctx.P.p10, (ctx.P.tRange[0] + ctx.P.tRange[1]) / 2]) })];
+    if (extra) { steps.push(T('s.cv.extra', { g: repGuide(ctx, 200, ctx.P.R) })); hard += 0.8; }
+    return sess('interval', T('s.cv.variant'), hard, hard + reps * 0.2 + (extra ? 0.8 : 0) + ctx.wu, steps, T('s.cv.how') + paceBasis(ctx), { kind: 'cv' });
+  }
   // سطح ۳-۴ تریل/عمومی: تپه‌ی کوتاه کنترل‌شده
   function makeHillsB(main, ctx) {
     var reps = clamp(Math.round(main / 0.12), 6, 8), hard = reps * 0.12;
@@ -2053,6 +2117,13 @@
       case 'longInt': s = makeLongInt(main, ctx, spec.rep); break;
       case 'tempoRun': s = makeTempoRun(main, ctx, spec.max); break;
       case 'progressive': s = makeProgressive(main, ctx); break;
+      case 'kenyan': s = makeKenyanFartlek(main, ctx, spec.form); break;
+      case 'saltin': s = makeSaltin(main, ctx); break;
+      case 'watson': s = makeWatson(main, ctx); break;
+      case 'gerschler': s = makeGerschler(main, ctx); break;
+      case 'billat': s = makeOnOffI(main, ctx, 30, 30); break;
+      case 'i6030': s = makeOnOffI(main, ctx, 60, 30); break;
+      case 'cv': s = makeCV(main, ctx); break;
       case 'longTempo': s = makeLongTempo(main, ctx); break;
       case 'mpInt': s = makeMpInt(main, ctx); break;
       case 'longFartlek': s = makeLongFartlek(main, ctx, weeklyKm); break;
@@ -2099,6 +2170,10 @@
       st = [T('s.long.plain', { km: km })];
       // آب همراه فقط وقتی مدت تخمینی از ۶۰ دقیقه بیشتره (نکته، نه قدم تمرین)
       if (km * ctx.P.pE / 60 > 60) extra = T('s.long.water');
+    } else if (kind === 'ff') {
+      // پایان تند: ۲ تا ۵ کیلومتر آخر بین پیس ماراتن و آستانه (Hansons و دیگران)
+      segKm = clamp(segKm, 2, 5);
+      st = [T('s.long.easyKm', { km: round05(km - segKm) }), T('s.long.ffEnd', { km: segKm, g: repGuide(ctx, 0, [ctx.P.tRange[0], ctx.P.pM]) })];
     } else if (kind === 'mp') {
       st = [T('s.long.easyKm', { km: round05(km - segKm) }), T('s.long.mpEnd', { km: segKm }), T('s.long.mpFuel')];
       extra = paceNote(T('lbl.paceMarathon'), zones && zones.marathon);
@@ -2115,7 +2190,7 @@
       how: rpeLine('long') + easyGuide(zones) + extra,
       talk: talkTest()
     };
-    if (segKm) s.variant = kind === 'mp' ? T('s.long.vMp') : T('s.long.vTempo');
+    if (segKm) s.variant = kind === 'mp' ? T('s.long.vMp') : kind === 'ff' ? T('s.long.vFf') : T('s.long.vTempo');
     return attachWarmup(s, 'long', ctx.level);
   }
 
@@ -2523,7 +2598,14 @@
       if (ipw && ipw.phase === 'ramp') {
         // مبنا: حجم هفته‌ی شروع آسیب (بدون هفته‌ی سبک)، تا رشد هر هفته فقط از خود برگشت باشه و از ۱۰٪ بیشتر نشه
         var preKm = weeklyVolume(profile, Math.max(0, weekIndexFor(profile, parseDate(ipw.inj.start))), true, a).km;
+        // مبنا حجم واقعیِ قبل از آسیب (تاریخچه)، نه حجم نظری برنامه که ممکنه با روزها یا سقف جلسه هیچ‌وقت اجرا نشده باشه
+        // (ممیزی v171: ۱۰۱ دونده در برگشت از آسیب بیشتر از قبل از آسیب می‌دویدن، مثلاً ۵۵ کیلومتر در برابر ۳۱٫۵)
+        var preReal = recentNormalKm(profile.planLog, weekStart(parseDate(ipw.inj.start)));
+        if (preReal) preKm = Math.min(preKm, preReal);
         weeklyKm = Math.max(5, Math.min(weeklyVolume(profile, W, true, a).km, floor05(preKm * ipw.factor)));
+        // رمپ برگشت از آسیب خودش حجم رو کم کرده؛ هفته‌ی سبکِ دوره‌ای روش اعمال نمی‌شه (مثل برگشت بعد از مسابقه)،
+        // وگرنه بعد از هر هفته‌ی سبک حجم یک‌باره تا ۴۰٪ بالا می‌پرید
+        if (pr.deload) { pr = { deload: false, steps: pr.steps }; workouts = weekWorkouts(tier, level, W, false, goal, period); }
         if (ipw.noQuality) workouts = { quality: [], long: { kind: ultra ? 'ultra' : 'plain', share: 0 }, strides: ipw.k >= 1, vertFactor: 0.3 };
       }
       // تاریخچه‌ی برنامه: حجم هفته حداکثر ۱۱۰٪ بیشترین ۳ هفته‌ی ذخیره‌شده (یا برگشت به حجم عادی ۱۲ هفته‌ی اخیر)؛
@@ -2668,6 +2750,20 @@
         var qd = qDays.pop(); delete qSessions[qd];
         qKm = qSum(); easyDays = [qd]; remaining = weeklyKm - longKm - b2bKm - qKm;
       }
+      // هفته‌ی خیلی کم‌حجم: اگه با جلسه‌ی کیفی برای دویدن‌های آسون (هر کدوم حداقل ۳ کیلومتر) جا نمی‌مونه و بقیه روی لانگ‌ران جمع می‌شه،
+      // این هفته جلسه‌ی کیفی نداره و حجم بین روزهایی که هر کدوم حداقل ۳ کیلومتر بشن پخش می‌شه
+      // (قبلاً ۱۱ کیلومتر = تمپوی ۵ + لانگ ۶، بدون هیچ دویدن آسون؛ لانگ‌ران بیش از نصف هفته)
+      if (qDays.length && b2bDay === null && ((nSessions >= 3 && easyDays.length && remaining / easyDays.length < 3) ||
+          (nSessions === 2 && weeklyKm < 15 && longKm + remaining > weeklyKm * 0.5))) {
+        var poolS = weeklyKm - b2bKm, otherS = sessionDays.filter(function (d) { return d !== b2bDay && d !== longDay; });
+        var nRun = Math.min(otherS.length + 1, Math.floor(poolS / 3 + 1e-9));
+        if (nRun >= 2) {
+          qDays.slice().forEach(function (d) { delete qSessions[d]; }); qDays = []; qKm = 0;
+          longKm = Math.max(Math.min(longKm, poolS / 2), round05(poolS / nRun));
+          easyDays = otherS.slice(0, nRun - 1);
+          remaining = weeklyKm - longKm - b2bKm;
+        }
+      }
       while (easyDays.length && remaining / easyDays.length < 3) easyDays.splice(easyDays.length - 1, 1);
       if (!easyDays.length && nSessions >= 2 && remaining > 0) { longKm = round05(Math.min(longCap, longKm + remaining)); remaining = 0; }
       // کمتر از حداقل روزهای سطح: لانگ‌ران همون سهم عادیش از هفته می‌مونه (بالا نمی‌ره) و هر دویدن آسون ازش کوتاه‌تره؛
@@ -2803,7 +2899,8 @@
           if (workouts.doubles && e.km >= 14) makeDouble(e);
           // استراید سربالایی فقط اگه در بودجه‌ی ارتفاع هفته جا داره؛ وگرنه استراید روی زمین صاف
           var hillOk = workouts.hillStrides && weekVertUsed() + 40 <= vertBudget;
-          if (d === accentDay) (hillOk ? addHillStrides : workouts.hills && W % 2 === 1 ? addHills : addStrides)(e);
+          var hillWeek = tier === 'C' ? W % 3 === 2 : W % 2 === 1;
+          if (d === accentDay) (hillOk ? addHillStrides : workouts.hills && hillWeek && !pr.deload ? addHills : addStrides)(e);
           if (d === downDay) addDownStrides(e);
           if (strengthDays.indexOf(d) >= 0) addStrength(e);
           template[d] = { session: e };

@@ -217,7 +217,7 @@ test('سطح ۳-۴: تمپوی ملایم + اینتروال خیلی کوتاه
 
 test('سطح ۵-۶: اینتروال ساختاریافته ۴۰۰ تا ۱۰۰۰، تمپو، لانگ‌ران با بخش تمپو', function () {
   [5, 6].forEach(function (n) {
-    var s = scan(profileFor(n), 12);
+    var s = scan(profileFor(n), 16);   // چرخه‌ی بدون هدف ۹ ردیفه (v172)
     [400, 800, 1000].forEach(function (r) { assert(s.reps[r], 'L' + n + ' rep ' + r); });
     assert(s.types.tempo && s.longKinds.tempo, 'L' + n);
     assert(!s.types.reps && !s.doubles);
@@ -550,6 +550,34 @@ test('پراگرسیو (افزاینده): از سطح ۵ گاهی، نه زیر
   assert(s.hardKm > 0 && s.km > s.hardKm, s.km + ' ' + s.hardKm);
   assert.ok(C.isHard(s.type));
 });
+test('مدل‌های تازه (v172): فارتلک کنیایی، Saltin، Watson، Gerschler، ۳۰-۳۰، ۶۰-۳۰، CV، لانگ با پایان تند، اسپرینت سربالایی', function () {
+  var all = {};
+  ['none', '5', '10', '21', '42'].forEach(function (g) {
+    [5, 6, 7, 9].forEach(function (n) {
+      var p = profileFor(n, { goal: goalOf(g) });
+      for (var w = 0; w < 36; w++) weekAt(p, w).days.forEach(function (d) {
+        var k = d.spec ? d.spec.type + (d.spec.form ? ':' + d.spec.form : '') : d.type === 'long' && d.kind === 'ff' ? 'long:ff' : null;
+        if (!k) return;
+        (all[k] = all[k] || []).push(n);
+        if (d.spec && d.spec.type === 'watson') assert.ok(n >= 7, 'Watson فقط گروه D و E، نه سطح ' + n);
+        if (k === 'long:ff') assert.ok(d.hardKm >= 2 && d.hardKm <= 5, 'پایان تند ۲ تا ۵ کیلومتر: ' + d.hardKm);
+        if (d.spec && /^(kenyan|saltin|watson|gerschler|billat|i6030|cv)$/.test(d.spec.type)) {
+          assert.ok(d.hardKm > 0 && d.km > d.hardKm, d.spec.type + ' ' + d.km + '/' + d.hardKm);
+          assert.ok(d.steps.length >= 1 && !/undefined|NaN/.test(d.steps.join(' ') + d.how), d.spec.type + ': ' + d.steps.join(' | '));
+        }
+      });
+    });
+  });
+  ['kenyan:2-1', 'kenyan:3-1', 'saltin', 'watson', 'gerschler', 'billat', 'i6030', 'cv', 'long:ff'].forEach(function (k) { assert.ok(all[k], 'مدل ساخته نشد: ' + k); });
+  // نه برای گروه A و B، نه برای اولترا
+  [2, 3, 4].forEach(function (n) { var v = variants(profileFor(n), 24); ['kenyan', 'saltin', 'watson', 'gerschler', 'billat', 'i6030', 'cv'].forEach(function (k) { assert.ok(!v[k], 'L' + n + ' ' + k); }); });
+  var vu = variants(profileFor(6, { goal: goalOf('ultra') }), 24);
+  ['kenyan', 'saltin', 'watson', 'gerschler', 'billat', 'i6030', 'cv'].forEach(function (k) { assert.ok(!vu[k], 'ultra ' + k); });
+  // اسپرینت سربالایی برای گروه C هم هست، ولی نه در هفته‌ی سبک
+  var p6 = profileFor(6), hillW = 0;
+  for (var w = 0; w < 16; w++) { var wk = weekAt(p6, w); wk.days.forEach(function (d) { if (d.hills) { hillW++; assert.notStrictEqual(wk.phase.key, 'deload', 'اسپرینت سربالایی در هفته‌ی سبک'); } }); }
+  assert.ok(hillW >= 2, 'اسپرینت سربالایی گروه C: ' + hillW);
+});
 test('هدف ماراتن: تمپوی بلند، اینتروال پیس ماراتن، فارتلک درازمدت، لانگ‌ران با پایان پیس ماراتن', function () {
   var v = variants(profileFor(6, { goal: goalOf('42') }), 9);
   ['longTempo', 'mpInt', 'longFartlek', 'long:mp'].forEach(function (k) { assert(v[k], k); });
@@ -608,9 +636,9 @@ test('جلسات کیفی اوایل هفته، با حداقل ۴۸ ساعت ف
     });
   });
 });
-test('بدون هدف: چرخه‌ی متنوع در ۱۲ هفته (اینتروال کوتاه، تمپو، فارتلک، تپه، آستانه)', function () {
+test('بدون هدف: چرخه‌ی متنوع در ۱۶ هفته (اینتروال کوتاه، تمپو، فارتلک، تپه، آستانه)', function () {
   [5, 6].forEach(function (n) {
-    var v = variants(profileFor(n), 12);
+    var v = variants(profileFor(n), 16);   // چرخه‌ی ۹ ردیفه (v172)
     ['shortInt', 'tempoRun', 'speedFartlek', 'thresholdInt', 'shortHills'].forEach(function (k) { assert(v[k], 'L' + n + ' ' + k); });
   });
 });
@@ -1947,6 +1975,38 @@ test('شبیه‌ساز ۹: ارتفاع اولترا؛ استراید سربا�
   for (var i = 0; i < 16; i++) v.push(weekAt(steep, i));
   var nd = v.filter(function (x, j) { return j >= 4 && x.phase.key !== 'deload'; }).map(function (x) { return x.vert; });
   assert.ok(nd[nd.length - 1] > nd[0], 'برنامه بزرگ‌تر می‌شه، نه کوچیک‌تر: ' + nd.join(' '));
+});
+test('برگشت از آسیب: از حجم واقعیِ قبل از آسیب، بدون هفته‌ی سبکِ دوره‌ای وسط رمپ (ممیزی v171)', function () {
+  // روی کاغذ ۱۱۰ کیلومتر، در عمل هفته‌ای ۳۰ کیلومتر (تاریخچه)؛ ۱۴ روز توقف
+  var p = profileFor(6, { currentWeeklyKm: 110, goal: goalOf('10') });
+  var inj = C.parseDate('2026-11-28'), ws0 = C.weekStart(inj);
+  p.planLog = {};
+  for (var i = 1; i <= 6; i++) p.planLog[C.dateKey(C.addDays(ws0, -7 * i))] = { km: 30, vert: 0, sv: 0, ph: 'build' };
+  p.injuries = [{ id: 'i1', area: 'shin', label: 'شین', start: '2026-11-28', stopUntil: '2026-12-12', setbacks: [] }];
+  var ramp = [];
+  for (var w = 0; w < 16; w++) {
+    var day = C.addDays(ws0, 7 * w), ip = C.injuryPhase(p, day);
+    if (!ip || ip.phase !== 'ramp') continue;
+    var wk = C.buildWeek(p, day);
+    assert.ok(wk.totalKm <= 30 + 0.5, 'هفته‌ی رمپ ' + w + ': ' + wk.totalKm + ' > ۳۰ قبل از آسیب');
+    assert.notStrictEqual(wk.phase.key, 'deload', 'هفته‌ی سبک وسط رمپ (هفته‌ی ' + w + ')');
+    ramp.push(wk.volumeTarget);
+  }
+  assert.ok(ramp.length >= 3, 'هفته‌های رمپ: ' + ramp.length);
+  for (var j = 1; j < ramp.length; j++) assert.ok(ramp[j] >= ramp[j - 1] - 0.25, 'رمپ کم نشه: ' + ramp.join(' → '));
+});
+test('هفته‌ی خیلی کم‌حجم: جلسه‌ی کیفی جای دویدن آسون رو نمی‌گیره و لانگ‌ران بیش از نصف هفته نمی‌شه (ممیزی v171)', function () {
+  // سطح ۳ با ۴ روز، ولی تاریخچه حجم رو حدود ۱۳ کیلومتر نگه داشته
+  var p = profileFor(3, { days: [0, 1, 4, 6] }), ws = C.weekStart(C.parseDate('2026-12-12'));
+  p.planLog = {};
+  for (var i = 1; i <= 3; i++) p.planLog[C.dateKey(C.addDays(ws, -7 * i))] = { km: 12, vert: 0, sv: 0, ph: 'build' };
+  var wk = C.buildWeek(p, ws);
+  var runs = wk.days.filter(function (d) { return d.km > 0; });
+  var longest = Math.max.apply(null, runs.map(function (d) { return d.km; }));
+  assert.ok(wk.totalKm < 15, 'هفته‌ی کم‌حجم: ' + wk.totalKm);
+  assert.ok(runs.length >= 3, 'حداقل ۳ دویدن: ' + runs.map(function (d) { return d.type + ':' + d.km; }).join(' '));
+  assert.ok(longest <= wk.totalKm * 0.5 + 0.25, 'بلندترین دویدن ' + longest + ' از ' + wk.totalKm);
+  runs.forEach(function (d) { assert.ok(d.km >= 3, 'دویدن کمتر از ۳ کیلومتر: ' + d.km); });
 });
 test('برگشت بعد از مسابقه از حجم واقعیِ قبل از مسابقه، نه از بیشترین ۱۲ هفته یا حجم نظری (ممیزی، v170)', function () {
   // دونده‌ی پرحجم روی کاغذ (۱۱۰ کیلومتر) که در عمل هفته‌ای ۴۰ کیلومتر دویده؛ یک هفته‌ی قدیمی ۷۰ کیلومتری هم در ۱۲ هفته‌ی اخیر هست
